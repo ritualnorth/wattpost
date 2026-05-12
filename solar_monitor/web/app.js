@@ -776,7 +776,6 @@ function renderCells() {
 
   // Hide the panel entirely if we have nothing to show — scenario B users
   // (shunt + dumb packs) have no cell data anywhere on the system.
-  const panel = $("#panel-cells");
   if (batteries.length === 0 || allV.length === 0) {
     if (panel) panel.hidden = true;
     return;
