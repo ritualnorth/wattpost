@@ -571,9 +571,81 @@ main {
   padding: 0 .25rem;
 }
 @media (max-width: 720px) {
-  .flow { flex-direction: column; }
-  .flow-col { width: 100%; }
-  .flow-conn { width: 100%; min-height: 36px; }
+  /* Portrait phones: stack vertically AND rotate the arrows 90° so the
+   * flow direction reads top → bottom. Source above the bank, bank above
+   * the load, with proper down-pointing arrows + vertical animated dots. */
+  .flow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .flow-col {
+    width: 100%;
+  }
+  .flow-conn {
+    width: auto;
+    min-height: 0;
+    height: 58px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    align-self: stretch;
+    padding: 0;
+  }
+  .flow-arrow {
+    width: 24px;
+    height: 100%;
+    position: relative;
+  }
+  /* Vertical line from top to bottom of the connector */
+  .flow-arrow::before {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 8px;
+    left: 50%;
+    width: 2px;
+    height: auto;
+    background: var(--border-2);
+    transform: translateX(-50%);
+  }
+  /* Down-pointing arrowhead at the bottom */
+  .flow-arrow::after {
+    content: "";
+    position: absolute;
+    left: 50%; bottom: 0; top: auto; right: auto;
+    width: 0; height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--border-2);
+    border-bottom: 0;
+    transform: translateX(-50%);
+  }
+  .flow-arrow.active::before {
+    background: linear-gradient(180deg, var(--from), var(--to));
+  }
+  .flow-arrow.active::after {
+    border-top-color: var(--to);
+    border-left-color: transparent;
+  }
+  /* Animated dot travels top → bottom along the line */
+  .flow-arrow.active .dot {
+    left: 50%;
+    top: 0;
+    transform: translate(-50%, 0);
+    animation: flow-dot-v 1.8s linear infinite;
+  }
+  @keyframes flow-dot-v {
+    from { top: 0%;   opacity: 0; }
+    10%  {            opacity: 1; }
+    90%  {            opacity: 1; }
+    to   { top: calc(100% - 12px); opacity: 0; }
+  }
+  .flow-arrow-label {
+    font-family: var(--mono);
+    font-size: .82rem;
+    color: var(--text-2);
+  }
 }
 .flow-arrow {
   width: 100%;
