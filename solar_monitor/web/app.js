@@ -1157,16 +1157,21 @@ function drawChart(label, metric, data) {
         stroke: "#6b7689",
         grid:  { stroke: "rgba(106,118,137,0.08)" },
         ticks: { stroke: "rgba(106,118,137,0.15)" },
-        space: 28,
-        // Wider left gutter so 3-4 character labels like "300 Ah" / "2.1kW"
-        // don't get clipped against the panel edge.
-        size: 64,
+        // Fewer ticks, more vertical space per tick — keeps labels
+        // breathable and lets us afford slightly longer text.
+        space: 36,
+        // Computed below from the actual longest label.
+        size: (u, values, axisIdx, cycleNum) => {
+          if (!values || !values.length) return 56;
+          // Rough monospace metric: ~7.5 px per char @ 11 px font.
+          const longest = values.reduce((m, s) => Math.max(m, (s || "").length), 0);
+          return Math.max(48, Math.min(112, longest * 7.5 + 14));
+        },
         values: (_u, splits) => {
           // Pick decimals based on the smallest gap between consecutive
-          // ticks — guarantees each label is distinct regardless of the
-          // overall magnitude. e.g. 246.79 / 246.80 / 246.81 → "246.79"
-          // instead of three "247"s; 13.20 / 13.30 → "13.2" / "13.3"; 0
-          // / 500 / 1000 → "0" / "500" / "1000".
+          // ticks — guarantees each tick is distinct. Cap at 3 decimals so
+          // tiny-noise data (e.g. bank Ah jiggling in the third decimal)
+          // doesn't produce 11-character monster labels like "246.8120 Ah".
           let minDelta = Infinity;
           for (let i = 1; i < splits.length; i++) {
             const d = Math.abs(splits[i] - splits[i - 1]);
@@ -1177,8 +1182,7 @@ function drawChart(label, metric, data) {
             if      (minDelta >= 10)    decimals = 0;
             else if (minDelta >= 1)     decimals = 1;
             else if (minDelta >= 0.1)   decimals = 2;
-            else if (minDelta >= 0.01)  decimals = 3;
-            else                         decimals = 4;
+            else                         decimals = 3;  // capped here
           }
           return splits.map(v => {
             if (v == null) return "";
