@@ -243,6 +243,22 @@ class Store:
                         num_rows.append((ts, label, k, val))
                         latest_num.append((label, k, ts, val))
 
+        # ----- Bank pseudo-device aggregate -----
+        # Compute and persist bank-level metrics under device="bank" so the
+        # existing history endpoint can chart bank.soc_pct, bank.power_w,
+        # bank.voltage_v, etc. the same way it charts a real device.
+        #
+        # Source preference: a shunt (if present) wins over smart-battery
+        # summation — matches the JS bank-aggregate logic.
+        bank = self._compute_bank_aggregate(devices)
+        if bank:
+            for k, val in bank.items():
+                if val is None:
+                    continue
+                num_rows.append((ts, "bank", k, float(val)))
+                latest_num.append(("bank", k, ts, float(val)))
+            device_meta_rows.append(("bank", "internal", "bank", None, ts))
+
         db = self._db
         try:
             if num_rows:
@@ -289,6 +305,77 @@ class Store:
         except Exception:
             await db.rollback()
             raise
+
+    def _compute_bank_aggregate(self, devices: dict[str, dict]) -> dict[str, float] | None:
+        """Compute bank-level aggregate metrics from one poll's per-device
+        snapshot. Shunt wins for V/I/SoC if present; otherwise sum across
+        smart batteries. Returns None if there's nothing to aggregate.
+        """
+        shunt = next((d for d in devices.values()
+                      if d and d.get("_kind") == "shunt"), None)
+        batts = [d for d in devices.values()
+                 if d and d.get("_kind") == "smart_battery"]
+
+        if shunt is not None:
+            l = shunt
+            v = float(l.get("voltage_v") or 0)
+            i = float(l.get("current_a") or 0)
+            cap = float(l.get("bank_capacity_ah") or l.get("capacity_ah") or 0)
+            rem = float(l.get("remaining_ah") or (cap * (float(l.get("soc_pct") or 0) / 100)))
+            soc = float(l.get("soc_pct") or (rem / cap * 100 if cap else 0))
+            power_w = float(l.get("power_w") if l.get("power_w") is not None else v * i)
+            return {
+                "voltage_v": v,
+                "current_a": i,
+                "power_w": power_w,
+                "soc_pct": soc,
+                "remaining_ah": rem,
+                "capacity_ah": cap,
+                "pack_count": float(len(batts)),
+            }
+
+        if not batts:
+            return None
+
+        sum_v = sum(float(b.get("voltage_v") or 0) for b in batts)
+        sum_i = sum(float(b.get("current_a") or 0) for b in batts)
+        total_cap = sum(float(b.get("capacity_ah") or 0) for b in batts)
+        total_rem = sum(float(b.get("remaining_charge_ah") or 0) for b in batts)
+        mean_v = sum_v / len(batts) if batts else 0
+        soc = (total_rem / total_cap * 100) if total_cap else 0
+        power_w = mean_v * sum_i
+
+        # Worst-pack drift across the bank — a single number that signals
+        # "any pack imbalance worth investigating" when charted over time.
+        worst_drift = 0.0
+        all_cell_min = None
+        all_cell_max = None
+        for b in batts:
+            n = int(b.get("cell_count") or 0)
+            cells = []
+            for j in range(n):
+                cv = b.get(f"cell_voltage_{j}_v")
+                if isinstance(cv, (int, float)):
+                    cells.append(float(cv))
+            if cells:
+                pmin, pmax = min(cells), max(cells)
+                worst_drift = max(worst_drift, pmax - pmin)
+                all_cell_min = pmin if all_cell_min is None else min(all_cell_min, pmin)
+                all_cell_max = pmax if all_cell_max is None else max(all_cell_max, pmax)
+
+        out: dict[str, float] = {
+            "voltage_v": mean_v,
+            "current_a": sum_i,
+            "power_w": power_w,
+            "soc_pct": soc,
+            "remaining_ah": total_rem,
+            "capacity_ah": total_cap,
+            "pack_count": float(len(batts)),
+            "worst_pack_drift_v": worst_drift,
+        }
+        if all_cell_min is not None: out["cell_min_v"] = all_cell_min
+        if all_cell_max is not None: out["cell_max_v"] = all_cell_max
+        return out
 
     # ---------- reads ----------
 

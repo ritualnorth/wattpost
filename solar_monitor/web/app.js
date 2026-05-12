@@ -892,7 +892,11 @@ async function ensureLifetime(label) {
 function renderDeviceCards() {
   const host = $("#device-cards");
   host.innerHTML = "";
-  for (const dev of devices) {
+  // Don't show the synthetic "bank" pseudo-device on the Devices tab —
+  // it's an aggregate, not real hardware. It still appears in the History
+  // dropdown so users can chart bank.soc_pct / .power_w / etc.
+  const visible = devices.filter(d => d.kind !== "bank");
+  for (const dev of visible) {
     const l = dev.latest || {};
     const card = document.createElement("a");
     card.className = `dev-card kind-${dev.kind}`;
@@ -989,16 +993,26 @@ function headlineKeys(kind, l) {
 // ---------- history chart ----------
 function populateChartSelectors() {
   const dSel = $("#sel-device");
-  const mSel = $("#sel-metric");
   const prevDevice = dSel.value;
-  const prevMetric = mSel.value;
+  const prevMetric = $("#sel-metric").value;
   dSel.innerHTML = "";
-  for (const d of devices) {
+
+  // Bank first (most useful default), then real devices in their natural order.
+  const bank = devices.find(d => d.kind === "bank");
+  const others = devices.filter(d => d.kind !== "bank");
+  const ordered = bank ? [bank, ...others] : others;
+
+  for (const d of ordered) {
     const opt = document.createElement("option");
-    opt.value = d.label; opt.textContent = d.label;
+    opt.value = d.label;
+    opt.textContent = d.kind === "bank" ? "Bank (aggregate)" : d.label;
     dSel.appendChild(opt);
   }
-  if (prevDevice && devices.find(d => d.label === prevDevice)) dSel.value = prevDevice;
+  if (prevDevice && devices.find(d => d.label === prevDevice)) {
+    dSel.value = prevDevice;
+  } else if (bank) {
+    dSel.value = bank.label;
+  }
   onDeviceChanged(prevMetric);
 }
 
@@ -1017,8 +1031,9 @@ function onDeviceChanged(preferMetric) {
     mSel.appendChild(opt);
   }
   if (preferMetric && numericMetrics.includes(preferMetric)) mSel.value = preferMetric;
+  else if (dev?.kind === "bank" && numericMetrics.includes("soc_pct"))             mSel.value = "soc_pct";
   else if (dev?.kind === "charge_controller" && numericMetrics.includes("pv_power_w")) mSel.value = "pv_power_w";
-  else if (dev?.kind === "smart_battery" && numericMetrics.includes("voltage_v")) mSel.value = "voltage_v";
+  else if (dev?.kind === "smart_battery" && numericMetrics.includes("voltage_v"))  mSel.value = "voltage_v";
   refreshChart();
 }
 
