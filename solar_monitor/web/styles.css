@@ -975,6 +975,11 @@ main {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
 }
+/* `display: flex` above overrides the HTML `hidden` attribute,
+ * so we have to opt back into hiding when the attribute is set. */
+.custom-range[hidden] {
+  display: none;
+}
 .custom-range label {
   display: flex; flex-direction: column; gap: .2rem;
   font-size: .72rem;
