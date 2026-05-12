@@ -172,29 +172,30 @@ body {
 }
 @media (max-width: 600px) {
   /* Equal-width tabs across the full viewport on phones — no horizontal
-   * scroll. The desktop padding/gap was eating the room for the 4th tab. */
+   * scroll, no edge-flush tabs, no truncated labels.
+   *
+   * Icons are hidden at this breakpoint so the longest label
+   * ("Dashboard") fits its 25% share without ellipsis. The active tab
+   * remains obvious via its blue underline + text colour.
+   */
   .app-nav {
-    padding: 0;
+    padding: 0 .5rem;
     gap: 0;
   }
   .nav-tab {
     flex: 1 1 0;
     justify-content: center;
-    gap: .35rem;
-    padding: .8rem .35rem .7rem;
-    font-size: .8rem;
+    gap: 0;
+    padding: .85rem .35rem .7rem;
+    font-size: .85rem;
     min-width: 0;
   }
-  .nav-tab svg { width: 15px; height: 15px; }
+  .nav-tab svg { display: none; }
   .nav-tab span {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
-}
-@media (max-width: 380px) {
-  /* Very narrow phones: hide the icons rather than truncate the labels. */
-  .nav-tab svg { display: none; }
-  .nav-tab { gap: 0; font-size: .82rem; }
 }
 
 /* ---------------- routes ---------------- */
