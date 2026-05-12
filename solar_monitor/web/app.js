@@ -505,6 +505,20 @@ function buildFlowModel() {
         inferred: visibleSourcesActive,
         sub: visibleSourcesActive ? "from energy balance" : null,
       });
+    } else if (loads.length === 0) {
+      // Nothing visible AND inferred is below threshold — the bus is
+      // genuinely idle. Show a placeholder Load tile so the strip stays
+      // symmetric with always-visible Sources, and the user can see at a
+      // glance that the system is monitoring loads (not broken).
+      loads.push({
+        id: "_load_idle",
+        label: "Load",
+        color: "dc",
+        icon: "house",
+        power: 0,
+        active: false,
+        sub: "idle",
+      });
     }
   }
 
