@@ -404,10 +404,17 @@ function buildFlowModel() {
         batteryNetW += l.power_w;
       }
     }
+    // Sources: ALWAYS render configured sources, even when they're at 0 W.
+    // A user who's set up an MPPT wants to see it on the dashboard at all
+    // times — "0 W idle" is informative; hiding the tile makes the system
+    // look misconfigured.
     for (const s of mapping.sources || []) {
       if (s.onlyIf && !s.onlyIf(l)) continue;
       const w = +l[s.metric] || 0;
-      if (w <= 0 && !s.onlyIf) continue;
+      const subParts = [
+        typeof l[s.vMetric] === "number" ? `${l[s.vMetric].toFixed(1)} V` : null,
+        typeof l[s.aMetric] === "number" ? `${l[s.aMetric].toFixed(2)} A` : null,
+      ].filter(Boolean);
       sources.push({
         id: `${dev.label}.${s.id}`,
         label: s.label,
@@ -416,12 +423,14 @@ function buildFlowModel() {
         icon: s.icon || COLOR_TO_ICON[s.color],
         power: w,
         active: w > 1,
-        sub: [
-          typeof l[s.vMetric] === "number" ? `${l[s.vMetric].toFixed(1)} V` : null,
-          typeof l[s.aMetric] === "number" ? `${l[s.aMetric].toFixed(2)} A` : null,
-        ].filter(Boolean).join(" · "),
+        // When the source is idle, say so explicitly rather than just
+        // showing V/A (which can look like the device is broken).
+        sub: w > 0 ? subParts.join(" · ") : (subParts.length ? `${subParts.join(" · ")} · idle` : "idle"),
       });
     }
+    // Loads: keep the onlyIf filter — the Rover's load output really is
+    // off for most users, and showing "DC Load: 0 W idle" would be clutter,
+    // not signal. Inferred bus-loads are still surfaced separately below.
     for (const lo of mapping.loads || []) {
       if (lo.onlyIf && !lo.onlyIf(l)) continue;
       const w = +l[lo.metric] || 0;
@@ -519,8 +528,10 @@ function renderFlow() {
   const totalSourceW = model.sources.reduce((a, s) => a + s.power, 0);
   const totalLoadW   = model.loads.reduce((a, l) => a + l.power, 0);
 
-  // Idle state — no sources, no loads, just the battery. Render a single
-  // calm tile centered, no skeleton placeholders, no useless arrows.
+  // With configured sources always present, "no sources AND no loads" is
+  // only true when the user genuinely hasn't set up any source/load
+  // devices (e.g. battery-only topology — bank shunt and dumb packs).
+  // In that case still show a clean centered battery tile.
   if (!hasSources && !hasLoads) {
     host.classList.add("flow--idle");
     const battCol = document.createElement("div");
@@ -534,11 +545,11 @@ function renderFlow() {
         power: b.netW,
         signed: true,
         active: false,
-        sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V · system idle`,
+        sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V`,
       }));
     }
     host.appendChild(battCol);
-    sub.textContent = "system idle";
+    sub.textContent = "no sources or loads configured";
     return;
   }
   host.classList.remove("flow--idle");
