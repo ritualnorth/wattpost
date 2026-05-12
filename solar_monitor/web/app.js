@@ -1160,23 +1160,30 @@ function drawChart(label, metric, data) {
         // don't get clipped against the panel edge.
         size: 64,
         values: (_u, splits) => {
-          // Detect a narrow data range so we don't print "13.2 V" three
-          // times in a row. If consecutive splits differ by less than 1
-          // at the current magnitude, bump to 2 decimals.
-          let needsExtra = false;
+          // Pick decimals based on the smallest gap between consecutive
+          // ticks — guarantees each label is distinct regardless of the
+          // overall magnitude. e.g. 246.79 / 246.80 / 246.81 → "246.79"
+          // instead of three "247"s; 13.20 / 13.30 → "13.2" / "13.3"; 0
+          // / 500 / 1000 → "0" / "500" / "1000".
+          let minDelta = Infinity;
           for (let i = 1; i < splits.length; i++) {
             const d = Math.abs(splits[i] - splits[i - 1]);
-            if (d > 0 && d < 1) { needsExtra = true; break; }
+            if (d > 0) minDelta = Math.min(minDelta, d);
+          }
+          let decimals = 0;
+          if (isFinite(minDelta)) {
+            if      (minDelta >= 10)    decimals = 0;
+            else if (minDelta >= 1)     decimals = 1;
+            else if (minDelta >= 0.1)   decimals = 2;
+            else if (minDelta >= 0.01)  decimals = 3;
+            else                         decimals = 4;
           }
           return splits.map(v => {
             if (v == null) return "";
             const abs = Math.abs(v);
             let txt;
-            if (abs >= 1000)      txt = (v / 1000).toFixed(1) + "k";
-            else if (abs >= 100)  txt = v.toFixed(0);
-            else if (needsExtra)  txt = v.toFixed(2);
-            else if (abs >= 10)   txt = v.toFixed(1);
-            else                  txt = v.toFixed(2);
+            if (abs >= 1000) txt = (v / 1000).toFixed(Math.max(1, decimals - 1)) + "k";
+            else             txt = v.toFixed(decimals);
             return unit ? `${txt} ${unit}` : txt;
           });
         },
