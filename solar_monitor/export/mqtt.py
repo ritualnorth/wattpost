@@ -33,6 +33,61 @@ _META_KEYS = {"_vendor", "_kind", "_label", "_slave_id", "_errors"}
 # per-metric topics (those would be redundant or noisy).
 _TOPIC_SKIP = _META_KEYS
 
+# Identifying metadata fields that live on the latest snapshot but aren't
+# numeric sensors — used to enrich the HA `device` block, not published as
+# sensors.
+_HA_DEVICE_META = {"model", "serial", "firmware_version", "device_id"}
+
+
+def _ha_sensor_meta(metric: str) -> dict[str, str]:
+    """Map a snake_case metric name → Home Assistant discovery hints
+    (device_class, unit, state_class). We're conservative: only emit a
+    device_class when it lines up with HA's enum, otherwise just set the
+    unit so the value still renders correctly."""
+    m = metric.lower()
+    # SoC is a special case — HA classifies as "battery" with % unit.
+    if m == "soc_pct":
+        return {"device_class": "battery", "unit_of_measurement": "%",
+                "state_class": "measurement"}
+    if m.endswith("_v"):
+        return {"device_class": "voltage", "unit_of_measurement": "V",
+                "state_class": "measurement"}
+    if m.endswith("_a"):
+        return {"device_class": "current", "unit_of_measurement": "A",
+                "state_class": "measurement"}
+    if m.endswith("_w"):
+        return {"device_class": "power", "unit_of_measurement": "W",
+                "state_class": "measurement"}
+    if m.endswith("_c"):
+        return {"device_class": "temperature", "unit_of_measurement": "°C",
+                "state_class": "measurement"}
+    if m.endswith("_pct"):
+        # Non-SoC percentages: no HA device_class fits, keep unit only.
+        return {"unit_of_measurement": "%", "state_class": "measurement"}
+    if m.endswith("_ah"):
+        # Amp-hours — no HA class; total_increasing for counters, but our
+        # _ah metrics are instantaneous (remaining/capacity), so measurement.
+        return {"unit_of_measurement": "Ah", "state_class": "measurement"}
+    if m.endswith("_hz"):
+        return {"device_class": "frequency", "unit_of_measurement": "Hz",
+                "state_class": "measurement"}
+    if m.endswith("_count"):
+        return {"state_class": "measurement"}
+    return {}
+
+
+_UNIT_SUFFIXES = {"v", "a", "w", "c", "ah", "wh", "pct", "hz"}
+
+
+def _ha_name(metric: str) -> str:
+    """Pretty entity name. HA prepends the device name when grouped, so
+    we just describe the metric — strip a trailing unit suffix so we
+    don't get "Voltage V" (HA already shows the unit separately)."""
+    parts = metric.split("_")
+    if parts and parts[-1].lower() in _UNIT_SUFFIXES:
+        parts = parts[:-1]
+    return " ".join(parts).title() if parts else metric.replace("_", " ").title()
+
 
 class MqttExporter(Exporter):
     def __init__(
@@ -47,6 +102,9 @@ class MqttExporter(Exporter):
         qos: int = 0,
         retain: bool = True,
         publish_per_metric: bool = True,
+        ha_discovery: bool = False,
+        ha_discovery_prefix: str = "homeassistant",
+        ha_node_id: str = "solar_monitor",
     ) -> None:
         self.id = id
         self.host = host
@@ -58,10 +116,21 @@ class MqttExporter(Exporter):
         self.qos = qos
         self.retain = retain
         self.publish_per_metric = publish_per_metric
+        # Home Assistant MQTT discovery: when on, publish a
+        # `<ha_prefix>/sensor/<node>/<label>_<metric>/config` payload the
+        # first time we see a given (device, metric) pair, pointing HA at
+        # the state topic we're already publishing.
+        self.ha_discovery = ha_discovery
+        self.ha_discovery_prefix = ha_discovery_prefix.rstrip("/")
+        self.ha_node_id = ha_node_id
 
         self._queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=64)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+        # (device_label, metric) pairs whose discovery config we've already
+        # published this connection. Cleared on reconnect so transient
+        # broker outages don't strand HA without configs.
+        self._ha_published: set[tuple[str, str]] = set()
 
     # ---- Exporter API ----
 
@@ -119,6 +188,10 @@ class MqttExporter(Exporter):
                 ) as client:
                     log.info("[%s] connected to %s:%d", self.id, self.host, self.port)
                     backoff = 1.0
+                    # Re-publish HA discovery configs on each reconnect — the
+                    # broker may have lost retained messages, or HA may have
+                    # been reconfigured since last time.
+                    self._ha_published.clear()
                     await client.publish(
                         f"{self.topic_prefix}/_status",
                         payload="online",
@@ -206,6 +279,65 @@ class MqttExporter(Exporter):
                         qos=self.qos,
                         retain=self.retain,
                     )
+                    if self.ha_discovery and isinstance(v, (int, float)):
+                        # Identity strings (model/serial/firmware) get
+                        # rolled into the HA `device` block, not a sensor.
+                        if k in _HA_DEVICE_META:
+                            continue
+                        await self._publish_ha_discovery(client, label, k, data)
+
+    async def _publish_ha_discovery(
+        self, client: aiomqtt.Client, label: str, metric: str, data: dict[str, Any]
+    ) -> None:
+        """Publish a Home Assistant MQTT-discovery config for one sensor.
+        Runs at most once per (device, metric) per connection."""
+        key = (label, metric)
+        if key in self._ha_published:
+            return
+        self._ha_published.add(key)
+
+        unique_id = f"{self.ha_node_id}_{label}_{metric}"
+        # Same topic id slot so HA can clean up cleanly via an empty payload.
+        config_topic = (
+            f"{self.ha_discovery_prefix}/sensor/"
+            f"{self.ha_node_id}/{label}_{metric}/config"
+        )
+        state_topic = f"{self.topic_prefix}/{label}/{metric}"
+        device_block: dict[str, Any] = {
+            "identifiers": [f"{self.ha_node_id}_{label}"],
+            "name": label.replace("_", " ").title(),
+            "manufacturer": "WattPost",
+        }
+        # Surface model / serial / firmware from the latest snapshot if
+        # the driver exposed them — HA will group entities by device.
+        model = data.get("model")
+        if isinstance(model, str) and model:
+            device_block["model"] = model
+        serial = data.get("serial")
+        if isinstance(serial, str) and serial:
+            device_block["serial_number"] = serial
+        fw = data.get("firmware_version")
+        if isinstance(fw, str) and fw:
+            device_block["sw_version"] = fw
+
+        config: dict[str, Any] = {
+            "name": _ha_name(metric),
+            "state_topic": state_topic,
+            "unique_id": unique_id,
+            "object_id": f"{label}_{metric}",
+            "value_template": "{{ value }}",
+            "availability_topic": f"{self.topic_prefix}/_status",
+            "payload_available": "online",
+            "payload_not_available": "offline",
+            "device": device_block,
+            **_ha_sensor_meta(metric),
+        }
+        await client.publish(
+            config_topic,
+            payload=json.dumps(config),
+            qos=self.qos,
+            retain=True,  # discovery configs are always retained — HA convention
+        )
 
 
 @register_exporter("mqtt")
@@ -224,6 +356,13 @@ def _factory(cfg: dict) -> MqttExporter:
       qos: default 0
       retain: default true
       publish_per_metric: default true
+      ha_discovery: default false — when true, publishes Home Assistant
+        MQTT-discovery configs so HA auto-creates one sensor per metric
+        on top of the existing per-metric topics.
+      ha_discovery_prefix: default "homeassistant" (HA convention)
+      ha_node_id: default "solar_monitor" — used in the unique_id and the
+        HA device identifier so multiple WattPost units on the same broker
+        don't collide.
     """
     return MqttExporter(
         id=cfg["id"],
@@ -236,4 +375,7 @@ def _factory(cfg: dict) -> MqttExporter:
         qos=int(cfg.get("qos", 0)),
         retain=bool(cfg.get("retain", True)),
         publish_per_metric=bool(cfg.get("publish_per_metric", True)),
+        ha_discovery=bool(cfg.get("ha_discovery", False)),
+        ha_discovery_prefix=cfg.get("ha_discovery_prefix", "homeassistant"),
+        ha_node_id=cfg.get("ha_node_id", "solar_monitor"),
     )
