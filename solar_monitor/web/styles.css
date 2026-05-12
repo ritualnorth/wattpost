@@ -999,14 +999,5 @@ main {
   line-height: 1.45;
 }
 
-footer {
-  text-align: center;
-  color: var(--text-3);
-  padding: 2rem 1rem 3rem;
-  font-size: .78rem;
-}
-footer span:not(:last-child)::after {
-  content: "·";
-  margin: 0 .5rem;
-  color: var(--border-2);
-}
+/* footer removed — version + identity already live in Settings → About */
+main { padding-bottom: 3rem; }
