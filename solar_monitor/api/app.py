@@ -9,15 +9,17 @@ and runs uvicorn.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 from litestar import Litestar, get
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.exceptions import NotFoundException
-from litestar.response import File
+from litestar.response import File, Stream
 from litestar.static_files import create_static_files_router
 
 from ..config import Config
@@ -120,6 +122,53 @@ async def device_history(
     }
 
 
+@get("/api/stream")
+async def stream(state: State) -> Stream:
+    """Server-Sent Events: pushes a full snapshot to the SPA on connect,
+    then again after every successful poll cycle. The client opens an
+    EventSource and replaces its 5s polling tick with this stream.
+
+    Snapshot payload is the union of /api/devices + /api/poll_run +
+    /api/today so we hand the SPA everything it currently fetches in
+    three round-trips, in one frame."""
+    scheduler: PollScheduler = state["scheduler"]
+
+    async def gen() -> AsyncIterator[bytes]:
+        q = scheduler.subscribe()
+        try:
+            # Initial frame so the page never sees a blank dashboard.
+            try:
+                first = await scheduler.build_snapshot()
+                yield f"data: {json.dumps(first)}\n\n".encode("utf-8")
+            except Exception:
+                # Don't tear down the stream just because the first snapshot
+                # failed — keep the connection alive and let the next poll
+                # fire the first real event.
+                pass
+
+            # Stream subsequent broadcasts. A 25s heartbeat keeps the
+            # connection warm through reverse proxies (Cloudflare, nginx)
+            # that idle-close silent connections.
+            while True:
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=25)
+                    yield f"data: {json.dumps(payload)}\n\n".encode("utf-8")
+                except asyncio.TimeoutError:
+                    yield b": keepalive\n\n"
+        finally:
+            scheduler.unsubscribe(q)
+
+    return Stream(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @get("/", sync_to_thread=False)
 def index() -> File:
     path = _web_dir() / "index.html"
@@ -162,6 +211,7 @@ def build_app(config: Config, db_path: str, interval_seconds: int = 60) -> Lites
             device_history,
             device_lifetime,
             load_heatmap,
+            stream,
             index,
             static_router,
         ],
