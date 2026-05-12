@@ -3,10 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#0a0d12" />
+  <meta name="theme-color" content="#0a0d12" id="meta-theme-color" />
   <title>WattPost</title>
+  <!-- Resolve theme before stylesheets paint so there's no flash of the
+       wrong palette. The preference is "system" | "dark" | "light";
+       in "system" mode we honour prefers-color-scheme. -->
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem("wp-theme") || "system";
+        var resolved = pref === "system"
+          ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+          : pref;
+        document.documentElement.setAttribute("data-theme", resolved);
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=42" />
+  <link rel="stylesheet" href="/web/styles.css?v=46" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -17,14 +33,13 @@
       <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
            aria-label="WattPost">
-        <!-- Vertical post on the right -->
-        <line x1="18" y1="2" x2="18" y2="22"/>
-        <!-- Rectangular sign attached to the post, extending left.
-             No chamfered point — clean plank, lightning bolt does the
-             visual work. -->
-        <rect x="4" y="5" width="14" height="8" rx="0.6"/>
-        <!-- Lightning bolt centred on the sign -->
-        <path d="M12 6 L8.5 10 L10.5 10 L9 12.5 L13 8.5 L11 8.5 Z"
+        <!-- Roadside sign: rectangular panel on top, two legs going down. -->
+        <rect x="2" y="3" width="20" height="12" rx="1"/>
+        <!-- Two legs supporting the sign -->
+        <line x1="7" y1="15" x2="7" y2="22"/>
+        <line x1="17" y1="15" x2="17" y2="22"/>
+        <!-- Lightning bolt centred on the panel -->
+        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
               fill="currentColor" stroke="none"/>
       </svg>
       <span class="title">WattPost</span>
@@ -301,6 +316,23 @@
             </a>
           </div>
           <div class="settings-block">
+            <h3>Appearance</h3>
+            <div class="theme-picker" role="radiogroup" aria-label="Theme">
+              <button class="theme-opt" data-theme-pref="system" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                <span>System</span>
+              </button>
+              <button class="theme-opt" data-theme-pref="dark" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                <span>Dark</span>
+              </button>
+              <button class="theme-opt" data-theme-pref="light" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                <span>Light</span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-block">
             <h3>Polling</h3>
             <div class="settings-row"><span>Interval</span><span class="v">60 s</span></div>
             <div class="settings-row"><span>Last poll</span><span class="v" id="settings-last-poll">—</span></div>
@@ -335,6 +367,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=42"></script>
+  <script src="/web/app.js?v=46"></script>
 </body>
 </html>

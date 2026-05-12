@@ -49,9 +49,75 @@
   --shadow: 0 2px 16px rgba(0,0,0,0.4);
   --shadow-soft: 0 1px 4px rgba(0,0,0,0.3);
 
+  /* Theme-variable surfaces — overridden in [data-theme="light"] below. */
+  --header-bg:      rgba(13,17,23,0.85);
+  --card-highlight: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%);
+  --chart-grid:     rgba(106,118,137,0.08);
+  --chart-grid-strong: rgba(106,118,137,0.15);
+  --chart-band-fill:rgba(88,166,255,0.12);
+  --chart-accent-fill: rgba(88,166,255,0.16);
+  --chart-amber-fill: rgba(210,153,34,0.15);
+  --body-bg-glow-1: rgba(88,166,255,0.06);
+  --body-bg-glow-2: rgba(63,185,80,0.04);
+
   /* Type */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ===== Light theme overrides =====
+ * The inline script in <head> sets [data-theme="light|dark"] before paint.
+ * Only properties that need to flip live here — everything else inherits
+ * from :root.
+ */
+[data-theme="light"] {
+  --bg:        #f4f6fa;
+  --surface:   #ffffff;
+  --surface-2: #eef1f6;
+  --surface-3: #e1e6ee;
+  --border:    #d6dbe4;
+  --border-2:  #c2c9d5;
+
+  --text:      #11161f;
+  --text-2:    #4d5868;
+  --text-3:    #7a8595;
+
+  /* Source/storage/load colors — deepen slightly so they read on white */
+  --pv:        #b87800;
+  --pv-soft:   rgba(184,120,0,0.10);
+  --batt:      #0969da;
+  --batt-soft: rgba(9,105,218,0.10);
+  --ac:        #1a7f37;
+  --ac-soft:   rgba(26,127,55,0.10);
+  --dc:        #2a8576;
+  --dc-soft:   rgba(42,133,118,0.10);
+  --grid:      #cf222e;
+  --grid-soft: rgba(207,34,46,0.10);
+  --neutral:   #7a8595;
+  --neutral-soft: rgba(122,133,149,0.10);
+
+  --accent:    #0969da;
+  --green:     #1a7f37;
+  --green-soft:#d4edd9;
+  --amber:     #9a6700;
+  --amber-soft:#fbeec0;
+  --red:       #cf222e;
+  --red-soft:  #fbd5d6;
+  --sky:       #2a6fc4;
+  --violet:    #6f42c1;
+
+  --shadow:        0 2px 16px rgba(15,23,42,0.10);
+  --shadow-soft:   0 1px 4px rgba(15,23,42,0.06);
+
+  --header-bg:        rgba(255,255,255,0.85);
+  --card-highlight:   linear-gradient(135deg, rgba(15,23,42,0.025), rgba(15,23,42,0) 60%);
+  --chart-grid:       rgba(60,72,95,0.10);
+  --chart-grid-strong:rgba(60,72,95,0.20);
+  --chart-band-fill:  rgba(9,105,218,0.08);
+  --chart-accent-fill:rgba(9,105,218,0.12);
+  --chart-amber-fill: rgba(154,103,0,0.12);
+  --body-bg-glow-1:   rgba(9,105,218,0.05);
+  --body-bg-glow-2:   rgba(26,127,55,0.04);
 }
 
 * { box-sizing: border-box; }
@@ -62,8 +128,8 @@ body {
   line-height: 1.45;
   color: var(--text);
   background:
-    radial-gradient(1200px 600px at 70% -100px, rgba(88,166,255,0.06), transparent 60%),
-    radial-gradient(800px 400px at 0% 100%, rgba(63,185,80,0.04), transparent 60%),
+    radial-gradient(1200px 600px at 70% -100px, var(--body-bg-glow-1), transparent 60%),
+    radial-gradient(800px 400px at 0% 100%, var(--body-bg-glow-2), transparent 60%),
     var(--bg);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -101,11 +167,11 @@ body {
   align-items: center;
   padding: 0.9rem 1.5rem;
   border-bottom: 1px solid var(--border);
-  background: rgba(13,17,23,0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.brand { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 .brand .logo { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
 .brand .title {
   font-weight: 600;
@@ -161,7 +227,7 @@ body {
   display: flex;
   gap: 0;
   padding: 0 1.5rem;
-  background: rgba(13,17,23,0.85);
+  background: var(--header-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
@@ -239,7 +305,7 @@ main {
   background:
     radial-gradient(circle at 18% 0%, rgba(63,185,80,0.12), transparent 55%),
     radial-gradient(circle at 100% 100%, rgba(88,166,255,0.08), transparent 60%),
-    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--card-highlight),
     var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -253,14 +319,14 @@ main {
   background:
     radial-gradient(circle at 18% 0%, rgba(248,81,73,0.16), transparent 55%),
     radial-gradient(circle at 100% 100%, rgba(248,81,73,0.06), transparent 60%),
-    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--card-highlight),
     var(--surface);
 }
 .hero-v2.soc-mid {
   background:
     radial-gradient(circle at 18% 0%, rgba(210,153,34,0.14), transparent 55%),
     radial-gradient(circle at 100% 100%, rgba(210,153,34,0.05), transparent 60%),
-    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--card-highlight),
     var(--surface);
 }
 @media (max-width: 740px) {
@@ -1396,3 +1462,40 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 
 /* footer removed — version + identity already live in Settings → About */
 main { padding-bottom: 3rem; }
+
+/* ---------------- theme picker (Settings → Appearance) ---------------- */
+.theme-picker {
+  display: flex;
+  gap: .4rem;
+  margin-top: .25rem;
+}
+.theme-opt {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: .65rem .5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text-2);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.08s;
+}
+.theme-opt svg {
+  width: 20px; height: 20px;
+}
+.theme-opt:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.theme-opt:active { transform: scale(0.98); }
+.theme-opt[aria-checked="true"] {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
