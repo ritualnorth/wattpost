@@ -59,3 +59,12 @@ devices:
 #     topic_prefix: solar
 #     retain: true
 #     publish_per_metric: true
+#     # Home Assistant MQTT discovery — when on, the daemon publishes a
+#     # `homeassistant/sensor/<node>/<label>_<metric>/config` payload the
+#     # first time it sees each (device, metric) pair. HA auto-creates the
+#     # sensors and groups them by device. Safe to leave on even without
+#     # an HA install — the discovery configs are tiny retained messages.
+#     ha_discovery: true
+#     ha_discovery_prefix: homeassistant
+#     ha_node_id: solar_monitor   # unique-id namespace; change if running
+#                                  # multiple WattPost units on one broker
