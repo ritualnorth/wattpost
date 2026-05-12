@@ -190,6 +190,55 @@ let currentRange = "24h";
 let lastRun = null;
 let todayAggregate = null;  // /api/today result, refreshed alongside devices
 
+// ---------- theme ----------
+// Preference is "system" | "dark" | "light". The inline <head> script sets
+// the resolved data-theme before paint to avoid FOUC; here we react to
+// Settings changes and OS changes, and republish a CSS-variable palette
+// to whatever renders (charts, heatmap).
+const THEME_KEY = "wp-theme";
+const META_BG = { dark: "#0a0d12", light: "#f4f6fa" };
+function themePref() {
+  try { return localStorage.getItem(THEME_KEY) || "system"; }
+  catch (_) { return "system"; }
+}
+function resolveTheme(pref) {
+  if (pref === "dark" || pref === "light") return pref;
+  return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+function applyTheme(pref) {
+  try { localStorage.setItem(THEME_KEY, pref); } catch (_) {}
+  const resolved = resolveTheme(pref);
+  document.documentElement.setAttribute("data-theme", resolved);
+  const meta = document.getElementById("meta-theme-color");
+  if (meta) meta.setAttribute("content", META_BG[resolved]);
+  document.querySelectorAll(".theme-opt").forEach(btn => {
+    btn.setAttribute("aria-checked", btn.dataset.themePref === pref ? "true" : "false");
+  });
+  // Charts + heatmap bake CSS-derived colours at draw time, so re-run any
+  // visible renderer.
+  const route = currentRouteName?.();
+  if (route === "history") { refreshChart?.(); refreshHeatmap?.(); }
+  else if (route === "dashboard") { refreshDriftSparkline?.(); }
+}
+function chartPalette() {
+  const s = getComputedStyle(document.documentElement);
+  const read = k => s.getPropertyValue(k).trim();
+  return {
+    axis:       read("--text-3")            || "#6b7689",
+    grid:       read("--chart-grid")        || "rgba(106,118,137,0.08)",
+    gridStrong: read("--chart-grid-strong") || "rgba(106,118,137,0.15)",
+    accent:     read("--accent")            || "#58a6ff",
+    accentFill: read("--chart-accent-fill") || "rgba(88,166,255,0.16)",
+    bandFill:   read("--chart-band-fill")   || "rgba(88,166,255,0.12)",
+    amber:      read("--amber")             || "#d29922",
+    amberFill:  read("--chart-amber-fill")  || "rgba(210,153,34,0.15)",
+  };
+}
+// Follow OS palette while in "system" mode.
+matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
+  if (themePref() === "system") applyTheme("system");
+});
+
 // ---------- status header ----------
 function setStatus(cls, text) {
   const el = $("#status");
@@ -1126,6 +1175,7 @@ function drawChart(label, metric, data) {
   //   series[2] = max — invisible line, paired with min by `bands`
   //   series[3] = avg — the visible line
   // Without bands: series[1] = avg, data = [ts, vals]
+  const pal = chartPalette();
   const series = [{}];
   const dataCols = [ts];
   let bands = [];
@@ -1141,16 +1191,16 @@ function drawChart(label, metric, data) {
     });
     dataCols.push(data.min, data.max);
     // Fill between max (series 2) and min (series 1).
-    bands = [{ series: [2, 1], fill: "rgba(88,166,255,0.12)" }];
+    bands = [{ series: [2, 1], fill: pal.bandFill }];
   }
 
   // Main line — last series, always visible.
   series.push({
     label: prettyKey(metric),
-    stroke: "#58a6ff",
+    stroke: pal.accent,
     width: 2,
-    fill: "rgba(88,166,255,0.16)",
-    points: { show: ts.length < 60, size: 4, fill: "#58a6ff", stroke: "#58a6ff" },
+    fill: pal.accentFill,
+    points: { show: ts.length < 60, size: 4, fill: pal.accent, stroke: pal.accent },
     value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
   });
   dataCols.push(vals);
@@ -1172,18 +1222,18 @@ function drawChart(label, metric, data) {
     bands,
     axes: [
       {
-        stroke: "#6b7689",
-        grid:  { stroke: "rgba(106,118,137,0.08)" },
-        ticks: { stroke: "rgba(106,118,137,0.15)" },
+        stroke: pal.axis,
+        grid:  { stroke: pal.grid },
+        ticks: { stroke: pal.gridStrong },
         // Tighter tick spacing so a 6-hour chart shows 1-hour increments
         // (6pm/7pm/8pm/9pm/10pm) rather than just 2-hour bookends.
         space: 45,
         size: 36,
       },
       {
-        stroke: "#6b7689",
-        grid:  { stroke: "rgba(106,118,137,0.08)" },
-        ticks: { stroke: "rgba(106,118,137,0.15)" },
+        stroke: pal.axis,
+        grid:  { stroke: pal.grid },
+        ticks: { stroke: pal.gridStrong },
         // Fewer ticks, more vertical space per tick — keeps labels
         // breathable and lets us afford slightly longer text.
         space: 36,
@@ -1234,7 +1284,7 @@ function drawChart(label, metric, data) {
       chart = new uPlot({
         width, height: 340,
         scales: { x: { time: true } },
-        series: [{}, { label: prettyKey(metric), stroke: "#58a6ff", width: 2, fill: "rgba(88,166,255,0.16)" }],
+        series: [{}, { label: prettyKey(metric), stroke: pal.accent, width: 2, fill: pal.accentFill }],
       }, [ts, vals], root);
     } catch (e2) {
       root.innerHTML = `<div style="padding:1rem;color:var(--red)">Chart render failed: ${e.message}</div>`;
@@ -1276,6 +1326,7 @@ async function refreshDriftSparkline() {
     return;
   }
   root.innerHTML = "";
+  const pal = chartPalette();
   try {
     driftSpark = new uPlot({
       width: Math.max(root.clientWidth, 280),
@@ -1285,11 +1336,11 @@ async function refreshDriftSparkline() {
       legend: { show: false },
       series: [
         {},
-        { stroke: "#d29922", width: 1.5, fill: "rgba(210,153,34,0.15)", points: { show: false } },
+        { stroke: pal.amber, width: 1.5, fill: pal.amberFill, points: { show: false } },
       ],
       axes: [
-        { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.06)" }, space: 80, size: 18 },
-        { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.06)" }, size: 36,
+        { stroke: pal.axis, grid: { stroke: pal.grid }, space: 80, size: 18 },
+        { stroke: pal.axis, grid: { stroke: pal.grid }, size: 36,
           values: (_u, splits) => splits.map(v => v == null ? "" : `${(v*1000).toFixed(0)} mV`) },
       ],
     }, [data.ts, data.values], root);
@@ -1340,12 +1391,14 @@ function drawHeatmap(root, data) {
         html += '<div class="hm-cell hm-cell--empty" title="no data"></div>';
       } else {
         const intensity = Math.min(1, v / max);
-        // HSL yellow→red ramp: hue stays in warm range (60→0), no green
-        // anywhere. Brightness + saturation ramp with intensity so low
-        // values are dim charcoal, high values are vivid red.
-        const hue = 50 - 50 * intensity;           // 50 (warm gold) → 0 (red)
-        const sat = 35 + 60 * intensity;           // 35% → 95%
-        const lig = 18 + 32 * intensity;           // 18% → 50%
+        // HSL warm-gold→red ramp. In dark mode low values start as dim
+        // charcoal and climb to vivid red. In light mode we invert the
+        // brightness ramp so low values are near-white and high values
+        // are saturated red — the same temperature reading on either bg.
+        const hue = 50 - 50 * intensity;
+        const light = document.documentElement.getAttribute("data-theme") === "light";
+        const sat = light ? (40 + 50 * intensity) : (35 + 60 * intensity);
+        const lig = light ? (92 - 40 * intensity) : (18 + 32 * intensity);
         const color = `hsl(${hue}, ${sat}%, ${lig}%)`;
         const label = `${days[d]} ${String(h).padStart(2,"0")}:00 · ${v.toFixed(0)} W avg`;
         html += `<div class="hm-cell hm-cell--data" style="background:${color}" title="${label}"></div>`;
@@ -1416,6 +1469,12 @@ function renderSettings() {
 }
 
 // ---------- wiring ----------
+// Theme picker — System / Dark / Light.
+document.querySelectorAll(".theme-opt").forEach(btn => {
+  btn.addEventListener("click", () => applyTheme(btn.dataset.themePref));
+});
+applyTheme(themePref());  // paints meta-color + button selection state
+
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);
 for (const btn of document.querySelectorAll("[data-range]")) {
@@ -1763,6 +1822,7 @@ function wireDeviceDetailChart(dev) {
     if (devDetailChart) { devDetailChart.destroy(); devDetailChart = null; }
     const unit = unitFromKey(m);
     const width = Math.max(host.clientWidth, 320);
+    const pal = chartPalette();
     try {
       devDetailChart = new uPlot({
         width, height: 320,
@@ -1771,15 +1831,15 @@ function wireDeviceDetailChart(dev) {
           {},
           {
             label: prettyKey(m),
-            stroke: "#58a6ff",
+            stroke: pal.accent,
             width: 2,
-            fill: "rgba(88,166,255,0.16)",
+            fill: pal.accentFill,
             value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
           },
         ],
         axes: [
-          { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.08)" } },
-          { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.08)" },
+          { stroke: pal.axis, grid: { stroke: pal.grid } },
+          { stroke: pal.axis, grid: { stroke: pal.grid },
             values: (_u, splits) => splits.map(v => v == null ? "" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`) },
         ],
       }, [data.ts, data.values], host);
