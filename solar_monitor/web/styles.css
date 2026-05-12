@@ -834,9 +834,8 @@ main {
   color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
 }
 /* ===== History chart panel ===== */
-.chart-panel {
-  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.07), rgba(88,166,255,0) 70%);
-}
+/* No special tint — chart and heatmap panels on the same route share the
+ * default panel background so they read as siblings. */
 
 /* Inline header controls (replaces the stacked label+select layout) */
 .chart-controls > select {
@@ -990,10 +989,9 @@ main {
   font-style: italic;
 }
 
-/* Load heatmap */
-.heatmap-panel {
-  --panel-tint: linear-gradient(135deg, rgba(210,153,34,0.06), rgba(248,81,73,0.03) 70%);
-}
+/* Load heatmap — uses the default panel background like the chart panel
+ * above it, so the two siblings on the History route match. */
+.heatmap-panel { /* no tint */ }
 .heatmap-rows {
   display: flex; flex-direction: column;
   gap: 3px;
