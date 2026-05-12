@@ -1046,7 +1046,10 @@ main {
   height: 8px;
   border-radius: 4px;
   background: linear-gradient(90deg,
-    rgb(60,60,60), rgb(120,120,40), rgb(180,100,30), rgb(255,80,20));
+    hsl(50, 35%, 18%),
+    hsl(35, 65%, 32%),
+    hsl(15, 85%, 45%),
+    hsl(0, 95%, 50%));
 }
 @media (max-width: 540px) {
   .hm-row { grid-template-columns: 28px repeat(24, 1fr); gap: 2px; }

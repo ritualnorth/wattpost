@@ -1169,12 +1169,15 @@ function drawHeatmap(root, data) {
         html += '<div class="hm-cell hm-cell--empty" title="no data"></div>';
       } else {
         const intensity = Math.min(1, v / max);
-        // Off-grid heatmap: yellow → red gradient for load
-        const r = Math.round(60 + 195 * intensity);
-        const g = Math.round(60 + 90 * (1 - intensity));
-        const b = Math.round(60 - 40 * intensity);
+        // HSL yellow→red ramp: hue stays in warm range (60→0), no green
+        // anywhere. Brightness + saturation ramp with intensity so low
+        // values are dim charcoal, high values are vivid red.
+        const hue = 50 - 50 * intensity;           // 50 (warm gold) → 0 (red)
+        const sat = 35 + 60 * intensity;           // 35% → 95%
+        const lig = 18 + 32 * intensity;           // 18% → 50%
+        const color = `hsl(${hue}, ${sat}%, ${lig}%)`;
         const label = `${days[d]} ${String(h).padStart(2,"0")}:00 · ${v.toFixed(0)} W avg`;
-        html += `<div class="hm-cell hm-cell--data" style="background: rgb(${r},${g},${b})" title="${label}"></div>`;
+        html += `<div class="hm-cell hm-cell--data" style="background:${color}" title="${label}"></div>`;
       }
     }
     html += '</div>';
