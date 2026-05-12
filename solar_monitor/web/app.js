@@ -1128,10 +1128,19 @@ function drawChart(label, metric, data) {
   });
   dataCols.push(vals);
 
+  // Auto-fit X scale to actual data — uPlot otherwise extends the visible
+  // range to weird year boundaries when only a tiny slice has data (which
+  // is what's happening on a freshly-seeded daemon).
+  const tsMin = ts.length ? ts[0] : null;
+  const tsMax = ts.length ? ts[ts.length - 1] : null;
+  const xScale = (tsMin != null && tsMax != null && tsMax > tsMin)
+    ? { time: true, range: [tsMin, tsMax] }
+    : { time: true };
+
   const opts = {
     width, height: 340,
     cursor: { drag: { x: true, y: false } },
-    scales: { x: { time: true } },
+    scales: { x: xScale },
     series,
     bands,
     axes: [
@@ -1140,12 +1149,16 @@ function drawChart(label, metric, data) {
         grid:  { stroke: "rgba(106,118,137,0.08)" },
         ticks: { stroke: "rgba(106,118,137,0.15)" },
         space: 60,
+        size: 36,
       },
       {
         stroke: "#6b7689",
         grid:  { stroke: "rgba(106,118,137,0.08)" },
         ticks: { stroke: "rgba(106,118,137,0.15)" },
         space: 28,
+        // Wider left gutter so 3-4 character labels like "300 Ah" / "2.1kW"
+        // don't get clipped against the panel edge.
+        size: 64,
         values: (_u, splits) => {
           // Detect a narrow data range so we don't print "13.2 V" three
           // times in a row. If consecutive splits differ by less than 1
@@ -1251,6 +1264,17 @@ async function refreshHeatmap() {
   try { data = await api("/api/load_heatmap?days=30"); }
   catch (e) { return; }
   drawHeatmap(root, data);
+
+  // Sub-header: how much data is actually in the grid? Empty cells look
+  // like bugs unless the user knows the daemon just hasn't seen them yet.
+  const sub = document.querySelector("#heatmap-sub");
+  if (sub && data?.counts) {
+    let filled = 0, total = 0;
+    for (const row of data.counts) {
+      for (const c of row) { total++; if (c > 0) filled++; }
+    }
+    sub.textContent = `last 30 days · hour × day · ${filled}/${total} cells with data`;
+  }
 }
 
 function drawHeatmap(root, data) {
