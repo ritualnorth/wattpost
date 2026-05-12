@@ -1501,6 +1501,7 @@ function setRoute(_unused) {
   if (route.name === "settings") renderSettings();
   if (route.name === "dashboard") refreshDriftSparkline();
   if (route.name === "device") renderDeviceDetail(route.label);
+  if (route.name === "setup") onEnterSetup();
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 }
 
@@ -1911,6 +1912,185 @@ function wireDeviceDetailChart(dev) {
     });
   }
 }
+
+// ---------- setup wizard ----------
+// Two REST endpoints carry it: /api/setup/transports + /api/setup/probe +
+// /api/setup/add_device. UI is intentionally bare — no modals, no router —
+// just an inline state machine that walks transport → scan → add per row.
+let wizState = { transport: null, scanResults: null, knownKeys: new Set() };
+
+const KIND_LABEL = {
+  smart_battery: "Smart battery",
+  charge_controller: "Charge controller",
+};
+
+function wizKnownKey(transport, slaveId) { return `${transport}::${slaveId}`; }
+
+async function wizLoadTransports() {
+  const host = $("#wiz-transports");
+  try {
+    const [{ transports }, { devices }] = await Promise.all([
+      api("/api/setup/transports"),
+      api("/api/setup/known_devices"),
+    ]);
+    wizState.knownKeys = new Set(devices.map(d => wizKnownKey(d.transport, d.slave_id)));
+    if (!transports.length) {
+      host.innerHTML = `<div class="wiz-empty">No transports configured yet. Add one to <code>config.yaml</code> and restart the daemon.</div>`;
+      return;
+    }
+    host.innerHTML = transports.map(t => `
+      <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${t.id}" ${t.open ? '' : 'disabled'}>
+        <div class="wiz-transport-main">
+          <span class="wiz-transport-id">${t.id}</span>
+          <span class="wiz-transport-addr">${t.address || ''}</span>
+        </div>
+        <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline'}</span>
+      </button>
+    `).join("");
+    host.querySelectorAll(".wiz-transport").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        wizState.transport = btn.dataset.id;
+        host.querySelectorAll(".wiz-transport").forEach(b => b.classList.toggle("active", b === btn));
+        $("#wiz-step-scan").hidden = false;
+        $("#wiz-scan-results").innerHTML = "";
+        $("#wiz-scan-status").textContent = "";
+      });
+    });
+  } catch (e) {
+    host.innerHTML = `<div class="wiz-empty">Could not load transports: ${e.message}</div>`;
+  }
+}
+
+async function wizScan() {
+  if (!wizState.transport) return;
+  const btn = $("#wiz-scan-btn");
+  const status = $("#wiz-scan-status");
+  const host = $("#wiz-scan-results");
+  btn.disabled = true;
+  status.textContent = "Probing slave IDs…";
+  host.innerHTML = "";
+  try {
+    const r = await fetch("/api/setup/probe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transport: wizState.transport }),
+    });
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const data = await r.json();
+    wizState.scanResults = data.results;
+    const alive = data.results.filter(x => x.alive);
+    status.textContent = `${alive.length} device(s) responded out of ${data.results.length} probed`;
+    renderScanResults(alive);
+  } catch (e) {
+    status.textContent = `Scan failed: ${e.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderScanResults(alive) {
+  const host = $("#wiz-scan-results");
+  if (!alive.length) {
+    host.innerHTML = `<div class="wiz-empty">No devices answered. Check the transport is connected and the gear is powered on, then try again.</div>`;
+    return;
+  }
+  host.innerHTML = alive.map(r => {
+    const known = wizState.knownKeys.has(wizKnownKey(wizState.transport, r.slave_id));
+    const kindLbl = KIND_LABEL[r.kind] || r.kind || "Unknown";
+    return `
+      <div class="wiz-row ${known ? 'known' : ''}" data-slave="${r.slave_id}">
+        <div class="wiz-row-main">
+          <div class="wiz-row-title">
+            <span class="wiz-row-slave">#${r.slave_id}</span>
+            <span class="wiz-row-model">${r.model || '—'}</span>
+          </div>
+          <div class="wiz-row-meta">
+            <span class="wiz-tag">${r.vendor || 'unknown vendor'}</span>
+            <span class="wiz-tag">${kindLbl}</span>
+            ${known ? '<span class="wiz-tag wiz-tag--known">already added</span>' : ''}
+          </div>
+        </div>
+        <div class="wiz-row-action">
+          ${known ? '' : `<button class="btn-action btn-action--primary wiz-add-btn">+ Add</button>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+  host.querySelectorAll(".wiz-row").forEach(row => {
+    const btn = row.querySelector(".wiz-add-btn");
+    if (btn) btn.addEventListener("click", () => wizExpandRow(row));
+  });
+}
+
+function wizExpandRow(row) {
+  const slave = +row.dataset.slave;
+  const result = wizState.scanResults.find(r => r.slave_id === slave);
+  if (!result) return;
+  const defaultLabel = result.kind === "smart_battery"
+    ? `battery_${slave - 48 >= 0 && slave - 48 < 16 ? slave - 48 : slave}`
+    : (result.kind === "charge_controller" ? "charge_controller" : `device_${slave}`);
+  row.querySelector(".wiz-row-action").innerHTML = `
+    <form class="wiz-add-form">
+      <input type="text" class="wiz-label" value="${defaultLabel}" placeholder="label" required />
+      <button type="submit" class="btn-action btn-action--primary">Save</button>
+      <button type="button" class="btn-action wiz-cancel">Cancel</button>
+    </form>
+  `;
+  const form = row.querySelector(".wiz-add-form");
+  form.querySelector(".wiz-cancel").addEventListener("click", () => {
+    row.querySelector(".wiz-row-action").innerHTML = `<button class="btn-action btn-action--primary wiz-add-btn">+ Add</button>`;
+    row.querySelector(".wiz-add-btn").addEventListener("click", () => wizExpandRow(row));
+  });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const label = form.querySelector(".wiz-label").value.trim();
+    if (!label) return;
+    const save = form.querySelector("button[type='submit']");
+    save.disabled = true;
+    save.textContent = "Saving…";
+    try {
+      const r = await fetch("/api/setup/add_device", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transport: wizState.transport,
+          vendor: result.vendor,
+          kind: result.kind,
+          slave_id: slave,
+          label,
+        }),
+      });
+      if (!r.ok) {
+        const detail = await r.json().catch(() => ({}));
+        throw new Error(detail.detail || `${r.status} ${r.statusText}`);
+      }
+      const data = await r.json();
+      wizState.knownKeys.add(wizKnownKey(wizState.transport, slave));
+      row.classList.add("known");
+      row.querySelector(".wiz-row-action").innerHTML = `<span class="wiz-saved">Saved · ${data.label}</span>`;
+      if (data.restart_required) showRestartBanner();
+    } catch (e) {
+      save.disabled = false;
+      save.textContent = "Save";
+      const msg = document.createElement("div");
+      msg.className = "wiz-error";
+      msg.textContent = e.message;
+      form.appendChild(msg);
+    }
+  });
+}
+
+function showRestartBanner() {
+  const el = $("#wiz-restart");
+  if (el) el.hidden = false;
+}
+
+$("#wiz-scan-btn").addEventListener("click", wizScan);
+
+// Lazy-load when user navigates to Setup so we don't waste a request on
+// every page load. setRoute() fires this hook.
+function onEnterSetup() { wizLoadTransports(); }
 
 // boot
 setRoute(currentRouteName());

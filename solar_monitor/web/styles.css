@@ -1463,6 +1463,133 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 /* footer removed — version + identity already live in Settings → About */
 main { padding-bottom: 3rem; }
 
+/* ---------------- setup wizard ---------------- */
+.wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0; }
+.wiz-step { display: flex; flex-direction: column; gap: 0.6rem; }
+.wiz-step-head {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-weight: 600; color: var(--text);
+}
+.wiz-num {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.78rem; font-weight: 700;
+}
+.wiz-help { color: var(--text-2); font-size: 0.88rem; margin: 0; }
+.wiz-transports { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-transport {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.wiz-transport:hover:not(:disabled) { background: var(--surface-3); }
+.wiz-transport:disabled { opacity: 0.55; cursor: not-allowed; }
+.wiz-transport.active {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+.wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
+.wiz-transport-id { font-weight: 600; }
+.wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
+.wiz-transport-state {
+  font-size: 0.72rem; font-weight: 600;
+  padding: 0.15rem 0.55rem; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.wiz-transport-state.on  { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-transport-state.off { background: rgba(107,118,137,0.12); color: var(--text-3); }
+.wiz-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.wiz-status { color: var(--text-2); font-size: 0.88rem; }
+.wiz-results { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-empty {
+  color: var(--text-3);
+  font-size: 0.88rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.wiz-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  transition: background 0.15s, opacity 0.2s;
+}
+.wiz-row.known { opacity: 0.65; }
+.wiz-row-main { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1 1 0; }
+.wiz-row-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.wiz-row-slave {
+  font-family: var(--mono); font-weight: 600; color: var(--text-3);
+  font-size: 0.82rem;
+}
+.wiz-row-model { font-weight: 600; color: var(--text); }
+.wiz-row-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.wiz-tag {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.wiz-tag--known { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-row-action { flex-shrink: 0; }
+.wiz-add-form {
+  display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.wiz-label {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  min-width: 10rem;
+}
+.wiz-saved {
+  font-size: 0.82rem;
+  color: var(--green);
+  font-weight: 500;
+}
+.wiz-error {
+  flex-basis: 100%;
+  color: var(--red);
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+.wiz-restart {
+  display: flex; align-items: center; gap: 0.7rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.7rem 0.95rem;
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.45);
+  border-radius: var(--r);
+  color: var(--text);
+}
+.wiz-restart svg { width: 18px; height: 18px; color: var(--amber); flex-shrink: 0; }
+.wiz-restart strong { color: var(--amber); margin-right: 0.4rem; }
+.wiz-restart[hidden] { display: none; }
+@media (max-width: 540px) {
+  .wiz-row { flex-direction: column; align-items: stretch; }
+  .wiz-row-action { width: 100%; }
+  .wiz-add-form { width: 100%; }
+  .wiz-label { flex: 1 1 0; min-width: 0; }
+}
+
 /* ---------------- theme picker (Settings → Appearance) ---------------- */
 .theme-picker {
   display: flex;

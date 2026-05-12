@@ -41,6 +41,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         config=config,
         db_path=args.db,
         interval_seconds=args.interval,
+        config_path=args.config,
     )
     uvicorn.run(
         app,

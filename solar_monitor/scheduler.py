@@ -51,6 +51,13 @@ class PollScheduler:
     def last_result(self) -> dict[str, Any] | None:
         return self._last_result
 
+    def get_transport(self, transport_id: str):
+        """Expose an open transport so the setup wizard can piggyback on
+        the live BLE link to probe slave IDs without taking BlueZ down."""
+        if self._poller is None:
+            return None
+        return self._poller._transports.get(transport_id)
+
     # ---------- SSE broadcast ----------
     def subscribe(self) -> asyncio.Queue[dict]:
         q: asyncio.Queue[dict] = asyncio.Queue(maxsize=4)
