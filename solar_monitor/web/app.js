@@ -952,72 +952,71 @@ function drawChart(label, metric, data) {
 
   const ts = data.ts;
   const vals = data.values;
-  const hasBand = Array.isArray(data.min) && Array.isArray(data.max) && data.min.length === ts.length;
+  const hasBand = Array.isArray(data.min) && Array.isArray(data.max) &&
+                  data.min.length === ts.length && data.min.length > 0;
 
-  // Series stack: [x, min (transparent), max (band fill), avg (line + fill)]
-  // We draw min underneath, then max with a translucent band-fill between
-  // them via uPlot's `band` feature.
-  const series = [
-    {},
-    // min line (invisible — just anchors the band)
-    hasBand ? {
-      label: "min",
-      stroke: "rgba(0,0,0,0)",
-      width: 0,
-      points: { show: false },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
-    } : null,
-    // max line (also invisible — band fills between this and min)
-    hasBand ? {
-      label: "max",
-      stroke: "rgba(0,0,0,0)",
-      width: 0,
-      fill: "rgba(88,166,255,0.10)",
-      points: { show: false },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
-    } : null,
-    // The main line — the avg/value series
-    {
-      label: prettyKey(metric),
-      stroke: "#58a6ff",
-      width: 2,
-      fill: "rgba(88,166,255,0.18)",
-      paths: uPlot.paths.spline ? uPlot.paths.spline() : undefined,
-      points: { show: ts.length < 60, size: 4, fill: "#58a6ff" },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
-    },
-  ].filter(Boolean);
+  // Build series + data matrix in lockstep so indices always line up.
+  //   series[0] = x (always)
+  //   series[1] = min — invisible line that anchors the band's bottom edge
+  //   series[2] = max — invisible line, paired with min by `bands`
+  //   series[3] = avg — the visible line
+  // Without bands: series[1] = avg, data = [ts, vals]
+  const series = [{}];
+  const dataCols = [ts];
+  let bands = [];
 
-  const dataMatrix = hasBand ? [ts, data.min, data.max, vals] : [ts, vals];
+  if (hasBand) {
+    series.push({
+      label: "min", stroke: "transparent", width: 0, points: { show: false },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    });
+    series.push({
+      label: "max", stroke: "transparent", width: 0, points: { show: false },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    });
+    dataCols.push(data.min, data.max);
+    // Fill between max (series 2) and min (series 1).
+    bands = [{ series: [2, 1], fill: "rgba(88,166,255,0.12)" }];
+  }
+
+  // Main line — last series, always visible.
+  series.push({
+    label: prettyKey(metric),
+    stroke: "#58a6ff",
+    width: 2,
+    fill: "rgba(88,166,255,0.16)",
+    points: { show: ts.length < 60, size: 4, fill: "#58a6ff", stroke: "#58a6ff" },
+    value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+  });
+  dataCols.push(vals);
 
   const opts = {
     width, height: 340,
-    cursor: { drag: { x: true, y: false }, points: { show: true } },
+    cursor: { drag: { x: true, y: false } },
     scales: { x: { time: true } },
     series,
-    bands: hasBand ? [{ series: [2, 1], fill: "rgba(88,166,255,0.10)" }] : [],
+    bands,
     axes: [
       {
         stroke: "#6b7689",
-        grid:   { stroke: "rgba(106,118,137,0.08)" },
-        ticks:  { stroke: "rgba(106,118,137,0.15)" },
+        grid:  { stroke: "rgba(106,118,137,0.08)" },
+        ticks: { stroke: "rgba(106,118,137,0.15)" },
         space: 60,
-        font: "11px var(--mono)",
       },
       {
         stroke: "#6b7689",
-        grid:   { stroke: "rgba(106,118,137,0.08)" },
-        ticks:  { stroke: "rgba(106,118,137,0.15)" },
+        grid:  { stroke: "rgba(106,118,137,0.08)" },
+        ticks: { stroke: "rgba(106,118,137,0.15)" },
         space: 28,
-        font: "11px var(--mono)",
-        // Format axis ticks with unit suffix where it makes sense
         values: (_u, splits) => splits.map(v => {
           if (v == null) return "";
           const abs = Math.abs(v);
-          if (abs >= 1000) return (v / 1000).toFixed(1) + "k" + (unit || "");
-          if (abs >= 100)  return v.toFixed(0) + (unit ? " " + unit : "");
-          if (abs >= 10)   return v.toFixed(1) + (unit ? " " + unit : "");
-          return v.toFixed(2) + (unit ? " " + unit : "");
+          let txt;
+          if (abs >= 1000)      txt = (v / 1000).toFixed(1) + "k";
+          else if (abs >= 100)  txt = v.toFixed(0);
+          else if (abs >= 10)   txt = v.toFixed(1);
+          else                  txt = v.toFixed(2);
+          return unit ? `${txt} ${unit}` : txt;
         }),
       },
     ],
@@ -1025,10 +1024,19 @@ function drawChart(label, metric, data) {
   };
 
   try {
-    chart = new uPlot(opts, dataMatrix, root);
+    chart = new uPlot(opts, dataCols, root);
   } catch (e) {
-    console.error("uPlot failed:", e, { data, width, root });
-    root.innerHTML = `<div style="padding:1rem;color:var(--red)">Chart render failed: ${e.message}</div>`;
+    console.error("uPlot failed:", e, { data, width, opts });
+    // Fall back to the simplest possible chart so the user sees *something*.
+    try {
+      chart = new uPlot({
+        width, height: 340,
+        scales: { x: { time: true } },
+        series: [{}, { label: prettyKey(metric), stroke: "#58a6ff", width: 2, fill: "rgba(88,166,255,0.16)" }],
+      }, [ts, vals], root);
+    } catch (e2) {
+      root.innerHTML = `<div style="padding:1rem;color:var(--red)">Chart render failed: ${e.message}</div>`;
+    }
   }
 }
 
