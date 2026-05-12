@@ -514,30 +514,56 @@ function renderFlow() {
     return;
   }
 
-  // ----- Sources column -----
-  const sourcesCol = document.createElement("div");
-  sourcesCol.className = "flow-col flow-sources";
-  if (model.sources.length === 0) {
-    sourcesCol.appendChild(makeFlowTile({ label: "No source", color: "neutral", power: 0, sub: "—" }, true));
-  } else {
+  const hasSources = model.sources.length > 0;
+  const hasLoads   = model.loads.length > 0;
+  const totalSourceW = model.sources.reduce((a, s) => a + s.power, 0);
+  const totalLoadW   = model.loads.reduce((a, l) => a + l.power, 0);
+
+  // Idle state — no sources, no loads, just the battery. Render a single
+  // calm tile centered, no skeleton placeholders, no useless arrows.
+  if (!hasSources && !hasLoads) {
+    host.classList.add("flow--idle");
+    const battCol = document.createElement("div");
+    battCol.className = "flow-col flow-col--solo";
+    if (model.bank) {
+      const b = model.bank;
+      battCol.appendChild(makeFlowTile({
+        label: "Battery bank",
+        color: "batt",
+        icon: "battery",
+        power: b.netW,
+        signed: true,
+        active: false,
+        sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V · system idle`,
+      }));
+    }
+    host.appendChild(battCol);
+    sub.textContent = "system idle";
+    return;
+  }
+  host.classList.remove("flow--idle");
+
+  // ----- Sources column (only when present) -----
+  if (hasSources) {
+    const sourcesCol = document.createElement("div");
+    sourcesCol.className = "flow-col flow-sources";
     for (const s of model.sources) sourcesCol.appendChild(makeFlowTile(s));
+    host.appendChild(sourcesCol);
+
+    host.appendChild(makeConnector({
+      label: `${totalSourceW.toFixed(0)} W`,
+      fromColor: model.sources[0]?.color || "neutral",
+      toColor: "batt",
+      active: totalSourceW > 1,
+    }));
   }
 
-  // ----- Connector: sources → battery -----
-  const totalSourceW = model.sources.reduce((a, s) => a + s.power, 0);
-  const connIn = makeConnector({
-    label: `${totalSourceW.toFixed(0)} W`,
-    fromColor: model.sources[0]?.color || "neutral",
-    toColor: "batt",
-    active: totalSourceW > 1,
-  });
-
-  // ----- Battery tile -----
+  // ----- Battery tile (always) -----
   const battCol = document.createElement("div");
   battCol.className = "flow-col";
   if (model.bank) {
     const b = model.bank;
-    const battTile = makeFlowTile({
+    battCol.appendChild(makeFlowTile({
       label: "Battery bank",
       color: "batt",
       icon: "battery",
@@ -545,36 +571,32 @@ function renderFlow() {
       signed: true,
       active: Math.abs(b.netW) > 1,
       sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V`,
-    });
-    battCol.appendChild(battTile);
+    }));
   } else {
     battCol.appendChild(makeFlowTile({ label: "Battery", color: "neutral", icon: "battery", power: 0, sub: "—" }, true));
   }
+  host.appendChild(battCol);
 
-  // ----- Connector: battery → loads -----
-  const totalLoadW = model.loads.reduce((a, l) => a + l.power, 0);
-  const connOut = makeConnector({
-    label: `${totalLoadW.toFixed(0)} W`,
-    fromColor: "batt",
-    toColor: model.loads[0]?.color || "neutral",
-    active: totalLoadW > 1,
-  });
+  // ----- Loads column (only when present) -----
+  if (hasLoads) {
+    host.appendChild(makeConnector({
+      label: `${totalLoadW.toFixed(0)} W`,
+      fromColor: "batt",
+      toColor: model.loads[0]?.color || "neutral",
+      active: totalLoadW > 1,
+    }));
 
-  // ----- Loads column -----
-  const loadsCol = document.createElement("div");
-  loadsCol.className = "flow-col flow-loads";
-  if (model.loads.length === 0) {
-    loadsCol.appendChild(makeFlowTile({ label: "No active load", color: "neutral", power: 0, sub: "—" }, true));
-  } else {
+    const loadsCol = document.createElement("div");
+    loadsCol.className = "flow-col flow-loads";
     for (const lo of model.loads) loadsCol.appendChild(makeFlowTile(lo));
+    host.appendChild(loadsCol);
   }
 
-  host.append(sourcesCol, connIn, battCol, connOut, loadsCol);
-
-  // Sub-header summary
-  sub.textContent = `${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ` +
-                    `${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ` +
-                    `${totalSourceW.toFixed(0)} W in · ${totalLoadW.toFixed(0)} W out`;
+  // Sub-header summary — describe whatever's actually present
+  const parts = [];
+  if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
+  if (hasLoads)   parts.push(`${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ${totalLoadW.toFixed(0)} W out`);
+  sub.textContent = parts.join(" · ") || "system idle";
 }
 
 function makeFlowTile(t, muted = false) {

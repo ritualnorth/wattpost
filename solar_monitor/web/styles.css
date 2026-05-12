@@ -730,6 +730,14 @@ main {
   color: var(--text-3);
   font-size: .85rem;
 }
+/* Idle state — battery tile centered, no source/load skeletons */
+.flow.flow--idle {
+  justify-content: center;
+}
+.flow-col--solo {
+  flex: 0 1 400px;
+  max-width: 100%;
+}
 
 /* ---------------- today strip ---------------- */
 .today-panel { padding: .9rem 1.25rem; }
