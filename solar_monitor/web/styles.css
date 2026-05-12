@@ -572,16 +572,13 @@ main {
 }
 @media (max-width: 720px) {
   /* Portrait phones: stack vertically AND rotate the arrows 90° so the
-   * flow direction reads top → bottom. Source above the bank, bank above
-   * the load, with proper down-pointing arrows + vertical animated dots. */
+   * flow direction reads top → bottom. */
   .flow {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
   }
-  .flow-col {
-    width: 100%;
-  }
+  .flow-col { width: 100%; }
   .flow-conn {
     width: auto;
     min-height: 0;
@@ -598,35 +595,37 @@ main {
     height: 100%;
     position: relative;
   }
-  /* Vertical line from top to bottom of the connector */
+  /* Vertical line — *fully* override every positional prop the
+   * landscape rule set, including `right` and `transform`. */
   .flow-arrow::before {
-    content: "";
-    position: absolute;
-    top: 0; bottom: 8px;
-    left: 50%;
-    width: 2px;
-    height: auto;
+    top: 4px !important;
+    bottom: 12px !important;
+    left: 50% !important;
+    right: auto !important;
+    width: 2px !important;
+    height: auto !important;
+    transform: translateX(-50%) !important;
     background: var(--border-2);
-    transform: translateX(-50%);
   }
-  /* Down-pointing arrowhead at the bottom */
+  /* Down-pointing arrowhead at the bottom of the line */
   .flow-arrow::after {
-    content: "";
-    position: absolute;
-    left: 50%; bottom: 0; top: auto; right: auto;
-    width: 0; height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 6px solid var(--border-2);
-    border-bottom: 0;
-    transform: translateX(-50%);
+    top: auto !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    right: auto !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-width: 7px 6px 0 6px !important;
+    border-style: solid !important;
+    border-color: var(--border-2) transparent transparent transparent !important;
+    transform: translateX(-50%) !important;
+    background: transparent !important;
   }
   .flow-arrow.active::before {
     background: linear-gradient(180deg, var(--from), var(--to));
   }
   .flow-arrow.active::after {
-    border-top-color: var(--to);
-    border-left-color: transparent;
+    border-top-color: var(--to) !important;
   }
   /* Animated dot travels top → bottom along the line */
   .flow-arrow.active .dot {
