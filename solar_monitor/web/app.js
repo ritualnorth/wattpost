@@ -1037,6 +1037,11 @@ function onDeviceChanged(preferMetric) {
   refreshChart();
 }
 
+// Custom-range state — populated when the user picks dates in the
+// datetime-local inputs. Both are unix seconds.
+let customSince = null;
+let customUntil = null;
+
 function sinceForRange(r) {
   const now = Math.floor(Date.now() / 1000);
   switch (r) {
@@ -1049,15 +1054,37 @@ function sinceForRange(r) {
   return [now - 86400, 120];
 }
 
+// Custom range returns [since, bucket, until]. Bucket size is picked so the
+// chart has roughly 300 points regardless of how wide a window the user
+// chose — keeps payload + render cheap and ticks readable.
+function customRangeParams() {
+  if (customSince == null || customUntil == null) return null;
+  const span = customUntil - customSince;
+  if (span <= 0) return null;
+  const bucket = Math.max(1, Math.round(span / 300));
+  return { since: customSince, until: customUntil, bucket };
+}
+
 async function refreshChart() {
   const label = $("#sel-device").value;
   const metric = $("#sel-metric").value;
   if (!label || !metric) return;
-  const [since, bucket] = sinceForRange(currentRange);
+
+  let url;
+  if (currentRange === "custom") {
+    const p = customRangeParams();
+    if (!p) return;  // user hasn't picked a valid range yet
+    url = `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
+          `&since=${p.since}&until=${p.until}&bucket=${p.bucket}`;
+  } else {
+    const [since, bucket] = sinceForRange(currentRange);
+    url = `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
+          `&since=${since}&bucket=${bucket}`;
+  }
+
   let data;
-  try {
-    data = await api(`/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}&since=${since}&bucket=${bucket}`);
-  } catch (e) { console.error(e); return; }
+  try { data = await api(url); }
+  catch (e) { console.error(e); return; }
   updateStatStrip(metric, data);
   drawChart(label, metric, data);
 }
@@ -1396,9 +1423,54 @@ for (const btn of document.querySelectorAll("[data-range]")) {
     document.querySelectorAll("[data-range]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     currentRange = btn.dataset.range;
+
+    const customWrap = $("#custom-range");
+    if (currentRange === "custom") {
+      // Reveal the picker, prefill last 6h if empty
+      customWrap.hidden = false;
+      const now = new Date();
+      const fromInput = $("#custom-from");
+      const toInput   = $("#custom-to");
+      if (!fromInput.value) {
+        const sixHoursAgo = new Date(now.getTime() - 6 * 3600 * 1000);
+        fromInput.value = toLocalInputValue(sixHoursAgo);
+        customSince = Math.floor(sixHoursAgo.getTime() / 1000);
+      }
+      if (!toInput.value) {
+        toInput.value = toLocalInputValue(now);
+        customUntil = Math.floor(now.getTime() / 1000);
+      }
+    } else {
+      customWrap.hidden = true;
+    }
+
     refreshChart();
   });
 }
+
+// datetime-local inputs use the format YYYY-MM-DDTHH:MM in local time.
+function toLocalInputValue(d) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+         `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+document.addEventListener("change", (e) => {
+  if (e.target.id === "custom-from" || e.target.id === "custom-to") {
+    const t = new Date(e.target.value);
+    if (!isFinite(t.getTime())) return;
+    const seconds = Math.floor(t.getTime() / 1000);
+    if (e.target.id === "custom-from") customSince = seconds;
+    else                                customUntil = seconds;
+    // Auto-swap if user picked from > to
+    if (customSince && customUntil && customSince > customUntil) {
+      [customSince, customUntil] = [customUntil, customSince];
+      $("#custom-from").value = toLocalInputValue(new Date(customSince * 1000));
+      $("#custom-to").value   = toLocalInputValue(new Date(customUntil * 1000));
+    }
+    if (currentRange === "custom") refreshChart();
+  }
+});
 window.addEventListener("resize", () => {
   if (chart && currentRouteName() === "history") {
     chart.setSize({ width: $("#chart").clientWidth, height: 340 });

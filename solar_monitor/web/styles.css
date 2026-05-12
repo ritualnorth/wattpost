@@ -961,6 +961,40 @@ main {
 }
 .chart-controls > select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 
+/* Custom date range picker — shown when the user clicks the Custom
+ * range button. Native datetime-local inputs get iOS Safari's built-in
+ * picker for free. */
+.custom-range {
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.custom-range label {
+  display: flex; flex-direction: column; gap: .2rem;
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+}
+.custom-range input[type="datetime-local"] {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: var(--mono);
+  color-scheme: dark;  /* dark-mode native picker on Chromium */
+  min-width: 170px;
+}
+
 /* ----- Stat strip ----- */
 .chart-statstrip {
   display: grid;
