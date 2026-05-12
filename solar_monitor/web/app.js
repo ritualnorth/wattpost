@@ -793,6 +793,19 @@ function renderCells() {
   }
 }
 
+// ---------- lifetime stats cache (refreshed on a slower cadence) ----------
+const lifetimeCache = {};  // label -> {data, fetchedAt}
+async function ensureLifetime(label) {
+  const now = Date.now();
+  const entry = lifetimeCache[label];
+  if (entry && (now - entry.fetchedAt) < 5 * 60 * 1000) return entry.data;
+  try {
+    const data = await api(`/api/devices/${encodeURIComponent(label)}/lifetime`);
+    lifetimeCache[label] = { data, fetchedAt: now };
+    return data;
+  } catch (e) { return null; }
+}
+
 // ---------- device cards ----------
 function renderDeviceCards() {
   const host = $("#device-cards");
@@ -825,6 +838,24 @@ function renderDeviceCards() {
     const fw = l.firmware_version || l.firmware_version_raw || "";
     sub.textContent = `${dev.vendor} · ${dev.kind}${fw ? " · fw " + fw : ""}${l.model ? " · " + l.model : ""}`;
     card.appendChild(sub);
+
+    // Lifetime stats strip for smart batteries — cycles + Ah throughput.
+    // Fetched in the background; injected when ready.
+    if (dev.kind === "smart_battery") {
+      const lifeBar = document.createElement("div");
+      lifeBar.className = "dev-card-lifetime";
+      lifeBar.innerHTML = `
+        <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">—</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">—</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>`;
+      card.appendChild(lifeBar);
+      ensureLifetime(dev.label).then(lt => {
+        if (!lt) return;
+        lifeBar.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "—";
+        lifeBar.querySelector('[data-lt="ah_in"]').textContent = `${(+lt.ah_in).toFixed(1)} Ah`;
+        lifeBar.querySelector('[data-lt="ah_out"]').textContent = `${(+lt.ah_out).toFixed(1)} Ah`;
+      });
+    }
 
     for (const k of headlineKeys(dev.kind, l)) {
       const v = l[k];
@@ -1051,6 +1082,115 @@ function drawChart(label, metric, data) {
   }
 }
 
+// ---------- drift sparkline (Cell balance panel) ----------
+let driftSpark = null;
+async function refreshDriftSparkline() {
+  const root = document.querySelector("#cell-drift-spark");
+  if (!root) return;
+  const batts = devices.filter(d => d.kind === "smart_battery");
+  if (batts.length === 0) return;
+
+  // Pick the pack with the highest current drift — that's the one worth
+  // tracking. Fetch its cell_drift_v over the last 24h.
+  let target = batts[0].label;
+  let maxDrift = -1;
+  for (const b of batts) {
+    const v = +b.latest?.cell_drift_v || 0;
+    if (v > maxDrift) { maxDrift = v; target = b.label; }
+  }
+  const since = Math.floor(Date.now() / 1000) - 24 * 3600;
+  let data;
+  try {
+    data = await api(`/api/devices/${encodeURIComponent(target)}/history?metric=cell_drift_v&since=${since}&bucket=300`);
+  } catch (e) { return; }
+  const stat = $("#cell-drift-stat");
+  if (data?.stats?.max != null && data.stats.now != null) {
+    stat.textContent = `now ${(+data.stats.now*1000).toFixed(0)} mV · max ${(+data.stats.max*1000).toFixed(0)} mV (${target})`;
+  } else {
+    stat.textContent = "—";
+  }
+  // Tiny sparkline using uPlot
+  if (driftSpark) { driftSpark.destroy(); driftSpark = null; }
+  if (!data?.ts?.length) {
+    root.innerHTML = '<div class="empty-spark">collecting…</div>';
+    return;
+  }
+  root.innerHTML = "";
+  try {
+    driftSpark = new uPlot({
+      width: Math.max(root.clientWidth, 280),
+      height: 90,
+      scales: { x: { time: true } },
+      cursor: { show: false },
+      legend: { show: false },
+      series: [
+        {},
+        { stroke: "#d29922", width: 1.5, fill: "rgba(210,153,34,0.15)", points: { show: false } },
+      ],
+      axes: [
+        { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.06)" }, space: 80, size: 18 },
+        { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.06)" }, size: 36,
+          values: (_u, splits) => splits.map(v => v == null ? "" : `${(v*1000).toFixed(0)} mV`) },
+      ],
+    }, [data.ts, data.values], root);
+  } catch (e) { console.error("drift sparkline:", e); }
+}
+
+// ---------- load heatmap ----------
+async function refreshHeatmap() {
+  const root = document.querySelector("#heatmap");
+  if (!root) return;
+  let data;
+  try { data = await api("/api/load_heatmap?days=30"); }
+  catch (e) { return; }
+  drawHeatmap(root, data);
+}
+
+function drawHeatmap(root, data) {
+  const grid = data.grid;
+  const max = data.max_w || 1;
+  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  let html = '<div class="heatmap-rows">';
+  // X axis hours header
+  html += '<div class="hm-row hm-row--head">';
+  html += '<div class="hm-cell hm-cell--label"></div>';
+  for (let h = 0; h < 24; h++) {
+    html += `<div class="hm-cell hm-cell--hour">${h % 6 === 0 ? h : ""}</div>`;
+  }
+  html += '</div>';
+
+  for (let d = 0; d < 7; d++) {
+    html += '<div class="hm-row">';
+    html += `<div class="hm-cell hm-cell--label">${days[d]}</div>`;
+    for (let h = 0; h < 24; h++) {
+      const v = grid[d][h];
+      if (v == null) {
+        html += '<div class="hm-cell hm-cell--empty" title="no data"></div>';
+      } else {
+        const intensity = Math.min(1, v / max);
+        // Off-grid heatmap: yellow → red gradient for load
+        const r = Math.round(60 + 195 * intensity);
+        const g = Math.round(60 + 90 * (1 - intensity));
+        const b = Math.round(60 - 40 * intensity);
+        const label = `${days[d]} ${String(h).padStart(2,"0")}:00 · ${v.toFixed(0)} W avg`;
+        html += `<div class="hm-cell hm-cell--data" style="background: rgb(${r},${g},${b})" title="${label}"></div>`;
+      }
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // Legend
+  html += `<div class="hm-legend">
+    <span>Low</span>
+    <span class="hm-legend-grad"></span>
+    <span>High · ${data.max_w.toFixed(0)} W max</span>
+  </div>`;
+
+  root.innerHTML = html;
+}
+
 // ---------- routing ----------
 // Hash-based. Default route = dashboard. Switching to History rebuilds
 // the chart so uPlot sees a non-zero container width.
@@ -1071,10 +1211,13 @@ function setRoute(route) {
   });
   // History tab was hidden → chart was sized to 0. Redraw on entry.
   if (route === "history") {
-    requestAnimationFrame(() => refreshChart());
+    requestAnimationFrame(() => { refreshChart(); refreshHeatmap(); });
   }
   if (route === "settings") {
     renderSettings();
+  }
+  if (route === "dashboard") {
+    refreshDriftSparkline();
   }
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 }
@@ -1114,7 +1257,12 @@ window.addEventListener("resize", () => {
 
 // boot
 setRoute(currentRoute());
-refresh();
+refresh().then(() => {
+  // Once the first poll list arrives, kick off the drift sparkline + heatmap
+  // refreshes for whichever route the user landed on.
+  if (currentRoute() === "dashboard") refreshDriftSparkline();
+  if (currentRoute() === "history") { refreshChart(); refreshHeatmap(); }
+});
 setInterval(refresh, 5000);
 setInterval(() => {
   if (currentRoute() === "history") refreshChart();

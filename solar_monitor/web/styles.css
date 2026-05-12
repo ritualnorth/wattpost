@@ -943,6 +943,117 @@ main {
 .dev-card-row .k { color: var(--text-3); }
 .dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
 
+/* Lifetime stats strip on smart-battery cards */
+.dev-card-lifetime {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .5rem;
+  margin: .25rem 0 .65rem;
+  padding: .5rem .55rem;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.lt-cell { display: flex; flex-direction: column; min-width: 0; }
+.lt-cell .lt-v {
+  font-family: var(--mono);
+  font-size: .92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+/* Cell-drift trend sparkline */
+.cell-drift-trend {
+  margin-top: .9rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.cell-drift-trend-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .35rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.cell-drift-trend-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+#cell-drift-spark {
+  min-height: 90px;
+}
+.empty-spark {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .8rem;
+  font-style: italic;
+}
+
+/* Load heatmap */
+.heatmap-panel {
+  --panel-tint: linear-gradient(135deg, rgba(210,153,34,0.06), rgba(248,81,73,0.03) 70%);
+}
+.heatmap-rows {
+  display: flex; flex-direction: column;
+  gap: 3px;
+  margin: .5rem 0 .75rem;
+}
+.hm-row {
+  display: grid;
+  grid-template-columns: 38px repeat(24, 1fr);
+  gap: 3px;
+}
+.hm-cell {
+  height: 22px;
+  border-radius: 2px;
+  font-size: .65rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.hm-cell--label {
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  padding-right: .35rem;
+  font-size: .72rem;
+}
+.hm-row--head { gap: 3px; }
+.hm-row--head .hm-cell--hour {
+  height: 16px;
+  color: var(--text-3);
+  font-size: .65rem;
+  font-family: var(--mono);
+}
+.hm-cell--empty {
+  background: var(--surface-3);
+  opacity: 0.3;
+}
+.hm-cell--data {
+  cursor: help;
+  transition: transform 0.12s ease;
+}
+.hm-cell--data:hover { transform: scale(1.4); z-index: 5; position: relative; }
+.hm-legend {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .78rem;
+  color: var(--text-3);
+  margin-top: .5rem;
+}
+.hm-legend-grad {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    rgb(60,60,60), rgb(120,120,40), rgb(180,100,30), rgb(255,80,20));
+}
+@media (max-width: 540px) {
+  .hm-row { grid-template-columns: 28px repeat(24, 1fr); gap: 2px; }
+  .hm-cell { height: 16px; font-size: .55rem; }
+  .hm-cell--label { font-size: .65rem; padding-right: .2rem; }
+}
+
 /* ---------------- panel-actions / action buttons ---------------- */
 .panel-actions { display: flex; gap: .5rem; }
 .btn-action {

@@ -221,6 +221,28 @@ class Store:
                     latest_str.append((label, k, ts, v))
                 # bools and Nones are skipped intentionally
 
+            # Derived metrics: cell drift / min / max for smart batteries.
+            # Stored as regular numeric metrics so the existing history +
+            # rollup machinery picks them up automatically.
+            if data.get("_kind") == "smart_battery":
+                cell_volts: list[float] = []
+                n = int(data.get("cell_count") or 0)
+                for i in range(n):
+                    v = data.get(f"cell_voltage_{i}_v")
+                    if isinstance(v, (int, float)):
+                        cell_volts.append(float(v))
+                if cell_volts:
+                    cell_min = min(cell_volts)
+                    cell_max = max(cell_volts)
+                    cell_drift = cell_max - cell_min
+                    for k, val in (
+                        ("cell_min_v", cell_min),
+                        ("cell_max_v", cell_max),
+                        ("cell_drift_v", cell_drift),
+                    ):
+                        num_rows.append((ts, label, k, val))
+                        latest_num.append((label, k, ts, val))
+
         db = self._db
         try:
             if num_rows:
@@ -582,6 +604,148 @@ class Store:
             "bank_net_today_wh": round(charged_wh - discharged_wh, 1),
             "load_today_wh": round(load_today_wh, 1),
             "poll_count": len(rows),
+        }
+
+    async def load_heatmap(self, since_ts: int, until_ts: int) -> dict[str, Any]:
+        """Aggregate bank power (V×I summed across packs) by hour-of-day
+        × day-of-week. Returns a 7×24 grid of mean load (positive = the
+        bank supplying watts, i.e. household consumption).
+
+        Uses local time for the hour/day bucketing — what counts as
+        "Sunday at 6pm" is the user's idea, not UTC's.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        sql = (
+            "SELECT v.ts, SUM(v.value * i.value) AS bank_w "
+            "FROM samples v "
+            "JOIN samples i ON v.ts = i.ts AND v.device = i.device "
+            "WHERE v.metric = 'voltage_v' AND i.metric = 'current_a' "
+            "  AND v.device LIKE 'battery_%' "
+            "  AND v.ts BETWEEN ? AND ? "
+            "GROUP BY v.ts"
+        )
+
+        # buckets[dow][hour] = (sum_w, count) — accumulating absolute
+        # discharge wattage (we only count negative bank_w as "load").
+        # 7×24 grid; Monday = 0 follows ISO + Python convention.
+        sums = [[0.0] * 24 for _ in range(7)]
+        counts = [[0] * 24 for _ in range(7)]
+
+        async with self._db.execute(sql, (since_ts, until_ts)) as cur:
+            async for ts, w in cur:
+                # Only count discharging (negative bank net) — for off-grid
+                # heat-mapping "what's drawing power" is the question.
+                if w is None or w >= 0:
+                    continue
+                load_w = -float(w)  # positive watts consumed
+                local = time.localtime(ts)
+                dow = local.tm_wday  # 0 = Mon
+                hour = local.tm_hour
+                sums[dow][hour] += load_w
+                counts[dow][hour] += 1
+
+        # Compute per-cell mean; None where no data
+        grid: list[list[float | None]] = [
+            [(sums[d][h] / counts[d][h]) if counts[d][h] else None for h in range(24)]
+            for d in range(7)
+        ]
+
+        # Headline stats
+        all_w = [v for row in grid for v in row if v is not None]
+        return {
+            "since_ts": since_ts,
+            "until_ts": until_ts,
+            "grid": grid,                          # 7 rows × 24 cols, watts
+            "counts": counts,                       # for tooltip / opacity
+            "max_w": max(all_w) if all_w else 0,
+            "min_w": min(all_w) if all_w else 0,
+            "mean_w": (sum(all_w) / len(all_w)) if all_w else 0,
+        }
+
+    async def battery_lifetime_stats(self, device: str) -> dict[str, Any]:
+        """Compute coulomb-counted lifetime Ah in/out + cycle count for a pack.
+
+        Trapezoid-integrates `current_a` across every poll we have for this
+        device. Cycles are referenced against the latest known `capacity_ah`
+        (also fetched here, defaulting to 100 Ah for the typical LFP pack).
+
+        For multi-year data this becomes expensive — at v0.0.x volumes it's
+        fast. When it starts to bite we'll add a `lifetime_counters` table
+        that the scheduler increments on each poll.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        # Window-function pairing: each row gets the previous poll's ts + value.
+        sql = (
+            "WITH paired AS ("
+            "  SELECT ts, value,"
+            "         LAG(ts)    OVER (ORDER BY ts) AS prev_ts,"
+            "         LAG(value) OVER (ORDER BY ts) AS prev_v"
+            "  FROM samples"
+            "  WHERE device = ? AND metric = 'current_a'"
+            ")"
+            "SELECT"
+            "  SUM(CASE WHEN avg_i > 0 THEN  avg_i * dt_h ELSE 0 END) AS ah_in,"
+            "  SUM(CASE WHEN avg_i < 0 THEN -avg_i * dt_h ELSE 0 END) AS ah_out,"
+            "  MIN(ts) AS until_ts,"
+            "  COUNT(*) AS n "
+            "FROM ("
+            "  SELECT (prev_v + value) / 2.0 AS avg_i,"
+            "         (ts - prev_ts) / 3600.0 AS dt_h, ts"
+            "  FROM paired"
+            "  WHERE prev_ts IS NOT NULL"
+            "    AND (ts - prev_ts) BETWEEN 1 AND 3600"  # ignore polling-gap outliers
+            ")"
+        )
+
+        ah_in = ah_out = 0.0
+        since_ts: int | None = None
+        until_ts: int | None = None
+        n_intervals = 0
+        async with self._db.execute(sql, (device,)) as cur:
+            row = await cur.fetchone()
+            if row:
+                ah_in = float(row[0] or 0)
+                ah_out = float(row[1] or 0)
+                until_ts = int(row[2]) if row[2] is not None else None
+                n_intervals = int(row[3] or 0)
+
+        # First-seen timestamp for context ("X days ago")
+        async with self._db.execute(
+            "SELECT MIN(ts), MAX(ts) FROM samples "
+            "WHERE device = ? AND metric = 'current_a'",
+            (device,),
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                since_ts = int(row[0]) if row[0] is not None else None
+                until_ts = int(row[1]) if row[1] is not None else until_ts
+
+        # Latest known capacity for the pack — needed to express cycle equivalence
+        capacity_ah = 100.0
+        async with self._db.execute(
+            "SELECT value FROM samples WHERE device = ? AND metric = 'capacity_ah' "
+            "ORDER BY ts DESC LIMIT 1",
+            (device,),
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0] is not None:
+                capacity_ah = float(row[0])
+
+        cycles = round(ah_out / capacity_ah, 2) if capacity_ah > 0 else 0
+        return {
+            "device": device,
+            "ah_in": round(ah_in, 2),
+            "ah_out": round(ah_out, 2),
+            "ah_throughput": round(ah_in + ah_out, 2),
+            "cycles": cycles,
+            "capacity_ah": capacity_ah,
+            "since_ts": since_ts,
+            "until_ts": until_ts,
+            "interval_samples": n_intervals,
         }
 
     async def last_poll_run(self) -> dict[str, Any] | None:

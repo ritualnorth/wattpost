@@ -78,6 +78,22 @@ async def device_latest(label: str, state: State) -> dict[str, Any]:
     return {"label": label, "latest": latest[label]}
 
 
+@get("/api/devices/{label:str}/lifetime")
+async def device_lifetime(label: str, state: State) -> dict[str, Any]:
+    """Coulomb-counted lifetime Ah in/out + equivalent cycle count."""
+    store: Store = state["store"]
+    return await store.battery_lifetime_stats(label)
+
+
+@get("/api/load_heatmap")
+async def load_heatmap(state: State, days: int = 30) -> dict[str, Any]:
+    """Hour-of-day × day-of-week mean discharge wattage over the last N days."""
+    store: Store = state["store"]
+    now = int(time.time())
+    since = now - days * 86400
+    return await store.load_heatmap(since, now)
+
+
 @get("/api/devices/{label:str}/history")
 async def device_history(
     label: str,
@@ -144,6 +160,8 @@ def build_app(config: Config, db_path: str, interval_seconds: int = 60) -> Lites
             list_devices,
             device_latest,
             device_history,
+            device_lifetime,
+            load_heatmap,
             index,
             static_router,
         ],
