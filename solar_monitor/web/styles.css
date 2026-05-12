@@ -1087,6 +1087,41 @@ main {
 }
 .btn-action svg { width: 14px; height: 14px; }
 
+/* ---------------- per-device detail page ---------------- */
+.dev-detail-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: -.5rem 0 .25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.dev-detail-crumb { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.dev-detail-crumb > a {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: .78rem;
+}
+.dev-detail-crumb > a:hover { color: var(--accent); }
+.dev-detail-title {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: 1.25rem; font-weight: 600;
+}
+.dev-detail-icon {
+  display: inline-flex; align-items: center;
+  width: 22px; height: 22px;
+  color: var(--text-2);
+}
+.dev-detail-icon svg { width: 100%; height: 100%; }
+.dev-detail-meta {
+  font-size: .8rem; color: var(--text-3); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dev-detail-nav { display: flex; gap: .4rem; flex-shrink: 0; }
+@media (max-width: 540px) { .dev-detail-title { font-size: 1.05rem; } }
+
+/* dev-card is now an <a> — kill default link decoration */
+a.dev-card { text-decoration: none; color: inherit; display: block; }
+a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); transition: all 0.15s; }
+
 /* ---------------- placeholder pages ---------------- */
 .placeholder-panel { --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.05), transparent 60%); }
 .placeholder {

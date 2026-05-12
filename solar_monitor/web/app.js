@@ -247,9 +247,40 @@ function renderStatus(run) {
 }
 
 // ---------- BANK AGGREGATE ----------
+// Bank-level numbers come from whichever data source is most authoritative:
+//
+//   1. A `shunt` device measures the real busbar current/voltage and tracks
+//      SoC against a user-declared bank capacity. If one is present, it wins
+//      for the bank's headline numbers — that's the case for users with
+//      dumb LiFePO4 packs + a Victron SmartShunt / Renogy 500A monitor.
+//
+//   2. Otherwise, we sum across smart batteries (the typical Renogy rig).
+//
+//   3. With nothing addressable, we return null and the dashboard hides
+//      the bank hero.
 function aggregateBank() {
+  const shunt = devices.find(d => d.kind === "shunt");
   const batts = devices.filter(d => d.kind === "smart_battery");
+
+  if (shunt) {
+    const l = shunt.latest || {};
+    const v = +l.voltage_v || 0;
+    const i = +l.current_a || 0;
+    const power_w = l.power_w != null ? +l.power_w : v * i;
+    const totalCap = +l.bank_capacity_ah || +l.capacity_ah || 0;
+    const totalRem = +l.remaining_ah || (totalCap * ((+l.soc_pct || 0) / 100));
+    const soc = +l.soc_pct || (totalCap > 0 ? (totalRem / totalCap) * 100 : 0);
+    return {
+      source: "shunt",
+      packs: batts.length,                  // declared packs alongside the shunt
+      model: l.model || shunt.label || "smart shunt",
+      soc, meanV: v, sumI: i, netW: power_w,
+      totalCap, totalRem,
+    };
+  }
+
   if (batts.length === 0) return null;
+
   let totalCap = 0, totalRem = 0, sumV = 0, sumI = 0;
   for (const b of batts) {
     const l = b.latest || {};
@@ -260,10 +291,11 @@ function aggregateBank() {
   }
   const meanV = sumV / batts.length;
   const soc = totalCap > 0 ? (totalRem / totalCap) * 100 : 0;
-  const netW = meanV * sumI;   // V × A across the bank
   return {
-    packs: batts.length, model: batts[0]?.latest?.model || "battery",
-    soc, meanV, sumI, netW, totalCap, totalRem,
+    source: "batteries",
+    packs: batts.length,
+    model: batts[0]?.latest?.model || "battery",
+    soc, meanV, sumI, netW: meanV * sumI, totalCap, totalRem,
   };
 }
 
@@ -742,10 +774,14 @@ function renderCells() {
     else if (spread >= 0.10) panel.classList.add("drift-warn");
   }
 
-  if (batteries.length === 0) {
-    grid.innerHTML = `<div class="dev-card-sub">no batteries yet</div>`;
+  // Hide the panel entirely if we have nothing to show — scenario B users
+  // (shunt + dumb packs) have no cell data anywhere on the system.
+  const panel = $("#panel-cells");
+  if (batteries.length === 0 || allV.length === 0) {
+    if (panel) panel.hidden = true;
     return;
   }
+  if (panel) panel.hidden = false;
 
   for (const b of batteries) {
     const l = b.latest || {};
@@ -812,8 +848,9 @@ function renderDeviceCards() {
   host.innerHTML = "";
   for (const dev of devices) {
     const l = dev.latest || {};
-    const card = document.createElement("div");
+    const card = document.createElement("a");
     card.className = `dev-card kind-${dev.kind}`;
+    card.href = `#/device/${encodeURIComponent(dev.label)}`;
 
     const head = document.createElement("div");
     head.className = "dev-card-head";
@@ -1195,37 +1232,40 @@ function drawHeatmap(root, data) {
 }
 
 // ---------- routing ----------
-// Hash-based. Default route = dashboard. Switching to History rebuilds
-// the chart so uPlot sees a non-zero container width.
+// Hash-based. Default route = dashboard. Two forms:
+//   #/                   → named routes (dashboard / history / devices / ...)
+//   #/device/<label>     → per-device detail page (dispatched by device kind)
 const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings"]);
 
-function currentRoute() {
+function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
-  return VALID_ROUTES.has(raw) ? raw : "dashboard";
+  const m = raw.match(/^device\/(.+)$/);
+  if (m) return { name: "device", label: decodeURIComponent(m[1]) };
+  return { name: VALID_ROUTES.has(raw) ? raw : "dashboard" };
 }
+function currentRouteName() { return parseRoute().name; }
 
-function setRoute(route) {
-  if (!VALID_ROUTES.has(route)) route = "dashboard";
+function setRoute(_unused) {
+  const route = parseRoute();
   document.querySelectorAll(".route").forEach(s => {
-    s.classList.toggle("active", s.dataset.route === route);
+    s.classList.toggle("active", s.dataset.route === route.name);
   });
+  // Top-nav highlights: device detail belongs under the Devices tab
   document.querySelectorAll(".nav-tab").forEach(t => {
-    t.classList.toggle("active", t.dataset.tab === route);
+    const tab = t.dataset.tab;
+    const match = route.name === tab || (route.name === "device" && tab === "devices");
+    t.classList.toggle("active", match);
   });
-  // History tab was hidden → chart was sized to 0. Redraw on entry.
-  if (route === "history") {
+  if (route.name === "history") {
     requestAnimationFrame(() => { refreshChart(); refreshHeatmap(); });
   }
-  if (route === "settings") {
-    renderSettings();
-  }
-  if (route === "dashboard") {
-    refreshDriftSparkline();
-  }
+  if (route.name === "settings") renderSettings();
+  if (route.name === "dashboard") refreshDriftSparkline();
+  if (route.name === "device") renderDeviceDetail(route.label);
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 }
 
-window.addEventListener("hashchange", () => setRoute(currentRoute()));
+window.addEventListener("hashchange", () => setRoute(currentRouteName()));
 
 // ---------- settings panel ----------
 function renderSettings() {
@@ -1253,20 +1293,343 @@ for (const btn of document.querySelectorAll("[data-range]")) {
   });
 }
 window.addEventListener("resize", () => {
-  if (chart && currentRoute() === "history") {
+  if (chart && currentRouteName() === "history") {
     chart.setSize({ width: $("#chart").clientWidth, height: 340 });
   }
 });
 
+// ---------- Per-device detail page ----------
+// Single route at #/device/<label>. Content dispatched by device kind so
+// a smart battery, shunt, or charge controller each get a layout that
+// matches what data they actually report.
+
+let devDetailChart = null;
+
+function renderDeviceDetail(label) {
+  const host = $("#device-route");
+  if (!host) return;
+  const dev = devices.find(d => d.label === label);
+  if (!dev) {
+    host.innerHTML = `
+      <section class="panel">
+        <p style="padding:1rem">No device named <code>${label}</code>. <a href="#/devices">Back to Devices</a></p>
+      </section>`;
+    return;
+  }
+  // Per-kind dispatcher. Each builder returns HTML for the panel stack;
+  // returning identical structure lets us reuse layout + styling.
+  let inner;
+  if (dev.kind === "smart_battery") inner = buildSmartBatteryDetail(dev);
+  else if (dev.kind === "charge_controller") inner = buildControllerDetail(dev);
+  else if (dev.kind === "shunt") inner = buildShuntDetail(dev);
+  else inner = buildGenericDetail(dev);
+
+  // Prev/next nav between devices of the same kind makes "compare packs"
+  // a one-tap operation.
+  const siblings = devices.filter(d => d.kind === dev.kind);
+  const idx = siblings.findIndex(d => d.label === dev.label);
+  const prev = idx > 0 ? siblings[idx - 1] : null;
+  const next = idx < siblings.length - 1 ? siblings[idx + 1] : null;
+
+  const fw = dev.latest?.firmware_version || dev.latest?.firmware_version_raw || "";
+  host.innerHTML = `
+    <div class="dev-detail-head">
+      <div class="dev-detail-crumb">
+        <a href="#/devices">← Devices</a>
+        <span class="dev-detail-title">
+          <span class="dev-detail-icon">${ICONS[KIND_ICON[dev.kind] || "unknown"]}</span>
+          ${dev.label}
+        </span>
+        <span class="dev-detail-meta">
+          ${dev.vendor} · ${dev.kind} · slave ${dev.slave_id}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}
+        </span>
+      </div>
+      <div class="dev-detail-nav">
+        ${prev ? `<a class="btn-action" href="#/device/${encodeURIComponent(prev.label)}">← ${prev.label}</a>` : ""}
+        ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${next.label} →</a>` : ""}
+      </div>
+    </div>
+    ${inner}`;
+
+  // Wire up the per-device chart after DOM is in place.
+  wireDeviceDetailChart(dev);
+}
+
+function buildSmartBatteryDetail(dev) {
+  const l = dev.latest || {};
+  const cap = +l.capacity_ah || 0;
+  const rem = +l.remaining_charge_ah || 0;
+  const pct = cap > 0 ? (rem / cap) * 100 : 0;
+  const v = +l.voltage_v || 0;
+  const i = +l.current_a || 0;
+  const w = v * i;
+  const direction = Math.abs(w) < 1 ? "idle" : (w > 0 ? "charging" : "discharging");
+  const flowText = direction === "idle" ? "Idle" : `${fmt.signed(w, 0)} W`;
+
+  // Per-pack cells
+  const n = +l.cell_count || 0;
+  const cells = [];
+  for (let j = 0; j < n; j++) cells.push(+l[`cell_voltage_${j}_v`]);
+  const cellMin = cells.length ? Math.min(...cells) : 0;
+  const cellMax = cells.length ? Math.max(...cells) : 0;
+  const spread = cellMax - cellMin;
+  const driftCls = spread >= 0.2 ? "red" : spread >= 0.1 ? "amber" : "green";
+
+  const tempSensors = +l.temperature_sensor_count || 0;
+  const temps = [];
+  for (let j = 0; j < tempSensors; j++) {
+    const t = l[`temperature_${j}_c`];
+    if (typeof t === "number") temps.push(t);
+  }
+  const meanTemp = temps.length ? (temps.reduce((a, c) => a + c, 0) / temps.length).toFixed(1) : "—";
+
+  return `
+    <section class="hero-v2 soc-${pct < 20 ? "low" : pct < 50 ? "mid" : "high"}">
+      <div class="hero-donut-wrap ${direction}">
+        <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14" />
+          <circle class="donut-arc soc-${pct < 20 ? "low" : pct < 50 ? "mid" : "high"}"
+                  cx="100" cy="100" r="86" fill="none" stroke-width="14"
+                  pathLength="100" stroke-dasharray="${pct} ${100 - pct}"
+                  stroke-linecap="round" transform="rotate(-90 100 100)" />
+        </svg>
+        <div class="donut-center">
+          <div class="donut-pct"><span>${pct.toFixed(1)}</span><span class="donut-pct-unit">%</span></div>
+          <div class="donut-label">This pack</div>
+          <div class="donut-flow ${direction}"><span class="donut-flow-arrow"></span><span>${flowText}</span></div>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><div class="meta-k">Voltage</div><div class="hero-stat-val"><span>${v.toFixed(2)}</span><span class="hero-stat-unit">V</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Current</div><div class="hero-stat-val ${direction === "charging" ? "power-charging" : direction === "discharging" ? "power-discharging" : ""}"><span>${fmt.signed(i, 2)}</span><span class="hero-stat-unit">A</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Remaining</div><div class="hero-stat-val"><span>${rem.toFixed(1)}</span><span class="hero-stat-unit">Ah</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Capacity</div><div class="hero-stat-val"><span>${cap.toFixed(0)}</span><span class="hero-stat-unit">Ah</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Avg cell temp</div><div class="hero-stat-val"><span>${meanTemp}</span><span class="hero-stat-unit">°C</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Drift</div><div class="hero-stat-val"><span>${(spread * 1000).toFixed(0)}</span><span class="hero-stat-unit">mV</span></div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="10" rx="1.5"/><path d="M17 10v4"/><path d="M6 9v6M10 9v6M14 9v6"/></svg> Cells</h2>
+        <div class="panel-sub">
+          <span class="pill ${driftCls}"><span class="pill-dot"></span>spread ${spread.toFixed(2)} V · min ${cellMin ? cellMin.toFixed(2) : "—"} · max ${cellMax ? cellMax.toFixed(2) : "—"}</span>
+        </div>
+      </div>
+      <div class="cell-row-cells" style="margin-top:.5rem">
+        ${cells.map((cv, ci) => {
+          let cls = "cell-chip";
+          if (cv === cellMin && spread > 0.01) cls += " is-min";
+          if (cv === cellMax && spread > 0.01) cls += " is-max";
+          if (cv > 3.65) cls += " is-high";
+          return `<div class="${cls}"><span class="cell-chip-k">cell ${ci+1}</span><span class="cell-chip-v">${cv != null ? cv.toFixed(2) + " V" : "—"}</span></div>`;
+        }).join("")}
+      </div>
+    </section>
+
+    ${buildLifetimeBlock(dev)}
+    ${buildHistoryBlock(dev, "voltage_v")}
+  `;
+}
+
+function buildShuntDetail(dev) {
+  const l = dev.latest || {};
+  const v = +l.voltage_v || 0;
+  const i = +l.current_a || 0;
+  const w = l.power_w != null ? +l.power_w : v * i;
+  const soc = +l.soc_pct || 0;
+  const direction = Math.abs(w) < 1 ? "idle" : (w > 0 ? "charging" : "discharging");
+  const flowText = direction === "idle" ? "Idle" : `${fmt.signed(w, 0)} W`;
+
+  return `
+    <section class="hero-v2 soc-${soc < 20 ? "low" : soc < 50 ? "mid" : "high"}">
+      <div class="hero-donut-wrap ${direction}">
+        <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14" />
+          <circle class="donut-arc soc-${soc < 20 ? "low" : soc < 50 ? "mid" : "high"}"
+                  cx="100" cy="100" r="86" fill="none" stroke-width="14"
+                  pathLength="100" stroke-dasharray="${soc} ${100 - soc}"
+                  stroke-linecap="round" transform="rotate(-90 100 100)" />
+        </svg>
+        <div class="donut-center">
+          <div class="donut-pct"><span>${soc.toFixed(1)}</span><span class="donut-pct-unit">%</span></div>
+          <div class="donut-label">Bank SoC</div>
+          <div class="donut-flow ${direction}"><span class="donut-flow-arrow"></span><span>${flowText}</span></div>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat hero-stat--big"><div class="meta-k">Voltage</div><div class="hero-stat-val"><span>${v.toFixed(2)}</span><span class="hero-stat-unit">V</span></div></div>
+        <div class="hero-stat hero-stat--big"><div class="meta-k">Current</div><div class="hero-stat-val ${direction === "charging" ? "power-charging" : direction === "discharging" ? "power-discharging" : ""}"><span>${fmt.signed(i, 2)}</span><span class="hero-stat-unit">A</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Power</div><div class="hero-stat-val"><span>${fmt.signed(w, 0)}</span><span class="hero-stat-unit">W</span></div></div>
+        <div class="hero-stat"><div class="meta-k">Remaining</div><div class="hero-stat-val"><span>${(+l.remaining_ah || 0).toFixed(1)}</span><span class="hero-stat-unit">Ah</span></div></div>
+      </div>
+    </section>
+
+    ${buildHistoryBlock(dev, "voltage_v")}
+  `;
+}
+
+function buildControllerDetail(dev) {
+  const l = dev.latest || {};
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M3.5 12H6M18 12h2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg> Charging</h2>
+        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "—"}</span></div>
+      </div>
+      <div class="today-strip" style="margin-top:.4rem">
+        <div class="today-cell"><span class="meta-k">PV input</span><span class="today-v">${fmt.num(l.pv_power_w, 0)} W</span></div>
+        <div class="today-cell"><span class="meta-k">PV voltage</span><span class="today-v">${fmt.num(l.pv_voltage_v, 1)} V</span></div>
+        <div class="today-cell"><span class="meta-k">PV current</span><span class="today-v">${fmt.num(l.pv_current_a, 2)} A</span></div>
+        <div class="today-cell"><span class="meta-k">To battery</span><span class="today-v">${fmt.num(l.battery_current_a, 2)} A @ ${fmt.num(l.battery_voltage_v, 1)} V</span></div>
+        <div class="today-cell"><span class="meta-k">Today</span><span class="today-v">${fmt.wh(l.energy_today_wh)}</span></div>
+        <div class="today-cell"><span class="meta-k">Lifetime</span><span class="today-v">${fmt.wh(l.energy_total_wh)}</span></div>
+        <div class="today-cell"><span class="meta-k">Peak today</span><span class="today-v">${fmt.num(l.max_charging_power_today_w, 0)} W</span></div>
+        <div class="today-cell"><span class="meta-k">Temp</span><span class="today-v">${fmt.num(l.controller_temperature_c, 0)} °C</span></div>
+      </div>
+    </section>
+    ${buildHistoryBlock(dev, "pv_power_w")}
+  `;
+}
+
+function buildGenericDetail(dev) {
+  // Fallback: dump all numeric metrics as a metric table + history.
+  const l = dev.latest || {};
+  const rows = Object.entries(l)
+    .filter(([k, v]) => typeof v === "number" && !k.startsWith("_"))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => {
+      const unit = unitFromKey(k);
+      return `<div class="dev-card-row"><span class="k">${prettyKey(k)}</span><span class="v">${fmt.num(v)}${unit ? " " + unit : ""}</span></div>`;
+    }).join("");
+  return `
+    <section class="panel">
+      <div class="panel-header"><h2>All metrics</h2></div>
+      ${rows}
+    </section>
+    ${buildHistoryBlock(dev, Object.keys(l).find(k => typeof l[k] === "number" && !k.startsWith("_")) || "")}
+  `;
+}
+
+function buildLifetimeBlock(dev) {
+  return `
+    <section class="panel" id="dd-lifetime-${dev.label}">
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Lifetime</h2>
+      </div>
+      <div class="dev-card-lifetime" style="margin-top:.25rem">
+        <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">—</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">—</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>
+      </div>
+    </section>
+  `;
+}
+
+function buildHistoryBlock(dev, defaultMetric) {
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/></svg> History</h2>
+        <div class="chart-controls">
+          <select id="dd-metric" aria-label="Metric"></select>
+          <div class="range-btns" id="dd-range">
+            <button data-range="1h">1h</button>
+            <button data-range="6h">6h</button>
+            <button data-range="24h" class="active">24h</button>
+            <button data-range="7d">7d</button>
+            <button data-range="30d">30d</button>
+          </div>
+        </div>
+      </div>
+      <div id="dd-chart" class="chart-host" data-default-metric="${defaultMetric}"></div>
+    </section>
+  `;
+}
+
+function wireDeviceDetailChart(dev) {
+  const select = document.querySelector("#dd-metric");
+  const host = document.querySelector("#dd-chart");
+  if (!select || !host) return;
+  const defaultMetric = host.dataset.defaultMetric;
+
+  // Populate metric dropdown from this device's latest numeric keys
+  const l = dev.latest || {};
+  const keys = Object.entries(l)
+    .filter(([k, v]) => typeof v === "number" && !k.startsWith("_"))
+    .map(([k]) => k)
+    .sort();
+  select.innerHTML = keys.map(k => `<option value="${k}">${prettyKey(k)}</option>`).join("");
+  if (keys.includes(defaultMetric)) select.value = defaultMetric;
+
+  let range = "24h";
+  document.querySelectorAll("#dd-range button").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("#dd-range button").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      range = b.dataset.range;
+      draw();
+    });
+  });
+  select.addEventListener("change", draw);
+
+  async function draw() {
+    const m = select.value;
+    if (!m) return;
+    const [since, bucket] = sinceForRange(range);
+    let data;
+    try {
+      data = await api(`/api/devices/${encodeURIComponent(dev.label)}/history?metric=${encodeURIComponent(m)}&since=${since}&bucket=${bucket}`);
+    } catch (e) { console.error(e); return; }
+    if (devDetailChart) { devDetailChart.destroy(); devDetailChart = null; }
+    const unit = unitFromKey(m);
+    const width = Math.max(host.clientWidth, 320);
+    try {
+      devDetailChart = new uPlot({
+        width, height: 320,
+        scales: { x: { time: true } },
+        series: [
+          {},
+          {
+            label: prettyKey(m),
+            stroke: "#58a6ff",
+            width: 2,
+            fill: "rgba(88,166,255,0.16)",
+            value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+          },
+        ],
+        axes: [
+          { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.08)" } },
+          { stroke: "#6b7689", grid: { stroke: "rgba(106,118,137,0.08)" },
+            values: (_u, splits) => splits.map(v => v == null ? "" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`) },
+        ],
+      }, [data.ts, data.values], host);
+    } catch (e) { console.error(e); }
+  }
+  draw();
+
+  // Lifetime stats (smart battery only)
+  if (dev.kind === "smart_battery") {
+    ensureLifetime(dev.label).then(lt => {
+      if (!lt) return;
+      const block = document.querySelector(`#dd-lifetime-${dev.label}`);
+      if (!block) return;
+      block.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "—";
+      block.querySelector('[data-lt="ah_in"]').textContent = `${(+lt.ah_in).toFixed(1)} Ah`;
+      block.querySelector('[data-lt="ah_out"]').textContent = `${(+lt.ah_out).toFixed(1)} Ah`;
+    });
+  }
+}
+
 // boot
-setRoute(currentRoute());
+setRoute(currentRouteName());
 refresh().then(() => {
   // Once the first poll list arrives, kick off the drift sparkline + heatmap
   // refreshes for whichever route the user landed on.
-  if (currentRoute() === "dashboard") refreshDriftSparkline();
-  if (currentRoute() === "history") { refreshChart(); refreshHeatmap(); }
+  if (currentRouteName() === "dashboard") refreshDriftSparkline();
+  if (currentRouteName() === "history") { refreshChart(); refreshHeatmap(); }
 });
 setInterval(refresh, 5000);
 setInterval(() => {
-  if (currentRoute() === "history") refreshChart();
+  if (currentRouteName() === "history") refreshChart();
 }, 30000);

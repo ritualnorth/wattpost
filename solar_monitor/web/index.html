@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0d12" />
   <title>solar-monitor</title>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=23" />
+  <link rel="stylesheet" href="/web/styles.css?v=24" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -231,6 +231,12 @@
     </section>
 
     <!-- =====================================================
+         ROUTE: Per-device detail (#/device/<label>)
+         Content rendered dynamically by renderDeviceDetail().
+         ===================================================== -->
+    <section class="route" data-route="device" id="device-route"></section>
+
+    <!-- =====================================================
          ROUTE: Setup (placeholder for wizard)
          ===================================================== -->
     <section class="route" data-route="setup">
@@ -314,6 +320,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=23"></script>
+  <script src="/web/app.js?v=24"></script>
 </body>
 </html>
