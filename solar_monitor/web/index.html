@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0a0d12" />
-  <title>solar-monitor</title>
+  <title>WattPost</title>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=37" />
+  <link rel="stylesheet" href="/web/styles.css?v=38" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -14,11 +14,18 @@
 
   <header class="app-header">
     <div class="brand">
-      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="4"></circle>
-        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+           aria-label="WattPost">
+        <!-- Sign plaque -->
+        <rect x="3" y="2" width="18" height="11" rx="1.6"/>
+        <!-- Single-leg post going down -->
+        <line x1="12" y1="13" x2="12" y2="21"/>
+        <!-- Lightning bolt inside the sign -->
+        <path d="M13.8 3.6 L9.2 8.6 L11.5 8.6 L10.2 11.8 L14.8 6.8 L12.5 6.8 Z"
+              fill="currentColor" stroke="none"/>
       </svg>
-      <span class="title">solar-monitor</span>
+      <span class="title">WattPost</span>
     </div>
     <div id="status" class="status">
       <span class="dot"></span>
@@ -320,6 +327,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=37"></script>
+  <script src="/web/app.js?v=38"></script>
 </body>
 </html>
