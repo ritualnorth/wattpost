@@ -920,7 +920,28 @@ async function refreshChart() {
   try {
     data = await api(`/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}&since=${since}&bucket=${bucket}`);
   } catch (e) { console.error(e); return; }
+  updateStatStrip(metric, data);
   drawChart(label, metric, data);
+}
+
+function updateStatStrip(metric, data) {
+  const unit = unitFromKey(metric);
+  const s = data?.stats || {};
+  const fmtV = (v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`;
+  $("#cs-now").textContent   = fmtV(s.now);
+  $("#cs-min").textContent   = fmtV(s.min);
+  $("#cs-avg").textContent   = fmtV(s.avg);
+  $("#cs-max").textContent   = fmtV(s.max);
+  $("#cs-range").textContent = s.range == null ? "—" : `${(+s.range).toFixed(2)}${unit ? " " + unit : ""}`;
+
+  // Resolution = bucket / table info: tell the user how dense the data is
+  const tableLabel = {
+    samples: "raw",
+    samples_1min: "1-min avg",
+    samples_1hour: "1-hour avg",
+    samples_1day: "1-day avg",
+  }[data?.table] || "—";
+  $("#cs-res").textContent = `${s.count ?? 0} pts · ${tableLabel}`;
 }
 
 function drawChart(label, metric, data) {
@@ -928,26 +949,83 @@ function drawChart(label, metric, data) {
   if (chart) { chart.destroy(); chart = null; }
   const unit = unitFromKey(metric);
   const width = Math.max(root.clientWidth, 320);
+
+  const ts = data.ts;
+  const vals = data.values;
+  const hasBand = Array.isArray(data.min) && Array.isArray(data.max) && data.min.length === ts.length;
+
+  // Series stack: [x, min (transparent), max (band fill), avg (line + fill)]
+  // We draw min underneath, then max with a translucent band-fill between
+  // them via uPlot's `band` feature.
+  const series = [
+    {},
+    // min line (invisible — just anchors the band)
+    hasBand ? {
+      label: "min",
+      stroke: "rgba(0,0,0,0)",
+      width: 0,
+      points: { show: false },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    } : null,
+    // max line (also invisible — band fills between this and min)
+    hasBand ? {
+      label: "max",
+      stroke: "rgba(0,0,0,0)",
+      width: 0,
+      fill: "rgba(88,166,255,0.10)",
+      points: { show: false },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    } : null,
+    // The main line — the avg/value series
+    {
+      label: prettyKey(metric),
+      stroke: "#58a6ff",
+      width: 2,
+      fill: "rgba(88,166,255,0.18)",
+      paths: uPlot.paths.spline ? uPlot.paths.spline() : undefined,
+      points: { show: ts.length < 60, size: 4, fill: "#58a6ff" },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    },
+  ].filter(Boolean);
+
+  const dataMatrix = hasBand ? [ts, data.min, data.max, vals] : [ts, vals];
+
   const opts = {
     width, height: 340,
+    cursor: { drag: { x: true, y: false }, points: { show: true } },
     scales: { x: { time: true } },
-    series: [
-      {},
+    series,
+    bands: hasBand ? [{ series: [2, 1], fill: "rgba(88,166,255,0.10)" }] : [],
+    axes: [
       {
-        label: `${prettyKey(metric)}${unit ? " (" + unit + ")" : ""}`,
-        stroke: "#58a6ff",
-        width: 1.7,
-        fill: "rgba(88,166,255,0.12)",
-        value: (u, v) => v == null ? "—" : v.toFixed(2) + (unit ? " " + unit : ""),
+        stroke: "#6b7689",
+        grid:   { stroke: "rgba(106,118,137,0.08)" },
+        ticks:  { stroke: "rgba(106,118,137,0.15)" },
+        space: 60,
+        font: "11px var(--mono)",
+      },
+      {
+        stroke: "#6b7689",
+        grid:   { stroke: "rgba(106,118,137,0.08)" },
+        ticks:  { stroke: "rgba(106,118,137,0.15)" },
+        space: 28,
+        font: "11px var(--mono)",
+        // Format axis ticks with unit suffix where it makes sense
+        values: (_u, splits) => splits.map(v => {
+          if (v == null) return "";
+          const abs = Math.abs(v);
+          if (abs >= 1000) return (v / 1000).toFixed(1) + "k" + (unit || "");
+          if (abs >= 100)  return v.toFixed(0) + (unit ? " " + unit : "");
+          if (abs >= 10)   return v.toFixed(1) + (unit ? " " + unit : "");
+          return v.toFixed(2) + (unit ? " " + unit : "");
+        }),
       },
     ],
-    axes: [
-      { stroke: "#9aa6b8", grid: { stroke: "rgba(106,118,137,0.12)" }, ticks: { stroke: "rgba(106,118,137,0.2)" } },
-      { stroke: "#9aa6b8", grid: { stroke: "rgba(106,118,137,0.12)" }, ticks: { stroke: "rgba(106,118,137,0.2)" } },
-    ],
+    legend: { live: true },
   };
+
   try {
-    chart = new uPlot(opts, [data.ts, data.values], root);
+    chart = new uPlot(opts, dataMatrix, root);
   } catch (e) {
     console.error("uPlot failed:", e, { data, width, root });
     root.innerHTML = `<div style="padding:1rem;color:var(--red)">Chart render failed: ${e.message}</div>`;

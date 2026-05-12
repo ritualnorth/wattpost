@@ -833,13 +833,79 @@ main {
 .range-btns button.active {
   color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
 }
-/* uPlot renders the chart at the configured height and the legend
- * as extra DOM below. A fixed container height crops the legend, so we
- * use min-height and let the container grow to fit. */
+/* ===== History chart panel ===== */
+.chart-panel {
+  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.07), rgba(88,166,255,0) 70%);
+}
+
+/* Inline header controls (replaces the stacked label+select layout) */
+.chart-controls > select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .42rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: inherit;
+  min-width: 0;
+  max-width: 180px;
+}
+.chart-controls > select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* ----- Stat strip ----- */
+.chart-statstrip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .5rem;
+  margin: 0 0 1rem;
+  padding: .6rem .5rem;
+  background: linear-gradient(180deg, var(--surface-2), transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.cs-cell {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding: 0 .5rem;
+}
+.cs-cell + .cs-cell { border-left: 1px solid var(--border-2); }
+.cs-cell .cs-k {
+  font-size: .65rem; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+  margin-bottom: .15rem;
+}
+.cs-cell .cs-v {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cs-cell--now .cs-v { color: var(--accent); font-size: 1.15rem; }
+.cs-cell--res .cs-v { font-size: .82rem; color: var(--text-2); }
+@media (max-width: 720px) {
+  .chart-statstrip { grid-template-columns: repeat(3, 1fr); gap: .35rem; }
+  .cs-cell + .cs-cell { border-left: none; }
+  .cs-cell { padding: .35rem .35rem; background: var(--surface-2); border-radius: var(--r-sm); }
+}
+
+/* ----- The chart itself ----- */
 .chart-host {
   min-height: 380px;
   padding-bottom: .5rem;
 }
+/* Style uPlot's own legend + crosshair to feel like part of the design */
+.u-legend {
+  margin-top: .5rem !important;
+  font-family: var(--font) !important;
+  font-size: .82rem !important;
+  color: var(--text-2) !important;
+}
+.u-legend .u-label, .u-legend .u-value { color: var(--text) !important; }
+.u-cursor-x, .u-cursor-y { background: var(--accent) !important; opacity: 0.5 !important; }
+.u-cursor-pt { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent) !important; }
 .uplot { font-family: var(--font) !important; }
 
 /* ---------------- device cards ---------------- */

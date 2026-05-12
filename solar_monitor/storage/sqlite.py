@@ -340,30 +340,39 @@ class Store:
         since: int,
         until: int | None = None,
         bucket_seconds: int | None = None,
-    ) -> list[tuple[int, float]]:
-        """Return [(ts, avg_or_value), ...] for the given range.
+    ) -> dict[str, Any]:
+        """Return time-series data + min/max bands + summary stats.
 
-        Picks raw `samples` for short ranges or one of the rollup tables for
-        longer ones. If `bucket_seconds` is set and exceeds the native bucket
-        of the chosen table, an extra SQL-side aggregation is applied so the
-        client gets a sensibly small payload.
+        Returns a dict with:
+          ts:     [unix-seconds, ...]
+          values: [number, ...]                  (raw value or avg)
+          min:    [number, ...] | None           (rollup min, if rollup table)
+          max:    [number, ...] | None           (rollup max, if rollup table)
+          stats:  {now, min, max, avg, count}
+          table:  which storage table the data came from
         """
         if self._db is None:
             raise RuntimeError("Store not open")
         until = until if until is not None else int(time.time())
         table, ts_col, native_bucket = self._pick_history_table(until - since)
+        is_rollup = table != "samples"
 
-        # Pick the right value expression: raw samples store `value`,
-        # rollups store `avg` (and min/max/n, which we don't surface here).
-        value_expr = "value" if table == "samples" else "avg"
-        agg_expr = f"AVG({value_expr})" if table == "samples" else f"AVG({value_expr})"
+        # Build the right SELECT clause: rollups have avg/min/max columns;
+        # raw samples only have the single `value`.
+        if is_rollup:
+            value_expr = "avg"
+            min_expr = "min"
+            max_expr = "max"
+        else:
+            value_expr = "value"
+            min_expr = "value"
+            max_expr = "value"
 
-        # If caller asked for a coarser bucket than the table's native one,
-        # do an extra GROUP BY on (ts / bucket).
         use_bucketing = bucket_seconds and bucket_seconds > native_bucket
         if use_bucketing:
             sql = (
-                f"SELECT ({ts_col} / ?) * ? AS bucket, {agg_expr} "
+                f"SELECT ({ts_col} / ?) * ? AS bucket, "
+                f"       AVG({value_expr}), MIN({min_expr}), MAX({max_expr}) "
                 f"FROM {table} "
                 f"WHERE device = ? AND metric = ? AND {ts_col} BETWEEN ? AND ? "
                 f"GROUP BY bucket "
@@ -372,18 +381,44 @@ class Store:
             params: tuple = (bucket_seconds, bucket_seconds, device, metric, since, until)
         else:
             sql = (
-                f"SELECT {ts_col}, {value_expr} "
+                f"SELECT {ts_col}, {value_expr}, {min_expr}, {max_expr} "
                 f"FROM {table} "
                 f"WHERE device = ? AND metric = ? AND {ts_col} BETWEEN ? AND ? "
                 f"ORDER BY {ts_col}"
             )
             params = (device, metric, since, until)
 
-        rows: list[tuple[int, float]] = []
+        ts: list[int] = []
+        values: list[float] = []
+        mins: list[float] = []
+        maxs: list[float] = []
         async with self._db.execute(sql, params) as cur:
-            async for ts, value in cur:
-                rows.append((int(ts), float(value)))
-        return rows
+            async for t, v, mn, mx in cur:
+                ts.append(int(t))
+                values.append(float(v))
+                mins.append(float(mn))
+                maxs.append(float(mx))
+
+        # Summary stats — computed once on the server so every client gets
+        # the same numbers without re-doing the math.
+        stats: dict[str, Any] = {"count": len(values)}
+        if values:
+            stats["now"] = round(values[-1], 4)
+            stats["min"] = round(min(mins), 4)
+            stats["max"] = round(max(maxs), 4)
+            stats["avg"] = round(sum(values) / len(values), 4)
+            stats["range"] = round(stats["max"] - stats["min"], 4)
+        else:
+            stats.update({"now": None, "min": None, "max": None, "avg": None, "range": None})
+
+        return {
+            "ts": ts,
+            "values": values,
+            "min": mins if is_rollup or use_bucketing else None,
+            "max": maxs if is_rollup or use_bucketing else None,
+            "stats": stats,
+            "table": table,
+        }
 
     # ---------- maintenance ----------
 

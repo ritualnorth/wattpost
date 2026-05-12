@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0d12" />
   <title>solar-monitor</title>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=17" />
+  <link rel="stylesheet" href="/web/styles.css?v=18" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -153,7 +153,7 @@
          ROUTE: History
          ===================================================== -->
     <section class="route" data-route="history">
-      <section class="panel">
+      <section class="panel chart-panel">
         <div class="panel-header">
           <h2>
             <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -162,8 +162,8 @@
             History
           </h2>
           <div class="chart-controls">
-            <label>Device <select id="sel-device"></select></label>
-            <label>Metric <select id="sel-metric"></select></label>
+            <select id="sel-device" aria-label="Device"></select>
+            <select id="sel-metric" aria-label="Metric"></select>
             <div class="range-btns">
               <button data-range="1h">1h</button>
               <button data-range="6h">6h</button>
@@ -173,6 +173,16 @@
             </div>
           </div>
         </div>
+
+        <div class="chart-statstrip" id="chart-stats">
+          <div class="cs-cell cs-cell--now"><span class="cs-k">Now</span><span class="cs-v" id="cs-now">—</span></div>
+          <div class="cs-cell"><span class="cs-k">Min</span><span class="cs-v" id="cs-min">—</span></div>
+          <div class="cs-cell"><span class="cs-k">Avg</span><span class="cs-v" id="cs-avg">—</span></div>
+          <div class="cs-cell"><span class="cs-k">Max</span><span class="cs-v" id="cs-max">—</span></div>
+          <div class="cs-cell"><span class="cs-k">Range</span><span class="cs-v" id="cs-range">—</span></div>
+          <div class="cs-cell cs-cell--res"><span class="cs-k">Resolution</span><span class="cs-v" id="cs-res">—</span></div>
+        </div>
+
         <div id="chart" class="chart-host"></div>
       </section>
     </section>
@@ -282,6 +292,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=17"></script>
+  <script src="/web/app.js?v=18"></script>
 </body>
 </html>

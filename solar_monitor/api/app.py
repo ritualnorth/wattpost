@@ -91,17 +91,16 @@ async def device_history(
     now = int(time.time())
     since = since if since is not None else now - 24 * 3600
     until = until if until is not None else now
-    rows = await store.get_history(label, metric, since, until, bucket_seconds=bucket)
+    payload = await store.get_history(label, metric, since, until, bucket_seconds=bucket)
     return {
         "label": label,
         "metric": metric,
         "since": since,
         "until": until,
         "bucket_seconds": bucket,
-        # Two arrays form (x, y) — uPlot expects this shape.
-        "ts": [r[0] for r in rows],
-        "values": [r[1] for r in rows],
-        "count": len(rows),
+        **payload,
+        # legacy alias for existing callers
+        "count": payload["stats"]["count"],
     }
 
 
