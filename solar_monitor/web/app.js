@@ -1148,7 +1148,9 @@ function drawChart(label, metric, data) {
         stroke: "#6b7689",
         grid:  { stroke: "rgba(106,118,137,0.08)" },
         ticks: { stroke: "rgba(106,118,137,0.15)" },
-        space: 60,
+        // Tighter tick spacing so a 6-hour chart shows 1-hour increments
+        // (6pm/7pm/8pm/9pm/10pm) rather than just 2-hour bookends.
+        space: 45,
         size: 36,
       },
       {
