@@ -571,52 +571,61 @@ main {
   padding: 0 .25rem;
 }
 @media (max-width: 720px) {
-  /* Portrait phones: stack vertically AND rotate the arrows 90° so the
-   * flow direction reads top → bottom. */
+  /* Portrait phones: stack vertically. Connector becomes a vertical
+   * column with a thicker line, chunky down-triangle, and the W label
+   * as a centered pill on the line — same pattern as Cerbo / Sol-Ark /
+   * Powerwall apps. */
   .flow {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
   }
   .flow-col { width: 100%; }
+
   .flow-conn {
-    width: auto;
+    position: relative;
+    width: 100%;
+    height: 72px;
     min-height: 0;
-    height: 58px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: .6rem;
     align-self: stretch;
     padding: 0;
+    /* abandon row-flex layout used elsewhere — children are absolutely
+     * positioned within this container */
+    display: block;
   }
   .flow-arrow {
-    width: 24px;
-    height: 100%;
-    position: relative;
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    display: block !important;
   }
-  /* Vertical line — *fully* override every positional prop the
-   * landscape rule set, including `right` and `transform`. */
+  /* Vertical line — thicker, rounded ends */
   .flow-arrow::before {
-    top: 4px !important;
-    bottom: 12px !important;
+    content: "";
+    position: absolute !important;
+    top: 2px !important;
+    bottom: 16px !important;
     left: 50% !important;
     right: auto !important;
-    width: 2px !important;
+    width: 3px !important;
     height: auto !important;
-    transform: translateX(-50%) !important;
     background: var(--border-2);
+    border-radius: 3px;
+    transform: translateX(-50%) !important;
   }
-  /* Down-pointing arrowhead at the bottom of the line */
+  /* Chunky down-triangle at the bottom of the line */
   .flow-arrow::after {
+    content: "";
+    position: absolute !important;
     top: auto !important;
     bottom: 0 !important;
     left: 50% !important;
     right: auto !important;
     width: 0 !important;
     height: 0 !important;
-    border-width: 7px 6px 0 6px !important;
     border-style: solid !important;
+    border-width: 14px 9px 0 9px !important;
     border-color: var(--border-2) transparent transparent transparent !important;
     transform: translateX(-50%) !important;
     background: transparent !important;
@@ -627,23 +636,45 @@ main {
   .flow-arrow.active::after {
     border-top-color: var(--to) !important;
   }
-  /* Animated dot travels top → bottom along the line */
+  /* Animated dot drops top → bottom along the line */
   .flow-arrow.active .dot {
+    position: absolute;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--to);
+    box-shadow: 0 0 12px var(--to);
     left: 50%;
     top: 0;
-    transform: translate(-50%, 0);
+    transform: translateX(-50%);
     animation: flow-dot-v 1.8s linear infinite;
   }
   @keyframes flow-dot-v {
     from { top: 0%;   opacity: 0; }
     10%  {            opacity: 1; }
     90%  {            opacity: 1; }
-    to   { top: calc(100% - 12px); opacity: 0; }
+    to   { top: calc(100% - 22px); opacity: 0; }
   }
+  /* W label as a centered pill on the line — visually anchors the
+   * connector to a meaningful number rather than dangling off to the side */
   .flow-arrow-label {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--surface);
+    padding: 3px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border-2);
     font-family: var(--mono);
-    font-size: .82rem;
+    font-size: .78rem;
+    font-weight: 600;
     color: var(--text-2);
+    z-index: 2;
+    white-space: nowrap;
+  }
+  .flow-arrow.active + .flow-arrow-label,
+  .flow-conn:has(.flow-arrow.active) .flow-arrow-label {
+    color: var(--text);
+    border-color: var(--accent);
   }
 }
 .flow-arrow {
