@@ -234,13 +234,16 @@ async function refresh() {
 }
 
 function renderStatus(run) {
-  if (!run.last_run) { setStatus("warn", "no poll yet"); return; }
+  if (!run.last_run) { setStatus("warn", "Connecting…"); return; }
   const lr = run.last_run;
-  const cls = lr.errors_count > 0 ? "warn" : (run.scheduler_running ? "ok" : "err");
-  const parts = [`${lr.devices_ok} device${lr.devices_ok === 1 ? "" : "s"}`,
-                 `${lr.elapsed_ms} ms`, fmt.ago(lr.ts)];
-  if (lr.errors_count) parts.push(`${lr.errors_count} err`);
-  setStatus(cls, parts.join(" · "));
+  const ageS = Math.floor(Date.now() / 1000) - lr.ts;
+  // Detailed metrics live in Settings. Header pill is just the answer
+  // to "am I OK?" — one word + (optional) error count.
+  if (!run.scheduler_running)        setStatus("err",  "Offline");
+  else if (ageS > 300)                setStatus("err",  "Stale");
+  else if (lr.errors_count > 0)       setStatus("warn", `${lr.errors_count} error${lr.errors_count===1?"":"s"}`);
+  else if (ageS > 120)                setStatus("warn", "Comms slow");
+  else                                 setStatus("ok",   "Healthy");
 }
 
 // ---------- BANK AGGREGATE ----------

@@ -105,9 +105,23 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.brand { display: flex; align-items: center; gap: .6rem; }
-.brand .logo { width: 22px; height: 22px; color: var(--accent); }
-.brand .title { font-weight: 600; font-size: 0.95rem; letter-spacing: 0.02em; }
+.brand { display: flex; align-items: center; gap: .6rem; min-width: 0; }
+.brand .logo { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
+.brand .title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 420px) {
+  .brand .title { font-size: .9rem; }
+}
+@media (max-width: 360px) {
+  /* Very narrow: hide the wordmark, just show the logo icon */
+  .brand .title { display: none; }
+}
 
 .status {
   display: flex; align-items: center; gap: .55rem;
@@ -127,6 +141,11 @@ body {
   color: inherit;
 }
 .status-icon svg { width: 100%; height: 100%; }
+@media (max-width: 360px) {
+  /* Very narrow phones: drop the text — dot + icon say everything */
+  .status .text { display: none; }
+  .status { padding: .35rem .55rem; }
+}
 .status.ok   { color: var(--green); }
 .status.ok   .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(63,185,80,0.15); }
 .status.warn { color: var(--amber); }
