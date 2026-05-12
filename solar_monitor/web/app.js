@@ -951,6 +951,50 @@ function drawChart(label, metric, data) {
   }
 }
 
+// ---------- routing ----------
+// Hash-based. Default route = dashboard. Switching to History rebuilds
+// the chart so uPlot sees a non-zero container width.
+const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings"]);
+
+function currentRoute() {
+  const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
+  return VALID_ROUTES.has(raw) ? raw : "dashboard";
+}
+
+function setRoute(route) {
+  if (!VALID_ROUTES.has(route)) route = "dashboard";
+  document.querySelectorAll(".route").forEach(s => {
+    s.classList.toggle("active", s.dataset.route === route);
+  });
+  document.querySelectorAll(".nav-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === route);
+  });
+  // History tab was hidden → chart was sized to 0. Redraw on entry.
+  if (route === "history") {
+    requestAnimationFrame(() => refreshChart());
+  }
+  if (route === "settings") {
+    renderSettings();
+  }
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+window.addEventListener("hashchange", () => setRoute(currentRoute()));
+
+// ---------- settings panel ----------
+function renderSettings() {
+  if (lastRun) {
+    $("#settings-last-poll").textContent =
+      `${lastRun.elapsed_ms} ms · ${fmt.ago(lastRun.ts)}`;
+    $("#settings-errors").textContent = String(lastRun.errors_count);
+  }
+  // Daemon status implied from the same source as the header pill.
+  const ok = lastRun && lastRun.errors_count === 0;
+  $("#settings-daemon").textContent = ok ? "running, healthy" : (lastRun ? "running, errors" : "no data");
+  // MQTT we don't query directly; best effort message until /api/exporters exists
+  $("#settings-mqtt").textContent = "see config.yaml";
+}
+
 // ---------- wiring ----------
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);
@@ -963,10 +1007,15 @@ for (const btn of document.querySelectorAll("[data-range]")) {
   });
 }
 window.addEventListener("resize", () => {
-  if (chart) chart.setSize({ width: $("#chart").clientWidth, height: 340 });
+  if (chart && currentRoute() === "history") {
+    chart.setSize({ width: $("#chart").clientWidth, height: 340 });
+  }
 });
 
 // boot
+setRoute(currentRoute());
 refresh();
 setInterval(refresh, 5000);
-setInterval(refreshChart, 30000);
+setInterval(() => {
+  if (currentRoute() === "history") refreshChart();
+}, 30000);
