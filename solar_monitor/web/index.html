@@ -15,14 +15,16 @@
   <header class="app-header">
     <div class="brand">
       <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
            aria-label="WattPost">
-        <!-- Vertical post on the left (UK fingerpost style) -->
-        <line x1="4" y1="2" x2="4" y2="22"/>
-        <!-- Pointed sign extending right from the post -->
-        <path d="M4 4 L17 4 L21 7.5 L17 11 L4 11"/>
-        <!-- Lightning bolt centred on the sign -->
-        <path d="M13 5 L10 8 L12.5 8 L12 10.5 L15 7 L12.5 7 Z"
+        <!-- Sturdy vertical post on the left -->
+        <line x1="6" y1="2" x2="6" y2="22"/>
+        <!-- Fingerpost sign — proper rectangular body with a chamfered
+             point on the right end. Closed path so the outline reads as
+             a defined sign rather than a flag wedge. -->
+        <path d="M6 5 L18 5 L21 9 L18 13 L6 13 Z"/>
+        <!-- Lightning bolt — sized to be visible at 22 px header scale -->
+        <path d="M14 6 L10 10 L12.5 10 L11 12 L15 8 L12.5 8 Z"
               fill="currentColor" stroke="none"/>
       </svg>
       <span class="title">WattPost</span>
