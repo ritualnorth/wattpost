@@ -1,0 +1,61 @@
+# solar-monitor config — copy to config.yaml and edit.
+#
+# Each transport is one connection to one bus. Each device sits on a transport
+# at a Modbus slave id. The same transport can carry many devices.
+
+transports:
+  - id: hub_bt
+    type: ble_modbus
+    address: CC:45:A5:83:B7:42       # the BT-2 dongle's BLE MAC
+    # Optional overrides:
+    # write_char: "0000ffd1-0000-1000-8000-00805f9b34fb"
+    # notify_char: "0000fff1-0000-1000-8000-00805f9b34fb"
+    # discovery_timeout: 20
+
+  # When you wire RS-485 directly into the Pi, add a second transport:
+  # - id: hub_rs485
+  #   type: serial_modbus
+  #   port: /dev/ttyUSB0
+  #   baudrate: 9600
+
+devices:
+  - vendor: renogy
+    kind: charge_controller
+    transport: hub_bt
+    slave_id: 16
+    label: rover_mppt
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 48
+    label: battery_0
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 49
+    label: battery_1
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 50
+    label: battery_2
+
+# Optional: stream every poll result to an MQTT broker so power users can
+# pipe data into Home Assistant, Grafana, or their own automations.
+# Topics published (with default prefix "solar"):
+#   solar/<device_label>/state       full device snapshot (retained)
+#   solar/<device_label>/<metric>    individual values (retained, optional)
+#   solar/_status                    online/offline (LWT)
+# exporters:
+#   - id: hass_mqtt
+#     type: mqtt
+#     host: 192.168.1.20
+#     port: 1883
+#     username: solar
+#     password: changeme
+#     topic_prefix: solar
+#     retain: true
+#     publish_per_metric: true

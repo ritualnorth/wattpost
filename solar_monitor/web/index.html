@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0d12" />
+  <title>solar-monitor</title>
+  <link rel="stylesheet" href="/web/uPlot.min.css" />
+  <link rel="stylesheet" href="/web/styles.css?v=11" />
+</head>
+<body>
+  <!-- Conditional alert banner — populated by JS, hidden when no alerts -->
+  <div id="alerts" class="alerts" hidden></div>
+
+  <header class="app-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/>
+      </svg>
+      <span class="title">solar-monitor</span>
+    </div>
+    <div id="status" class="status">
+      <span class="dot"></span>
+      <span class="status-icon"></span>
+      <span class="text">connecting…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO: bank donut + key metrics -->
+    <section class="hero-v2">
+      <div class="hero-donut-wrap" id="donut-wrap">
+        <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14" />
+          <circle id="donut-arc" class="donut-arc" cx="100" cy="100" r="86" fill="none" stroke-width="14"
+                  pathLength="100" stroke-dasharray="0 100" stroke-linecap="round"
+                  transform="rotate(-90 100 100)" />
+          <!-- animated pulse — a short bright dash travels around the ring
+               in the direction of energy flow when the bank is active -->
+          <circle id="donut-pulse" class="donut-pulse" cx="100" cy="100" r="86"
+                  fill="none" stroke-width="14"
+                  pathLength="100" stroke-dasharray="4 96" stroke-linecap="round"
+                  transform="rotate(-90 100 100)" />
+        </svg>
+        <div class="donut-center">
+          <div class="donut-pct"><span id="bank-soc">—</span><span class="donut-pct-unit">%</span></div>
+          <div class="donut-label">State of charge</div>
+          <div class="donut-flow" id="donut-flow"><span class="donut-flow-arrow"></span><span class="donut-flow-text">—</span></div>
+        </div>
+      </div>
+
+      <div class="hero-stats">
+        <div class="hero-stat hero-stat--big" id="bank-power-tile">
+          <div class="meta-k">Net power</div>
+          <div class="hero-stat-val">
+            <span id="bank-power">—</span><span class="hero-stat-unit">W</span>
+          </div>
+          <div class="hero-stat-sub" id="bank-power-sub">—</div>
+        </div>
+        <div class="hero-stat hero-stat--big" id="bank-time-tile">
+          <div class="meta-k">Remaining</div>
+          <div class="hero-stat-val">
+            <span id="bank-time">—</span>
+          </div>
+          <div class="hero-stat-sub" id="bank-time-sub">—</div>
+        </div>
+        <div class="hero-stat">
+          <div class="meta-k">Voltage</div>
+          <div class="hero-stat-val"><span id="bank-voltage">—</span><span class="hero-stat-unit">V</span></div>
+        </div>
+        <div class="hero-stat">
+          <div class="meta-k">Capacity</div>
+          <div class="hero-stat-val"><span id="bank-capacity">—</span><span class="hero-stat-unit">Ah</span></div>
+        </div>
+        <div class="hero-stat">
+          <div class="meta-k">Remaining</div>
+          <div class="hero-stat-val"><span id="bank-remaining">—</span><span class="hero-stat-unit">Ah</span></div>
+        </div>
+        <div class="hero-stat">
+          <div class="meta-k">Bank</div>
+          <div class="hero-stat-val"><span id="bank-meta">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- POWER FLOW: data-driven; tiles appear / disappear with devices -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h6m6 0h6"/>
+            <path d="M9 8l-4 4 4 4"/>
+            <path d="M15 8l4 4-4 4"/>
+          </svg>
+          Power flow
+        </h2>
+        <div class="panel-sub" id="flow-sub">—</div>
+      </div>
+      <div id="flow" class="flow"></div>
+    </section>
+
+    <!-- TODAY: aggregate stats -->
+    <section class="panel today-panel">
+      <div class="panel-header today-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          Today
+        </h2>
+      </div>
+      <div class="today-strip" id="today-strip">
+        <div class="today-cell"><span class="meta-k">PV today</span><span class="today-v" id="today-pv">—</span></div>
+        <div class="today-cell"><span class="meta-k">Charged Ah</span><span class="today-v" id="today-charged">—</span></div>
+        <div class="today-cell"><span class="meta-k">Peak today</span><span class="today-v" id="today-peak">—</span></div>
+        <div class="today-cell"><span class="meta-k">Load today</span><span class="today-v" id="today-load">—</span></div>
+        <div class="today-cell"><span class="meta-k">Lifetime</span><span class="today-v" id="today-lifetime">—</span></div>
+      </div>
+    </section>
+
+    <!-- CELL BALANCE -->
+    <section class="panel" id="panel-cells">
+      <div class="panel-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="7" width="14" height="10" rx="1.5"/>
+            <path d="M17 10v4"/>
+            <path d="M6 9v6M10 9v6M14 9v6"/>
+          </svg>
+          Cell balance
+        </h2>
+        <div class="panel-sub" id="cells-summary">—</div>
+      </div>
+      <div class="cells-grid" id="cells-grid"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 17l5-6 4 3 4-7 5 6"/>
+            <path d="M3 21h18"/>
+          </svg>
+          History
+        </h2>
+        <div class="chart-controls">
+          <label>Device <select id="sel-device"></select></label>
+          <label>Metric <select id="sel-metric"></select></label>
+          <div class="range-btns">
+            <button data-range="1h">1h</button>
+            <button data-range="6h">6h</button>
+            <button data-range="24h" class="active">24h</button>
+            <button data-range="7d">7d</button>
+            <button data-range="30d">30d</button>
+          </div>
+        </div>
+      </div>
+      <div id="chart" class="chart-host"></div>
+    </section>
+
+    <!-- DEVICES -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="5" width="16" height="6" rx="1.5"/>
+            <rect x="4" y="13" width="16" height="6" rx="1.5"/>
+            <circle cx="8" cy="8" r="0.6" fill="currentColor"/>
+            <circle cx="8" cy="16" r="0.6" fill="currentColor"/>
+          </svg>
+          Devices
+        </h2>
+        <div class="panel-sub" id="devices-meta">—</div>
+      </div>
+      <div id="device-cards" class="device-cards"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>solar-monitor</span> · <span>local-first</span> · <span>no cloud required</span>
+  </footer>
+
+  <script src="/web/uPlot.iife.min.js"></script>
+  <script src="/web/app.js?v=11"></script>
+</body>
+</html>

@@ -1,0 +1,801 @@
+/* solar-monitor — design tokens & layout
+ * Dark by default (off-grid users live in dim places). Grid-organised,
+ * generous spacing. Inspired by Cerbo GX overview + Sol-Ark flow + Solar-Assistant.
+ */
+
+:root {
+  /* Surfaces */
+  --bg:        #0a0d12;
+  --surface:   #131820;
+  --surface-2: #1b212c;
+  --surface-3: #232a37;
+  --border:    #2a3343;
+  --border-2:  #3a4458;
+
+  /* Text */
+  --text:      #e6edf3;
+  --text-2:    #9aa6b8;
+  --text-3:    #6b7689;
+
+  /* Source/storage/load colors — match Cerbo GX vocabulary */
+  --pv:        #f0b429;   /* yellow = solar/PV */
+  --pv-soft:   rgba(240,180,41,0.12);
+  --batt:      #58a6ff;   /* blue = DC battery storage */
+  --batt-soft: rgba(88,166,255,0.12);
+  --ac:        #3fb950;   /* green = AC loads */
+  --ac-soft:   rgba(63,185,80,0.12);
+  --dc:        #2cc9b1;   /* teal = DC loads */
+  --dc-soft:   rgba(44,201,177,0.12);
+  --grid:      #f85149;   /* red = grid/genset AC input */
+  --grid-soft: rgba(248,81,73,0.12);
+  --neutral:   #6b7689;
+  --neutral-soft: rgba(107,118,137,0.12);
+
+  /* Accents */
+  --accent:    #58a6ff;
+  --green:     #3fb950;
+  --green-soft:#1d4d2a;
+  --amber:     #d29922;
+  --amber-soft:#4a3717;
+  --red:       #f85149;
+  --red-soft:  #4a1f1f;
+  --sky:       #79c0ff;
+  --violet:    #a371f7;
+
+  /* Radii / shadow */
+  --r-sm: 4px;
+  --r:    8px;
+  --r-lg: 14px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  --shadow-soft: 0 1px 4px rgba(0,0,0,0.3);
+
+  /* Type */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 70% -100px, rgba(88,166,255,0.06), transparent 60%),
+    radial-gradient(800px 400px at 0% 100%, rgba(63,185,80,0.04), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------- alert banner ---------------- */
+.alerts {
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, rgba(248,81,73,0.12), rgba(248,81,73,0));
+  border-bottom: 1px solid rgba(248,81,73,0.4);
+}
+.alerts[hidden] { display: none; }
+.alert-row {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .6rem 1.5rem;
+  font-size: .88rem;
+}
+.alert-row + .alert-row {
+  border-top: 1px solid rgba(248,81,73,0.15);
+}
+.alert-row.warn { color: #f1cf6f; background: rgba(210,153,34,0.07); }
+.alert-row.alarm { color: #ffb0ab; background: rgba(248,81,73,0.10); }
+.alert-row .icon {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+
+/* ---------------- header ---------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(13,17,23,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.brand { display: flex; align-items: center; gap: .6rem; }
+.brand .logo { width: 22px; height: 22px; color: var(--accent); }
+.brand .title { font-weight: 600; font-size: 0.95rem; letter-spacing: 0.02em; }
+
+.status {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .82rem; color: var(--text-2);
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+}
+.status-icon {
+  display: inline-flex; align-items: center;
+  width: 14px; height: 14px;
+  color: inherit;
+}
+.status-icon svg { width: 100%; height: 100%; }
+.status.ok   { color: var(--green); }
+.status.ok   .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(63,185,80,0.15); }
+.status.warn { color: var(--amber); }
+.status.warn .dot { background: var(--amber); box-shadow: 0 0 0 3px rgba(210,153,34,0.15); }
+.status.err  { color: var(--red); }
+.status.err  .dot { background: var(--red); }
+
+/* ---------------- main ---------------- */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+
+/* ---------------- hero v2: donut + stats ---------------- */
+.hero-v2 {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(63,185,80,0.12), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.08), transparent 60%),
+    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+}
+/* Hero hue follows SoC state for subtle emotional cue */
+.hero-v2.soc-low {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(248,81,73,0.16), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(248,81,73,0.06), transparent 60%),
+    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--surface);
+}
+.hero-v2.soc-mid {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(210,153,34,0.14), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(210,153,34,0.05), transparent 60%),
+    linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%),
+    var(--surface);
+}
+@media (max-width: 740px) {
+  .hero-v2 { grid-template-columns: 1fr; }
+}
+.hero-donut-wrap {
+  position: relative;
+  width: 220px; height: 220px;
+  justify-self: center;
+}
+.hero-donut {
+  width: 100%; height: 100%;
+  display: block;
+}
+.donut-track {
+  stroke: var(--surface-3);
+}
+.donut-arc {
+  /* color is set per state via JS or :is() variant below */
+  stroke: var(--green);
+  transition: stroke-dasharray 0.8s ease, stroke 0.4s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(63,185,80,0.35));
+}
+.donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px rgba(248,81,73,0.45)); }
+.donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(210,153,34,0.4)); }
+.donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
+
+/* Active glow intensifies + shifts color when charging or discharging */
+#donut-wrap.charging .donut-arc {
+  filter: drop-shadow(0 0 12px rgba(63,185,80,0.55));
+}
+#donut-wrap.discharging .donut-arc {
+  filter: drop-shadow(0 0 12px rgba(210,153,34,0.55));
+}
+
+/* Rotating pulse — a small bright dash travels the ring's circumference.
+   Hidden by default; shown only when charging/discharging. Direction is
+   controlled by the sign of stroke-dashoffset animation. */
+.donut-pulse {
+  stroke: transparent;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#donut-wrap.charging .donut-pulse {
+  stroke: var(--green);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px rgba(63,185,80,0.8));
+  animation: pulse-cw 3.5s linear infinite;
+}
+#donut-wrap.discharging .donut-pulse {
+  stroke: var(--amber);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px rgba(210,153,34,0.8));
+  animation: pulse-ccw 3.5s linear infinite;
+}
+@keyframes pulse-cw  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
+@keyframes pulse-ccw { from { stroke-dashoffset: 0; } to { stroke-dashoffset:  100; } }
+
+/* Net W indicator under "State of charge" */
+.donut-flow {
+  display: inline-flex; align-items: center; gap: .3rem;
+  margin-top: .55rem;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+.donut-flow-arrow {
+  display: inline-flex;
+  width: 10px; height: 10px;
+}
+#donut-wrap.charging .donut-flow {
+  color: var(--green);
+  border-color: rgba(63,185,80,0.45);
+  background: rgba(63,185,80,0.08);
+}
+#donut-wrap.charging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid currentColor;
+}
+#donut-wrap.discharging .donut-flow {
+  color: var(--amber);
+  border-color: rgba(210,153,34,0.45);
+  background: rgba(210,153,34,0.08);
+}
+#donut-wrap.discharging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid currentColor;
+}
+#donut-wrap.idle .donut-flow-arrow::before {
+  content: "•";
+  color: var(--text-3);
+  font-size: 1.3rem;
+  line-height: .5;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.donut-pct {
+  font-family: var(--mono);
+  font-size: 3.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.donut-pct-unit {
+  font-size: 1.2rem;
+  color: var(--text-2);
+  margin-left: 2px;
+}
+.donut-label {
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: .35rem;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  gap: .75rem;
+  align-content: start;
+}
+@media (max-width: 540px) {
+  .hero-stats { grid-template-columns: 1fr 1fr; }
+}
+.hero-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+}
+.hero-stat--big {
+  grid-column: span 1;
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+}
+@media (max-width: 540px) {
+  .hero-stat--big { grid-column: span 2; }
+}
+.hero-stat-val {
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: .15rem;
+  display: flex; align-items: baseline; gap: .25rem;
+  /* Long device/model strings must not break the grid cell */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-stat-val > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* When the value is a non-numeric string (e.g. bank meta), don't blow up
+   the font; let it shrink and fit on one line. */
+.hero-stat-val.is-text { font-size: .95rem; font-weight: 500; }
+.hero-stat--big .hero-stat-val { font-size: 1.7rem; }
+.hero-stat-unit {
+  font-size: .95rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.hero-stat-sub {
+  font-size: .76rem;
+  color: var(--text-3);
+  margin-top: .2rem;
+}
+
+/* Net power color cues */
+#bank-power-tile.charging .hero-stat-val { color: var(--green); }
+#bank-power-tile.discharging .hero-stat-val { color: var(--amber); }
+#bank-power-tile.idle .hero-stat-val { color: var(--text-2); }
+
+.meta-k {
+  font-size: .68rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  display: block;
+}
+
+/* ---------------- panel ---------------- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.1rem 1.25rem 1.3rem;
+  position: relative;
+  overflow: hidden;
+}
+/* Per-panel subtle hue tints. ::before sits above the surface but below
+   content; pointer-events disabled so it never blocks clicks. */
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--panel-tint, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+.panel > * { position: relative; z-index: 1; }
+
+/* Flow panel — PV yellow on the left fading into battery blue on the right */
+.panel:has(#flow) {
+  --panel-tint:
+    linear-gradient(95deg, rgba(240,180,41,0.07) 0%, rgba(240,180,41,0) 35%),
+    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.06), transparent 60%);
+}
+/* Today panel — warm energy-accounting tint */
+.today-panel {
+  --panel-tint: linear-gradient(135deg, rgba(210,153,34,0.06), rgba(210,153,34,0) 70%);
+}
+/* Cell-balance panel — green by default, amber on drift, red on bad */
+#panel-cells { --panel-tint: linear-gradient(180deg, rgba(63,185,80,0.05), transparent 50%); }
+#panel-cells.drift-warn  { --panel-tint: linear-gradient(180deg, rgba(210,153,34,0.07), transparent 55%); }
+#panel-cells.drift-alarm { --panel-tint: linear-gradient(180deg, rgba(248,81,73,0.08), transparent 55%); }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+.h-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+
+/* Inline-SVG icon containers — make any SVG child fill its parent.
+ * Without this, SVGs rendered without width/height attributes collapse
+ * to 0×0 inside our span wrappers and the icon never shows. */
+.dev-card-icon svg,
+.flow-tile-icon svg,
+.flow-tile-bg-icon svg,
+.status-icon svg,
+.donut-flow-arrow svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Per-panel header icon tint */
+.panel:has(#flow) .h-icon { color: var(--pv); }
+.today-panel .h-icon       { color: var(--amber); }
+#panel-cells .h-icon       { color: var(--green); }
+#panel-cells.drift-warn  .h-icon { color: var(--amber); }
+#panel-cells.drift-alarm .h-icon { color: var(--red); }
+.panel-sub {
+  font-size: .82rem;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+/* ---------------- power flow strip ---------------- */
+.flow {
+  display: flex;
+  align-items: stretch;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+.flow-col {
+  display: flex; flex-direction: column;
+  gap: .5rem;
+  min-width: 160px;
+  flex: 1;
+}
+.flow-conn {
+  flex: 0 0 auto;
+  min-width: 90px;
+  align-self: center;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: 0 .25rem;
+}
+@media (max-width: 720px) {
+  .flow { flex-direction: column; }
+  .flow-col { width: 100%; }
+  .flow-conn { width: 100%; min-height: 36px; }
+}
+.flow-arrow {
+  width: 100%;
+  height: 18px;
+  position: relative;
+  display: flex; align-items: center;
+}
+.flow-arrow::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 8px;
+  top: 50%; height: 2px;
+  background: var(--border-2);
+  transform: translateY(-50%);
+}
+.flow-arrow::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 50%;
+  border: 6px solid transparent;
+  border-left-color: var(--border-2);
+  transform: translateY(-50%);
+}
+.flow-arrow.active::before,
+.flow-arrow.active::after {
+  background: linear-gradient(90deg, var(--from), var(--to));
+}
+.flow-arrow.active::after {
+  background: transparent;
+  border-left-color: var(--to);
+}
+/* Animated moving dot */
+.flow-arrow.active .dot {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--to);
+  top: 50%;
+  transform: translateY(-50%);
+  animation: flow-dot 1.8s linear infinite;
+  box-shadow: 0 0 8px var(--to);
+}
+.flow-arrow.reverse .dot {
+  animation-direction: reverse;
+}
+@keyframes flow-dot {
+  from { left: 0%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  to   { left: calc(100% - 12px); opacity: 0; }
+}
+.flow-arrow-label {
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.flow-tile {
+  border-radius: var(--r);
+  padding: .9rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.flow-tile::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--tile-tint, transparent);
+  pointer-events: none;
+}
+.flow-tile-head {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-2);
+  position: relative;
+  z-index: 1;
+}
+.flow-tile-icon {
+  width: 16px; height: 16px;
+  color: var(--tile-color, var(--text-3));
+  flex-shrink: 0;
+}
+/* Large watermark icon in the tile background — drives most of the
+ * visual identity of each tile without crowding the numbers */
+.flow-tile-bg-icon {
+  position: absolute;
+  right: -8px; bottom: -16px;
+  width: 78px; height: 78px;
+  color: var(--tile-color, var(--text-3));
+  opacity: 0.12;
+  pointer-events: none;
+}
+.flow-tile.pv .flow-tile-bg-icon       { opacity: 0.18; }
+.flow-tile.batt .flow-tile-bg-icon     { opacity: 0.14; }
+/* Subtle pulse on active source tiles when power > 0 */
+.flow-tile.is-active .flow-tile-bg-icon {
+  animation: tile-glow 2.4s ease-in-out infinite;
+}
+@keyframes tile-glow {
+  0%, 100% { opacity: 0.10; transform: scale(1); }
+  50%      { opacity: 0.22; transform: scale(1.04); }
+}
+.flow-tile-val {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-top: .2rem;
+  position: relative;
+  z-index: 1;
+}
+.flow-tile-val .unit { font-size: .9rem; color: var(--text-2); margin-left: 2px; font-weight: 500; }
+/* Signed power values shift color with direction — same green/amber
+   cue the donut uses, so the eye picks up "gaining vs losing" without
+   reading the sign. */
+.flow-tile-val.power-charging    { color: var(--green); }
+.flow-tile-val.power-discharging { color: var(--amber); }
+.flow-tile-val.power-charging .unit,
+.flow-tile-val.power-discharging .unit { color: inherit; opacity: 0.75; }
+.flow-tile-sub {
+  font-size: .72rem;
+  color: var(--text-3);
+  font-family: var(--mono);
+  margin-top: .25rem;
+  position: relative;
+  z-index: 1;
+}
+.flow-tile.pv      { --tile-tint: var(--pv-soft); --tile-color: var(--pv); border-color: rgba(240,180,41,0.25); }
+.flow-tile.batt    { --tile-tint: var(--batt-soft); --tile-color: var(--batt); border-color: rgba(88,166,255,0.25); }
+.flow-tile.ac      { --tile-tint: var(--ac-soft); --tile-color: var(--ac); border-color: rgba(63,185,80,0.25); }
+.flow-tile.dc      { --tile-tint: var(--dc-soft); --tile-color: var(--dc); border-color: rgba(44,201,177,0.25); }
+.flow-tile.grid    { --tile-tint: var(--grid-soft); --tile-color: var(--grid); border-color: rgba(248,81,73,0.25); }
+.flow-tile.neutral { --tile-tint: var(--neutral-soft); --tile-color: var(--text-3); }
+/* Inferred (energy-balance) tiles use a dashed border + an asterisk hint
+   so users know it's calculated, not directly measured. */
+.flow-tile.inferred {
+  border-style: dashed;
+}
+.flow-tile.inferred .flow-tile-sub::before {
+  content: "∗ ";
+  color: var(--text-3);
+}
+
+.flow-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .85rem;
+}
+
+/* ---------------- today strip ---------------- */
+.today-panel { padding: .9rem 1.25rem; }
+.today-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+.today-cell {
+  display: flex; flex-direction: column;
+  border-left: 2px solid var(--border-2);
+  padding-left: .8rem;
+}
+.today-cell:first-child { border-left: none; padding-left: 0; }
+@media (max-width: 540px) {
+  .today-cell { border-left: none; padding-left: 0; }
+}
+.today-v {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: .2rem;
+}
+
+/* ---------------- cell grid ---------------- */
+.cells-grid { display: flex; flex-direction: column; gap: .5rem; }
+.cell-row {
+  display: grid;
+  grid-template-columns: minmax(0, 110px) 1fr auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .55rem .65rem;
+  background: var(--surface-2);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+.cell-row-label {
+  font-size: .82rem; color: var(--text-2); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cell-row-cells { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
+.cell-chip {
+  display: flex; flex-direction: column;
+  padding: .35rem .5rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .85rem;
+  min-width: 0;
+}
+.cell-chip.is-min { border-color: rgba(121,192,255,0.4); background: rgba(121,192,255,0.06); }
+.cell-chip.is-max { border-color: rgba(210,153,34,0.4); background: rgba(210,153,34,0.06); }
+.cell-chip.is-high { border-color: rgba(248,81,73,0.5); background: rgba(248,81,73,0.07); }
+.cell-chip-v { font-variant-numeric: tabular-nums; }
+.cell-chip-k { font-size: .65rem; color: var(--text-3); }
+.cell-row-temp { font-family: var(--mono); font-size: .82rem; color: var(--text-2); text-align: right; white-space: nowrap; }
+@media (max-width: 720px) {
+  .cell-row { grid-template-columns: 1fr; gap: .5rem; }
+  .cell-row-temp { text-align: left; }
+}
+
+/* ---------------- pills (used in cell summary) ---------------- */
+.pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  font-size: .78rem; font-weight: 500;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+}
+.pill .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.green { color: var(--green); background: var(--green-soft); border-color: rgba(63,185,80,0.3); }
+.pill.amber { color: var(--amber); background: var(--amber-soft); border-color: rgba(210,153,34,0.3); }
+.pill.red   { color: var(--red);   background: var(--red-soft);   border-color: rgba(248,81,73,0.3); }
+
+/* ---------------- history chart ---------------- */
+.chart-controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.chart-controls label {
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: center; gap: .4rem;
+}
+.chart-controls select {
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem; border-radius: var(--r-sm);
+  font-size: .85rem; font-family: inherit;
+}
+.range-btns { display: flex; gap: .25rem; }
+.range-btns button {
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.range-btns button:hover { color: var(--text); border-color: var(--border-2); }
+.range-btns button.active {
+  color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
+}
+/* uPlot renders the chart at the configured height and the legend
+ * as extra DOM below. A fixed container height crops the legend, so we
+ * use min-height and let the container grow to fit. */
+.chart-host {
+  min-height: 380px;
+  padding-bottom: .5rem;
+}
+.uplot { font-family: var(--font) !important; }
+
+/* ---------------- device cards ---------------- */
+.device-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: .85rem;
+}
+.dev-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .9rem 1rem 1rem;
+}
+.dev-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: .25rem;
+}
+.dev-card-head-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-icon {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.dev-card.kind-charge_controller .dev-card-icon { color: var(--pv); }
+.dev-card.kind-smart_battery     .dev-card-icon { color: var(--batt); }
+.dev-card.kind-inverter          .dev-card-icon { color: var(--ac); }
+.dev-card.kind-dcdc_charger      .dev-card-icon { color: var(--grid); }
+.dev-card.kind-shunt             .dev-card-icon { color: var(--batt); }
+.dev-card-name { font-weight: 600; font-size: .92rem; }
+.dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
+.dev-card-sub { font-size: .76rem; color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
+.dev-card-row { display: flex; justify-content: space-between; padding: .2rem 0; font-size: .85rem; }
+.dev-card-row .k { color: var(--text-3); }
+.dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
+
+footer {
+  text-align: center;
+  color: var(--text-3);
+  padding: 2rem 1rem 3rem;
+  font-size: .78rem;
+}
+footer span:not(:last-child)::after {
+  content: "·";
+  margin: 0 .5rem;
+  color: var(--border-2);
+}

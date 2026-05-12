@@ -1,0 +1,27 @@
+[project]
+name = "solar-monitor"
+version = "0.0.1"
+description = "Local-first multi-vendor solar/battery telemetry appliance"
+requires-python = ">=3.11"
+dependencies = [
+    "bleak>=0.22",
+    "pyserial>=3.5",
+    "pyyaml>=6.0",
+    "msgspec>=0.19",
+    "litestar[standard]>=2.13",
+    "aiosqlite>=0.20",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+solar-monitor = "solar_monitor.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["solar_monitor*"]
+
+[tool.setuptools.package-data]
+solar_monitor = ["web/*.html", "web/*.css", "web/*.js"]
