@@ -25,6 +25,12 @@ from litestar.static_files import create_static_files_router
 from ..config import Config
 from ..scheduler import PollScheduler
 from ..storage import Store
+from .setup import (
+    list_setup_transports,
+    known_devices,
+    probe,
+    add_device,
+)
 
 
 def _web_dir() -> Path:
@@ -177,7 +183,12 @@ def index() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
-def build_app(config: Config, db_path: str, interval_seconds: int = 60) -> Litestar:
+def build_app(
+    config: Config,
+    db_path: str,
+    interval_seconds: int = 60,
+    config_path: str = "config.yaml",
+) -> Litestar:
     store = Store(db_path)
     scheduler = PollScheduler(config, store, interval_seconds=interval_seconds)
 
@@ -187,6 +198,7 @@ def build_app(config: Config, db_path: str, interval_seconds: int = 60) -> Lites
         app.state["store"] = store
         app.state["scheduler"] = scheduler
         app.state["config"] = config
+        app.state["config_path"] = config_path
 
     async def on_shutdown(app: Litestar) -> None:
         await scheduler.stop()
@@ -212,6 +224,10 @@ def build_app(config: Config, db_path: str, interval_seconds: int = 60) -> Lites
             device_lifetime,
             load_heatmap,
             stream,
+            list_setup_transports,
+            known_devices,
+            probe,
+            add_device,
             index,
             static_router,
         ],
