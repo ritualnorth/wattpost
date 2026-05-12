@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 from typing import Any
 
 from .config import Config
@@ -41,10 +42,61 @@ class PollScheduler:
         self._last_result: dict[str, Any] | None = None
         self._poller: Poller | None = None
         self._exporters: list[Exporter] = []
+        # SSE subscribers. Each subscriber gets its own bounded queue; if a
+        # slow client falls behind we drop the oldest event for it (never
+        # block the scheduler on a misbehaving consumer).
+        self._subscribers: set[asyncio.Queue[dict]] = set()
 
     @property
     def last_result(self) -> dict[str, Any] | None:
         return self._last_result
+
+    # ---------- SSE broadcast ----------
+    def subscribe(self) -> asyncio.Queue[dict]:
+        q: asyncio.Queue[dict] = asyncio.Queue(maxsize=4)
+        self._subscribers.add(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue[dict]) -> None:
+        self._subscribers.discard(q)
+
+    def _broadcast(self, payload: dict) -> None:
+        # Non-blocking publish. A full queue means the consumer is slow —
+        # drop the oldest event for them rather than stall the scheduler.
+        for q in self._subscribers:
+            while True:
+                try:
+                    q.put_nowait(payload)
+                    break
+                except asyncio.QueueFull:
+                    try:
+                        q.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+
+    async def build_snapshot(self) -> dict[str, Any]:
+        """Same shape the SPA already consumes from /api/devices +
+        /api/poll_run + /api/today, bundled into one payload so the SSE
+        stream replaces the three separate REST fetches on each tick."""
+        now = int(time.time())
+        local = time.localtime(now)
+        midnight = int(time.mktime(
+            (local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1)
+        ))
+        devs = await self.store.list_devices()
+        latest = await self.store.get_latest()
+        last_run = await self.store.last_poll_run()
+        today = await self.store.today_aggregate(midnight, now)
+        return {
+            "type": "snapshot",
+            "ts": now,
+            "devices": [{**d, "latest": latest.get(d["label"], {})} for d in devs],
+            "poll_run": {
+                "last_run": last_run,
+                "scheduler_running": self._task is not None and not self._task.done(),
+            },
+            "today": today,
+        }
 
     async def start(self) -> None:
         if self._task is not None and not self._task.done():
@@ -156,6 +208,14 @@ class PollScheduler:
                             self._consecutive_failures,
                         )
                     self._consecutive_failures = 0
+
+                # Fan a fresh snapshot out to any SSE subscribers.
+                if self._subscribers:
+                    try:
+                        snapshot = await self.build_snapshot()
+                        self._broadcast(snapshot)
+                    except Exception:
+                        log.exception("snapshot build for SSE broadcast failed")
             except Exception as e:
                 self._consecutive_failures += 1
                 log.exception(

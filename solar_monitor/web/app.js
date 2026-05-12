@@ -256,6 +256,26 @@ async function api(path) {
   return r.json();
 }
 
+// Shared apply path: REST fallback and the SSE stream both flow through
+// here. The frame shape (devices / poll_run / today) is the same in both
+// directions so this stays a one-liner per renderer.
+function applySnapshot(frame) {
+  devices = frame.devices || [];
+  lastRun = frame.poll_run?.last_run || null;
+  todayAggregate = frame.today || null;
+  renderStatus(frame.poll_run || {});
+  renderHero();
+  renderFlow();
+  renderToday();
+  renderCells();
+  renderDeviceCards();
+  populateChartSelectors();
+  renderAlerts();
+  $("#devices-meta").textContent = lastRun
+    ? `${devices.length} devices · last poll ${lastRun.elapsed_ms} ms · ${fmt.ago(lastRun.ts)}`
+    : "";
+}
+
 async function refresh() {
   try {
     const [devs, run, today] = await Promise.all([
@@ -263,23 +283,55 @@ async function refresh() {
       api("/api/poll_run"),
       api("/api/today").catch(() => null),
     ]);
-    devices = devs.devices || [];
-    lastRun = run.last_run;
-    todayAggregate = today;
-    renderStatus(run);
-    renderHero();
-    renderFlow();
-    renderToday();
-    renderCells();
-    renderDeviceCards();
-    populateChartSelectors();
-    renderAlerts();
-    $("#devices-meta").textContent = lastRun
-      ? `${devices.length} devices · last poll ${lastRun.elapsed_ms} ms · ${fmt.ago(lastRun.ts)}`
-      : "";
+    applySnapshot({
+      devices: devs.devices || [],
+      poll_run: run,
+      today: today,
+    });
   } catch (e) {
     setStatus("err", "API error: " + e.message);
   }
+}
+
+// ---------- live stream (SSE) ----------
+// EventSource is the lightest live-update mechanism the browser ships
+// with — auto-reconnects, no protocol upgrade, plain HTTP. We open one
+// on boot; the server hand-delivers a full snapshot immediately and a
+// new one after every poll. Polling stays around as a fallback.
+let eventStream = null;
+let pollingFallbackTimer = null;
+function openStream() {
+  if (eventStream) return;
+  try {
+    eventStream = new EventSource("/api/stream");
+  } catch (e) {
+    console.warn("EventSource unavailable, falling back to polling", e);
+    startPollingFallback();
+    return;
+  }
+  eventStream.addEventListener("message", (ev) => {
+    try {
+      const frame = JSON.parse(ev.data);
+      applySnapshot(frame);
+      stopPollingFallback();
+    } catch (e) {
+      console.error("snapshot parse failed", e);
+    }
+  });
+  eventStream.addEventListener("error", () => {
+    // EventSource will retry on its own; keep a polling tick alive so the
+    // UI doesn't freeze in the meantime.
+    startPollingFallback();
+  });
+}
+function startPollingFallback() {
+  if (pollingFallbackTimer) return;
+  pollingFallbackTimer = setInterval(refresh, 5000);
+}
+function stopPollingFallback() {
+  if (!pollingFallbackTimer) return;
+  clearInterval(pollingFallbackTimer);
+  pollingFallbackTimer = null;
 }
 
 function renderStatus(run) {
@@ -1862,13 +1914,15 @@ function wireDeviceDetailChart(dev) {
 
 // boot
 setRoute(currentRouteName());
+// Do one REST refresh so the page is populated even before the SSE
+// connection is established (and as a backstop on browsers that fail to
+// open EventSource). The stream takes over once the first event lands.
 refresh().then(() => {
-  // Once the first poll list arrives, kick off the drift sparkline + heatmap
-  // refreshes for whichever route the user landed on.
   if (currentRouteName() === "dashboard") refreshDriftSparkline();
   if (currentRouteName() === "history") { refreshChart(); refreshHeatmap(); }
 });
-setInterval(refresh, 5000);
+openStream();
+// Background charts still poll on their own slower cadence.
 setInterval(() => {
   if (currentRouteName() === "history") refreshChart();
 }, 30000);
