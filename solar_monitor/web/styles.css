@@ -170,9 +170,31 @@ body {
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
-@media (max-width: 540px) {
-  .nav-tab { padding: .8rem .75rem .7rem; font-size: .82rem; }
+@media (max-width: 600px) {
+  /* Equal-width tabs across the full viewport on phones — no horizontal
+   * scroll. The desktop padding/gap was eating the room for the 4th tab. */
+  .app-nav {
+    padding: 0;
+    gap: 0;
+  }
+  .nav-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    gap: .35rem;
+    padding: .8rem .35rem .7rem;
+    font-size: .8rem;
+    min-width: 0;
+  }
   .nav-tab svg { width: 15px; height: 15px; }
+  .nav-tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+@media (max-width: 380px) {
+  /* Very narrow phones: hide the icons rather than truncate the labels. */
+  .nav-tab svg { display: none; }
+  .nav-tab { gap: 0; font-size: .82rem; }
 }
 
 /* ---------------- routes ---------------- */
