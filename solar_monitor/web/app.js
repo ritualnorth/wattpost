@@ -1008,16 +1008,27 @@ function drawChart(label, metric, data) {
         grid:  { stroke: "rgba(106,118,137,0.08)" },
         ticks: { stroke: "rgba(106,118,137,0.15)" },
         space: 28,
-        values: (_u, splits) => splits.map(v => {
-          if (v == null) return "";
-          const abs = Math.abs(v);
-          let txt;
-          if (abs >= 1000)      txt = (v / 1000).toFixed(1) + "k";
-          else if (abs >= 100)  txt = v.toFixed(0);
-          else if (abs >= 10)   txt = v.toFixed(1);
-          else                  txt = v.toFixed(2);
-          return unit ? `${txt} ${unit}` : txt;
-        }),
+        values: (_u, splits) => {
+          // Detect a narrow data range so we don't print "13.2 V" three
+          // times in a row. If consecutive splits differ by less than 1
+          // at the current magnitude, bump to 2 decimals.
+          let needsExtra = false;
+          for (let i = 1; i < splits.length; i++) {
+            const d = Math.abs(splits[i] - splits[i - 1]);
+            if (d > 0 && d < 1) { needsExtra = true; break; }
+          }
+          return splits.map(v => {
+            if (v == null) return "";
+            const abs = Math.abs(v);
+            let txt;
+            if (abs >= 1000)      txt = (v / 1000).toFixed(1) + "k";
+            else if (abs >= 100)  txt = v.toFixed(0);
+            else if (needsExtra)  txt = v.toFixed(2);
+            else if (abs >= 10)   txt = v.toFixed(1);
+            else                  txt = v.toFixed(2);
+            return unit ? `${txt} ${unit}` : txt;
+          });
+        },
       },
     ],
     legend: { live: true },
