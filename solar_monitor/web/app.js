@@ -910,10 +910,12 @@ function renderDeviceCards() {
     name.className = "dev-card-name";
     name.textContent = dev.label;
     left.append(iconSpan, name);
-    const slave = document.createElement("div");
-    slave.className = "dev-card-slave";
-    slave.textContent = `slave ${dev.slave_id}`;
-    head.append(left, slave);
+    const right = document.createElement("div");
+    right.className = "dev-card-head-right";
+    right.innerHTML = `
+      <span class="dev-card-slave">slave ${dev.slave_id}</span>
+      <svg class="dev-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
+    head.append(left, right);
     card.appendChild(head);
 
     const sub = document.createElement("div");
@@ -957,6 +959,13 @@ function renderDeviceCards() {
       row.append(ke, ve);
       card.appendChild(row);
     }
+
+    // Tap-target hint at the bottom of the card
+    const footer = document.createElement("div");
+    footer.className = "dev-card-foot";
+    footer.innerHTML = `<span>View detail</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
+    card.appendChild(footer);
+
     host.appendChild(card);
   }
 }
