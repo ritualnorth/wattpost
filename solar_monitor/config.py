@@ -77,7 +77,11 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     daemon exchanges the code for a `bearer_token` which gets written
     back into this struct.
     """
-    endpoint:          str  = "https://wattpost.io"
+    # Canonical product subdomain. wattpost.io is the marketing site;
+    # the API + dashboard live on app.wattpost.io. Old pairings with
+    # endpoint=https://wattpost.io keep working — Caddy reverse-proxies
+    # /api/* on both hostnames.
+    endpoint:          str  = "https://app.wattpost.io"
     bearer_token:      str  = ""    # empty until paired
     appliance_id:      int | None = None
     label:             str  = ""
