@@ -1103,6 +1103,13 @@ function renderTomorrow() {
     }
     panel.hidden = false;
     renderTomorrowEmpty(false);
+    // Today's full-day forecast — what the user could have known at
+    // midnight. Distinct from the actual "PV today" tile (energy
+    // already delivered by the controller). Shows "—" when the
+    // forecast window starts mid-day and there's no useful today total
+    // (e.g. first poll after a fresh Solcast setup at 4pm).
+    $("#tomorrow-today-kwh").textContent = s.todayWh > 0
+      ? `${(s.todayWh / 1000).toFixed(2)} kWh` : "—";
     $("#tomorrow-kwh").textContent = `${(s.tomorrowWh / 1000).toFixed(2)} kWh`;
     if (s.tomorrowPeak) {
       $("#tomorrow-peak").textContent = `${(s.tomorrowPeak.w / 1000).toFixed(2)} kW`;
@@ -1112,8 +1119,6 @@ function renderTomorrow() {
       $("#tomorrow-peak").textContent = "—";
       $("#tomorrow-peak-at").textContent = "—";
     }
-    $("#tomorrow-day-after").textContent = s.dayAfterWh > 0
-      ? `${(s.dayAfterWh / 1000).toFixed(2)} kWh` : "—";
     $("#tomorrow-sub").textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
     drawTomorrowSpark(s.tomorrowPoints);
   });
@@ -1131,7 +1136,10 @@ function renderWeek() {
     const days = buckets.filter(b => b.wh > 0).slice(0, 7);
     if (days.length === 0) { panel.hidden = true; return; }
     panel.hidden = false;
-    $("#week-sub").textContent = `${days.length}-day outlook · refreshed ${fmt.ago(f.fetched_at)}`;
+    // Title carries the actual day count so it never contradicts the
+    // grid below. Sub-line stays as a pure freshness timestamp.
+    $("#week-title").textContent = `${days.length}-day outlook`;
+    $("#week-sub").textContent = `Refreshed ${fmt.ago(f.fetched_at)}`;
     drawWeekStrip(days);
   });
 }
