@@ -1594,78 +1594,444 @@ function renderSettings() {
   refreshAlertsPanel();
 }
 
-// ---------- alerts panel ----------
-const ALERT_OP_LABEL = {
-  lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=", neq: "≠",
-};
+// ---------- alerts panel (full editor) ----------
+const ALERT_OP_LABEL = { lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=", neq: "≠" };
+// Common metric paths the user can pick without typing. Anything else
+// works too — the field falls back to a free-text input.
+const METRIC_SUGGESTIONS = [
+  { value: "bank.soc_pct",              label: "Battery SoC (%)" },
+  { value: "bank.netW",                 label: "Bank net power (W)" },
+  { value: "bank.meanV",                label: "Bank voltage (V)" },
+  { value: "bank.totalRem",             label: "Bank remaining (Ah)" },
+  { value: "bank.totalCap",             label: "Bank capacity (Ah)" },
+  { value: "bank.worst_pack_drift_v",   label: "Worst pack drift (V)" },
+  { value: "aggregate.max_cell_drift_v",label: "Max cell drift (V)" },
+];
+const TRANSPORT_TYPES = [
+  { value: "ntfy",            label: "ntfy",        keyField: "topic", placeholder: "my-private-topic" },
+  { value: "discord_webhook", label: "Discord",     keyField: "url",   placeholder: "https://discord.com/api/webhooks/…" },
+  { value: "webhook",         label: "Webhook",     keyField: "url",   placeholder: "https://example.com/hook" },
+  { value: "smtp",            label: "Email (SMTP)",keyField: "host",  placeholder: "smtp.gmail.com" },
+];
+
+let alertsState = { rules: [], transports: [], editing: null };  // editing: {type:'rule'|'transport', id, mode:'edit'|'add'}
+
 async function refreshAlertsPanel() {
   const host = $("#settings-alerts");
   if (!host) return;
-  let data;
-  try { data = await api("/api/alerts"); }
-  catch (e) {
+  try {
+    const data = await api("/api/alerts");
+    alertsState.rules = data.rules || [];
+    alertsState.transports = data.transports || [];
+  } catch (e) {
     host.innerHTML = `<div class="settings-empty">Could not load alerts: ${e.message}</div>`;
     return;
   }
-  if (!data.rules?.length) {
-    host.innerHTML = `<div class="settings-empty">No alert rules configured. Add some to <code>config.yaml</code> under <code>alerts:</code>.</div>`;
-    return;
+  renderAlertsPanel();
+}
+
+function renderAlertsPanel() {
+  const host = $("#settings-alerts");
+  if (!host) return;
+  const transportIds = alertsState.transports.map(t => t.id);
+
+  let html = `<div class="alerts-sub-head"><h4>Alert rules</h4>
+    <button class="alerts-add-btn" data-add="rule">+ Add rule</button></div>`;
+
+  if (alertsState.editing?.type === "rule" && alertsState.editing.mode === "add") {
+    html += renderRuleForm(null, transportIds);
   }
-  const transportSet = new Set((data.transports || []).map(t => t.id));
-  host.innerHTML = data.rules.map(r => {
-    const opLbl = ALERT_OP_LABEL[r.op] || r.op;
-    const condition = `${r.metric} ${opLbl} ${r.threshold}`;
-    const lastFired = r.last_fired_ts
-      ? `fired ${fmt.ago(r.last_fired_ts)}`
-      : "never fired";
-    const cooldown = `cooldown ${Math.round(r.cooldown_seconds / 60)} min`;
-    const transports = (r.transports || [])
-      .map(tid => transportSet.has(tid) ? tid : `${tid} (missing!)`)
-      .join(", ") || "(no transports!)";
-    const severityClass = `alerts-row--${r.severity}`;
-    return `
-      <div class="alerts-row ${severityClass}" data-rule="${r.id}">
-        <div class="alerts-row-main">
-          <div class="alerts-row-title">
-            <span class="alerts-row-name">${r.name}</span>
-            <span class="alerts-row-cond">${condition}</span>
-          </div>
-          <div class="alerts-row-meta">
-            <span class="alerts-row-tag alerts-row-tag--${r.severity}">${r.severity}</span>
-            <span class="alerts-row-tag">${transports}</span>
-            <span class="alerts-row-tag">${cooldown}</span>
-            <span class="alerts-row-tag">${lastFired}</span>
-          </div>
+  if (!alertsState.rules.length && !(alertsState.editing?.type === "rule" && alertsState.editing.mode === "add")) {
+    html += `<div class="settings-empty">No rules yet. Click "+ Add rule" to create one.</div>`;
+  }
+  for (const r of alertsState.rules) {
+    if (alertsState.editing?.type === "rule" && alertsState.editing.id === r.id) {
+      html += renderRuleForm(r, transportIds);
+    } else {
+      html += renderRuleRow(r, transportIds);
+    }
+  }
+
+  html += `<div class="alerts-sub-head"><h4>Transports</h4>
+    <button class="alerts-add-btn" data-add="transport">+ Add transport</button></div>`;
+  if (alertsState.editing?.type === "transport" && alertsState.editing.mode === "add") {
+    html += renderTransportForm(null);
+  }
+  if (!alertsState.transports.length && !(alertsState.editing?.type === "transport" && alertsState.editing.mode === "add")) {
+    html += `<div class="settings-empty">No transports yet. Add one before creating rules.</div>`;
+  }
+  for (const t of alertsState.transports) {
+    if (alertsState.editing?.type === "transport" && alertsState.editing.id === t.id) {
+      html += renderTransportForm(t);
+    } else {
+      html += renderTransportRow(t);
+    }
+  }
+
+  host.innerHTML = html;
+  wireAlertsHandlers();
+}
+
+function renderRuleRow(r, transportIds) {
+  const opLbl = ALERT_OP_LABEL[r.op] || r.op;
+  const cond = `${r.metric} ${opLbl} ${r.threshold}`;
+  const lastFired = r.last_fired_ts ? `fired ${fmt.ago(r.last_fired_ts)}` : "never fired";
+  const cooldown = `cooldown ${Math.round(r.cooldown_seconds / 60)} min`;
+  const tlist = (r.transports || [])
+    .map(tid => transportIds.includes(tid) ? tid : `${tid} ⚠ missing`)
+    .join(", ") || "⚠ none";
+  return `
+    <div class="alerts-row alerts-row--${r.severity}" data-rule="${r.id}">
+      <div class="alerts-row-main">
+        <div class="alerts-row-title">
+          <span class="alerts-row-name">${r.name}</span>
+          <span class="alerts-row-cond">${cond}</span>
         </div>
-        <div class="alerts-row-action">
-          <button class="alerts-test-btn" data-rule="${r.id}">Test</button>
-          <span class="alerts-test-status" data-rule="${r.id}"></span>
+        <div class="alerts-row-meta">
+          <span class="alerts-row-tag alerts-row-tag--${r.severity}">${r.severity}</span>
+          <span class="alerts-row-tag">→ ${tlist}</span>
+          <span class="alerts-row-tag">${cooldown}</span>
+          <span class="alerts-row-tag">${lastFired}</span>
         </div>
       </div>
-    `;
-  }).join("");
-  host.querySelectorAll(".alerts-test-btn").forEach(btn => {
-    btn.addEventListener("click", () => testAlert(btn.dataset.rule));
+      <div class="alerts-row-action">
+        <button class="alerts-test-btn" data-test-rule="${r.id}">Test</button>
+        <button class="alerts-icon-btn" data-edit-rule="${r.id}" title="Edit">✎</button>
+        <button class="alerts-icon-btn alerts-icon-btn--danger" data-delete-rule="${r.id}" title="Delete">×</button>
+        <span class="alerts-test-status" data-rule="${r.id}"></span>
+      </div>
+    </div>`;
+}
+
+function renderRuleForm(r, transportIds) {
+  const editing = !!r;
+  const id = r?.id || "";
+  const name = r?.name || "";
+  const metric = r?.metric || METRIC_SUGGESTIONS[0].value;
+  const op = r?.op || "lt";
+  const threshold = r?.threshold ?? 30;
+  const severity = r?.severity || "warn";
+  const cooldownMin = Math.round((r?.cooldown_seconds ?? 1800) / 60);
+  const ts = new Set(r?.transports || []);
+  return `
+    <form class="alerts-form" data-form="rule" data-original-id="${id}">
+      <div class="alerts-form-grid">
+        <label>ID
+          <input type="text" name="id" value="${id}" pattern="[a-zA-Z0-9_\\-]+" required ${editing ? "readonly" : ""} />
+        </label>
+        <label>Name
+          <input type="text" name="name" value="${name}" required />
+        </label>
+        <label>Metric
+          <select name="metric">
+            ${METRIC_SUGGESTIONS.map(m =>
+              `<option value="${m.value}" ${m.value === metric ? "selected" : ""}>${m.label} — ${m.value}</option>`).join("")}
+            <option value="__custom__" ${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : "selected"}>Custom…</option>
+          </select>
+          <input type="text" name="metric_custom" value="${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : metric}" placeholder="e.g. devices.battery_0.cell_drift_v" />
+        </label>
+        <label>Op
+          <select name="op">
+            ${Object.keys(ALERT_OP_LABEL).map(o =>
+              `<option value="${o}" ${o === op ? "selected" : ""}>${o} (${ALERT_OP_LABEL[o]})</option>`).join("")}
+          </select>
+        </label>
+        <label>Threshold
+          <input type="number" name="threshold" value="${threshold}" step="any" required />
+        </label>
+        <label>Severity
+          <select name="severity">
+            <option value="warn"  ${severity === "warn" ? "selected" : ""}>Warn</option>
+            <option value="alarm" ${severity === "alarm" ? "selected" : ""}>Alarm</option>
+          </select>
+        </label>
+        <label>Cooldown (min)
+          <input type="number" name="cooldown_min" value="${cooldownMin}" min="0" step="1" required />
+        </label>
+      </div>
+      <fieldset class="alerts-form-transports">
+        <legend>Send via</legend>
+        ${transportIds.length === 0
+          ? `<p class="settings-foot">No transports configured yet — add one below first.</p>`
+          : transportIds.map(tid =>
+              `<label class="alerts-checkbox"><input type="checkbox" name="transport" value="${tid}" ${ts.has(tid) ? "checked" : ""}/>${tid}</label>`).join("")}
+      </fieldset>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">${editing ? "Save" : "Create rule"}</button>
+        <button type="button" class="btn-action" data-cancel-edit>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function renderTransportRow(t) {
+  const cfg = t.config || {};
+  const keyField = TRANSPORT_TYPES.find(x => x.value === t.type)?.keyField;
+  const keyValue = keyField ? cfg[keyField] : "";
+  const aliveTag = t.alive
+    ? `<span class="alerts-row-tag alerts-row-tag--ok">active</span>`
+    : `<span class="alerts-row-tag alerts-row-tag--warn">restart pending</span>`;
+  return `
+    <div class="alerts-row" data-transport="${t.id}">
+      <div class="alerts-row-main">
+        <div class="alerts-row-title">
+          <span class="alerts-row-name">${t.id}</span>
+          <span class="alerts-row-cond">${t.type}${keyValue ? ` · ${keyField}: ${keyValue}` : ""}</span>
+        </div>
+        <div class="alerts-row-meta">${aliveTag}</div>
+      </div>
+      <div class="alerts-row-action">
+        <button class="alerts-icon-btn" data-edit-transport="${t.id}" title="Edit">✎</button>
+        <button class="alerts-icon-btn alerts-icon-btn--danger" data-delete-transport="${t.id}" title="Delete">×</button>
+      </div>
+    </div>`;
+}
+
+function renderTransportForm(t) {
+  const editing = !!t;
+  const type = t?.type || "ntfy";
+  const id = t?.id || "";
+  const cfg = t?.config || {};
+  return `
+    <form class="alerts-form" data-form="transport" data-original-id="${id}">
+      <div class="alerts-form-grid">
+        <label>ID
+          <input type="text" name="id" value="${id}" pattern="[a-zA-Z0-9_\\-]+" required ${editing ? "readonly" : ""} />
+        </label>
+        <label>Type
+          <select name="type" ${editing ? "disabled" : ""}>
+            ${TRANSPORT_TYPES.map(tt =>
+              `<option value="${tt.value}" ${tt.value === type ? "selected" : ""}>${tt.label}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <div class="alerts-form-grid alerts-form-grid--full" data-transport-fields>
+        ${transportTypeFields(type, cfg)}
+      </div>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">${editing ? "Save" : "Create transport"}</button>
+        <button type="button" class="btn-action" data-cancel-edit>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function transportTypeFields(type, cfg) {
+  const v = (k, d = "") => cfg[k] != null ? String(cfg[k]) : d;
+  switch (type) {
+    case "ntfy":
+      return `
+        <label>Topic <input type="text" name="topic" value="${v("topic")}" required placeholder="something-obscure-pick-me"/></label>
+        <label>Server <input type="text" name="server" value="${v("server", "https://ntfy.sh")}" placeholder="https://ntfy.sh"/></label>`;
+    case "discord_webhook":
+      return `
+        <label class="alerts-field-wide">Webhook URL <input type="url" name="url" value="${v("url")}" required placeholder="https://discord.com/api/webhooks/…"/></label>`;
+    case "webhook":
+      return `
+        <label class="alerts-field-wide">URL <input type="url" name="url" value="${v("url")}" required placeholder="https://example.com/hook"/></label>
+        <label>Method <input type="text" name="method" value="${v("method", "POST")}" placeholder="POST"/></label>`;
+    case "smtp":
+      return `
+        <label>Host <input type="text" name="host" value="${v("host")}" required placeholder="smtp.gmail.com"/></label>
+        <label>Port <input type="number" name="port" value="${v("port", "587")}" required /></label>
+        <label>Username <input type="text" name="username" value="${v("username")}" /></label>
+        <label>Password <input type="password" name="password" value="${cfg.password === "****" ? "" : v("password")}" placeholder="${cfg.password === "****" ? "(unchanged)" : ""}"/></label>
+        <label class="alerts-field-wide">From <input type="text" name="from_addr" value="${v("from_addr")}" placeholder="WattPost <alerts@example.com>"/></label>
+        <label class="alerts-field-wide">To (comma-separated) <input type="text" name="to_addrs" value="${(cfg.to_addrs || []).join(", ")}" required /></label>
+        <label class="alerts-checkbox"><input type="checkbox" name="use_starttls" ${cfg.use_starttls !== false ? "checked" : ""}/> STARTTLS</label>
+        <label class="alerts-checkbox"><input type="checkbox" name="use_ssl" ${cfg.use_ssl ? "checked" : ""}/> SSL (port 465)</label>`;
+    default:
+      return "";
+  }
+}
+
+function wireAlertsHandlers() {
+  const host = $("#settings-alerts");
+  if (!host) return;
+  host.querySelectorAll("[data-add]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alertsState.editing = { type: btn.dataset.add, mode: "add", id: null };
+      renderAlertsPanel();
+    });
+  });
+  host.querySelectorAll("[data-cancel-edit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alertsState.editing = null;
+      renderAlertsPanel();
+    });
+  });
+  host.querySelectorAll("[data-edit-rule]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alertsState.editing = { type: "rule", mode: "edit", id: btn.dataset.editRule };
+      renderAlertsPanel();
+    });
+  });
+  host.querySelectorAll("[data-edit-transport]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alertsState.editing = { type: "transport", mode: "edit", id: btn.dataset.editTransport };
+      renderAlertsPanel();
+    });
+  });
+  host.querySelectorAll("[data-delete-rule]").forEach(btn => {
+    btn.addEventListener("click", () => deleteRule(btn.dataset.deleteRule));
+  });
+  host.querySelectorAll("[data-delete-transport]").forEach(btn => {
+    btn.addEventListener("click", () => deleteTransport(btn.dataset.deleteTransport));
+  });
+  host.querySelectorAll("[data-test-rule]").forEach(btn => {
+    btn.addEventListener("click", () => testAlert(btn.dataset.testRule));
+  });
+  host.querySelectorAll("form[data-form='rule']").forEach(f => {
+    // Custom metric input toggles based on the dropdown
+    const sel = f.elements["metric"];
+    const custom = f.elements["metric_custom"];
+    const toggleCustom = () => { custom.hidden = sel.value !== "__custom__"; };
+    sel.addEventListener("change", toggleCustom);
+    toggleCustom();
+    f.addEventListener("submit", (e) => { e.preventDefault(); submitRuleForm(f); });
+  });
+  host.querySelectorAll("form[data-form='transport']").forEach(f => {
+    const sel = f.elements["type"];
+    const fieldsBox = f.querySelector("[data-transport-fields]");
+    sel.addEventListener("change", () => {
+      fieldsBox.innerHTML = transportTypeFields(sel.value, {});
+    });
+    f.addEventListener("submit", (e) => { e.preventDefault(); submitTransportForm(f); });
   });
 }
+
+async function submitRuleForm(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  const transports = Array.from(form.querySelectorAll("input[name='transport']:checked"))
+    .map(el => el.value);
+  const metricSel = form.elements["metric"].value;
+  const metric = metricSel === "__custom__" ? form.elements["metric_custom"].value.trim() : metricSel;
+  const payload = {
+    id: form.elements["id"].value.trim(),
+    name: form.elements["name"].value.trim(),
+    metric,
+    op: form.elements["op"].value,
+    threshold: parseFloat(form.elements["threshold"].value),
+    severity: form.elements["severity"].value,
+    cooldown_seconds: parseInt(form.elements["cooldown_min"].value, 10) * 60,
+    transports,
+  };
+  const editing = !!form.dataset.originalId;
+  const url = editing ? `/api/alerts/rules/${encodeURIComponent(payload.id)}` : "/api/alerts/rules";
+  const method = editing ? "PUT" : "POST";
+  try {
+    const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    alertsState.editing = null;
+    await refreshAlertsPanel();
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add("err");
+  }
+}
+
+async function submitTransportForm(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  const type = form.elements["type"].value;
+  const extra = {};
+  const fields = form.querySelectorAll("[data-transport-fields] input");
+  fields.forEach(el => {
+    if (el.type === "checkbox") {
+      extra[el.name] = el.checked;
+    } else if (el.value !== "" || el.name === "password") {
+      if (el.name === "password" && el.value === "") return;  // don't overwrite with empty
+      if (el.name === "to_addrs") {
+        extra[el.name] = el.value.split(",").map(s => s.trim()).filter(Boolean);
+      } else if (el.type === "number") {
+        extra[el.name] = el.value === "" ? null : Number(el.value);
+      } else {
+        extra[el.name] = el.value;
+      }
+    }
+  });
+  const payload = {
+    id: form.elements["id"].value.trim(),
+    type,
+    extra,
+  };
+  const editing = !!form.dataset.originalId;
+  const url = editing ? `/api/alerts/transports/${encodeURIComponent(payload.id)}` : "/api/alerts/transports";
+  const method = editing ? "PUT" : "POST";
+  try {
+    const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    const result = await r.json();
+    alertsState.editing = null;
+    await refreshAlertsPanel();
+    if (result.restart_required) showAlertsRestartBanner();
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add("err");
+  }
+}
+
+async function deleteRule(id) {
+  if (!confirm(`Delete rule "${id}"?`)) return;
+  try {
+    const r = await fetch(`/api/alerts/rules/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    await refreshAlertsPanel();
+  } catch (e) { alert(e.message); }
+}
+
+async function deleteTransport(id) {
+  if (!confirm(`Delete transport "${id}"?\nRules referencing it must be removed first.`)) return;
+  try {
+    const r = await fetch(`/api/alerts/transports/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    await refreshAlertsPanel();
+    showAlertsRestartBanner();
+  } catch (e) { alert(e.message); }
+}
+
+function showAlertsRestartBanner() {
+  // Reuse the wizard's restart banner pattern. It lives in the Setup
+  // route; the user will see it when they next visit Setup. We also
+  // show a transient notice at the top of the alerts panel.
+  const host = $("#settings-alerts");
+  if (!host) return;
+  let banner = host.querySelector(".alerts-restart-banner");
+  if (banner) return;
+  banner = document.createElement("div");
+  banner.className = "alerts-restart-banner";
+  banner.textContent = "Transport changes will take effect after the daemon restarts.";
+  host.prepend(banner);
+}
+
 async function testAlert(ruleId) {
-  const btn    = document.querySelector(`.alerts-test-btn[data-rule="${ruleId}"]`);
+  const btn    = document.querySelector(`[data-test-rule="${ruleId}"]`);
   const status = document.querySelector(`.alerts-test-status[data-rule="${ruleId}"]`);
   if (!btn || !status) return;
   btn.disabled = true;
-  status.textContent = "sending…";
-  status.className = "alerts-test-status";
+  status.textContent = "sending…"; status.className = "alerts-test-status";
   try {
     const r = await fetch(`/api/alerts/${encodeURIComponent(ruleId)}/test`, { method: "POST" });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       throw new Error(d.detail || `${r.status} ${r.statusText}`);
     }
-    status.textContent = "sent";
-    status.classList.add("ok");
+    status.textContent = "sent"; status.classList.add("ok");
   } catch (e) {
-    status.textContent = e.message;
-    status.classList.add("err");
+    status.textContent = e.message; status.classList.add("err");
   } finally {
     btn.disabled = false;
     setTimeout(() => { if (status) status.textContent = ""; }, 4000);

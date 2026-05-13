@@ -132,6 +132,16 @@ class AlertEngine:
                 log.exception("alert transport %s stop failed", t.id)
         self._transports.clear()
 
+    def reload_rules(self, rules: list[AlertRule]) -> None:
+        """Hot-swap the rule list without restarting the daemon. Keeps
+        the cooldown / last-fired state so a re-saved rule doesn't lose
+        its rate-limit history."""
+        self.rules = rules
+        # Drop history for rules that no longer exist; keep the rest.
+        live_ids = {r.id for r in rules}
+        self._last_fired = {k: v for k, v in self._last_fired.items() if k in live_ids}
+        self._last_event = {k: v for k, v in self._last_event.items() if k in live_ids}
+
     async def evaluate(self, snapshot: dict) -> list[AlertEvent]:
         """Run every rule against the supplied snapshot. Returns the list
         of newly-fired events (post-cooldown). Never raises — a misbehaving
@@ -180,7 +190,19 @@ class AlertEngine:
         return event
 
     def snapshot_state(self) -> dict:
-        """Cheap state dump for the Settings UI."""
+        """Cheap state dump for the Settings UI. Includes the original
+        transport config dict (passwords stripped) so the UI can show the
+        topic / URL / host without round-tripping to YAML."""
+        # Build a quick lookup of the loaded transport instances by id so
+        # we can mark "alive" vs config-only.
+        live = set(self._transports)
+
+        def _sanitise(cfg: dict) -> dict:
+            return {
+                k: ("****" if k.lower() in {"password", "secret", "token", "api_key"} else v)
+                for k, v in cfg.items()
+            }
+
         return {
             "rules": [
                 {
@@ -195,8 +217,15 @@ class AlertEngine:
                 for r in self.rules
             ],
             "transports": [
-                {"id": t.id, "type": type(t).__name__}
-                for t in self._transports.values()
+                {
+                    "id": tcfg.get("id"),
+                    "type": tcfg.get("type"),
+                    "alive": tcfg.get("id") in live,
+                    "config": _sanitise(
+                        {k: v for k, v in tcfg.items() if k not in ("id", "type")}
+                    ),
+                }
+                for tcfg in self.transports_cfg
             ],
         }
 

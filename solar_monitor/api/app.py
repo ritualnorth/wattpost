@@ -31,6 +31,10 @@ from .setup import (
     probe,
     add_device,
 )
+from .alerts_admin import (
+    create_rule, update_rule, delete_rule,
+    create_transport, update_transport, delete_transport,
+)
 
 
 def _web_dir() -> Path:
@@ -132,9 +136,35 @@ async def device_history(
 async def list_alerts(state: State) -> dict[str, Any]:
     """Rules + transports state for the Settings → Alerts panel.
     Returns each rule's metric/op/threshold/cooldown + when it last
-    fired and what the last value was."""
+    fired and what the last value was.
+
+    Transport list is rebuilt from the current Config (not the engine's
+    boot-time snapshot) so transports added via the admin endpoints
+    show up immediately — flagged `alive: false` until the daemon
+    restarts and picks them up.
+    """
     scheduler: PollScheduler = state["scheduler"]
-    return scheduler._alerts.snapshot_state()
+    config: Config = state["config"]
+    snap = scheduler._alerts.snapshot_state()
+    live_ids = set(scheduler._alerts.transport_ids)
+
+    def _sanitise(cfg: dict) -> dict:
+        sensitive = {"password", "secret", "token", "api_key"}
+        return {
+            k: ("****" if k.lower() in sensitive else v)
+            for k, v in cfg.items()
+        }
+
+    snap["transports"] = [
+        {
+            "id": t.get("id"),
+            "type": t.get("type"),
+            "alive": t.get("id") in live_ids,
+            "config": _sanitise({k: v for k, v in t.items() if k not in ("id", "type")}),
+        }
+        for t in config.notification_transports
+    ]
+    return snap
 
 
 @post("/api/alerts/{rule_id:str}/test")
@@ -254,6 +284,12 @@ def build_app(
             stream,
             list_alerts,
             test_alert,
+            create_rule,
+            update_rule,
+            delete_rule,
+            create_transport,
+            update_transport,
+            delete_transport,
             list_setup_transports,
             known_devices,
             probe,
