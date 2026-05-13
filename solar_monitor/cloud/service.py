@@ -58,7 +58,14 @@ class CloudService:
             "Content-Type":  "application/json",
         }
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            # follow_redirects=True so an appliance still pointing at
+            # an older hostname (e.g. https://wattpost.io after we
+            # moved the API to app.wattpost.io) succeeds via the 308
+            # rather than silently 308-ing into a no-op. POST → POST
+            # is method-preserving under 308 by spec.
+            async with httpx.AsyncClient(
+                timeout=10.0, follow_redirects=True,
+            ) as client:
                 r = await client.post(url, json=payload, headers=headers)
         except Exception as e:
             log.warning("cloud heartbeat failed: %s", e)

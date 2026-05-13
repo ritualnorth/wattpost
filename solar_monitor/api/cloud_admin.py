@@ -133,7 +133,12 @@ async def pair_appliance(
 
     url = f"{data.endpoint.rstrip('/')}/api/pair/exchange"
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        # Same follow_redirects rationale as the heartbeat client —
+        # a user typing https://wattpost.io into the pairing form
+        # still works because Caddy 308s /api/* to app.wattpost.io.
+        async with httpx.AsyncClient(
+            timeout=15.0, follow_redirects=True,
+        ) as client:
             r = await client.post(url, json={"code": code})
     except Exception as e:
         raise HTTPException(
