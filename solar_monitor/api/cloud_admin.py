@@ -32,13 +32,13 @@ log = logging.getLogger(__name__)
 # ---------- payloads ----------
 
 class CloudConfigPayload(msgspec.Struct, kw_only=True):
-    endpoint:          str = "https://wattpost.io"
+    endpoint:          str = "https://app.wattpost.io"
     heartbeat_minutes: int = 5
 
 
 class PairPayload(msgspec.Struct, kw_only=True):
     code:     str
-    endpoint: str = "https://wattpost.io"
+    endpoint: str = "https://app.wattpost.io"
 
 
 # ---------- helpers ----------
@@ -65,7 +65,7 @@ async def get_cloud_config(state: State) -> dict[str, Any]:
     if c is None or not c.bearer_token:
         return {
             "configured":        False,
-            "endpoint":          c.endpoint if c else "https://wattpost.io",
+            "endpoint":          c.endpoint if c else "https://app.wattpost.io",
             "heartbeat_minutes": c.heartbeat_minutes if c else 5,
             "appliance_id":      None,
             "label":             "",
