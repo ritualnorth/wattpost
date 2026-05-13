@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Added
+- Local alert engine — rule schema (metric / op / threshold / severity /
+  cooldown), Settings → Alerts UI editor (rules + transports), per-rule
+  Test button
+- Notification transports: ntfy, Discord webhook, generic webhook,
+  SMTP / email, MQTT-publish (LAN-local), Pushover
+- CSV export of any metric over any range
+  (`/api/devices/{label}/history.csv`)
+- PWA install — manifest + service worker, dashboard installs to home
+  screen on iOS / Android
+- Tailscale auto-config — sudoers entry, `tailscale serve` for HTTPS,
+  Settings → System surfaces the auth URL
+- In-app docs (`/docs/...`) rendered from bundled Markdown — no
+  external site needed
+- Diagnostics — Settings → System shows recent log lines + a Restart
+  daemon button (no SSH required)
+- Kiosk mode — `#/kiosk` chrome-free SoC + flow tiles, Settings toggle
+  to default-on for one device, Wake Lock keeps the screen on
+- WebSocket / SSE live updates — dashboard streams snapshots after
+  every poll instead of polling every 5s
+- BLE discovery wizard — Setup page scans an open transport for new
+  slave IDs and appends them to config.yaml
+- Home Assistant MQTT discovery topics
+- packaging/install.sh + systemd unit + pi-gen stage for SD-image
+  builds
+
+### Changed
+- BLE transport now auto-recovers from "device not advertising"
+  timeouts on daemon restart by clearing BlueZ's stale connection
+  state (`bluetoothctl disconnect`) and retrying once
+
 ## [0.0.1] — 2026-05-12
 Initial private commit. End-to-end working appliance against a live
 Renogy rig.
