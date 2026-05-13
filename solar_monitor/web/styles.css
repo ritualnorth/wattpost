@@ -1571,8 +1571,15 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .integration-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
 .integration-row-head { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
 .integration-row-name { font-weight: 600; color: var(--text); }
-.integration-row-sub { font-size: .78rem; color: var(--text-2); }
+.integration-row-sub {
+  font-size: .78rem; color: var(--text-2);
+  overflow-wrap: anywhere;     /* long resource_id / endpoint URL */
+}
 .integration-row-sub a { color: var(--accent); }
+.integration-row-sub code {
+  font-family: var(--mono); font-size: .9em;
+  background: var(--surface-3); padding: 0 .2rem; border-radius: 3px;
+}
 .integration-row-actions { display: flex; gap: .35rem; }
 .alerts-form-status.ok { color: var(--green, #3fb950); }
 .alerts-form-status.err { color: var(--red, #f85149); }
@@ -2199,6 +2206,11 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .alerts-row-cond  {
   font-family: var(--mono); font-size: .78rem; color: var(--text-3);
   font-variant-numeric: tabular-nums;
+  /* Long values (Discord webhook URLs, SMTP from-addresses with
+   * angle brackets, etc.) used to spill past the row's right edge.
+   * Wrap by character so a single long token can't blow the layout. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .alerts-row-meta  {
   display: flex; gap: .4rem; flex-wrap: wrap;
@@ -2294,14 +2306,22 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: .55rem .75rem;
+  /* min-width on the grid container caps any intrinsic-width child
+   * (e.g. an input with a long placeholder) so the whole form can't
+   * push past its parent's right edge on narrow viewports. */
+  min-width: 0;
 }
 .alerts-form-grid--full { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .alerts-form label {
   display: flex; flex-direction: column; gap: .25rem;
   font-size: .76rem;
   color: var(--text-2);
+  /* CSS-grid items refuse to shrink below content size by default;
+   * min-width:0 lets the input below it use width:100% without
+   * blowing out the column on long placeholders / values. */
+  min-width: 0;
 }
-.alerts-form .alerts-field-wide { grid-column: span 2; }
+.alerts-form .alerts-field-wide { grid-column: span 2; min-width: 0; }
 .alerts-form input,
 .alerts-form select {
   font: inherit; font-size: .88rem;
@@ -2311,6 +2331,11 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   font-family: var(--mono);
+  /* Fill the grid column. box-sizing makes border + padding count
+   * toward 100% so inputs don't peek out by 2px. */
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 .alerts-form select { font-family: inherit; }
 .alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
