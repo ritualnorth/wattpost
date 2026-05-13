@@ -1236,28 +1236,167 @@ function customRangeParams() {
   return { since: customSince, until: customUntil, bucket };
 }
 
+// ---- compare-packs mode ----
+//
+// Toggle persists across page loads so the user's preference sticks.
+// Only effective when the selected device is a smart_battery AND
+// there are >=2 smart_battery devices configured — otherwise the
+// checkbox is greyed out and refreshChart() falls through to the
+// single-series path.
+let compareMode = localStorage.getItem("compareMode") === "1";
+
+// Five-pack colour palette. Hand-picked to read distinctly in both
+// light and dark themes; if a user ever wires up >5 packs we cycle
+// back to the start (the legend keeps them disambiguated).
+const COMPARE_COLORS = [
+  "#58a6ff",   // accent blue
+  "#d29922",   // amber
+  "#3fb950",   // green
+  "#f85149",   // red
+  "#a371f7",   // purple
+];
+
+function smartBatteries() {
+  return devices.filter(d => d.kind === "smart_battery");
+}
+
+function updateCompareToggle() {
+  const box = $("#chart-compare-packs");
+  const label = box?.parentElement;
+  if (!box || !label) return;
+  const selDev = devices.find(d => d.label === $("#sel-device").value);
+  const eligible = selDev?.kind === "smart_battery" && smartBatteries().length >= 2;
+  box.disabled = !eligible;
+  label.classList.toggle("is-disabled", !eligible);
+  if (!eligible) box.checked = false;
+  else box.checked = compareMode;
+}
+
+function buildHistoryURL(label, metric) {
+  if (currentRange === "custom") {
+    const p = customRangeParams();
+    if (!p) return null;
+    return `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
+           `&since=${p.since}&until=${p.until}&bucket=${p.bucket}`;
+  }
+  const [since, bucket] = sinceForRange(currentRange);
+  return `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
+         `&since=${since}&bucket=${bucket}`;
+}
+
 async function refreshChart() {
   const label = $("#sel-device").value;
   const metric = $("#sel-metric").value;
   if (!label || !metric) return;
 
-  let url;
-  if (currentRange === "custom") {
-    const p = customRangeParams();
-    if (!p) return;  // user hasn't picked a valid range yet
-    url = `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
-          `&since=${p.since}&until=${p.until}&bucket=${p.bucket}`;
-  } else {
-    const [since, bucket] = sinceForRange(currentRange);
-    url = `/api/devices/${encodeURIComponent(label)}/history?metric=${encodeURIComponent(metric)}` +
-          `&since=${since}&bucket=${bucket}`;
+  updateCompareToggle();
+  const selDev = devices.find(d => d.label === label);
+  const inCompare = compareMode && selDev?.kind === "smart_battery"
+                    && smartBatteries().length >= 2;
+
+  if (inCompare) {
+    return refreshChartCompare(metric, label);
   }
 
+  const url = buildHistoryURL(label, metric);
+  if (!url) return;
   let data;
   try { data = await api(url); }
   catch (e) { console.error(e); return; }
   updateStatStrip(metric, data);
   drawChart(label, metric, data);
+}
+
+async function refreshChartCompare(metric, selectedLabel) {
+  const packs = smartBatteries();
+  const urls = packs.map(p => [p.label, buildHistoryURL(p.label, metric)])
+                    .filter(([, u]) => u != null);
+  if (!urls.length) return;
+  // Parallel fetch — a 3-pack rig with the daemon on LAN comes back in
+  // well under 200 ms total, so no need for a request-coalescing layer.
+  let results;
+  try {
+    results = await Promise.all(urls.map(async ([label, u]) => {
+      const data = await api(u);
+      return { label, data };
+    }));
+  } catch (e) {
+    console.error("compare-packs fetch failed:", e);
+    return;
+  }
+  // Stat strip reflects the device the dropdown is on — keeps the
+  // "selected pack" semantic intact even when we render N of them.
+  const sel = results.find(r => r.label === selectedLabel) || results[0];
+  if (sel) updateStatStrip(metric, sel.data);
+  drawCompareChart(metric, results);
+}
+
+function drawCompareChart(metric, datasets) {
+  const root = $("#chart");
+  if (chart) { chart.destroy(); chart = null; }
+  const unit = unitFromKey(metric);
+  const width = Math.max(root.clientWidth, 320);
+  const pal = chartPalette();
+
+  // Union the timestamps across all packs into one monotonic axis so
+  // a slight phase difference between BMS polls doesn't fragment the
+  // chart. uPlot wants every series aligned to one x array, with
+  // null gaps where a series has no point at that x.
+  const xs = new Set();
+  for (const d of datasets) for (const t of d.data.ts || []) xs.add(t);
+  const ts = Array.from(xs).sort((a, b) => a - b);
+  const tsIndex = new Map(ts.map((t, i) => [t, i]));
+
+  const series = [{}];
+  const dataCols = [ts];
+  datasets.forEach((d, i) => {
+    const color = COMPARE_COLORS[i % COMPARE_COLORS.length];
+    const col = new Array(ts.length).fill(null);
+    const tsArr = d.data.ts || [];
+    const vals = d.data.values || [];
+    for (let j = 0; j < tsArr.length; j++) {
+      const idx = tsIndex.get(tsArr[j]);
+      if (idx != null) col[idx] = vals[j];
+    }
+    series.push({
+      label: d.label,
+      stroke: color,
+      width: 2,
+      points: { show: ts.length < 60, size: 4, fill: color, stroke: color },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    });
+    dataCols.push(col);
+  });
+
+  const tsMin = ts[0], tsMax = ts[ts.length - 1];
+  const xScale = (tsMin != null && tsMax > tsMin)
+    ? { time: true, range: [tsMin, tsMax] } : { time: true };
+
+  const opts = {
+    width, height: 340,
+    cursor: { drag: { x: true, y: false } },
+    scales: { x: xScale },
+    series,
+    axes: [
+      { stroke: pal.axis, grid: { stroke: pal.grid },
+        ticks: { stroke: pal.gridStrong }, space: 45, size: 36 },
+      { stroke: pal.axis, grid: { stroke: pal.grid },
+        ticks: { stroke: pal.gridStrong }, space: 36,
+        values: (_u, splits) => splits.map(v =>
+          v == null ? "" :
+          (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(2))
+          + (unit ? " " + unit : "")),
+      },
+    ],
+    legend: { live: true },
+  };
+
+  try {
+    chart = new uPlot(opts, dataCols, root);
+  } catch (e) {
+    console.error("uPlot compare failed:", e);
+    root.innerHTML = `<div style="padding:1rem;color:var(--red)">Compare chart render failed: ${e.message}</div>`;
+  }
 }
 
 function updateStatStrip(metric, data) {
@@ -2312,6 +2451,15 @@ if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || 
 
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);
+// Compare-packs toggle: persist the preference and re-render. The
+// checkbox is greyed out when the eligibility conditions don't hold
+// (need a smart_battery selected + >=2 packs), but we still update
+// state so flipping back to an eligible device remembers the choice.
+$("#chart-compare-packs")?.addEventListener("change", (e) => {
+  compareMode = !!e.target.checked;
+  localStorage.setItem("compareMode", compareMode ? "1" : "0");
+  refreshChart();
+});
 // Export the currently-selected metric + range as a CSV download.
 // Browser handles the file save via the Content-Disposition header on
 // the response.
