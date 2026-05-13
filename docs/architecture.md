@@ -147,6 +147,21 @@ the scheduler.
 day one, not retrofit." Power users pipe to Home Assistant / Grafana
 via MQTT. Future exporters: webhook, HTTP push, InfluxDB direct.
 
+### Forecasts (`solar_monitor/forecast/`)
+Same provider-registry shape as alert transports. Each provider is
+one client (`SolcastProvider`, future `TomorrowIoProvider`) returning
+a normalised `PvForecast` (Watts, unix seconds). One
+`ForecastService` background task per daemon owns the poll loop and
+writes the JSON payload to the SQLite `kv` table at
+`forecast:pv` — cache survives daemon restarts so the dashboard
+isn't blank for hours after a reboot.
+
+**Why we don't proxy keys.** Solcast's hobbyist terms require one
+key per end-user; we'd lose the right to ship if we tried to share
+a key. The upside is privacy — your forecast never goes through
+anything we operate. Each appliance talks to Solcast directly over
+HTTPS using the user's own credentials.
+
 ### API (`solar_monitor/api/app.py`)
 **Litestar** because msgspec serialization is 10-20× faster than
 Pydantic, the WebSocket story is first-class, and a single process
