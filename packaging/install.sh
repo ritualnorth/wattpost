@@ -110,6 +110,25 @@ else
     step "keeping existing ${CONFIG_FILE}"
 fi
 
+# ----- sudoers fragment for Tailscale -----
+# Settings → Network needs to run `tailscale up / logout / serve` from
+# the daemon (which runs as the wattpost system user). Without this,
+# the Connect / Disconnect / HTTPS-serve buttons would all 500 with a
+# permission error. Limited to the three exact subcommands, so the
+# escalation surface stays tight.
+step "granting wattpost user sudo access to /usr/bin/tailscale"
+SUDOERS_FILE="/etc/sudoers.d/wattpost-tailscale"
+cat > "${SUDOERS_FILE}.tmp" <<'SUDO'
+# Allow the wattpost daemon to manage its Tailscale connection from
+# the dashboard's Settings → Network block.
+wattpost ALL=(root) NOPASSWD: /usr/bin/tailscale up *, /usr/bin/tailscale logout, /usr/bin/tailscale serve *
+SUDO
+# visudo -c validates syntax before we move it into /etc/sudoers.d/
+if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
+    install -m 0440 "${SUDOERS_FILE}.tmp" "${SUDOERS_FILE}"
+fi
+rm -f "${SUDOERS_FILE}.tmp"
+
 # ----- systemd unit -----
 step "installing wattpost.service"
 install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"

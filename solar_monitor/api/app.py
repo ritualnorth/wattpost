@@ -39,6 +39,7 @@ from .alerts_admin import (
 )
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
+    tailscale_serve,
 )
 
 
@@ -430,6 +431,7 @@ def build_app(
             tailscale_status,
             tailscale_up,
             tailscale_down,
+            tailscale_serve,
             service_worker,
             manifest,
             create_rule,

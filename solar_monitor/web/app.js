@@ -1663,16 +1663,33 @@ async function refreshTailscale() {
   }
   let html = "";
   if (s.logged_in && s.ipv4) {
-    const url = s.dns_name ? `http://${s.dns_name.replace(/\.$/, "")}:8000/` : `http://${s.ipv4}:8000/`;
+    const dns = s.dns_name || "";
+    const httpUrl  = dns ? `http://${dns}:8000/` : `http://${s.ipv4}:8000/`;
+    const httpsUrl = s.https_url;  // server-side: only present when serve is active
     html += `
       <div class="ts-state-row">
         <div class="ts-state-main">
           <span class="ts-state-title">Connected · ${s.hostname || "wattpost"}</span>
-          <span class="ts-state-sub">${s.ipv4}${s.dns_name ? ` · ${s.dns_name.replace(/\.$/, "")}` : ""}</span>
+          <span class="ts-state-sub">${s.ipv4}${dns ? ` · ${dns}` : ""}</span>
         </div>
         <span class="ts-state-tag ts-state-tag--ok">on tailnet</span>
-      </div>
-      <div class="settings-foot">Open from anywhere: <a href="${url}">${url}</a></div>
+      </div>`;
+    if (httpsUrl) {
+      html += `
+        <div class="settings-foot">
+          Open from anywhere (HTTPS, real cert):
+          <a href="${httpsUrl}">${httpsUrl}</a>
+        </div>
+        <div class="settings-foot">Plain HTTP also works: <a href="${httpUrl}">${httpUrl}</a></div>`;
+    } else {
+      html += `
+        <div class="settings-foot">Open from anywhere: <a href="${httpUrl}">${httpUrl}</a></div>
+        <div class="settings-foot">
+          Want a real HTTPS cert (no "Not Secure" warning)?
+          <button id="ts-enable-https" class="alerts-add-btn" style="margin-left:.35rem">Enable HTTPS via Tailscale Serve</button>
+        </div>`;
+    }
+    html += `
       <div class="ts-actions">
         <button id="ts-disconnect" class="alerts-add-btn">Disconnect</button>
       </div>`;
@@ -1693,8 +1710,28 @@ async function refreshTailscale() {
 
   const connect    = $("#ts-connect");
   const disconnect = $("#ts-disconnect");
+  const enableHttps = $("#ts-enable-https");
   if (connect)    connect.addEventListener("click", tailscaleConnect);
   if (disconnect) disconnect.addEventListener("click", tailscaleDisconnect);
+  if (enableHttps) enableHttps.addEventListener("click", tailscaleEnableHttps);
+}
+
+async function tailscaleEnableHttps() {
+  const btn = $("#ts-enable-https");
+  if (btn) { btn.disabled = true; btn.textContent = "Enabling…"; }
+  try {
+    const r = await fetch("/api/system/tailscale/serve", { method: "POST" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    // Give Tailscale a couple seconds to provision the cert, then
+    // re-read status (will populate https_url).
+    setTimeout(refreshTailscale, 1500);
+  } catch (e) {
+    alert(e.message);
+    if (btn) { btn.disabled = false; btn.textContent = "Enable HTTPS via Tailscale Serve"; }
+  }
 }
 
 async function tailscaleConnect() {
@@ -1714,6 +1751,7 @@ async function tailscaleConnect() {
         <div class="ts-auth">
           <span class="ts-auth-title">Log in to your tailnet to finish</span>
           <a href="${data.auth_url}" target="_blank" rel="noopener">${data.auth_url}</a>
+          <span class="settings-foot"><strong>Keep this link private.</strong> Anyone who opens it adds this appliance to <em>their</em> tailnet. It expires in ~10 minutes either way.</span>
           <span class="settings-foot">After authorising, refresh — this page should flip to "Connected · &lt;hostname&gt;".</span>
         </div>
         <div class="ts-actions">
