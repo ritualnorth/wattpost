@@ -838,26 +838,12 @@ main {
   border-radius: 3px;
   transform: translateX(-50%) !important;
 }
-.kiosk-flow .flow-arrow::after {
-  content: "";
-  position: absolute !important;
-  top: auto !important;
-  bottom: 0 !important;
-  left: 50% !important;
-  right: auto !important;
-  width: 0 !important;
-  height: 0 !important;
-  border-style: solid !important;
-  border-width: 14px 9px 0 9px !important;
-  border-color: var(--border-2) transparent transparent transparent !important;
-  transform: translateX(-50%) !important;
-  background: transparent !important;
-}
+/* (chevron-style ::after / .active::after live earlier in this file
+   under the @media (max-width: 720px) override section — don't add a
+   filled-triangle duplicate here, it would win the cascade by virtue
+   of being later in source order.) */
 .kiosk-flow .flow-arrow.active::before {
   background: linear-gradient(180deg, var(--from), var(--to));
-}
-.kiosk-flow .flow-arrow.active::after {
-  border-top-color: var(--to) !important;
 }
 /* The 9px haloed dot rendered as a chunky pin at the top of the
    connector — its glow leaked into the tile above and dominated the
