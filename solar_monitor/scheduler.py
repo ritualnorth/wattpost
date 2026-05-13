@@ -12,6 +12,7 @@ import random
 import time
 from typing import Any
 
+from .alerts import AlertEngine, AlertRule
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -46,6 +47,16 @@ class PollScheduler:
         # slow client falls behind we drop the oldest event for it (never
         # block the scheduler on a misbehaving consumer).
         self._subscribers: set[asyncio.Queue[dict]] = set()
+        # Local alert engine — runs after every successful poll.
+        rules = [
+            AlertRule(
+                id=r.id, name=r.name, metric=r.metric, op=r.op,
+                threshold=r.threshold, severity=r.severity,
+                cooldown_seconds=r.cooldown_seconds, transports=r.transports,
+            )
+            for r in config.alerts
+        ]
+        self._alerts = AlertEngine(rules, config.notification_transports)
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -126,14 +137,20 @@ class PollScheduler:
             except Exception:
                 log.exception("exporter %s failed to start", ecfg.get("id"))
 
+        # Bring up alert transports (ntfy / Discord / webhook / …).
+        await self._alerts.start()
+
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
         self._maint_task = asyncio.create_task(self._maintenance(), name="maintenance")
         log.info(
-            "scheduler started (interval=%ss, maintenance=%ss, exporters=%d)",
+            "scheduler started (interval=%ss, maintenance=%ss, exporters=%d, "
+            "alert_rules=%d, alert_transports=%d)",
             self.interval_seconds,
             self.maintenance_interval_seconds,
             len(self._exporters),
+            len(self._alerts.rules),
+            len(self._alerts.transport_ids),
         )
 
     async def stop(self) -> None:
@@ -165,6 +182,8 @@ class PollScheduler:
             except Exception:
                 log.exception("exporter %s stop failed", exp.id)
         self._exporters.clear()
+
+        await self._alerts.stop()
 
         log.info("scheduler stopped")
 
@@ -216,13 +235,24 @@ class PollScheduler:
                         )
                     self._consecutive_failures = 0
 
-                # Fan a fresh snapshot out to any SSE subscribers.
-                if self._subscribers:
+                # Build the snapshot once per poll — used by both SSE and
+                # the alert evaluator. Skip the work entirely when no one
+                # cares (no subscribers, no rules) so an idle daemon stays
+                # cheap.
+                if self._subscribers or self._alerts.rules:
                     try:
                         snapshot = await self.build_snapshot()
-                        self._broadcast(snapshot)
                     except Exception:
-                        log.exception("snapshot build for SSE broadcast failed")
+                        log.exception("snapshot build failed")
+                        snapshot = None
+                    if snapshot is not None:
+                        if self._subscribers:
+                            self._broadcast(snapshot)
+                        if self._alerts.rules:
+                            try:
+                                await self._alerts.evaluate(snapshot)
+                            except Exception:
+                                log.exception("alert evaluator crashed")
             except Exception as e:
                 self._consecutive_failures += 1
                 log.exception(

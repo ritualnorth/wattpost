@@ -40,10 +40,25 @@ class DeviceCfg(msgspec.Struct, kw_only=True):
     label: str | None = None
 
 
+class AlertRuleCfg(msgspec.Struct, kw_only=True):
+    """Mirror of alerts.AlertRule kept in the config schema so YAML
+    loading validates the shape upfront."""
+    id: str
+    name: str
+    metric: str
+    op: str
+    threshold: float
+    severity: str = "warn"
+    cooldown_seconds: int = 1800
+    transports: list[str] = []
+
+
 class Config(msgspec.Struct, kw_only=True):
     transports: list[dict[str, Any]]
     devices: list[DeviceCfg]
     exporters: list[dict[str, Any]] = []  # optional
+    notification_transports: list[dict[str, Any]] = []  # optional
+    alerts: list[AlertRuleCfg] = []  # optional
 
 
 def load_config(path: str | Path) -> Config:
