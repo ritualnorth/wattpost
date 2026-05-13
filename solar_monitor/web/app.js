@@ -317,6 +317,7 @@ function applySnapshot(frame) {
   const kioskFlow = $("#kiosk-flow");
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
+  renderWeather();
   renderTomorrow();
   renderWeek();
   renderCells();
@@ -943,6 +944,101 @@ function summariseForecast(points) {
     }
   }
   return out;
+}
+
+// ---------- CURRENT WEATHER (Open-Meteo) ----------
+let weatherData = null;
+let weatherLastFetched = 0;
+const WEATHER_REFRESH_MS = 5 * 60 * 1000;
+
+async function ensureWeather(force = false) {
+  const now = Date.now();
+  if (!force && weatherData && (now - weatherLastFetched) < WEATHER_REFRESH_MS) {
+    return weatherData;
+  }
+  try {
+    const w = await api("/api/weather/current");
+    weatherData = (w && w.provider) ? w : null;
+    weatherLastFetched = now;
+  } catch (e) { weatherData = null; }
+  return weatherData;
+}
+
+// WMO weather code → human label + minimal SVG icon. We pick from a
+// small palette (clear, partly cloudy, cloud, fog, rain, snow,
+// thunder) rather than the full WMO ladder — anything more fine-
+// grained than that doesn't read at this size.
+const WMO = {
+  describe(code, isDay) {
+    if (code == null) return "—";
+    if (code === 0)                              return isDay === false ? "Clear night" : "Sunny";
+    if (code === 1)                              return "Mostly clear";
+    if (code === 2)                              return "Partly cloudy";
+    if (code === 3)                              return "Overcast";
+    if (code === 45 || code === 48)              return "Fog";
+    if (code >= 51 && code <= 57)                return "Drizzle";
+    if (code >= 61 && code <= 67)                return "Rain";
+    if (code >= 71 && code <= 77)                return "Snow";
+    if (code >= 80 && code <= 82)                return "Showers";
+    if (code === 85 || code === 86)              return "Snow showers";
+    if (code >= 95 && code <= 99)                return "Thunderstorm";
+    return "—";
+  },
+  iconSvg(code, isDay) {
+    if (code == null) return "";
+    // Big-friendly inline icons. Stroke uses currentColor so the
+    // panel theme controls tint.
+    const sun = `<circle cx="12" cy="12" r="4"/>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>`;
+    const moon = `<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`;
+    const cloud = `<path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>`;
+    const partly = `<path d="M16 17a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.8A3.5 3.5 0 0 0 5.5 17z"/>
+      <circle cx="17" cy="6" r="2.4"/>
+      <path d="M17 1.5v1.5M22 6h-1.5M19.5 2.5l-1.05 1.05"/>`;
+    const rain = cloud + `<path d="M9 21l1-2M13 21l1-2M17 21l1-2"/>`;
+    const snow = cloud + `<path d="M10 21l.5-1M14 21l.5-1M18 21l.5-1"/>`;
+    const fog  = cloud + `<path d="M4 21h16M6 19h12"/>`;
+    const storm = cloud + `<path d="M11 18l-2 3h3l-2 3"/>`;
+    let inner;
+    if (code === 0)                              inner = isDay === false ? moon : sun;
+    else if (code === 1)                         inner = partly;
+    else if (code === 2)                         inner = partly;
+    else if (code === 3)                         inner = cloud;
+    else if (code === 45 || code === 48)         inner = fog;
+    else if (code >= 51 && code <= 67)           inner = rain;
+    else if (code >= 71 && code <= 77)           inner = snow;
+    else if (code >= 80 && code <= 86)           inner = rain;
+    else if (code >= 95 && code <= 99)           inner = storm;
+    else                                         inner = cloud;
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  },
+};
+
+function renderWeather() {
+  const panel = $("#weather-panel");
+  if (!panel) return;
+  ensureWeather().then(w => {
+    if (!w) { panel.hidden = true; return; }
+    panel.hidden = false;
+    $("#weather-icon").innerHTML = WMO.iconSvg(w.weather_code, w.is_day);
+    $("#weather-temp").textContent = w.temperature_c == null ? "—" : Math.round(w.temperature_c);
+    $("#weather-cond").textContent = WMO.describe(w.weather_code, w.is_day);
+    $("#weather-cloud").textContent = w.cloud_cover_pct == null ? "—" : `${Math.round(w.cloud_cover_pct)} %`;
+    $("#weather-wind").textContent  = w.wind_speed_ms == null ? "—"
+      : `${w.wind_speed_ms.toFixed(1)} m/s${w.wind_direction_deg == null ? "" : ` · ${windCompass(w.wind_direction_deg)}`}`;
+    $("#weather-humidity").textContent = w.humidity_pct == null ? "—" : `${Math.round(w.humidity_pct)} %`;
+    $("#weather-sunrise").textContent = w.sunrise_ts
+      ? new Date(w.sunrise_ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "—";
+    $("#weather-sunset").textContent  = w.sunset_ts
+      ? new Date(w.sunset_ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "—";
+    const feels = w.feels_like_c != null ? ` · feels ${Math.round(w.feels_like_c)}°` : "";
+    $("#weather-sub").textContent = `Open-Meteo${feels} · refreshed ${fmt.ago(w.fetched_at)}`;
+  });
+}
+
+function windCompass(deg) {
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+  return dirs[Math.round((deg % 360) / 22.5) % 16];
 }
 
 const FORECAST_EMPTY_DISMISS_KEY = "wattpost.forecast.empty.dismissed";
@@ -2286,13 +2382,19 @@ async function tailscaleDisconnect() {
 // One-shot fetch on settings open; mutates inline when the user
 // clicks Edit / Save / Test. State stays in module-scope so we don't
 // re-fetch on every render.
-let integrationsState = { forecast: null, editing: false };
+let integrationsState = { forecast: null, weather: null, editing: null };
+// editing: null | "forecast" | "weather"
 
 async function refreshIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
   try {
-    integrationsState.forecast = await api("/api/forecast/config");
+    const [fc, wc] = await Promise.all([
+      api("/api/forecast/config"),
+      api("/api/weather/config"),
+    ]);
+    integrationsState.forecast = fc;
+    integrationsState.weather  = wc;
   } catch (e) {
     host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
     return;
@@ -2304,23 +2406,32 @@ function renderIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
   const fc = integrationsState.forecast || {};
-  if (integrationsState.editing) {
+  const wc = integrationsState.weather  || {};
+
+  if (integrationsState.editing === "forecast") {
     host.innerHTML = renderForecastForm(fc);
     wireForecastForm();
     return;
   }
-  const configured = fc.configured;
+  if (integrationsState.editing === "weather") {
+    host.innerHTML = renderWeatherForm(wc);
+    wireWeatherForm();
+    return;
+  }
+
+  const forecastConfigured = fc.configured;
+  const weatherConfigured  = wc.configured;
   host.innerHTML = `
     <div class="integration-row" data-integration="solcast">
       <div class="integration-row-main">
         <div class="integration-row-head">
           <span class="integration-row-name">Solcast PV forecast</span>
-          <span class="alerts-row-tag alerts-row-tag--${configured ? "ok" : "warn"}">
-            ${configured ? "configured" : "not set up"}
+          <span class="alerts-row-tag alerts-row-tag--${forecastConfigured ? "ok" : "warn"}">
+            ${forecastConfigured ? "configured" : "not set up"}
           </span>
         </div>
         <div class="integration-row-sub">
-          ${configured
+          ${forecastConfigured
             ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "—"}…`
             : `Sign up at <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">solcast.com</a> for a free hobbyist API key.`
           }
@@ -2328,14 +2439,150 @@ function renderIntegrationsPanel() {
       </div>
       <div class="integration-row-actions">
         <button class="alerts-add-btn" data-edit-forecast>
-          ${configured ? "Edit" : "Configure"}
+          ${forecastConfigured ? "Edit" : "Configure"}
+        </button>
+      </div>
+    </div>
+    <div class="integration-row" data-integration="openmeteo">
+      <div class="integration-row-main">
+        <div class="integration-row-head">
+          <span class="integration-row-name">Open-Meteo weather</span>
+          <span class="alerts-row-tag alerts-row-tag--${weatherConfigured ? "ok" : "warn"}">
+            ${weatherConfigured ? "configured" : "not set up"}
+          </span>
+        </div>
+        <div class="integration-row-sub">
+          ${weatherConfigured
+            ? `Polling every ${wc.poll_minutes}m · ${wc.lat?.toFixed(3)}, ${wc.lon?.toFixed(3)}`
+            : `Current conditions (temp, cloud, sunrise/sunset). No API key — free public service.`
+          }
+        </div>
+      </div>
+      <div class="integration-row-actions">
+        <button class="alerts-add-btn" data-edit-weather>
+          ${weatherConfigured ? "Edit" : "Configure"}
         </button>
       </div>
     </div>`;
   $("[data-edit-forecast]")?.addEventListener("click", () => {
-    integrationsState.editing = true;
+    integrationsState.editing = "forecast";
     renderIntegrationsPanel();
   });
+  $("[data-edit-weather]")?.addEventListener("click", () => {
+    integrationsState.editing = "weather";
+    renderIntegrationsPanel();
+  });
+}
+
+function renderWeatherForm(wc) {
+  return `
+    <form class="alerts-form" data-form="weather">
+      <div class="alerts-form-grid">
+        <label>Latitude
+          <input type="number" name="lat" value="${wc.lat ?? ""}"
+                 step="any" min="-90" max="90" required placeholder="51.5074"/>
+        </label>
+        <label>Longitude
+          <input type="number" name="lon" value="${wc.lon ?? ""}"
+                 step="any" min="-180" max="180" required placeholder="-0.1278"/>
+        </label>
+        <label>Poll every (minutes)
+          <input type="number" name="poll_minutes" value="${wc.poll_minutes ?? 15}"
+                 min="5" max="120" required/>
+        </label>
+      </div>
+      <p class="settings-foot">
+        No API key needed — Open-Meteo's public endpoint is free for hobbyist use.
+        If you already wired up Solcast, paste the same lat/lon from your registered site.
+      </p>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">Save</button>
+        <button type="button" class="btn-action" data-test-weather>Test</button>
+        ${wc.configured
+          ? `<button type="button" class="btn-action alerts-icon-btn--danger" data-clear-weather>Disable</button>`
+          : ""}
+        <button type="button" class="btn-action" data-cancel-weather>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function wireWeatherForm() {
+  const form = document.querySelector("form[data-form='weather']");
+  if (!form) return;
+  form.addEventListener("submit", (e) => { e.preventDefault(); saveWeatherConfig(form); });
+  form.querySelector("[data-cancel-weather]")?.addEventListener("click", () => {
+    integrationsState.editing = null;
+    renderIntegrationsPanel();
+  });
+  form.querySelector("[data-test-weather]")?.addEventListener("click", () => testWeather(form));
+  form.querySelector("[data-clear-weather]")?.addEventListener("click", () => clearWeather(form));
+}
+
+function _weatherPayload(form) {
+  return {
+    provider:     "openmeteo",
+    lat:          parseFloat(form.elements["lat"].value),
+    lon:          parseFloat(form.elements["lon"].value),
+    poll_minutes: parseInt(form.elements["poll_minutes"].value, 10),
+  };
+}
+
+async function saveWeatherConfig(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/weather/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_weatherPayload(form)),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
+  }
+}
+
+async function testWeather(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Testing…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/weather/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_weatherPayload(form)),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    status.textContent = `✓ ${d.temperature_c}°C · ${d.cloud_cover}% cloud`;
+    status.classList.add("ok");
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
+  }
+}
+
+async function clearWeather() {
+  if (!confirm("Disable Open-Meteo weather? Cached conditions are dropped.")) return;
+  try {
+    const r = await fetch("/api/weather/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "openmeteo", lat: null, lon: null, poll_minutes: 15 }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 function renderForecastForm(fc) {
@@ -2381,7 +2628,7 @@ function wireForecastForm() {
   if (!form) return;
   form.addEventListener("submit", (e) => { e.preventDefault(); saveForecastConfig(form); });
   form.querySelector("[data-cancel-forecast]")?.addEventListener("click", () => {
-    integrationsState.editing = false;
+    integrationsState.editing = null;
     renderIntegrationsPanel();
   });
   form.querySelector("[data-test-forecast]")?.addEventListener("click", () => testForecast(form));
@@ -2411,7 +2658,7 @@ async function saveForecastConfig(form) {
       const d = await r.json().catch(() => ({}));
       throw new Error(d.detail || `${r.status} ${r.statusText}`);
     }
-    integrationsState.editing = false;
+    integrationsState.editing = null;
     await refreshIntegrationsPanel();
   } catch (e) {
     status.textContent = e.message; status.classList.add("err");
@@ -2453,7 +2700,7 @@ async function clearForecast(form) {
       const d = await r.json().catch(() => ({}));
       throw new Error(d.detail || `${r.status} ${r.statusText}`);
     }
-    integrationsState.editing = false;
+    integrationsState.editing = null;
     await refreshIntegrationsPanel();
   } catch (e) {
     status.textContent = e.message; status.classList.add("err");

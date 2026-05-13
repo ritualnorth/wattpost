@@ -66,6 +66,20 @@ class ForecastCfg(msgspec.Struct, kw_only=True):
     poll_hours: int = 3
 
 
+class WeatherCfg(msgspec.Struct, kw_only=True):
+    """Current weather conditions integration. Open-Meteo only for now —
+    no API key required (free public service, generous rate limits).
+    Lat/lon are user-supplied; could derive from Solcast in a future
+    iteration but explicit is cleaner."""
+    provider: str = "openmeteo"
+    lat: float
+    lon: float
+    # Cadence in minutes — Open-Meteo doesn't rate-limit hobbyist
+    # traffic but there's no point hammering when conditions change
+    # on a 10-minute timescale anyway.
+    poll_minutes: int = 15
+
+
 class QuietHoursCfg(msgspec.Struct, kw_only=True):
     """Window during which `warn`-severity alerts are buffered instead of
     dispatched immediately. `alarm` always pages through. Hours are
@@ -86,6 +100,7 @@ class Config(msgspec.Struct, kw_only=True):
     alerts: list[AlertRuleCfg] = []  # optional
     quiet_hours: QuietHoursCfg | None = None  # optional
     forecast: ForecastCfg | None = None  # optional
+    weather: WeatherCfg | None = None    # optional
 
 
 def load_config(path: str | Path) -> Config:

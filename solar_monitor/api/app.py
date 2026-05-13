@@ -42,6 +42,10 @@ from .forecast_admin import (
     get_pv_forecast, get_forecast_config, update_forecast_config,
     test_forecast_fetch,
 )
+from .weather_admin import (
+    get_current_weather, get_weather_config, update_weather_config,
+    test_weather_fetch,
+)
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve,
@@ -479,6 +483,10 @@ def build_app(
             get_forecast_config,
             update_forecast_config,
             test_forecast_fetch,
+            get_current_weather,
+            get_weather_config,
+            update_weather_config,
+            test_weather_fetch,
             list_setup_transports,
             known_devices,
             probe,

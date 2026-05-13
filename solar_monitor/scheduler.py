@@ -14,6 +14,7 @@ from typing import Any
 
 from .alerts import AlertEngine, AlertRule
 from .forecast import ForecastService
+from .weather import WeatherService
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -71,6 +72,15 @@ class PollScheduler:
                 self._forecast = ForecastService(config.forecast, store)
             except Exception:
                 log.exception("forecast service failed to initialise")
+
+        # Current-weather service (Open-Meteo). Independent of the PV
+        # forecast — many users will want one without the other.
+        self._weather: WeatherService | None = None
+        if config.weather is not None:
+            try:
+                self._weather = WeatherService(config.weather, store)
+            except Exception:
+                log.exception("weather service failed to initialise")
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -157,6 +167,8 @@ class PollScheduler:
         # Background forecast poller (only if configured).
         if self._forecast is not None:
             await self._forecast.start()
+        if self._weather is not None:
+            await self._weather.start()
 
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
@@ -204,6 +216,8 @@ class PollScheduler:
         await self._alerts.stop()
         if self._forecast is not None:
             await self._forecast.stop()
+        if self._weather is not None:
+            await self._weather.stop()
 
         log.info("scheduler stopped")
 
