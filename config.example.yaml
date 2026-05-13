@@ -104,6 +104,18 @@ devices:
 #     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
 #     # device: pixel-9                            # optional: only this device. Omit for all.
 
+# WattPost cloud (wattpost.io). Optional. Pair the appliance to your
+# cloud account so the multi-site dashboard sees it and overdue
+# heartbeats fire an offline alert. The bearer_token is normally
+# written here by the Settings → Integrations → WattPost cloud
+# pairing flow — you don't have to edit it manually.
+# cloud:
+#   endpoint:          https://wattpost.io
+#   bearer_token:      <fill via UI pairing>
+#   appliance_id:      <set by cloud on pair>
+#   label:             <set by cloud on pair>
+#   heartbeat_minutes: 5
+
 # Current weather (Open-Meteo, free, no API key). When set, the
 # daemon polls Open-Meteo for temperature, cloud cover, wind, and
 # sunrise/sunset, and the dashboard's "Right now" tile populates.

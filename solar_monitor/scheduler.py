@@ -15,6 +15,7 @@ from typing import Any
 from .alerts import AlertEngine, AlertRule
 from .forecast import ForecastService
 from .weather import WeatherService
+from .cloud import CloudService
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -81,6 +82,15 @@ class PollScheduler:
                 self._weather = WeatherService(config.weather, store)
             except Exception:
                 log.exception("weather service failed to initialise")
+
+        # Cloud heartbeat. Only spun up when an actual bearer token is
+        # present — daemon stays fully offline-capable when not paired.
+        self._cloud: CloudService | None = None
+        if config.cloud is not None and config.cloud.bearer_token:
+            try:
+                self._cloud = CloudService(config.cloud, self)
+            except Exception:
+                log.exception("cloud heartbeat service failed to initialise")
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -169,6 +179,8 @@ class PollScheduler:
             await self._forecast.start()
         if self._weather is not None:
             await self._weather.start()
+        if self._cloud is not None:
+            await self._cloud.start()
 
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
@@ -218,6 +230,8 @@ class PollScheduler:
             await self._forecast.stop()
         if self._weather is not None:
             await self._weather.stop()
+        if self._cloud is not None:
+            await self._cloud.stop()
 
         log.info("scheduler stopped")
 

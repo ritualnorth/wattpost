@@ -66,6 +66,24 @@ class ForecastCfg(msgspec.Struct, kw_only=True):
     poll_hours: int = 3
 
 
+class CloudCfg(msgspec.Struct, kw_only=True):
+    """Opt-in cloud integration. When present, the daemon periodically
+    POSTs a heartbeat (SoC, net power, alert summary) to wattpost.io.
+    Nothing else changes — the appliance stays fully functional with
+    no cloud, no internet, no account.
+
+    Pairing flow lives in the API: user gets a code from the cloud
+    dashboard, pastes it into Settings → Cloud on the appliance, the
+    daemon exchanges the code for a `bearer_token` which gets written
+    back into this struct.
+    """
+    endpoint:          str  = "https://wattpost.io"
+    bearer_token:      str  = ""    # empty until paired
+    appliance_id:      int | None = None
+    label:             str  = ""
+    heartbeat_minutes: int  = 5
+
+
 class WeatherCfg(msgspec.Struct, kw_only=True):
     """Current weather conditions integration. Open-Meteo only for now —
     no API key required (free public service, generous rate limits).
@@ -101,6 +119,7 @@ class Config(msgspec.Struct, kw_only=True):
     quiet_hours: QuietHoursCfg | None = None  # optional
     forecast: ForecastCfg | None = None  # optional
     weather: WeatherCfg | None = None    # optional
+    cloud: CloudCfg | None = None        # optional
 
 
 def load_config(path: str | Path) -> Config:

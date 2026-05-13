@@ -46,6 +46,10 @@ from .weather_admin import (
     get_current_weather, get_weather_config, update_weather_config,
     test_weather_fetch,
 )
+from .cloud_admin import (
+    get_cloud_config, update_cloud_config, pair_appliance,
+    unpair_appliance, trigger_heartbeat,
+)
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve,
@@ -488,6 +492,11 @@ def build_app(
             get_weather_config,
             update_weather_config,
             test_weather_fetch,
+            get_cloud_config,
+            update_cloud_config,
+            pair_appliance,
+            unpair_appliance,
+            trigger_heartbeat,
             list_setup_transports,
             known_devices,
             probe,
