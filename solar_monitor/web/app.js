@@ -2062,6 +2062,10 @@ if (kioskExitBtn) {
     window.location.hash = "#/";
   });
 }
+const restartBtn = $("#restart-daemon-btn");
+if (restartBtn) {
+  restartBtn.addEventListener("click", restartDaemon);
+}
 // If this device is set to default-to-kiosk and the URL has no explicit
 // hash, redirect before the initial setRoute runs.
 if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
@@ -2631,6 +2635,48 @@ $("#wiz-scan-btn").addEventListener("click", wizScan);
 // Lazy-load when user navigates to Setup so we don't waste a request on
 // every page load. setRoute() fires this hook.
 function onEnterSetup() { wizLoadTransports(); }
+
+// ---------- daemon restart ----------
+// Settings → System → Restart. POSTs /api/system/restart (which fires
+// asyncio task that os.execv's the process), shows a full-screen
+// overlay, polls /api/health every ~600 ms until the daemon answers,
+// then dismisses the overlay. The existing SSE EventSource reconnects
+// on its own once the new process is listening.
+async function restartDaemon() {
+  if (!confirm("Restart the daemon? The UI will reconnect in about 5 seconds.")) return;
+  const overlay = $("#restart-overlay");
+  const sub     = $("#restart-overlay-sub");
+  overlay.hidden = false;
+  sub.textContent = "Sending restart signal…";
+  try {
+    const r = await fetch("/api/system/restart", { method: "POST" });
+    if (!r.ok && r.status !== 202) throw new Error(`${r.status} ${r.statusText}`);
+  } catch (e) {
+    sub.textContent = `Failed to send restart: ${e.message}`;
+    setTimeout(() => { overlay.hidden = true; }, 3000);
+    return;
+  }
+  sub.textContent = "Waiting for daemon to come back…";
+  await pollUntilHealthy(45000);
+  sub.textContent = "Reloading page…";
+  // Easiest way to re-establish SSE + flush stale snapshot state.
+  setTimeout(() => window.location.reload(), 500);
+}
+
+async function pollUntilHealthy(timeoutMs) {
+  const start = Date.now();
+  // Brief grace period so we don't hit /api/health before the old
+  // process has actually torn down.
+  await new Promise(r => setTimeout(r, 800));
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const r = await fetch("/api/health", { cache: "no-store" });
+      if (r.ok) return true;
+    } catch (_) { /* still down, retry */ }
+    await new Promise(r => setTimeout(r, 600));
+  }
+  return false;
+}
 
 // boot
 setRoute(currentRouteName());

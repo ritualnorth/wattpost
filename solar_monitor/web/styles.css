@@ -2080,6 +2080,47 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   margin-bottom: .55rem;
 }
 
+/* ---------------- restart overlay ---------------- */
+.restart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+[data-theme="light"] .restart-overlay { background: rgba(15, 23, 42, 0.35); }
+.restart-overlay[hidden] { display: none; }
+.restart-overlay-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.4rem 1.8rem;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center;
+  gap: .75rem;
+  min-width: 240px;
+}
+.restart-overlay-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.restart-overlay-sub {
+  font-size: .82rem;
+  color: var(--text-3);
+}
+.restart-spinner {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+  animation: restart-spin 0.9s linear infinite;
+}
+@keyframes restart-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ---------------- theme picker (Settings → Appearance) ---------------- */
 .theme-picker {
   display: flex;
