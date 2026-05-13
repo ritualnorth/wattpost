@@ -632,23 +632,24 @@ function buildFlowModel() {
   //
   // Positive  ⇒ an unmeasured LOAD of that magnitude.
   // Negative  ⇒ an unmeasured SOURCE of that magnitude.
-  // Threshold below which we ignore noise / BMS rounding.
-  const INFERRED_THRESHOLD_W = 10;
+  // Noise floor: a ±1 W imbalance is essentially sampling skew between
+  // the MPPT poll and the battery poll, plus integer rounding. Anything
+  // above this is genuine system load (or an unmeasured source).
+  //
+  // We always surface the inferred figure now, not just above some 10 W
+  // threshold — otherwise the dashboard reads as "PV 71 W → battery 66 W →
+  // load 0 W" and users (correctly) think the maths is broken. Showing
+  // the small 5 W difference as load — with an "estimated" sub-label —
+  // makes the totals reconcile and tells the truth: load is computed
+  // from energy balance unless a real load meter is wired in.
+  const INFERRED_NOISE_W = 1;
   if (bank) {
     const visibleSourcesW = sources.reduce((a, s) => a + s.power, 0);
     const visibleLoadsW   = loads.reduce((a, l) => a + l.power, 0);
     const inferred = visibleSourcesW - bank.netW - visibleLoadsW;
+    const visibleLoadsActive = loads.length > 0;
 
-    // Loads almost never go through the charge controller's load
-     // terminals — they're wired to a busbar. So the "balance" calculation
-     // is in fact the real consumption, not a fallback. Promote it to the
-     // primary Load tile and drop the dashed-border treatment.
-     //
-     // If the controller's load output IS active (rare — usually a small
-     // LED or fan), we leave its existing tile in place and only the
-     // *additional* load coming via the bus is surfaced as a balance number.
-    if (inferred > INFERRED_THRESHOLD_W) {
-      const visibleLoadsActive = loads.length > 0;
+    if (inferred > INFERRED_NOISE_W) {
       loads.push({
         id: visibleLoadsActive ? "_bus_load" : "_load",
         label: visibleLoadsActive ? "Bus loads" : "Load",
@@ -656,12 +657,12 @@ function buildFlowModel() {
         icon: "house",
         power: inferred,
         active: inferred > 50,
-        // Only flag as "inferred" (dashed border + asterisk) when it's a
-        // secondary tile alongside something we measured directly.
+        // Only flag as "inferred" (dashed border + asterisk) when it's
+        // a secondary tile alongside something we measured directly.
         inferred: visibleLoadsActive,
-        sub: visibleLoadsActive ? "from energy balance" : null,
+        sub: "estimated",
       });
-    } else if (inferred < -INFERRED_THRESHOLD_W) {
+    } else if (inferred < -INFERRED_NOISE_W) {
       const visibleSourcesActive = sources.length > 0;
       sources.push({
         id: visibleSourcesActive ? "_bus_source" : "_source",
@@ -671,13 +672,12 @@ function buildFlowModel() {
         power: -inferred,
         active: -inferred > 50,
         inferred: visibleSourcesActive,
-        sub: visibleSourcesActive ? "from energy balance" : null,
+        sub: "estimated",
       });
-    } else if (loads.length === 0) {
-      // Nothing visible AND inferred is below threshold — the bus is
-      // genuinely idle. Show a placeholder Load tile so the strip stays
-      // symmetric with always-visible Sources, and the user can see at a
-      // glance that the system is monitoring loads (not broken).
+    } else if (!visibleLoadsActive) {
+      // True idle: |inferred| ≤ noise floor and nothing measured.
+      // Placeholder tile keeps the strip symmetric with the always-
+      // visible Sources column.
       loads.push({
         id: "_load_idle",
         label: "Load",
@@ -685,7 +685,7 @@ function buildFlowModel() {
         icon: "house",
         power: 0,
         active: false,
-        sub: "idle",
+        sub: "estimated · idle",
       });
     }
   }
