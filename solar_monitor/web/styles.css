@@ -1693,10 +1693,11 @@ body.kiosk-active .route.kiosk-route.active {
   overflow-y: auto;
   padding: 2vh 0;
 }
-/* The moving flow-dot pip is hard to notice at kiosk scale and just
-   adds visual noise from across the room — hide it. The arrow itself
-   still conveys direction, and the colour gradient on the line stays. */
-.kiosk-flow .flow-arrow .dot { display: none !important; }
+/* The "53 W" / "0 W" pills in the connector are redundant at kiosk
+   scale — the Solar / Battery / Load tiles already show the wattage,
+   and one less label to read across the room is cleaner. Keep the
+   animated dot so flow direction is still obvious. */
+.kiosk-flow .flow-arrow-label { display: none !important; }
 .kiosk-flow .flow-tile {
   padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
 }
