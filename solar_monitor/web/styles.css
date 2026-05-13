@@ -1636,9 +1636,10 @@ body.kiosk-active .route.kiosk-route.active {
 .kiosk-donut {
   position: relative;
   /* Pick whichever axis is the constraint — a landscape phone is short
-     vertically, a portrait phone is narrow horizontally. The 80vw cap
-     gives the donut room to breathe in landscape where vh is tiny. */
-  width: min(55vh, 80vw, 460px);
+     vertically, a portrait phone is narrow horizontally. Bumped the cap
+     to 560px so the ring fills more of the left half on a landscape
+     tablet without crowding the flow column. */
+  width: min(72vh, 80vw, 560px);
   aspect-ratio: 1 / 1;
 }
 .kiosk-donut .hero-donut { width: 100%; height: 100%; display: block; }
@@ -1685,10 +1686,17 @@ body.kiosk-active .route.kiosk-route.active {
      scale typography & padding up so the tiles read from a couch. */
   font-size: 1.15rem;
   /* When the viewport is short (landscape phone), the column scrolls
-     internally instead of pushing content under the bottom chrome. */
+     internally instead of pushing content under the bottom chrome.
+     padding adds breathing room so the top Solar tile doesn't sit
+     flush with the top of the viewport. */
   max-height: 100%;
   overflow-y: auto;
+  padding: 2vh 0;
 }
+/* The moving flow-dot pip is hard to notice at kiosk scale and just
+   adds visual noise from across the room — hide it. The arrow itself
+   still conveys direction, and the colour gradient on the line stays. */
+.kiosk-flow .flow-arrow .dot { display: none !important; }
 .kiosk-flow .flow-tile {
   padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
 }
