@@ -134,21 +134,43 @@ async def device_history(
     }
 
 
+@get("/api/system/logs")
+async def system_logs(n: int = 200) -> dict[str, Any]:
+    """Return the most recent N log lines for Settings → Diagnostics.
+    Backed by an in-memory ring buffer (`solar_monitor.diagnostics`) so
+    we don't depend on journalctl or a log-file path."""
+    from ..diagnostics import LOG_RING
+    lines = LOG_RING.lines()
+    if n > 0:
+        lines = lines[-n:]
+    return {"lines": lines}
+
+
 @post("/api/system/restart", status_code=202)
-async def restart_daemon() -> dict[str, Any]:
+async def restart_daemon(state: State) -> dict[str, Any]:
     """Gracefully restart the daemon by re-exec()-ing the current
     process. The HTTP response goes out before exec replaces us, so the
     SPA sees a clean 202 → starts polling /api/health → notices the
     daemon is back ~5 s later.
 
+    Before exec we shut the scheduler down properly — that disconnects
+    the BLE transports cleanly so BlueZ doesn't hold a phantom
+    connection to the BT-2 across the process swap (otherwise the new
+    process gets "device not advertising" for ~60 s and the dashboard
+    fills up with "device errors on last poll" warnings).
+
     Works whether or not a supervisor (systemd) is around — os.execv
     replaces the current process image in place, no orphan-process
     cleanup required."""
+    scheduler: PollScheduler = state["scheduler"]
 
     async def _delayed_exec() -> None:
-        # Tiny pause so the HTTP response can flush back to the client
-        # before the kernel tears down its FDs in exec.
+        # Let the HTTP response flush back to the client first.
         await asyncio.sleep(0.4)
+        try:
+            await scheduler.stop()
+        except Exception:
+            pass
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     asyncio.create_task(_delayed_exec())
@@ -274,6 +296,11 @@ def build_app(
     scheduler = PollScheduler(config, store, interval_seconds=interval_seconds)
 
     async def on_startup(app: Litestar) -> None:
+        # uvicorn finishes its own logging dictConfig before this hook
+        # fires, so attaching our ring buffer here means it survives the
+        # reset and starts capturing daemon output.
+        from ..diagnostics import install as install_log_ring
+        install_log_ring()
         await store.open()
         await scheduler.start()
         app.state["store"] = store
@@ -308,6 +335,7 @@ def build_app(
             list_alerts,
             test_alert,
             restart_daemon,
+            system_logs,
             create_rule,
             update_rule,
             delete_rule,
