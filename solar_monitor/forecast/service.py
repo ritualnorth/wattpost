@@ -63,11 +63,23 @@ class ForecastService:
             self._task = None
 
     async def fetch_once(self) -> PvForecast:
-        """Single fetch + cache write. Exposed for the /api/forecast/test
-        endpoint; the background loop calls the same path."""
+        """Single fetch + cache write + archive. Exposed for the
+        /api/forecast/test endpoint; the background loop calls the
+        same path so archive coverage matches what the kv cache held."""
         fc = await self.provider.fetch()
         body = msgspec.json.encode(fc).decode("utf-8")
         await self.store.kv_set(CACHE_KEY, body)
+        # Archive every point under one fetched_at so the accuracy
+        # widget can later look back at "the forecast as the user
+        # would have seen it before day X started." Best-effort —
+        # archiving failure must not block the dashboard refresh.
+        try:
+            archive_rows = [
+                (p.ts, p.pv_w, p.pv_w_p10, p.pv_w_p90) for p in fc.points
+            ]
+            await self.store.archive_forecast(fc.fetched_at, archive_rows)
+        except Exception:
+            log.exception("forecast archive write failed")
         return fc
 
     async def _loop(self) -> None:

@@ -34,6 +34,12 @@ Versions follow [Semantic Versioning].
   sunrise / sunset. No API key required; user supplies lat/lon.
   Polls every 15 min by default, cached in the same `kv` table
   the PV forecast uses.
+- Forecast accuracy: every Solcast fetch is now archived to a new
+  `forecast_history` table (30-day retention). The Tomorrow tile
+  grows a "Yesterday: predicted X · actual Y · Z% of forecast"
+  line tinted green / amber / red by deviation. Surfaces drift in
+  Solcast's site model (capacity, tilt, azimuth, shading) before
+  it gets too far from reality.
 - Charge efficiency: `/api/devices/{label}/efficiency` returns
   SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
   windows. Smart-battery device cards show an `η` tile picking the

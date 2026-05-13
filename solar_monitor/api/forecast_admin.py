@@ -57,6 +57,53 @@ def _save_config(config_path: str, mutator) -> None:
 
 # ---------- routes ----------
 
+@get("/api/forecast/accuracy")
+async def get_forecast_accuracy(
+    state: State,
+    day_offset: int = 1,
+) -> dict[str, Any]:
+    """Compare a past day's PV forecast against the actual energy the
+    charge_controller(s) recorded.
+
+    `day_offset=1` (default) = yesterday; 2 = day-before-yesterday, etc.
+    Capped at 30 to match the forecast_history retention window.
+
+    The endpoint never errors when there's no data — it returns a
+    `{ok: false}` shape that the UI treats as "hide this widget."
+    """
+    from ..storage.sqlite import Store
+    config: Config = state["config"]
+    store: Store = state["store"]
+
+    if day_offset < 1 or day_offset > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="day_offset must be between 1 and 30",
+        )
+
+    # Local-midnight of the target day. Done server-side so timezone
+    # interpretation matches the SQL we wrote against the same
+    # timestamps in the maintenance + archive paths.
+    import datetime as _dt
+    now = _dt.datetime.now()
+    today_mid = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    target_mid = today_mid - _dt.timedelta(days=day_offset)
+    target_mid_ts = int(target_mid.timestamp())
+
+    controller_labels = [
+        d.label for d in config.devices if d.kind == "charge_controller"
+    ]
+    if not controller_labels:
+        return {"ok": False, "reason": "no charge controllers configured"}
+
+    result = await store.forecast_accuracy_for_day(
+        target_mid_ts, controller_labels,
+    )
+    if result is None:
+        return {"ok": False, "reason": "not enough data yet"}
+    return {"ok": True, **result}
+
+
 @get("/api/forecast/pv")
 async def get_pv_forecast(state: State) -> dict[str, Any]:
     """Return the latest cached forecast or a 204-shaped empty payload.
