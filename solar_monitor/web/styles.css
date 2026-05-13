@@ -778,21 +778,23 @@ main {
   width: 100%;
   /* Shorter than the portrait-phone version — at kiosk scale a stubby
      connector pulls the tiles closer together and reads as one block.
-     Used to be clamp(48px, 8vh, 72px). */
-  height: clamp(28px, 5vh, 42px);
+     Used to be clamp(48px, 8vh, 72px); slimmed further once we shrank
+     the arrowhead so the geometry matched. */
+  height: clamp(18px, 3.5vh, 28px);
   min-height: 0;
   align-self: stretch;
   padding: 0;
   display: block;
 }
-/* Smaller arrow head + tighter line geometry to match. */
+/* Slim line + small arrow head, proportioned to each other so it
+   reads as a single tick rather than a stuck-on triangle. */
 .kiosk-flow .flow-arrow::before {
-  top: 2px !important;
-  bottom: 10px !important;
-  width: 3px !important;
+  top: 1px !important;
+  bottom: 6px !important;
+  width: 2px !important;
 }
 .kiosk-flow .flow-arrow::after {
-  border-width: 9px 6px 0 6px !important;
+  border-width: 5px 3.5px 0 3.5px !important;
 }
 .kiosk-flow .flow-arrow {
   position: absolute !important;
