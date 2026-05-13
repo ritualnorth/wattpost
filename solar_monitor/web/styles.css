@@ -1374,6 +1374,56 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   text-transform: lowercase;
 }
 
+/* "Right now" panel — current weather conditions from Open-Meteo.
+ * Sits between Today (energy state) and Tomorrow (PV forecast). The
+ * big temperature reading + icon dominates so the panel reads at a
+ * glance; supporting cells (cloud, wind, humidity, sunrise/sunset)
+ * sit below in a row. Tint stays neutral so it feels like ambient
+ * context rather than another metric. */
+.weather-panel { border-color: rgba(88, 166, 255, 0.18); }
+.weather-strip {
+  display: flex; flex-direction: column; gap: .65rem;
+}
+.weather-hero {
+  display: flex; align-items: center; gap: 1rem;
+}
+.weather-icon {
+  width: 56px; height: 56px; flex: none;
+  color: var(--accent);
+}
+.weather-icon svg { width: 100%; height: 100%; }
+.weather-temp {
+  display: flex; align-items: baseline; gap: .15rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.weather-temp-v { font-size: 2.4rem; line-height: 1; color: var(--text); }
+.weather-temp-unit { font-size: 1rem; color: var(--text-2); }
+.weather-cond {
+  font-size: 1rem; color: var(--text-2);
+  margin-left: auto;       /* push to the right */
+  font-weight: 500;
+}
+.weather-meta {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: .5rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-meta { grid-template-columns: repeat(3, 1fr); }
+  .weather-cond { margin-left: 0; font-size: .85rem; }
+}
+.weather-cell { display: flex; flex-direction: column; min-width: 0; }
+.weather-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .9rem;
+  color: var(--text);
+}
+
 /* Tomorrow panel (dashboard PV forecast) — sits between Today and
  * the cell balance panel. Reuses .today-strip / .today-cell since
  * the layout is identical; the sparkline is the only new piece.

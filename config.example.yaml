@@ -104,6 +104,17 @@ devices:
 #     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
 #     # device: pixel-9                            # optional: only this device. Omit for all.
 
+# Current weather (Open-Meteo, free, no API key). When set, the
+# daemon polls Open-Meteo for temperature, cloud cover, wind, and
+# sunrise/sunset, and the dashboard's "Right now" tile populates.
+# Lat/lon are required; if you also have a Solcast site registered,
+# use the same coordinates.
+# weather:
+#   provider: openmeteo
+#   lat: 51.5074
+#   lon: -0.1278
+#   poll_minutes: 15
+
 # PV forecast — optional. When set, the daemon polls Solcast (or
 # another supported provider) every poll_hours and caches the result;
 # the History chart overlays the forecast on pv_power_w. Sign up

@@ -28,6 +28,12 @@ Versions follow [Semantic Versioning].
   P10–P90 confidence band as a translucent amber fill between
   the bounds — wide band = the model isn't sure, narrow = high
   confidence. Median line stays dashed on top.
+- Current weather (Open-Meteo): new `weather/` module + Settings
+  → Integrations row + dashboard "Right now" tile showing temp,
+  conditions icon (WMO code → SVG), cloud cover, wind, humidity,
+  sunrise / sunset. No API key required; user supplies lat/lon.
+  Polls every 15 min by default, cached in the same `kv` table
+  the PV forecast uses.
 - Charge efficiency: `/api/devices/{label}/efficiency` returns
   SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
   windows. Smart-battery device cards show an `η` tile picking the

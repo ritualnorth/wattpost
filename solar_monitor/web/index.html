@@ -201,6 +201,37 @@
         </div>
       </section>
 
+      <!-- RIGHT NOW (Open-Meteo current conditions — hidden until configured) -->
+      <section class="panel weather-panel" id="weather-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+            Right now
+          </h2>
+          <div class="panel-sub" id="weather-sub">—</div>
+        </div>
+        <div class="weather-strip" id="weather-strip">
+          <div class="weather-hero">
+            <div class="weather-icon" id="weather-icon"></div>
+            <div class="weather-temp">
+              <span class="weather-temp-v" id="weather-temp">—</span>
+              <span class="weather-temp-unit">°C</span>
+            </div>
+            <div class="weather-cond" id="weather-cond">—</div>
+          </div>
+          <div class="weather-meta">
+            <div class="weather-cell"><span class="meta-k">Cloud</span><span class="weather-v" id="weather-cloud">—</span></div>
+            <div class="weather-cell"><span class="meta-k">Wind</span><span class="weather-v" id="weather-wind">—</span></div>
+            <div class="weather-cell"><span class="meta-k">Humidity</span><span class="weather-v" id="weather-humidity">—</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunrise</span><span class="weather-v" id="weather-sunrise">—</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunset</span><span class="weather-v" id="weather-sunset">—</span></div>
+          </div>
+        </div>
+      </section>
+
       <!-- TOMORROW (PV forecast — hidden until first fetch lands) -->
       <section class="panel tomorrow-panel" id="tomorrow-panel" hidden>
         <div class="panel-header">
