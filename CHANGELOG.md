@@ -15,6 +15,11 @@ Versions follow [Semantic Versioning].
   chart when viewing pv_power_w. New SQLite `kv` table caches
   the most recent fetch so a daemon restart doesn't blank the
   overlay.
+- Dashboard "Tomorrow" tile: when a forecast is configured, a new
+  panel between Today and Cell balance shows expected PV (kWh),
+  peak power + time, day-after preview, and a translucent SVG
+  sparkline of tomorrow's curve. Auto-hidden when no forecast
+  data is cached.
 - Charge efficiency: `/api/devices/{label}/efficiency` returns
   SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
   windows. Smart-battery device cards show an `η` tile picking the

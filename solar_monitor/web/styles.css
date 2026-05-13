@@ -1374,6 +1374,21 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   text-transform: lowercase;
 }
 
+/* Tomorrow panel (dashboard PV forecast) — sits between Today and
+ * the cell balance panel. Reuses .today-strip / .today-cell since
+ * the layout is identical; the sparkline is the only new piece.
+ * Tint is amber rather than the today-panel's blue so the forecast
+ * reads as a distinct concept, not "more of today". */
+.tomorrow-panel { border-color: rgba(210,153,34,0.30); }
+.tomorrow-panel .panel-header h2 .h-icon { color: var(--amber); }
+.tomorrow-spark {
+  margin-top: .65rem;
+  border-top: 1px dashed var(--border);
+  padding-top: .5rem;
+  min-height: 56px;
+}
+.tomorrow-spark svg { display: block; width: 100%; }
+
 /* Integrations panel (Settings → Integrations) */
 .integrations-block {
   display: flex; flex-direction: column; gap: .55rem;
