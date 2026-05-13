@@ -20,6 +20,14 @@ Versions follow [Semantic Versioning].
   peak power + time, day-after preview, and a translucent SVG
   sparkline of tomorrow's curve. Auto-hidden when no forecast
   data is cached.
+- Dashboard "7-day outlook" strip below the Tomorrow tile —
+  per-day kWh + mini sparkline across all forecast days, common
+  Y scale so quiet days read as quiet next to sunny ones, the
+  Tomorrow card highlighted as the focal point.
+- History chart's forecast overlay now renders Solcast's
+  P10–P90 confidence band as a translucent amber fill between
+  the bounds — wide band = the model isn't sure, narrow = high
+  confidence. Median line stays dashed on top.
 - Charge efficiency: `/api/devices/{label}/efficiency` returns
   SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
   windows. Smart-battery device cards show an `η` tile picking the
