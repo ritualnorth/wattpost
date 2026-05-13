@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- Quiet hours: `config.yaml` accepts a `quiet_hours: {start_hour, end_hour}`
+  block. Inside the window, warn-severity alerts buffer and flush
+  when the window ends; alarm-severity always pages through.
 - CI: `.github/workflows/build-image.yml` builds the SD image via
   pi-gen on tag push (`v*`) and attaches the `.img.xz` + SHA256 to a
   GitHub Release. `workflow_dispatch` available for smoke tests.

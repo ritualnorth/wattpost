@@ -56,7 +56,11 @@ class PollScheduler:
             )
             for r in config.alerts
         ]
-        self._alerts = AlertEngine(rules, config.notification_transports)
+        qh = config.quiet_hours
+        quiet_hours = (qh.start_hour, qh.end_hour) if qh is not None else None
+        self._alerts = AlertEngine(
+            rules, config.notification_transports, quiet_hours=quiet_hours,
+        )
 
     @property
     def last_result(self) -> dict[str, Any] | None:
