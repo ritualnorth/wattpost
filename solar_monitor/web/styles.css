@@ -1374,6 +1374,26 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   text-transform: lowercase;
 }
 
+/* Integrations panel (Settings → Integrations) */
+.integrations-block {
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.integration-row {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .55rem .65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.integration-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
+.integration-row-head { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+.integration-row-name { font-weight: 600; color: var(--text); }
+.integration-row-sub { font-size: .78rem; color: var(--text-2); }
+.integration-row-sub a { color: var(--accent); }
+.integration-row-actions { display: flex; gap: .35rem; }
+.alerts-form-status.ok { color: var(--green, #3fb950); }
+.alerts-form-status.err { color: var(--red, #f85149); }
+
 /* Per-window efficiency breakdown on the device detail page. Hidden
  * until the fetch resolves so an unfinished smart_battery (no data
  * yet) doesn't show an empty grid. */

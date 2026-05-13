@@ -38,6 +38,10 @@ from .alerts_admin import (
     create_transport, update_transport, delete_transport,
     update_quiet_hours,
 )
+from .forecast_admin import (
+    get_pv_forecast, get_forecast_config, update_forecast_config,
+    test_forecast_fetch,
+)
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve,
@@ -471,6 +475,10 @@ def build_app(
             update_transport,
             delete_transport,
             update_quiet_hours,
+            get_pv_forecast,
+            get_forecast_config,
+            update_forecast_config,
+            test_forecast_fetch,
             list_setup_transports,
             known_devices,
             probe,
