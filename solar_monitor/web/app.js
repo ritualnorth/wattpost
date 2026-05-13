@@ -317,6 +317,7 @@ function applySnapshot(frame) {
   const kioskFlow = $("#kiosk-flow");
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
+  renderTomorrow();
   renderCells();
   renderDeviceCards();
   populateChartSelectors();
@@ -860,6 +861,121 @@ function makeConnector(c) {
   label.textContent = c.label;
   wrap.append(arrow, label);
   return wrap;
+}
+
+// ---------- TOMORROW STRIP (PV forecast) ----------
+//
+// Forecast lives in /api/forecast/pv; we fetch on dashboard load and
+// every ~5 min thereafter (poll cadence is hours, no point refreshing
+// faster). When no forecast is configured or the cache is empty, the
+// panel hides itself entirely so the dashboard isn't cluttered.
+
+let forecastData = null;
+let forecastLastFetched = 0;
+const FORECAST_REFRESH_MS = 5 * 60 * 1000;
+
+async function ensureForecast(force = false) {
+  const now = Date.now();
+  if (!force && forecastData && (now - forecastLastFetched) < FORECAST_REFRESH_MS) {
+    return forecastData;
+  }
+  try {
+    const f = await api("/api/forecast/pv");
+    forecastData = (f?.points?.length) ? f : null;
+    forecastLastFetched = now;
+  } catch (e) { forecastData = null; }
+  return forecastData;
+}
+
+// Bucket forecast points by local calendar day; returns
+// { todayWh, tomorrowWh, dayAfterWh, tomorrowPeak: {ts, w} | null,
+//   tomorrowPoints: [{ts, w}], dayAfterPoints: [...] }
+function summariseForecast(points) {
+  const out = {
+    todayWh: 0, tomorrowWh: 0, dayAfterWh: 0,
+    tomorrowPeak: null, tomorrowPoints: [], dayAfterPoints: [],
+  };
+  if (!points?.length) return out;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayMid = today.getTime() / 1000;
+  const dayS = 86400;
+  // Solcast's `period_end` is the END of a 30-min slice, so the
+  // slice that ends at exactly 00:00 tomorrow is actually 23:30 of
+  // *today*. Bucket by the slice mid-point (ts - 900s) to keep the
+  // attribution honest at day boundaries.
+  for (const p of points) {
+    const ts = p.ts;
+    const w = p.pv_w || 0;
+    const wh = w * 0.5;
+    const bucketTs = ts - 900;
+    if (bucketTs >= todayMid && bucketTs < todayMid + dayS) {
+      out.todayWh += wh;
+    } else if (bucketTs >= todayMid + dayS && bucketTs < todayMid + 2*dayS) {
+      out.tomorrowWh += wh;
+      out.tomorrowPoints.push({ ts, w });
+      if (!out.tomorrowPeak || w > out.tomorrowPeak.w) {
+        out.tomorrowPeak = { ts, w };
+      }
+    } else if (bucketTs >= todayMid + 2*dayS && bucketTs < todayMid + 3*dayS) {
+      out.dayAfterWh += wh;
+      out.dayAfterPoints.push({ ts, w });
+    }
+  }
+  return out;
+}
+
+function renderTomorrow() {
+  const panel = $("#tomorrow-panel");
+  if (!panel) return;
+  ensureForecast().then(f => {
+    if (!f) { panel.hidden = true; return; }
+    const s = summariseForecast(f.points);
+    // If neither tomorrow nor the day after has any data, the forecast
+    // window is probably just historic — don't show an empty tile.
+    if (s.tomorrowWh <= 0 && s.dayAfterWh <= 0) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    $("#tomorrow-kwh").textContent = `${(s.tomorrowWh / 1000).toFixed(2)} kWh`;
+    if (s.tomorrowPeak) {
+      $("#tomorrow-peak").textContent = `${(s.tomorrowPeak.w / 1000).toFixed(2)} kW`;
+      const t = new Date(s.tomorrowPeak.ts * 1000);
+      $("#tomorrow-peak-at").textContent = t.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+    } else {
+      $("#tomorrow-peak").textContent = "—";
+      $("#tomorrow-peak-at").textContent = "—";
+    }
+    $("#tomorrow-day-after").textContent = s.dayAfterWh > 0
+      ? `${(s.dayAfterWh / 1000).toFixed(2)} kWh` : "—";
+    $("#tomorrow-sub").textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
+    drawTomorrowSpark(s.tomorrowPoints);
+  });
+}
+
+function drawTomorrowSpark(points) {
+  const host = $("#tomorrow-spark");
+  if (!host || !points.length) { if (host) host.innerHTML = ""; return; }
+  // Plain SVG sparkline — simpler than spinning up another uPlot
+  // instance for a tile this small.
+  const W = host.clientWidth || 600;
+  const H = 56;
+  const padX = 8, padY = 6;
+  const maxW = Math.max(...points.map(p => p.w), 1);
+  const t0 = points[0].ts, tN = points[points.length - 1].ts;
+  const span = Math.max(1, tN - t0);
+  const pts = points.map(p => {
+    const x = padX + (p.w === 0 ? 0 : ((p.ts - t0) / span) * (W - 2*padX));
+    const y = H - padY - (p.w / maxW) * (H - 2*padY);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  // Area under the curve so the silhouette reads more than a line.
+  const area = `M${padX},${H - padY} L ${pts} L ${W - padX},${H - padY} Z`;
+  host.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
+      <path d="${area}" fill="rgba(210,153,34,0.15)"/>
+      <polyline points="${pts}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>
+    </svg>`;
 }
 
 // ---------- TODAY STRIP ----------

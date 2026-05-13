@@ -201,6 +201,27 @@
         </div>
       </section>
 
+      <!-- TOMORROW (PV forecast — hidden until first fetch lands) -->
+      <section class="panel tomorrow-panel" id="tomorrow-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
+              <path d="M9 13l1.5 2 2-3 2.5 3.5"/>
+            </svg>
+            Tomorrow
+          </h2>
+          <div class="panel-sub" id="tomorrow-sub">—</div>
+        </div>
+        <div class="today-strip" id="tomorrow-strip">
+          <div class="today-cell"><span class="meta-k">Expected PV</span><span class="today-v" id="tomorrow-kwh">—</span></div>
+          <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="tomorrow-peak">—</span></div>
+          <div class="today-cell"><span class="meta-k">Peak at</span><span class="today-v" id="tomorrow-peak-at">—</span></div>
+          <div class="today-cell"><span class="meta-k">Day after</span><span class="today-v" id="tomorrow-day-after">—</span></div>
+        </div>
+        <div class="tomorrow-spark" id="tomorrow-spark" aria-hidden="true"></div>
+      </section>
+
       <!-- CELL BALANCE -->
       <section class="panel" id="panel-cells">
         <div class="panel-header">
