@@ -132,6 +132,23 @@ CREATE TABLE IF NOT EXISTS kv (
     v          TEXT NOT NULL,
     updated_at INTEGER NOT NULL
 );
+
+-- Archive of every PV-forecast point we've ever fetched. The current-
+-- forecast blob in `kv` is overwritten on each poll, so without this
+-- table we can't compute "yesterday's prediction vs reality." Keyed
+-- by (fetched_at, period_end) — a single forecast fetch produces
+-- ~336 rows (7 days × 48 half-hour slices), and we keep ~30 days of
+-- history, so the table caps at ~80k rows. Light.
+CREATE TABLE IF NOT EXISTS forecast_history (
+    fetched_at INTEGER NOT NULL,
+    period_end INTEGER NOT NULL,
+    pv_w       REAL NOT NULL,
+    pv_w_p10   REAL,
+    pv_w_p90   REAL,
+    PRIMARY KEY (fetched_at, period_end)
+);
+CREATE INDEX IF NOT EXISTS idx_fc_hist_period
+    ON forecast_history (period_end);
 """
 
 # Retention windows (seconds). Each lower-resolution table keeps data for
@@ -140,6 +157,7 @@ CREATE TABLE IF NOT EXISTS kv (
 RETENTION_RAW       = 7  * 86400     # 7 days of 60s polls
 RETENTION_1MIN      = 30 * 86400     # 30 days of 1-min aggregates
 RETENTION_1HOUR     = 365 * 86400    # 1 year of 1-hour aggregates
+RETENTION_FORECAST  = 30 * 86400     # 30 days of archived PV-forecast points
 # samples_1day is retained indefinitely.
 
 # Tuning for WAL on Pi-class hardware.
@@ -186,6 +204,130 @@ class Store:
 
     async def __aexit__(self, *_: Any) -> None:
         await self.close()
+
+    # ---------- forecast archive ----------
+
+    async def archive_forecast(
+        self, fetched_at: int,
+        points: list[tuple[int, float, float | None, float | None]],
+    ) -> None:
+        """Persist a batch of forecast points under one fetched_at
+        timestamp. Each point is (period_end_ts, pv_w, p10, p90).
+
+        Idempotent — re-archiving the same (fetched_at, period_end)
+        replaces the previous row. The same scheduler that records the
+        live cache calls this; the two stay in lockstep."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        if not points:
+            return
+        rows = [(fetched_at, t, w, p10, p90) for (t, w, p10, p90) in points]
+        await self._db.executemany(
+            "INSERT OR REPLACE INTO forecast_history "
+            "(fetched_at, period_end, pv_w, pv_w_p10, pv_w_p90) "
+            "VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
+        await self._db.commit()
+
+    async def forecast_accuracy_for_day(
+        self,
+        day_mid_ts: int,
+        controller_labels: list[str],
+    ) -> dict[str, Any] | None:
+        """Compute predicted-vs-actual PV energy for one local day.
+
+        Predicted: integrate the forecast that the user could have
+        SEEN before the day started — the latest fetch made strictly
+        before `day_mid_ts`. That's the prediction they "trusted"; a
+        forecast made mid-day after observing low PV doesn't count.
+
+        Actual: sum integrated pv_power_w from any charge_controller
+        device whose label is in `controller_labels`, between
+        day_mid_ts and day_mid_ts + 86400 exclusive.
+
+        Returns None when either side has no data — the UI hides the
+        widget rather than show "—%" of nothing.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        day_end = day_mid_ts + 86400
+
+        # Predicted: latest forecast made before the target day, then
+        # all of its points falling inside the day's window. (Solcast
+        # period_end follows the END of the slice — we bucket by the
+        # mid-point ts - 900 to keep the day boundary honest, same as
+        # the dashboard summariser.)
+        async with self._db.execute(
+            "SELECT MAX(fetched_at) FROM forecast_history "
+            "WHERE fetched_at < ?", (day_mid_ts,),
+        ) as cur:
+            row = await cur.fetchone()
+            fetched_at = int(row[0]) if row and row[0] is not None else None
+        if fetched_at is None:
+            return None
+
+        async with self._db.execute(
+            "SELECT period_end, pv_w FROM forecast_history "
+            "WHERE fetched_at = ? "
+            "  AND (period_end - 900) >= ? "
+            "  AND (period_end - 900) <  ? "
+            "ORDER BY period_end",
+            (fetched_at, day_mid_ts, day_end),
+        ) as cur:
+            forecast_points = [(int(r[0]), float(r[1])) async for r in cur]
+
+        if not forecast_points:
+            return None
+        # Each point is the END of a 30-min slice; energy = pv_w × 0.5h
+        predicted_wh = sum(w * 0.5 for _, w in forecast_points)
+
+        # Actual: trapezoid-integrate pv_power_w from each controller's
+        # samples, then sum across controllers.
+        actual_wh = 0.0
+        n_actual_samples = 0
+        for label in controller_labels:
+            sql = (
+                "WITH paired AS ("
+                "  SELECT ts, value,"
+                "         LAG(ts)    OVER (ORDER BY ts) AS prev_ts,"
+                "         LAG(value) OVER (ORDER BY ts) AS prev_v"
+                "  FROM samples"
+                "  WHERE device = ? AND metric = 'pv_power_w' AND ts BETWEEN ? AND ?"
+                ")"
+                "SELECT SUM(avg_w * dt_h), COUNT(*) FROM ("
+                "  SELECT (prev_v + value) / 2.0 AS avg_w,"
+                "         (ts - prev_ts) / 3600.0 AS dt_h"
+                "  FROM paired"
+                "  WHERE prev_ts IS NOT NULL"
+                "    AND (ts - prev_ts) BETWEEN 1 AND 3600"
+                ")"
+            )
+            async with self._db.execute(
+                sql, (label, day_mid_ts, day_end),
+            ) as cur:
+                row = await cur.fetchone()
+                if row and row[0] is not None:
+                    actual_wh += float(row[0])
+                    n_actual_samples += int(row[1] or 0)
+
+        if n_actual_samples < 6:
+            # Less than 6 intervals = not enough actual data to compare
+            # against. Day isn't over yet, or daemon was offline.
+            return None
+
+        accuracy_pct = (actual_wh / predicted_wh * 100.0) if predicted_wh > 0 else None
+
+        return {
+            "day_ts":         day_mid_ts,
+            "predicted_wh":   round(predicted_wh, 1),
+            "actual_wh":      round(actual_wh, 1),
+            "delta_wh":       round(actual_wh - predicted_wh, 1),
+            "accuracy_pct":   round(accuracy_pct, 1) if accuracy_pct is not None else None,
+            "forecast_fetched_at": fetched_at,
+            "actual_samples": n_actual_samples,
+        }
 
     # ---------- key/value scratch ----------
 
@@ -649,6 +791,14 @@ class Store:
             "DELETE FROM poll_runs WHERE ts < ?", (now - 30 * 86400,)
         )
         stats["purged_poll_runs"] = purged_runs.rowcount
+
+        # Prune archived forecast points past retention. We keep enough
+        # history for the accuracy widget to look back ~30 days.
+        purged_fc = await db.execute(
+            "DELETE FROM forecast_history WHERE period_end < ?",
+            (now - RETENTION_FORECAST,),
+        )
+        stats["purged_forecast_history"] = purged_fc.rowcount
 
         await db.commit()
         log.info("rollup+purge: %s", stats)

@@ -1439,6 +1439,22 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .tomorrow-spark svg { display: block; width: 100%; }
 
+/* "Yesterday: predicted X kWh · actual Y kWh · Z% of forecast" line.
+ * Lives under the Tomorrow sparkline so the user can see how well
+ * the previous day's forecast held up — drift here is the early
+ * signal that Solcast's array model needs re-tuning (capacity, tilt,
+ * azimuth, shading). */
+.forecast-accuracy {
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap;
+}
+.forecast-accuracy strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.acc-ok   { color: var(--green, #3fb950); }
+.acc-warn { color: var(--amber); }
+.acc-off  { color: var(--red,   #f85149); }
+
 /* 7-day outlook strip: horizontal row of day-cards under the
  * Tomorrow tile. Tomorrow's card is highlighted with a slightly
  * brighter border so it reads as the "you are here" of the week.

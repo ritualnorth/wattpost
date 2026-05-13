@@ -1057,9 +1057,34 @@ function renderTomorrowEmpty(show) {
   }
 }
 
+async function refreshAccuracyLine() {
+  const row = $("#forecast-accuracy");
+  if (!row) return;
+  try {
+    const r = await api("/api/forecast/accuracy?day_offset=1");
+    if (!r?.ok) { row.hidden = true; return; }
+    const pred = (r.predicted_wh / 1000).toFixed(2);
+    const got  = (r.actual_wh / 1000).toFixed(2);
+    const acc  = r.accuracy_pct == null ? "—" : `${r.accuracy_pct.toFixed(0)} %`;
+    // Tint: green if within ±10%, amber if 10-25% off, red beyond.
+    const dev = Math.abs((r.accuracy_pct || 100) - 100);
+    const cls = dev <= 10 ? "ok" : (dev <= 25 ? "warn" : "off");
+    $("#forecast-accuracy-line").innerHTML = `
+      predicted <strong>${pred} kWh</strong> ·
+      actual <strong>${got} kWh</strong> ·
+      <span class="acc-${cls}">${acc} of forecast</span>`;
+    row.hidden = false;
+  } catch (e) { row.hidden = true; }
+}
+
 function renderTomorrow() {
   const panel = $("#tomorrow-panel");
   if (!panel) return;
+  // Accuracy line refreshes on a slower cadence than the dashboard
+  // poll — it only changes once per day. We just kick it off here
+  // alongside the regular Tomorrow render; the API returns quickly
+  // and the result is hidden when there's no archive yet.
+  refreshAccuracyLine();
   ensureForecast().then(f => {
     if (!f) {
       panel.hidden = true;
