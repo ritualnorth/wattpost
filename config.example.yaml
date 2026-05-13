@@ -68,3 +68,54 @@ devices:
 #     ha_discovery_prefix: homeassistant
 #     ha_node_id: solar_monitor   # unique-id namespace; change if running
 #                                  # multiple WattPost units on one broker
+
+# Notification transports — outbound channels the alert engine can fan
+# events to. Each entry needs a unique `id` you reference from alert
+# rules below.
+# notification_transports:
+#   - id: ntfy_main
+#     type: ntfy
+#     topic: my-private-rv-alerts   # pick something obscure — public broker
+#     # server: https://ntfy.sh     # default; override for self-hosted
+#
+#   - id: discord_main
+#     type: discord_webhook
+#     url: https://discord.com/api/webhooks/...   # channel webhook URL
+#
+#   - id: my_webhook
+#     type: webhook
+#     url: https://example.com/wattpost-hook
+#     method: POST                                # default
+#     headers: { "X-Auth-Token": "..." }          # optional
+
+# Alert rules — evaluated after every poll. Metric is a dotted path
+# into the alert context (bank.soc_pct, bank.netW, bank.meanV,
+# bank.worst_pack_drift_v, aggregate.max_cell_drift_v, or
+# devices.<label>.<metric_key>). Cooldown rate-limits re-fires.
+# alerts:
+#   - id: low_soc
+#     name: Battery low
+#     metric: bank.soc_pct
+#     op: lt
+#     threshold: 30
+#     severity: warn          # warn | alarm
+#     cooldown_seconds: 1800  # 30 min between re-fires
+#     transports: [ntfy_main]
+#
+#   - id: critical_soc
+#     name: Critical battery
+#     metric: bank.soc_pct
+#     op: lt
+#     threshold: 15
+#     severity: alarm
+#     cooldown_seconds: 600
+#     transports: [ntfy_main, discord_main]
+#
+#   - id: cell_drift
+#     name: Cell drift high
+#     metric: aggregate.max_cell_drift_v
+#     op: gt
+#     threshold: 0.05         # 50 mV
+#     severity: warn
+#     cooldown_seconds: 3600
+#     transports: [ntfy_main]

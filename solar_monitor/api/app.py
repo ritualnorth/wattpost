@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
-from litestar import Litestar, get
+from litestar import Litestar, get, post
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.exceptions import NotFoundException
@@ -128,6 +128,34 @@ async def device_history(
     }
 
 
+@get("/api/alerts")
+async def list_alerts(state: State) -> dict[str, Any]:
+    """Rules + transports state for the Settings → Alerts panel.
+    Returns each rule's metric/op/threshold/cooldown + when it last
+    fired and what the last value was."""
+    scheduler: PollScheduler = state["scheduler"]
+    return scheduler._alerts.snapshot_state()
+
+
+@post("/api/alerts/{rule_id:str}/test")
+async def test_alert(rule_id: str, state: State) -> dict[str, Any]:
+    """Force a rule to fire via all its configured transports, so the
+    user can confirm ntfy/Discord/etc. are wired up before something
+    real goes wrong."""
+    scheduler: PollScheduler = state["scheduler"]
+    event = await scheduler._alerts.test_fire(rule_id)
+    if event is None:
+        raise NotFoundException(f"unknown alert rule {rule_id!r}")
+    return {
+        "ok": True,
+        "rule_id": event.rule_id,
+        "transports": next(
+            (r.transports for r in scheduler._alerts.rules if r.id == rule_id),
+            [],
+        ),
+    }
+
+
 @get("/api/stream")
 async def stream(state: State) -> Stream:
     """Server-Sent Events: pushes a full snapshot to the SPA on connect,
@@ -224,6 +252,8 @@ def build_app(
             device_lifetime,
             load_heatmap,
             stream,
+            list_alerts,
+            test_alert,
             list_setup_transports,
             known_devices,
             probe,

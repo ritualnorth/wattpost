@@ -1591,6 +1591,85 @@ function renderSettings() {
   $("#settings-daemon").textContent = ok ? "running, healthy" : (lastRun ? "running, errors" : "no data");
   // MQTT we don't query directly; best effort message until /api/exporters exists
   $("#settings-mqtt").textContent = "see config.yaml";
+  refreshAlertsPanel();
+}
+
+// ---------- alerts panel ----------
+const ALERT_OP_LABEL = {
+  lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=", neq: "≠",
+};
+async function refreshAlertsPanel() {
+  const host = $("#settings-alerts");
+  if (!host) return;
+  let data;
+  try { data = await api("/api/alerts"); }
+  catch (e) {
+    host.innerHTML = `<div class="settings-empty">Could not load alerts: ${e.message}</div>`;
+    return;
+  }
+  if (!data.rules?.length) {
+    host.innerHTML = `<div class="settings-empty">No alert rules configured. Add some to <code>config.yaml</code> under <code>alerts:</code>.</div>`;
+    return;
+  }
+  const transportSet = new Set((data.transports || []).map(t => t.id));
+  host.innerHTML = data.rules.map(r => {
+    const opLbl = ALERT_OP_LABEL[r.op] || r.op;
+    const condition = `${r.metric} ${opLbl} ${r.threshold}`;
+    const lastFired = r.last_fired_ts
+      ? `fired ${fmt.ago(r.last_fired_ts)}`
+      : "never fired";
+    const cooldown = `cooldown ${Math.round(r.cooldown_seconds / 60)} min`;
+    const transports = (r.transports || [])
+      .map(tid => transportSet.has(tid) ? tid : `${tid} (missing!)`)
+      .join(", ") || "(no transports!)";
+    const severityClass = `alerts-row--${r.severity}`;
+    return `
+      <div class="alerts-row ${severityClass}" data-rule="${r.id}">
+        <div class="alerts-row-main">
+          <div class="alerts-row-title">
+            <span class="alerts-row-name">${r.name}</span>
+            <span class="alerts-row-cond">${condition}</span>
+          </div>
+          <div class="alerts-row-meta">
+            <span class="alerts-row-tag alerts-row-tag--${r.severity}">${r.severity}</span>
+            <span class="alerts-row-tag">${transports}</span>
+            <span class="alerts-row-tag">${cooldown}</span>
+            <span class="alerts-row-tag">${lastFired}</span>
+          </div>
+        </div>
+        <div class="alerts-row-action">
+          <button class="alerts-test-btn" data-rule="${r.id}">Test</button>
+          <span class="alerts-test-status" data-rule="${r.id}"></span>
+        </div>
+      </div>
+    `;
+  }).join("");
+  host.querySelectorAll(".alerts-test-btn").forEach(btn => {
+    btn.addEventListener("click", () => testAlert(btn.dataset.rule));
+  });
+}
+async function testAlert(ruleId) {
+  const btn    = document.querySelector(`.alerts-test-btn[data-rule="${ruleId}"]`);
+  const status = document.querySelector(`.alerts-test-status[data-rule="${ruleId}"]`);
+  if (!btn || !status) return;
+  btn.disabled = true;
+  status.textContent = "sending…";
+  status.className = "alerts-test-status";
+  try {
+    const r = await fetch(`/api/alerts/${encodeURIComponent(ruleId)}/test`, { method: "POST" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    status.textContent = "sent";
+    status.classList.add("ok");
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add("err");
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { if (status) status.textContent = ""; }, 4000);
+  }
 }
 
 // ---------- wiring ----------

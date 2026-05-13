@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=69" />
+  <link rel="stylesheet" href="/web/styles.css?v=70" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -360,6 +360,13 @@
               </span>
             </label>
           </div>
+          <div class="settings-block settings-block--alerts">
+            <h3>Alerts</h3>
+            <div id="settings-alerts" class="alerts-list">
+              <div class="settings-empty">Loading…</div>
+            </div>
+            <p class="settings-foot">Rules and transports live in <code>config.yaml</code>. Editing them in the UI is on the backlog.</p>
+          </div>
           <div class="settings-block">
             <h3>Polling</h3>
             <div class="settings-row"><span>Interval</span><span class="v">60 s</span></div>
@@ -425,6 +432,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=69"></script>
+  <script src="/web/app.js?v=70"></script>
 </body>
 </html>
