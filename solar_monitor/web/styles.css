@@ -201,13 +201,17 @@ body {
 }
 
 .status {
-  display: flex; align-items: center; gap: .55rem;
+  display: inline-flex; align-items: center; gap: .55rem;
+  font: inherit;
   font-size: .82rem; color: var(--text-2);
   padding: .35rem .7rem;
   border-radius: 999px;
   background: var(--surface);
   border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
 }
+.status:hover { background: var(--surface-2); }
 .status .dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--text-3);
@@ -2079,6 +2083,93 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   font-size: .82rem;
   margin-bottom: .55rem;
 }
+
+/* ---------------- status legend popover ---------------- */
+.status-legend {
+  position: fixed;
+  top: 64px;            /* below the header */
+  right: 1rem;
+  z-index: 60;
+  width: min(360px, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: .85rem 1rem;
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.status-legend[hidden] { display: none; }
+.status-legend-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: .92rem;
+}
+.status-legend-close {
+  font: inherit; font-size: 1.1rem; line-height: 1;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer;
+}
+.status-legend-close:hover { color: var(--text); border-color: var(--accent); }
+.status-legend-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: .45rem;
+}
+.status-legend-list li {
+  font-size: .82rem; color: var(--text-2);
+  line-height: 1.45;
+}
+.status-legend-pill {
+  display: inline-block;
+  font-size: .72rem; font-weight: 600;
+  padding: .12rem .5rem;
+  border-radius: 999px;
+  margin-right: .4rem;
+  white-space: nowrap;
+}
+.status-legend-pill--ok   { background: rgba(63,185,80,0.14);  color: var(--green); }
+.status-legend-pill--warn { background: rgba(210,153,34,0.16); color: var(--amber); }
+.status-legend-pill--err  { background: rgba(248,81,73,0.14);  color: var(--red); }
+.status-legend-link {
+  font-size: .78rem;
+  color: var(--accent);
+  text-decoration: none;
+  margin-top: .25rem;
+}
+.status-legend-link:hover { text-decoration: underline; }
+
+/* ---------------- diagnostics (Settings → Diagnostics) ---------------- */
+.settings-block--diagnostics { grid-column: 1 / -1; }
+.diag-controls {
+  display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
+  margin-bottom: .45rem;
+}
+.diag-log {
+  margin: 0;
+  background: #0a0d12;
+  color: #cdd6f4;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+  font-family: var(--mono);
+  font-size: .72rem;
+  line-height: 1.45;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre;
+}
+[data-theme="light"] .diag-log {
+  background: #f6f8fa;
+  color: #1f2328;
+}
+.diag-line { display: block; }
+.diag-line--error    { color: #ff9a9a; }
+.diag-line--warning  { color: #f1cf6f; }
+.diag-line--info     { color: #cdd6f4; }
+.diag-line--debug    { color: #6b7689; }
+[data-theme="light"] .diag-line--error   { color: #cf222e; }
+[data-theme="light"] .diag-line--warning { color: #9a6700; }
+[data-theme="light"] .diag-line--info    { color: #1f2328; }
+[data-theme="light"] .diag-line--debug   { color: #7a8595; }
 
 /* ---------------- restart overlay ---------------- */
 .restart-overlay {

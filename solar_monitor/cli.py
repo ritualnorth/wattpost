@@ -16,6 +16,7 @@ import uvicorn
 
 from .api import build_app
 from .config import load_config
+from .diagnostics import install as install_log_ring
 from .orchestrator import poll_once
 
 
@@ -36,6 +37,10 @@ def cmd_serve(args: argparse.Namespace) -> int:
         level=getattr(logging, args.log_level.upper()),
         format="%(levelname)s %(name)s: %(message)s",
     )
+    # NOTE: install_log_ring() is called from the Litestar on_startup
+    # hook, AFTER uvicorn finishes reconfiguring logging — if we attach
+    # here uvicorn's dictConfig wipes the handler before any of our
+    # daemon code emits log lines.
     config = load_config(args.config)
     app = build_app(
         config=config,

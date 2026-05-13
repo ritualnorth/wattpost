@@ -1568,7 +1568,8 @@ function setRoute(_unused) {
   if (route.name === "history") {
     requestAnimationFrame(() => { refreshChart(); refreshHeatmap(); });
   }
-  if (route.name === "settings") renderSettings();
+  if (route.name === "settings") { renderSettings(); startDiagTimer(); }
+  else { stopDiagTimer(); }
   if (route.name === "dashboard") refreshDriftSparkline();
   if (route.name === "device") renderDeviceDetail(route.label);
   if (route.name === "setup") onEnterSetup();
@@ -2065,6 +2066,28 @@ if (kioskExitBtn) {
 const restartBtn = $("#restart-daemon-btn");
 if (restartBtn) {
   restartBtn.addEventListener("click", restartDaemon);
+}
+const diagRefreshBtn = $("#diag-refresh");
+if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
+
+// Status pill legend popover — click the pill to open, click outside or
+// the close button to dismiss.
+const statusEl = $("#status");
+const legendEl = $("#status-legend");
+if (statusEl && legendEl) {
+  const close = () => { legendEl.hidden = true; };
+  const open  = () => { legendEl.hidden = false; };
+  statusEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    legendEl.hidden ? open() : close();
+  });
+  legendEl.querySelector(".status-legend-close")?.addEventListener("click", close);
+  document.addEventListener("click", (e) => {
+    if (!legendEl.hidden && !legendEl.contains(e.target) && e.target !== statusEl) {
+      close();
+    }
+  });
+  legendEl.querySelector(".status-legend-link")?.addEventListener("click", close);
 }
 // If this device is set to default-to-kiosk and the URL has no explicit
 // hash, redirect before the initial setRoute runs.
@@ -2635,6 +2658,57 @@ $("#wiz-scan-btn").addEventListener("click", wizScan);
 // Lazy-load when user navigates to Setup so we don't waste a request on
 // every page load. setRoute() fires this hook.
 function onEnterSetup() { wizLoadTransports(); }
+
+// ---------- diagnostics (log tail) ----------
+let diagTimer = null;
+const DIAG_REFRESH_MS = 4000;
+function diagLevelClass(level) {
+  const l = (level || "").toLowerCase();
+  if (l === "error" || l === "critical") return "diag-line--error";
+  if (l === "warning") return "diag-line--warning";
+  if (l === "debug")   return "diag-line--debug";
+  return "diag-line--info";
+}
+function diagFmtTs(epoch) {
+  const d = new Date(epoch * 1000);
+  return d.toLocaleTimeString([], { hour12: false });
+}
+async function refreshDiagLog() {
+  const host = $("#diag-log");
+  if (!host) return;
+  let data;
+  try { data = await api("/api/system/logs?n=300"); }
+  catch (e) {
+    host.textContent = `Could not load logs: ${e.message}`;
+    return;
+  }
+  const lines = data.lines || [];
+  const meta = $("#diag-meta");
+  if (meta) meta.textContent = `${lines.length} line${lines.length === 1 ? "" : "s"}`;
+  if (!lines.length) {
+    host.textContent = "(no log lines captured yet — daemon just started)";
+    return;
+  }
+  // Escape HTML — log lines may contain < > & from tracebacks etc.
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+  host.innerHTML = lines.map(l => {
+    const lvl = (l.level || "INFO").padEnd(7);
+    return `<span class="diag-line ${diagLevelClass(l.level)}">${diagFmtTs(l.ts)}  ${esc(lvl)}  ${esc(l.logger)}: ${esc(l.msg)}</span>`;
+  }).join("\n");
+  if ($("#diag-autoscroll")?.checked) {
+    host.scrollTop = host.scrollHeight;
+  }
+}
+function startDiagTimer() {
+  if (diagTimer) return;
+  refreshDiagLog();
+  diagTimer = setInterval(refreshDiagLog, DIAG_REFRESH_MS);
+}
+function stopDiagTimer() {
+  if (diagTimer) { clearInterval(diagTimer); diagTimer = null; }
+}
 
 // ---------- daemon restart ----------
 // Settings → System → Restart. POSTs /api/system/restart (which fires

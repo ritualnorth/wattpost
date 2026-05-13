@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=72" />
+  <link rel="stylesheet" href="/web/styles.css?v=73" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -53,10 +53,26 @@
       </svg>
       <span class="title">WattPost</span>
     </div>
-    <div id="status" class="status">
+    <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
       <span class="dot"></span>
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
+    </button>
+
+    <!-- Status legend popover — opens when the pill is tapped. -->
+    <div id="status-legend" class="status-legend" hidden>
+      <div class="status-legend-head">
+        <span>System status</span>
+        <button class="status-legend-close" type="button" aria-label="Close">×</button>
+      </div>
+      <ul class="status-legend-list">
+        <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes — usually a brief BLE wobble; clears on the next cycle.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes — check Bluetooth power / range to the dongle.</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Visit Settings → System → Restart daemon.</li>
+      </ul>
+      <a class="status-legend-link" href="#/settings">Open Settings → Diagnostics for live logs</a>
     </div>
   </header>
 
@@ -416,6 +432,21 @@
               <span>Restart daemon</span>
             </button>
           </div>
+          <div class="settings-block settings-block--diagnostics">
+            <h3>Diagnostics</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Live log tail from the daemon. Newest at the bottom.
+              Send these lines if you open a support ticket.
+            </p>
+            <div class="diag-controls">
+              <button id="diag-refresh" type="button" class="alerts-add-btn">Refresh</button>
+              <label class="alerts-checkbox">
+                <input type="checkbox" id="diag-autoscroll" checked /> Follow tail
+              </label>
+              <span class="settings-foot" id="diag-meta">—</span>
+            </div>
+            <pre id="diag-log" class="diag-log">Loading…</pre>
+          </div>
         </div>
       </section>
     </section>
@@ -452,6 +483,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=72"></script>
+  <script src="/web/app.js?v=73"></script>
 </body>
 </html>
