@@ -64,10 +64,17 @@ What the user sees on first load:
   energy balance (sees loads on the busbar, not just the controller)
 - **Today** — PV in, charged Ah, peak W, **load consumed (real, computed
   from balance — not what the MPPT thinks)**, lifetime Wh
+- **Tomorrow** — optional PV forecast tile (Solcast). Expected kWh,
+  peak time, day-after preview, sparkline. User brings their own free
+  hobbyist key; nothing's proxied
 - **Cell balance** — per-cell voltages across every pack, min/max
   highlighted, panel hue follows drift severity
+- **Charge efficiency** — SoC-corrected coulombic η per pack, surfaced
+  on smart_battery cards. Catches degradation before cycles get away
 - **History chart** — uPlot, any metric of any device, 1h/6h/24h/7d/30d,
-  with tiered rollups under the hood for fast year-scale queries
+  with tiered rollups under the hood for fast year-scale queries.
+  "Compare packs" overlay across multi-pack rigs; Solcast forecast
+  overlay when viewing `pv_power_w`
 - **Devices** — detail cards with firmware/serial/all metrics
 - **Conditional alert banner** — hidden when healthy, shows on cell
   drift, low SoC, over-temp, comms loss
@@ -91,9 +98,16 @@ solar_monitor/
 │   ├── base.py             # Exporter ABC
 │   ├── registry.py
 │   └── mqtt.py             # JSON snapshots → MQTT broker
+├── alerts/                 # local rule engine + notification transports
+│   ├── engine.py           # rule eval, quiet-hours buffer
+│   └── transports/         # ntfy / Discord / webhook / SMTP / MQTT / Pushover
+├── forecast/               # third-party PV forecast integrations
+│   ├── base.py             # ForecastProvider ABC + normalised shape
+│   ├── solcast.py          # Solcast hobbyist API client
+│   └── service.py          # poll loop, kv-cache writeback
 ├── storage/
 │   └── sqlite.py           # WAL, raw + 1min/1hr/1day rollups, energy
-│                           # aggregates, retention purge
+│                           # aggregates, retention purge, kv blob cache
 ├── api/
 │   └── app.py              # Litestar HTTP + static SPA
 ├── web/                    # vanilla HTML/CSS/JS, no build step

@@ -924,19 +924,43 @@ function summariseForecast(points) {
   return out;
 }
 
+const FORECAST_EMPTY_DISMISS_KEY = "wattpost.forecast.empty.dismissed";
+
+function renderTomorrowEmpty(show) {
+  const empty = $("#tomorrow-empty");
+  if (!empty) return;
+  const dismissed = localStorage.getItem(FORECAST_EMPTY_DISMISS_KEY) === "1";
+  empty.hidden = !show || dismissed;
+  if (!empty.dataset.wired) {
+    empty.dataset.wired = "1";
+    $("#tomorrow-empty-dismiss")?.addEventListener("click", () => {
+      localStorage.setItem(FORECAST_EMPTY_DISMISS_KEY, "1");
+      empty.hidden = true;
+    });
+  }
+}
+
 function renderTomorrow() {
   const panel = $("#tomorrow-panel");
   if (!panel) return;
   ensureForecast().then(f => {
-    if (!f) { panel.hidden = true; return; }
+    if (!f) {
+      panel.hidden = true;
+      // No forecast configured (or no successful fetch yet) — surface
+      // the gentle "set this up" tile unless the user has dismissed it.
+      renderTomorrowEmpty(true);
+      return;
+    }
     const s = summariseForecast(f.points);
     // If neither tomorrow nor the day after has any data, the forecast
     // window is probably just historic — don't show an empty tile.
     if (s.tomorrowWh <= 0 && s.dayAfterWh <= 0) {
       panel.hidden = true;
+      renderTomorrowEmpty(true);
       return;
     }
     panel.hidden = false;
+    renderTomorrowEmpty(false);
     $("#tomorrow-kwh").textContent = `${(s.tomorrowWh / 1000).toFixed(2)} kWh`;
     if (s.tomorrowPeak) {
       $("#tomorrow-peak").textContent = `${(s.tomorrowPeak.w / 1000).toFixed(2)} kW`;

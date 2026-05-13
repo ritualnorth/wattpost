@@ -20,6 +20,10 @@ same network.
   bank's net flow, and the loads pulling energy out. Connectors
   glow when there's active flow.
 - **Today**: cumulative energy in / out / charged for today.
+- **Tomorrow** (optional): PV forecast tile — expected kWh, peak time,
+  day-after preview, sparkline. Appears once you've wired a free
+  Solcast key in Settings → Integrations (see the
+  [PV forecast](#/docs/forecast) doc).
 - **Cell balance**: per-cell voltages for each smart battery, with a
   24-hour drift sparkline.
 - **History tab**: charts of any metric over 1h / 6h / 24h / 7d / 30d
@@ -39,3 +43,7 @@ same network.
 3. **Decide on remote access**: Settings → Network. Either skip
    (LAN-only is fine), or join your Tailscale account for free
    secure remote access.
+4. **Wire a PV forecast** (optional, recommended): Settings →
+   Integrations → Solcast. Free hobbyist key, 5 minutes of setup,
+   adds tomorrow's expected kWh + a forecast overlay to the History
+   chart. Walkthrough in the [PV forecast](#/docs/forecast) doc.

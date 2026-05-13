@@ -222,6 +222,27 @@
         <div class="tomorrow-spark" id="tomorrow-spark" aria-hidden="true"></div>
       </section>
 
+      <!-- TOMORROW EMPTY STATE (shown when no forecast is configured) -->
+      <section class="panel tomorrow-empty" id="tomorrow-empty" hidden>
+        <button class="tomorrow-empty-close" id="tomorrow-empty-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+        <div class="tomorrow-empty-body">
+          <svg class="tomorrow-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
+            <path d="M12 22v-3M8 21l1-2M16 21l-1-2"/>
+          </svg>
+          <div class="tomorrow-empty-text">
+            <h3>See tomorrow's expected PV here</h3>
+            <p>
+              Hook up a free <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">Solcast</a>
+              hobbyist key in <a href="#/settings">Settings → Integrations</a> and this tile fills with
+              tomorrow's kWh estimate, peak time, and a dashed forecast overlay on the History chart.
+              Nothing leaves your network without it.
+            </p>
+            <a class="tomorrow-empty-cta" href="#/docs/forecast">How it works →</a>
+          </div>
+        </div>
+      </section>
+
       <!-- CELL BALANCE -->
       <section class="panel" id="panel-cells">
         <div class="panel-header">

@@ -1389,6 +1389,42 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .tomorrow-spark svg { display: block; width: 100%; }
 
+/* Empty-state nudge for users without Solcast set up. Mid-weight —
+ * present enough to be discovered, polite enough to be ignored. */
+.tomorrow-empty {
+  position: relative;
+  border: 1px dashed var(--border-2, var(--border));
+  background: var(--surface-2);
+}
+.tomorrow-empty-body {
+  display: flex; gap: .9rem; align-items: flex-start;
+  padding: .35rem .2rem;
+}
+.tomorrow-empty-icon {
+  width: 38px; height: 38px; flex: none;
+  color: var(--amber);
+  opacity: .85;
+}
+.tomorrow-empty-text { flex: 1; min-width: 0; }
+.tomorrow-empty-text h3 {
+  margin: 0 0 .25rem; font-size: .95rem; color: var(--text);
+}
+.tomorrow-empty-text p {
+  margin: 0 0 .35rem; font-size: .85rem; color: var(--text-2); line-height: 1.45;
+}
+.tomorrow-empty-text a { color: var(--accent); }
+.tomorrow-empty-cta {
+  display: inline-block; font-size: .8rem;
+  margin-top: .15rem;
+}
+.tomorrow-empty-close {
+  position: absolute; top: .35rem; right: .55rem;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 1.2rem; line-height: 1;
+  padding: .15rem .35rem; border-radius: var(--r-sm);
+}
+.tomorrow-empty-close:hover { background: var(--surface-3); color: var(--text); }
+
 /* Integrations panel (Settings → Integrations) */
 .integrations-block {
   display: flex; flex-direction: column; gap: .55rem;

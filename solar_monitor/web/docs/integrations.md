@@ -4,6 +4,9 @@ WattPost is local-first and **opinionated about staying out of your
 way**: every metric is exposed in several formats so you can plug it
 into whatever you already use.
 
+> Looking for the **PV forecast** integration?
+> That's covered in [PV forecast (Solcast)](#/docs/forecast).
+
 ## REST
 
 Read-only JSON on the same daemon that serves this dashboard. Common
