@@ -1601,11 +1601,18 @@ body.kiosk-active main {
   height: 100dvh;
 }
 body.kiosk-active .route.kiosk-route.active {
+  /* Column flex + margin:auto on the inner stage = vertically centered
+     when content fits, scrollable when it doesn't. Avoids the previous
+     "align-items: center clips equally top + bottom" failure on phones
+     where the donut + flow stack is taller than 100dvh. */
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  height: 100dvh;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   /* Respect notch / home-bar / status-bar so the donut doesn't clip
      under iOS chrome. env() falls back to 0 on platforms without it. */
   padding-top:    max(2vh, env(safe-area-inset-top));
@@ -1621,6 +1628,7 @@ body.kiosk-active .route.kiosk-route.active {
   align-items: center;
   justify-items: center;
   width: 100%; max-width: 1400px;
+  margin: auto 0;  /* vertical centering only when room allows */
 }
 @media (max-width: 820px) {
   .kiosk-stage { grid-template-columns: 1fr; gap: 3vh; }
@@ -1652,9 +1660,12 @@ body.kiosk-active .route.kiosk-route.active {
   white-space: nowrap;
 }
 .kiosk-donut .donut-pct-unit {
-  font-size: clamp(1rem, 4vh, 2.4rem);
+  font-size: clamp(0.95rem, 3.5vh, 2rem);
   color: var(--text-2);
   margin-left: .2rem;
+  /* Lift the % off the baseline so it reads like a superscript hugging
+     the top-right of the digits, instead of slumping under "5". */
+  vertical-align: 0.45em;
 }
 .kiosk-donut .donut-label {
   font-size: clamp(.8rem, 1.6vh, 1rem);
@@ -1695,7 +1706,11 @@ body.kiosk-active .route.kiosk-route.active {
 }
 .kiosk-exit {
   position: fixed;
-  top: 1rem; right: 1rem;
+  /* Sit inside the safe-area inset so it never overlaps the Solar tile
+     on a landscape phone where the right column starts at the route's
+     padding edge. */
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
   width: 44px; height: 44px;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface);
