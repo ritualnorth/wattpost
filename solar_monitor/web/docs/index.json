@@ -6,6 +6,7 @@
     { "slug": "history",         "title": "History & CSV export", "section": "Features" },
     { "slug": "kiosk",           "title": "Kiosk mode", "section": "Features" },
     { "slug": "forecast",        "title": "PV forecast (Solcast)", "section": "Integrations" },
+    { "slug": "weather",         "title": "Current weather (Open-Meteo)", "section": "Integrations" },
     { "slug": "integrations",    "title": "Home Assistant, Grafana, MQTT", "section": "Integrations" },
     { "slug": "remote-access",   "title": "Remote access (Tailscale)", "section": "Integrations" },
     { "slug": "security",        "title": "About the \"Not Secure\" warning", "section": "Security" },

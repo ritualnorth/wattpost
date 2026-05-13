@@ -64,9 +64,13 @@ What the user sees on first load:
   energy balance (sees loads on the busbar, not just the controller)
 - **Today** — PV in, charged Ah, peak W, **load consumed (real, computed
   from balance — not what the MPPT thinks)**, lifetime Wh
+- **Right now** — optional current-weather tile (Open-Meteo). Temp,
+  cloud cover, wind, sunrise / sunset. No API key needed
 - **Tomorrow** — optional PV forecast tile (Solcast). Expected kWh,
   peak time, day-after preview, sparkline. User brings their own free
   hobbyist key; nothing's proxied
+- **7-day outlook** — per-day kWh + mini sparkline across the
+  forecast window; common Y scale so quiet days read as quiet
 - **Cell balance** — per-cell voltages across every pack, min/max
   highlighted, panel hue follows drift severity
 - **Charge efficiency** — SoC-corrected coulombic η per pack, surfaced
@@ -104,6 +108,10 @@ solar_monitor/
 ├── forecast/               # third-party PV forecast integrations
 │   ├── base.py             # ForecastProvider ABC + normalised shape
 │   ├── solcast.py          # Solcast hobbyist API client
+│   └── service.py          # poll loop, kv-cache writeback
+├── weather/                # current-conditions integrations
+│   ├── base.py             # WeatherProvider ABC + normalised shape
+│   ├── openmeteo.py        # Open-Meteo client (no API key required)
 │   └── service.py          # poll loop, kv-cache writeback
 ├── storage/
 │   └── sqlite.py           # WAL, raw + 1min/1hr/1day rollups, energy
