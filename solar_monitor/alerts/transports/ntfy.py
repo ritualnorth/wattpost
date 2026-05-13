@@ -46,12 +46,15 @@ class NtfyTransport(NotificationTransport):
         )
         try:
             # ntfy headers are sent as HTTP headers and must be ASCII —
-            # no fancy bullets. Body can be UTF-8 freely.
+            # no fancy bullets. Body can be UTF-8 freely. Explicit
+            # Content-Type on the body helps the iOS app's push handler
+            # render the notification reliably.
             title = f"WattPost - {event.name}".encode("ascii", "replace").decode("ascii")
             await self._client.post(
                 url,
                 content=body.encode("utf-8"),
                 headers={
+                    "Content-Type": "text/plain; charset=utf-8",
                     "Title": title,
                     "Priority": _SEVERITY_PRIORITY.get(event.severity, "default"),
                     "Tags": _SEVERITY_TAGS.get(event.severity, "warning"),
