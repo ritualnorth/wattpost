@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=53" />
+  <link rel="stylesheet" href="/web/styles.css?v=54" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -77,7 +77,7 @@
     <section class="route" data-route="dashboard">
       <!-- HERO -->
       <section class="hero-v2">
-        <div class="hero-donut-wrap" id="donut-wrap">
+        <div class="hero-donut-wrap donut-state" id="donut-wrap">
           <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
             <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14" />
             <circle id="donut-arc" class="donut-arc" cx="100" cy="100" r="86" fill="none" stroke-width="14"
@@ -352,6 +352,13 @@
                 <span>Light</span>
               </button>
             </div>
+            <label class="settings-toggle">
+              <input type="checkbox" id="kiosk-default-toggle" />
+              <span class="settings-toggle-label">
+                <span>Kiosk view on this device</span>
+                <span class="settings-toggle-sub">Opens straight to the SoC + power flow card. Visit <code>/#/kiosk</code> any time, or go to Settings to switch back.</span>
+              </span>
+            </label>
           </div>
           <div class="settings-block">
             <h3>Polling</h3>
@@ -385,9 +392,39 @@
         </div>
       </section>
     </section>
+
+    <!-- =====================================================
+         ROUTE: Kiosk — chrome-free SoC + flow for wall-mounted tablets
+         ===================================================== -->
+    <section class="route kiosk-route" data-route="kiosk">
+      <div class="kiosk-stage">
+        <div class="kiosk-donut">
+          <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="donut-track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
+            <circle class="donut-arc"   cx="100" cy="100" r="88" fill="none" stroke-width="14"
+                    stroke-linecap="round" pathLength="100"
+                    stroke-dasharray="0 100" transform="rotate(-90 100 100)"/>
+            <circle class="donut-pulse" cx="100" cy="100" r="88" fill="none" stroke-width="14"
+                    stroke-linecap="round" pathLength="100"
+                    stroke-dasharray="6 94" transform="rotate(-90 100 100)"/>
+          </svg>
+          <div class="donut-center donut-state" id="kiosk-donut-wrap">
+            <div class="donut-pct"><span id="kiosk-soc">—</span><span class="donut-pct-unit">%</span></div>
+            <div class="donut-label">state of charge</div>
+            <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">—</span></div>
+          </div>
+        </div>
+        <div class="kiosk-flow" id="kiosk-flow"></div>
+      </div>
+      <button class="kiosk-exit" id="kiosk-exit" aria-label="Exit kiosk view" title="Exit kiosk view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+        </svg>
+      </button>
+    </section>
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=53"></script>
+  <script src="/web/app.js?v=54"></script>
 </body>
 </html>

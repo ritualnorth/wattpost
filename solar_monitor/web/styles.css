@@ -128,8 +128,8 @@
   --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
   --donut-pulse-discharging-glow: rgba(154,103,0,0.7);
 }
-[data-theme="light"] #donut-wrap.charging .donut-pulse    { stroke: #5dd373; }
-[data-theme="light"] #donut-wrap.discharging .donut-pulse { stroke: #f1b73a; }
+[data-theme="light"] .donut-state.charging .donut-pulse    { stroke: #5dd373; }
+[data-theme="light"] .donut-state.discharging .donut-pulse { stroke: #f1b73a; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -366,10 +366,10 @@ main {
 .donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
 
 /* Active glow intensifies + shifts color when charging or discharging */
-#donut-wrap.charging .donut-arc {
+.donut-state.charging .donut-arc {
   filter: drop-shadow(0 0 12px rgba(63,185,80,0.55));
 }
-#donut-wrap.discharging .donut-arc {
+.donut-state.discharging .donut-arc {
   filter: drop-shadow(0 0 12px rgba(210,153,34,0.55));
 }
 
@@ -387,13 +387,13 @@ main {
    would disappear against them. Use a near-white core so the pip is
    visible in both themes, and tint the glow with the action color so it
    still reads as "charging" or "discharging" at a glance. */
-#donut-wrap.charging .donut-pulse {
+.donut-state.charging .donut-pulse {
   stroke: var(--donut-pulse-stroke);
   opacity: 0.95;
   filter: drop-shadow(0 0 5px var(--donut-pulse-charging-glow));
   animation: pulse-cw 3.5s linear infinite;
 }
-#donut-wrap.discharging .donut-pulse {
+.donut-state.discharging .donut-pulse {
   stroke: var(--donut-pulse-stroke);
   opacity: 0.95;
   filter: drop-shadow(0 0 5px var(--donut-pulse-discharging-glow));
@@ -420,12 +420,12 @@ main {
   display: inline-flex;
   width: 10px; height: 10px;
 }
-#donut-wrap.charging .donut-flow {
+.donut-state.charging .donut-flow {
   color: var(--green);
   border-color: rgba(63,185,80,0.45);
   background: rgba(63,185,80,0.08);
 }
-#donut-wrap.charging .donut-flow-arrow::before {
+.donut-state.charging .donut-flow-arrow::before {
   content: "";
   display: inline-block;
   width: 0; height: 0;
@@ -433,12 +433,12 @@ main {
   border-right: 5px solid transparent;
   border-bottom: 7px solid currentColor;
 }
-#donut-wrap.discharging .donut-flow {
+.donut-state.discharging .donut-flow {
   color: var(--amber);
   border-color: rgba(210,153,34,0.45);
   background: rgba(210,153,34,0.08);
 }
-#donut-wrap.discharging .donut-flow-arrow::before {
+.donut-state.discharging .donut-flow-arrow::before {
   content: "";
   display: inline-block;
   width: 0; height: 0;
@@ -446,7 +446,7 @@ main {
   border-right: 5px solid transparent;
   border-top: 7px solid currentColor;
 }
-#donut-wrap.idle .donut-flow-arrow::before {
+.donut-state.idle .donut-flow-arrow::before {
   content: "•";
   color: var(--text-3);
   font-size: 1.3rem;
@@ -1488,6 +1488,142 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 
 /* footer removed — version + identity already live in Settings → About */
 main { padding-bottom: 3rem; }
+
+/* ---------------- kiosk mode ---------------- */
+/* The kiosk route is chrome-free: header, nav, alerts banner all hidden
+   so a wall-mounted tablet shows only the at-a-glance facts. Activated
+   by body.kiosk-active (set by setRoute when the route name is "kiosk"). */
+body.kiosk-active .app-header,
+body.kiosk-active .app-nav,
+body.kiosk-active .alerts { display: none !important; }
+body.kiosk-active main {
+  max-width: none;
+  padding: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+body.kiosk-active .route.kiosk-route.active {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  height: 100dvh;
+  padding: 2vh 4vw;
+  gap: 0;
+}
+.kiosk-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4vw;
+  align-items: center;
+  justify-items: center;
+  width: 100%; max-width: 1400px;
+}
+@media (max-width: 820px) {
+  .kiosk-stage { grid-template-columns: 1fr; gap: 3vh; }
+}
+.kiosk-donut {
+  position: relative;
+  width: min(46vh, 90vw, 460px);
+  aspect-ratio: 1 / 1;
+}
+.kiosk-donut .hero-donut { width: 100%; height: 100%; display: block; }
+.kiosk-donut .donut-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.kiosk-donut .donut-pct {
+  font-family: var(--mono);
+  font-size: clamp(3.5rem, 11vh, 7rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.kiosk-donut .donut-pct-unit {
+  font-size: clamp(1.4rem, 4vh, 2.4rem);
+  color: var(--text-2);
+  margin-left: .25rem;
+}
+.kiosk-donut .donut-label {
+  font-size: clamp(.8rem, 1.6vh, 1rem);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-top: .5rem;
+}
+.kiosk-donut .donut-flow {
+  margin-top: 1rem;
+  padding: .25rem .85rem;
+  font-size: clamp(.9rem, 1.8vh, 1.05rem);
+}
+.kiosk-flow {
+  width: 100%;
+  /* Reuse the existing flow strip components inside this host, but
+     scale typography & padding up so the tiles read from a couch. */
+  font-size: 1.15rem;
+}
+.kiosk-flow .flow-tile {
+  padding: 1.15rem 1.35rem;
+}
+.kiosk-flow .flow-tile-power {
+  font-size: clamp(1.6rem, 3.6vh, 2.4rem);
+}
+.kiosk-flow .flow-tile-label {
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+}
+.kiosk-flow .flow-tile-sub {
+  font-size: clamp(.8rem, 1.5vh, .95rem);
+}
+.kiosk-flow .flow-arrow-label {
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+}
+.kiosk-exit {
+  position: fixed;
+  top: 1rem; right: 1rem;
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  z-index: 50;
+}
+.kiosk-exit svg { width: 20px; height: 20px; }
+.kiosk-exit:hover, .kiosk-exit:focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: var(--surface-2);
+}
+body:not(.kiosk-active) .kiosk-exit { display: none; }
+
+/* Settings toggle row (Appearance → Kiosk default) */
+.settings-toggle {
+  display: flex; align-items: flex-start; gap: .7rem;
+  margin-top: .75rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.settings-toggle input[type="checkbox"] {
+  margin-top: .15rem;
+  accent-color: var(--accent);
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+.settings-toggle-label { display: flex; flex-direction: column; gap: .15rem; }
+.settings-toggle-label > span:first-child { font-weight: 500; color: var(--text); }
+.settings-toggle-sub {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  line-height: 1.45;
+}
 
 /* ---------------- setup wizard ---------------- */
 .wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0; }

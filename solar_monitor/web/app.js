@@ -239,6 +239,52 @@ matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
   if (themePref() === "system") applyTheme("system");
 });
 
+// ---------- kiosk mode ----------
+// Wall-mounted tablet view: chrome-free, SoC + power flow at chunky size,
+// with a Wake Lock to keep the screen on while the route is active. The
+// "default to kiosk on this device" preference is localStorage so other
+// devices keep their normal view.
+const KIOSK_KEY = "wp-kiosk-default";
+let wakeLock = null;
+function kioskDefault() {
+  try { return localStorage.getItem(KIOSK_KEY) === "1"; }
+  catch (_) { return false; }
+}
+function setKioskDefault(on) {
+  try { localStorage.setItem(KIOSK_KEY, on ? "1" : "0"); } catch (_) {}
+}
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener?.("release", () => { wakeLock = null; });
+  } catch (_) {
+    // Browser denied (user not in a tab-visible state, no permission). The
+    // tablet will still display; screen may eventually dim per OS rules.
+  }
+}
+function releaseWakeLock() {
+  if (!wakeLock) return;
+  wakeLock.release().catch(() => {});
+  wakeLock = null;
+}
+function onEnterKiosk() {
+  document.body.classList.add("kiosk-active");
+  requestWakeLock();
+}
+function onLeaveKiosk() {
+  document.body.classList.remove("kiosk-active");
+  releaseWakeLock();
+}
+// Reacquire the wake lock when the tab comes back to the foreground.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" &&
+      document.body.classList.contains("kiosk-active") &&
+      !wakeLock) {
+    requestWakeLock();
+  }
+});
+
 // ---------- status header ----------
 function setStatus(cls, text) {
   const el = $("#status");
@@ -266,6 +312,10 @@ function applySnapshot(frame) {
   renderStatus(frame.poll_run || {});
   renderHero();
   renderFlow();
+  // Kiosk view shares aggregateBank/buildFlowModel but lives in a
+  // separate DOM tree — mirror the flow strip into it on every frame.
+  const kioskFlow = $("#kiosk-flow");
+  if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
   renderCells();
   renderDeviceCards();
@@ -429,6 +479,16 @@ function renderHero() {
   const socCls = pct < 20 ? "soc-low" : pct < 50 ? "soc-mid" : "soc-high";
   arc.classList.remove("soc-low", "soc-mid", "soc-high");
   arc.classList.add(socCls);
+  // Mirror the SoC paint onto the kiosk donut (lives in a different DOM
+  // tree but uses the same class hooks).
+  const kioskArc = document.querySelector(".kiosk-donut .donut-arc");
+  if (kioskArc) {
+    kioskArc.setAttribute("stroke-dasharray", `${pct} ${100 - pct}`);
+    kioskArc.classList.remove("soc-low", "soc-mid", "soc-high");
+    kioskArc.classList.add(socCls);
+  }
+  const kioskSoc = $("#kiosk-soc");
+  if (kioskSoc) kioskSoc.textContent = bank.soc.toFixed(1);
   // Tint the hero container with the same SoC band so the card hue
   // matches the donut color.
   const heroEl = document.querySelector(".hero-v2");
@@ -454,16 +514,23 @@ function renderHero() {
 
   // Donut wrapper state — drives ring color, pulse animation direction,
   // glow, and the small flow-indicator pill under "State of charge".
-  const donutWrap = $("#donut-wrap");
-  if (donutWrap) {
-    donutWrap.classList.remove("charging", "discharging", "idle");
-    donutWrap.classList.add(powerState);
-    const flowText = $("#donut-flow .donut-flow-text");
-    if (flowText) {
-      flowText.textContent = powerState === "idle"
-        ? "Idle"
-        : `${fmt.signed(bank.netW, 0)} W`;
-    }
+  // Applied to both the dashboard wrapper and the kiosk one (both carry
+  // the shared .donut-state class).
+  document.querySelectorAll(".donut-state").forEach(el => {
+    el.classList.remove("charging", "discharging", "idle");
+    el.classList.add(powerState);
+  });
+  const flowText = $("#donut-flow .donut-flow-text");
+  if (flowText) {
+    flowText.textContent = powerState === "idle"
+      ? "Idle"
+      : `${fmt.signed(bank.netW, 0)} W`;
+  }
+  const kioskFlowText = $("#kiosk-flow-text");
+  if (kioskFlowText) {
+    kioskFlowText.textContent = powerState === "idle"
+      ? "Idle"
+      : `${fmt.signed(bank.netW, 0)} W`;
   }
 
   // Remaining time
@@ -626,15 +693,18 @@ function buildFlowModel() {
   return { sources, loads, batteryNetW, bank };
 }
 
-function renderFlow() {
-  const host = $("#flow");
-  const sub  = $("#flow-sub");
+function renderFlow(targetHost) {
+  // Default to the dashboard's flow strip. The kiosk view passes its own
+  // host so we can mount a second copy of the strip inside the kiosk
+  // layout — same components, just scaled up by CSS.
+  const host = targetHost || $("#flow");
+  const sub  = host === $("#flow") ? $("#flow-sub") : null;
   host.innerHTML = "";
 
   const model = buildFlowModel();
   if (!model.bank && model.sources.length === 0 && model.loads.length === 0) {
     host.innerHTML = `<div class="flow-empty">No active devices yet.</div>`;
-    sub.textContent = "";
+    if (sub) sub.textContent = "";
     return;
   }
 
@@ -664,7 +734,7 @@ function renderFlow() {
       }));
     }
     host.appendChild(battCol);
-    sub.textContent = "no sources or loads configured";
+    if (sub) sub.textContent = "no sources or loads configured";
     return;
   }
   host.classList.remove("flow--idle");
@@ -722,7 +792,7 @@ function renderFlow() {
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
   if (hasLoads)   parts.push(`${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ${totalLoadW.toFixed(0)} W out`);
-  sub.textContent = parts.join(" · ") || "system idle";
+  if (sub) sub.textContent = parts.join(" · ") || "system idle";
 }
 
 function makeFlowTile(t, muted = false) {
@@ -1474,7 +1544,7 @@ function drawHeatmap(root, data) {
 // Hash-based. Default route = dashboard. Two forms:
 //   #/                   → named routes (dashboard / history / devices / ...)
 //   #/device/<label>     → per-device detail page (dispatched by device kind)
-const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings"]);
+const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings", "kiosk"]);
 
 function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
@@ -1502,6 +1572,8 @@ function setRoute(_unused) {
   if (route.name === "dashboard") refreshDriftSparkline();
   if (route.name === "device") renderDeviceDetail(route.label);
   if (route.name === "setup") onEnterSetup();
+  if (route.name === "kiosk") onEnterKiosk();
+  else if (document.body.classList.contains("kiosk-active")) onLeaveKiosk();
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
 }
 
@@ -1527,6 +1599,29 @@ document.querySelectorAll(".theme-opt").forEach(btn => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.themePref));
 });
 applyTheme(themePref());  // paints meta-color + button selection state
+
+// Kiosk default toggle + exit button. The default-on-this-device flag
+// only triggers a redirect if the user landed without an explicit route
+// in the URL — otherwise an inbound link to /#/history or /#/devices
+// would be silently stomped on every refresh.
+const kioskToggle = $("#kiosk-default-toggle");
+if (kioskToggle) {
+  kioskToggle.checked = kioskDefault();
+  kioskToggle.addEventListener("change", () => {
+    setKioskDefault(kioskToggle.checked);
+  });
+}
+const kioskExitBtn = $("#kiosk-exit");
+if (kioskExitBtn) {
+  kioskExitBtn.addEventListener("click", () => {
+    window.location.hash = "#/";
+  });
+}
+// If this device is set to default-to-kiosk and the URL has no explicit
+// hash, redirect before the initial setRoute runs.
+if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
+  window.location.hash = "#/kiosk";
+}
 
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);
