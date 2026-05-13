@@ -719,23 +719,21 @@ main {
     border-top-color: var(--to) !important;
   }
   /* Animated dot drops top → bottom along the line.
-     `!important` for the same reason as the ::before/::after rules above:
-     the landscape `.flow-arrow.active .dot` block sits later in source
-     order and would otherwise win on `top`, `transform`, and `animation`,
-     leaving the dot drifting left-to-right across the portrait pill. */
-  .flow-arrow.active .dot {
-    position: absolute !important;
-    width: 9px !important; height: 9px !important;
-    border-radius: 50%;
+     We beat the landscape rule via the .flow-conn parent (specificity
+     0,3,0 vs 0,2,0) rather than !important. CSS animations are *lower*
+     priority than !important author rules, so flagging `top` important
+     would freeze the dot at top:0 — exactly the bug we're fixing. */
+  .flow-conn .flow-arrow.active .dot {
+    width: 9px; height: 9px;
     background: var(--to);
     box-shadow: 0 0 12px var(--to);
-    left: 50% !important;
-    top: 0 !important;
-    transform: translateX(-50%) !important;
-    animation: flow-dot-v 1.8s linear infinite !important;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    animation: flow-dot-v 1.8s linear infinite;
   }
-  .flow-arrow.reverse .dot {
-    animation-direction: reverse !important;
+  .flow-conn .flow-arrow.reverse .dot {
+    animation-direction: reverse;
   }
   /* (keyframes flow-dot-v live at top-of-file to dodge a Safari quirk) */
   /* W label centered on the *line*, not the whole connector. The connector
