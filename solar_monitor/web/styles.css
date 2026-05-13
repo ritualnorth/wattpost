@@ -788,12 +788,6 @@ main {
    Load) already encodes direction, and at this scale any explicit arrow
    reads as a blob. Just a clean vertical line, slightly thicker, with
    the gradient colour when active. */
-.kiosk-flow .flow-arrow::before {
-  top: 2px !important;
-  bottom: 2px !important;
-  width: 3px !important;
-  border-radius: 3px;
-}
 .kiosk-flow .flow-arrow::after {
   /* Hide the triangle inherited from the portrait @media rule. */
   display: none !important;
@@ -808,11 +802,16 @@ main {
   height: auto !important;
   display: block !important;
 }
+/* Single canonical line rule: top→bottom symmetric, dead-centre
+   horizontally. Source order matters here — having two ::before rules
+   meant the later one's bottom:16px (held over from when we had a
+   chevron at the bottom of the connector) was making the line look
+   off-centre vertically. */
 .kiosk-flow .flow-arrow::before {
   content: "";
   position: absolute !important;
   top: 2px !important;
-  bottom: 16px !important;
+  bottom: 2px !important;
   left: 50% !important;
   right: auto !important;
   width: 3px !important;
