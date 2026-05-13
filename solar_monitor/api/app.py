@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import sys
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator
@@ -130,6 +132,27 @@ async def device_history(
         # legacy alias for existing callers
         "count": payload["stats"]["count"],
     }
+
+
+@post("/api/system/restart", status_code=202)
+async def restart_daemon() -> dict[str, Any]:
+    """Gracefully restart the daemon by re-exec()-ing the current
+    process. The HTTP response goes out before exec replaces us, so the
+    SPA sees a clean 202 → starts polling /api/health → notices the
+    daemon is back ~5 s later.
+
+    Works whether or not a supervisor (systemd) is around — os.execv
+    replaces the current process image in place, no orphan-process
+    cleanup required."""
+
+    async def _delayed_exec() -> None:
+        # Tiny pause so the HTTP response can flush back to the client
+        # before the kernel tears down its FDs in exec.
+        await asyncio.sleep(0.4)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    asyncio.create_task(_delayed_exec())
+    return {"ok": True, "message": "restart scheduled"}
 
 
 @get("/api/alerts")
@@ -284,6 +307,7 @@ def build_app(
             stream,
             list_alerts,
             test_alert,
+            restart_daemon,
             create_rule,
             update_rule,
             delete_rule,
