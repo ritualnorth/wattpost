@@ -8,6 +8,7 @@ right home for any future system-level handlers.
 from __future__ import annotations
 
 import asyncio
+import getpass
 import json
 import logging
 import platform
@@ -164,18 +165,51 @@ def _ts_priv(*args: str) -> tuple[str, ...]:
     return ("sudo", "-n", "tailscale", *args)
 
 
-async def _tailscale_serve_https() -> None:
+def _is_password_required(err: str) -> bool:
+    """Detect the two ways sudo -n refuses non-interactively: 'a password
+    is required' (no matching NOPASSWD rule) and 'no tty present' (rare
+    legacy variant)."""
+    e = (err or "").lower()
+    return "password is required" in e or "no tty" in e
+
+
+def _sudo_hint() -> str:
+    """Customer-vs-dev-aware error message for sudo failures on
+    tailscale up / logout / serve. The production install.sh creates a
+    `wattpost` system user and drops a NOPASSWD sudoers entry for it;
+    a dev running the daemon as their own login user won't have that
+    entry and gets a different fix."""
+    user = getpass.getuser()
+    if user == "wattpost":
+        return ("Tailscale needs root, and the daemon's sudoers entry is "
+                "missing or has been removed. Re-run packaging/install.sh "
+                "to reinstall it.")
+    return (f"Tailscale needs root. The daemon is running as `{user}`, "
+            f"not the production `wattpost` user, so install.sh's sudoers "
+            f"entry doesn't apply. Run `sudo bash packaging/dev-sudoers.sh` "
+            f"to grant `{user}` the same passwordless access.")
+
+
+async def _tailscale_serve_https() -> tuple[bool, str | None]:
     """Once we're authenticated, expose the dashboard at
     https://<hostname>.<tailnet>.ts.net/ via Tailscale Serve. This is
     Tailscale's free Let's Encrypt cert path — no manual cert
     management, no warning bypass. Idempotent: `tailscale serve` with
-    the same args is a no-op if already serving."""
+    the same args is a no-op if already serving.
+
+    Returns `(True, None)` on success and `(False, hint)` otherwise so
+    the caller decides whether to escalate (the explicit Enable-HTTPS
+    button raises 500; the post-up best-effort call just logs)."""
     rc, _out, err = await _run(
         *_ts_priv("serve", "--bg", "--https=443", "http://127.0.0.1:8000"),
         timeout=15.0,
     )
-    if rc != 0:
-        log.info("tailscale serve not (re)started: %s", (err or "").strip())
+    if rc == 0:
+        return True, None
+    err_msg = (err or "").strip()
+    if _is_password_required(err_msg):
+        return False, _sudo_hint()
+    return False, f"tailscale serve failed: {err_msg}"
 
 
 @post("/api/system/tailscale/up", status_code=202)
@@ -189,7 +223,11 @@ async def tailscale_up() -> dict[str, Any]:
     if not _tailscale_installed():
         raise HTTPException(status_code=400, detail="tailscale not installed")
 
-    asyncio.create_task(_run(
+    # Run `tailscale up` in the background — it blocks until the user
+    # finishes auth in their browser, but we need to keep polling for
+    # the AuthURL it emits early. Keep a handle so we can detect an
+    # immediate failure (most importantly: sudo refused non-interactively).
+    up_task = asyncio.create_task(_run(
         *_ts_priv(
             "up",
             "--reset",
@@ -203,14 +241,37 @@ async def tailscale_up() -> dict[str, Any]:
 
     for _ in range(12):
         await asyncio.sleep(0.5)
+
+        # If `tailscale up` already exited with a non-zero rc, something
+        # went wrong before auth started — almost always sudo. Surface
+        # it before the poll-loop times out with a generic hint.
+        if up_task.done():
+            try:
+                rc, _out, err = up_task.result()
+            except Exception as e:
+                raise HTTPException(status_code=500,
+                                    detail=f"tailscale up crashed: {e}")
+            if rc != 0:
+                err_msg = (err or "").strip()
+                if _is_password_required(err_msg):
+                    raise HTTPException(status_code=500, detail=_sudo_hint())
+                raise HTTPException(status_code=500,
+                                    detail=f"tailscale up failed: {err_msg}")
+
         snap = await _tailscale_status_json()
         if not snap:
             continue
         if snap.get("BackendState") == "Running":
             self_node = snap.get("Self") or {}
             ips = self_node.get("TailscaleIPs") or []
-            # Best-effort HTTPS serve; not fatal if it fails.
-            asyncio.create_task(_tailscale_serve_https())
+            # Best-effort HTTPS serve; not fatal if it fails — the
+            # user can hit Enable HTTPS manually and get a proper
+            # error message there if sudoers is wrong.
+            async def _best_effort_serve() -> None:
+                ok, hint = await _tailscale_serve_https()
+                if not ok:
+                    log.info("tailscale serve not (re)started: %s", hint)
+            asyncio.create_task(_best_effort_serve())
             return {"ok": True, "already_authed": True,
                     "ipv4": next((i for i in ips if ":" not in i), None)}
         url = snap.get("AuthURL")
@@ -226,15 +287,9 @@ async def tailscale_down() -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="tailscale not installed")
     rc, _out, err = await _run(*_ts_priv("logout"))
     if rc != 0:
-        # Most common failure now is "sudo: a password is required" —
-        # surface that as a hint instead of an opaque 500.
         msg = (err or "").strip()
-        if "password is required" in msg or "no tty" in msg:
-            raise HTTPException(
-                status_code=500,
-                detail="logout needs root. Re-run install.sh to grant "
-                       "the daemon sudo access to `tailscale logout`.",
-            )
+        if _is_password_required(msg):
+            raise HTTPException(status_code=500, detail=_sudo_hint())
         raise HTTPException(status_code=500, detail=f"logout failed: {msg}")
     return {"ok": True}
 
@@ -243,8 +298,12 @@ async def tailscale_down() -> dict[str, Any]:
 async def tailscale_serve() -> dict[str, Any]:
     """Manual trigger for the HTTPS Serve config — useful if the
     user's tailnet was already up when the daemon started (we only
-    auto-serve right after a fresh login)."""
+    auto-serve right after a fresh login). Unlike the post-up
+    best-effort call, this one raises 500 on failure so the Enable
+    HTTPS button shows a real error."""
     if not _tailscale_installed():
         raise HTTPException(status_code=400, detail="tailscale not installed")
-    await _tailscale_serve_https()
+    ok, hint = await _tailscale_serve_https()
+    if not ok:
+        raise HTTPException(status_code=500, detail=hint or "tailscale serve failed")
     return {"ok": True}
