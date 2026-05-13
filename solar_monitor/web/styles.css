@@ -786,15 +786,37 @@ main {
   padding: 0;
   display: block;
 }
-/* Slim line + small arrow head, proportioned to each other so it
-   reads as a single tick rather than a stuck-on triangle. */
+/* Slim line ending in a thin chevron stroke (two short border segments
+   rotated 45° form a V). Visually much lighter than the filled-triangle
+   approach used in the dashboard portrait — at kiosk scale that triangle
+   reads as a chunky stuck-on blob no matter how small we make it. */
 .kiosk-flow .flow-arrow::before {
   top: 1px !important;
-  bottom: 6px !important;
+  bottom: 9px !important;
   width: 2px !important;
 }
 .kiosk-flow .flow-arrow::after {
-  border-width: 5px 3.5px 0 3.5px !important;
+  /* Override the border-triangle: clear the triangle borders, then draw
+     a chevron by re-applying only the right + bottom borders. The
+     element is rotated 45° so those two borders form a downward-pointing
+     V at the end of the line. */
+  top: auto !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  width: 8px !important;
+  height: 8px !important;
+  border: none !important;
+  border-right: 2px solid var(--border-2) !important;
+  border-bottom: 2px solid var(--border-2) !important;
+  background: transparent !important;
+  transform: translateX(-50%) rotate(45deg) !important;
+}
+.kiosk-flow .flow-arrow.active::after {
+  border-right-color: var(--to) !important;
+  border-bottom-color: var(--to) !important;
+  /* Defeat the inherited .flow-arrow.active::after { border-top-color }
+     rule from portrait — we don't have a top border to colour. */
+  border-top-color: transparent !important;
 }
 .kiosk-flow .flow-arrow {
   position: absolute !important;
