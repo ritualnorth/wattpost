@@ -78,6 +78,14 @@ if [[ ! -x "${APP_VENV}/bin/python" ]]; then
     python3 -m venv "${APP_VENV}"
 fi
 "${APP_VENV}/bin/pip" install --upgrade pip wheel >/dev/null
+# A stale `solar_monitor.egg-info/` from a developer's earlier
+# `pip install -e .` can break the wheel build with "Cannot update
+# time stamp of directory". Real installs (curl|bash, fresh git clone,
+# pi-gen rsync) never have one; this is a no-op there. Silently
+# ignored if SOURCE is read-only — pip would already have failed in
+# that case for other reasons.
+find "${SOURCE}" -maxdepth 3 -name '*.egg-info' -type d \
+    -exec rm -rf {} + 2>/dev/null || true
 "${APP_VENV}/bin/pip" install --upgrade "${SOURCE}"
 
 # ----- config (only if not present — don't clobber the user's edits) -----
