@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- CI: `.github/workflows/build-image.yml` builds the SD image via
+  pi-gen on tag push (`v*`) and attaches the `.img.xz` + SHA256 to a
+  GitHub Release. `workflow_dispatch` available for smoke tests.
 - Local alert engine — rule schema (metric / op / threshold / severity /
   cooldown), Settings → Alerts UI editor (rules + transports), per-rule
   Test button

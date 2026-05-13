@@ -1,0 +1,99 @@
+name: Build SD image
+
+# Triggers:
+#   - Pushing a tag matching v* (e.g. v0.0.2) → builds + attaches the
+#     .img.xz to a real GitHub Release.
+#   - workflow_dispatch → builds + uploads as a workflow artefact (no
+#     release). Useful for smoke-testing the pipeline without cutting
+#     a tag, or for one-off images for demos.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create the release on tag push
+
+jobs:
+  build:
+    name: pi-gen build (x86_64 + qemu)
+    runs-on: ubuntu-22.04
+    # Pi-gen under qemu emulation on a free x86_64 runner takes
+    # 1-3 hours depending on apt mirror latency. Setting 5h gives us
+    # headroom and a clean cancel before GitHub's 6h hard limit.
+    timeout-minutes: 300
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # release notes generation needs full history
+
+      # pi-gen builds a rootfs from scratch into the host filesystem;
+      # GH-hosted runners default to ~14 GB free after the preinstalled
+      # toolchains, which is tight. Free up ~25 GB by dropping bits we
+      # don't need (Haskell, .NET, Android SDK, etc).
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Install pi-gen build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git quilt parted qemu-user-static debootstrap zerofree \
+            zip dosfstools libcap2-bin grep rsync xz-utils file kmod bc gpg pigz
+
+      - name: Build image
+        run: |
+          ./packaging/build-image.sh
+
+      - name: Locate artefact
+        id: locate
+        run: |
+          set -euo pipefail
+          IMG=$(find build/pi-gen/deploy -maxdepth 2 -name '*.img.xz' -type f | head -n1)
+          if [ -z "$IMG" ]; then
+            echo "No .img.xz under build/pi-gen/deploy:" >&2
+            ls -laR build/pi-gen/deploy || true
+            exit 1
+          fi
+          # Produce a sidecar SHA256 so users can verify the download.
+          ( cd "$(dirname "$IMG")" && sha256sum "$(basename "$IMG")" > "$(basename "$IMG").sha256" )
+          echo "image=$IMG"           >> "$GITHUB_OUTPUT"
+          echo "checksum=$IMG.sha256" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$IMG")" >> "$GITHUB_OUTPUT"
+
+      # Always upload as a workflow artefact so manual runs have
+      # something to grab without going through the Releases UI.
+      - name: Upload as workflow artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wattpost-image
+          path: |
+            ${{ steps.locate.outputs.image }}
+            ${{ steps.locate.outputs.checksum }}
+          retention-days: 14
+          if-no-files-found: error
+
+      # On tag pushes only: attach to a GitHub Release. action-gh-release
+      # creates the release if it doesn't exist, or appends to an
+      # existing one — so we can re-run on the same tag to repair a
+      # failed upload without losing the original release body.
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.locate.outputs.image }}
+            ${{ steps.locate.outputs.checksum }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
