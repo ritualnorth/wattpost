@@ -776,47 +776,30 @@ main {
 .kiosk-flow .flow-conn {
   position: relative;
   width: 100%;
-  /* Shorter than the portrait-phone version — at kiosk scale a stubby
-     connector pulls the tiles closer together and reads as one block.
-     Used to be clamp(48px, 8vh, 72px); slimmed further once we shrank
-     the arrowhead so the geometry matched. */
-  height: clamp(18px, 3.5vh, 28px);
+  /* Taller than the previous attempt so the line actually reads as a
+     connection rather than a stub. */
+  height: clamp(28px, 4.5vh, 40px);
   min-height: 0;
   align-self: stretch;
   padding: 0;
   display: block;
 }
-/* Slim line ending in a thin chevron stroke (two short border segments
-   rotated 45° form a V). Visually much lighter than the filled-triangle
-   approach used in the dashboard portrait — at kiosk scale that triangle
-   reads as a chunky stuck-on blob no matter how small we make it. */
+/* No chevron / arrowhead in kiosk — the tile order (Solar → Battery →
+   Load) already encodes direction, and at this scale any explicit arrow
+   reads as a blob. Just a clean vertical line, slightly thicker, with
+   the gradient colour when active. */
 .kiosk-flow .flow-arrow::before {
-  top: 1px !important;
-  bottom: 9px !important;
-  width: 2px !important;
+  top: 2px !important;
+  bottom: 2px !important;
+  width: 3px !important;
+  border-radius: 3px;
 }
 .kiosk-flow .flow-arrow::after {
-  /* Override the border-triangle: clear the triangle borders, then draw
-     a chevron by re-applying only the right + bottom borders. The
-     element is rotated 45° so those two borders form a downward-pointing
-     V at the end of the line. */
-  top: auto !important;
-  bottom: 0 !important;
-  left: 50% !important;
-  width: 8px !important;
-  height: 8px !important;
-  border: none !important;
-  border-right: 2px solid var(--border-2) !important;
-  border-bottom: 2px solid var(--border-2) !important;
-  background: transparent !important;
-  transform: translateX(-50%) rotate(45deg) !important;
+  /* Hide the triangle inherited from the portrait @media rule. */
+  display: none !important;
 }
 .kiosk-flow .flow-arrow.active::after {
-  border-right-color: var(--to) !important;
-  border-bottom-color: var(--to) !important;
-  /* Defeat the inherited .flow-arrow.active::after { border-top-color }
-     rule from portrait — we don't have a top border to colour. */
-  border-top-color: transparent !important;
+  display: none !important;
 }
 .kiosk-flow .flow-arrow {
   position: absolute !important;
