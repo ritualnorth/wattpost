@@ -87,6 +87,16 @@ devices:
 #     url: https://example.com/wattpost-hook
 #     method: POST                                # default
 #     headers: { "X-Auth-Token": "..." }          # optional
+#
+#   - id: email_main
+#     type: smtp
+#     host: smtp.gmail.com
+#     port: 587                                   # 587 STARTTLS, 465 SSL
+#     username: alerts@example.com
+#     password: app-specific-password             # Gmail: create at myaccount.google.com/apppasswords
+#     from_addr: "WattPost <alerts@example.com>"
+#     to_addrs: [james@example.com, partner@example.com]
+#     use_starttls: true                          # default; set use_ssl on port 465 instead
 
 # Alert rules — evaluated after every poll. Metric is a dotted path
 # into the alert context (bank.soc_pct, bank.netW, bank.meanV,
