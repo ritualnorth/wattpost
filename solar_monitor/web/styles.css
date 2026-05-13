@@ -776,7 +776,9 @@ main {
 .kiosk-flow .flow-conn {
   position: relative;
   width: 100%;
-  height: 72px;
+  /* Squeeze the connectors when vertical space is tight (landscape
+     phone). On a tablet 72px is the right size. */
+  height: clamp(48px, 8vh, 72px);
   min-height: 0;
   align-self: stretch;
   padding: 0;
@@ -1604,7 +1606,12 @@ body.kiosk-active .route.kiosk-route.active {
   justify-content: center;
   height: 100vh;
   height: 100dvh;
-  padding: 2vh 4vw;
+  /* Respect notch / home-bar / status-bar so the donut doesn't clip
+     under iOS chrome. env() falls back to 0 on platforms without it. */
+  padding-top:    max(2vh, env(safe-area-inset-top));
+  padding-right:  max(4vw, env(safe-area-inset-right));
+  padding-bottom: max(2vh, env(safe-area-inset-bottom));
+  padding-left:   max(4vw, env(safe-area-inset-left));
   gap: 0;
 }
 .kiosk-stage {
@@ -1620,7 +1627,10 @@ body.kiosk-active .route.kiosk-route.active {
 }
 .kiosk-donut {
   position: relative;
-  width: min(46vh, 90vw, 460px);
+  /* Pick whichever axis is the constraint — a landscape phone is short
+     vertically, a portrait phone is narrow horizontally. The 80vw cap
+     gives the donut room to breathe in landscape where vh is tiny. */
+  width: min(55vh, 80vw, 460px);
   aspect-ratio: 1 / 1;
 }
 .kiosk-donut .hero-donut { width: 100%; height: 100%; display: block; }
@@ -1632,15 +1642,19 @@ body.kiosk-active .route.kiosk-route.active {
 }
 .kiosk-donut .donut-pct {
   font-family: var(--mono);
-  font-size: clamp(3.5rem, 11vh, 7rem);
+  font-size: clamp(2.6rem, 11vh, 7rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1;
+  /* "%" should hug "83.4" instead of wrapping to a new line when the
+     donut is small (landscape phone). The clamp floor also drops so the
+     two together stay shorter than the donut diameter. */
+  white-space: nowrap;
 }
 .kiosk-donut .donut-pct-unit {
-  font-size: clamp(1.4rem, 4vh, 2.4rem);
+  font-size: clamp(1rem, 4vh, 2.4rem);
   color: var(--text-2);
-  margin-left: .25rem;
+  margin-left: .2rem;
 }
 .kiosk-donut .donut-label {
   font-size: clamp(.8rem, 1.6vh, 1rem);
@@ -1659,9 +1673,13 @@ body.kiosk-active .route.kiosk-route.active {
   /* Reuse the existing flow strip components inside this host, but
      scale typography & padding up so the tiles read from a couch. */
   font-size: 1.15rem;
+  /* When the viewport is short (landscape phone), the column scrolls
+     internally instead of pushing content under the bottom chrome. */
+  max-height: 100%;
+  overflow-y: auto;
 }
 .kiosk-flow .flow-tile {
-  padding: 1.15rem 1.35rem;
+  padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
 }
 .kiosk-flow .flow-tile-power {
   font-size: clamp(1.6rem, 3.6vh, 2.4rem);
