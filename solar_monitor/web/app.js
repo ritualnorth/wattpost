@@ -2413,19 +2413,21 @@ async function tailscaleDisconnect() {
 // One-shot fetch on settings open; mutates inline when the user
 // clicks Edit / Save / Test. State stays in module-scope so we don't
 // re-fetch on every render.
-let integrationsState = { forecast: null, weather: null, editing: null };
-// editing: null | "forecast" | "weather"
+let integrationsState = { forecast: null, weather: null, cloud: null, editing: null };
+// editing: null | "forecast" | "weather" | "cloud"
 
 async function refreshIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
   try {
-    const [fc, wc] = await Promise.all([
+    const [fc, wc, cc] = await Promise.all([
       api("/api/forecast/config"),
       api("/api/weather/config"),
+      api("/api/cloud/config"),
     ]);
     integrationsState.forecast = fc;
     integrationsState.weather  = wc;
+    integrationsState.cloud    = cc;
   } catch (e) {
     host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
     return;
@@ -2449,9 +2451,15 @@ function renderIntegrationsPanel() {
     wireWeatherForm();
     return;
   }
+  if (integrationsState.editing === "cloud") {
+    host.innerHTML = renderCloudForm(integrationsState.cloud || {});
+    wireCloudForm();
+    return;
+  }
 
   const forecastConfigured = fc.configured;
   const weatherConfigured  = wc.configured;
+  const cloudConfigured    = (integrationsState.cloud || {}).configured;
   host.innerHTML = `
     <div class="integration-row" data-integration="solcast">
       <div class="integration-row-main">
@@ -2494,6 +2502,27 @@ function renderIntegrationsPanel() {
           ${weatherConfigured ? "Edit" : "Configure"}
         </button>
       </div>
+    </div>
+    <div class="integration-row" data-integration="cloud">
+      <div class="integration-row-main">
+        <div class="integration-row-head">
+          <span class="integration-row-name">WattPost cloud (wattpost.io)</span>
+          <span class="alerts-row-tag alerts-row-tag--${cloudConfigured ? "ok" : "warn"}">
+            ${cloudConfigured ? "paired" : "not paired"}
+          </span>
+        </div>
+        <div class="integration-row-sub">
+          ${cloudConfigured
+            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}`
+            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.io")}" target="_blank" rel="noopener">wattpost.io</a> account for the multi-site dashboard + offline alerts.`
+          }
+        </div>
+      </div>
+      <div class="integration-row-actions">
+        <button class="alerts-add-btn" data-edit-cloud>
+          ${cloudConfigured ? "Edit" : "Pair"}
+        </button>
+      </div>
     </div>`;
   $("[data-edit-forecast]")?.addEventListener("click", () => {
     integrationsState.editing = "forecast";
@@ -2503,6 +2532,140 @@ function renderIntegrationsPanel() {
     integrationsState.editing = "weather";
     renderIntegrationsPanel();
   });
+  $("[data-edit-cloud]")?.addEventListener("click", () => {
+    integrationsState.editing = "cloud";
+    renderIntegrationsPanel();
+  });
+}
+
+function renderCloudForm(cc) {
+  const paired = !!cc.configured;
+  const endpoint = cc.endpoint || "https://wattpost.io";
+  return `
+    <form class="alerts-form" data-form="cloud">
+      <div class="alerts-form-grid">
+        <label class="alerts-field-wide">Cloud endpoint
+          <input type="url" name="endpoint" value="${endpoint}" required placeholder="https://wattpost.io"/>
+        </label>
+        <label>Heartbeat (minutes)
+          <input type="number" name="heartbeat_minutes" value="${cc.heartbeat_minutes ?? 5}" min="1" max="60" required/>
+        </label>
+      </div>
+      ${paired ? `
+        <p class="settings-foot">
+          Paired as <strong>${cc.label || "—"}</strong>${cc.appliance_id ? ` (#${cc.appliance_id})` : ""}.
+          Save changes the endpoint or cadence; Send heartbeat now to confirm
+          the cloud sees this appliance; Disable to unpair.
+        </p>
+        <div class="alerts-form-actions">
+          <button type="submit" class="btn-action btn-action--primary">Save</button>
+          <button type="button" class="btn-action" data-test-cloud>Send heartbeat now</button>
+          <button type="button" class="btn-action alerts-icon-btn--danger" data-unpair-cloud>Disable</button>
+          <button type="button" class="btn-action" data-cancel-cloud>Cancel</button>
+          <span class="alerts-form-status"></span>
+        </div>` : `
+        <label class="alerts-field-wide">Pairing code
+          <input type="text" name="code" placeholder="e.g. 8MR7EYS6" required pattern="[A-Za-z0-9]{6,12}"
+                 maxlength="12" autocomplete="off" style="text-transform:uppercase; letter-spacing:.12em;"/>
+        </label>
+        <p class="settings-foot">
+          Sign in at <a href="${endpoint}" target="_blank" rel="noopener">${endpoint.replace(/^https?:\/\//, "")}</a>,
+          click <strong>+ Add appliance</strong>, paste the 8-character code here, hit Pair.
+          Codes expire after 10 minutes.
+        </p>
+        <div class="alerts-form-actions">
+          <button type="submit" class="btn-action btn-action--primary">Pair</button>
+          <button type="button" class="btn-action" data-cancel-cloud>Cancel</button>
+          <span class="alerts-form-status"></span>
+        </div>`}
+    </form>`;
+}
+
+function wireCloudForm() {
+  const form = document.querySelector("form[data-form='cloud']");
+  if (!form) return;
+  const paired = !!(integrationsState.cloud || {}).configured;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    paired ? saveCloudConfig(form) : pairCloud(form);
+  });
+  form.querySelector("[data-cancel-cloud]")?.addEventListener("click", () => {
+    integrationsState.editing = null;
+    renderIntegrationsPanel();
+  });
+  form.querySelector("[data-test-cloud]")?.addEventListener("click", () => testCloudHeartbeat(form));
+  form.querySelector("[data-unpair-cloud]")?.addEventListener("click", () => unpairCloud(form));
+}
+
+async function pairCloud(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Pairing…"; status.className = "alerts-form-status";
+  const payload = {
+    endpoint: form.elements["endpoint"].value.trim(),
+    code:     form.elements["code"].value.trim().toUpperCase(),
+  };
+  try {
+    const r = await fetch("/api/cloud/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    status.textContent = `✓ Paired (${d.label || "—"} #${d.appliance_id}). Restart daemon for heartbeats to start.`;
+    status.classList.add("ok");
+    setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 1500);
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add("err");
+  }
+}
+
+async function saveCloudConfig(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  const payload = {
+    endpoint: form.elements["endpoint"].value.trim(),
+    heartbeat_minutes: parseInt(form.elements["heartbeat_minutes"].value, 10),
+  };
+  try {
+    const r = await fetch("/api/cloud/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function testCloudHeartbeat(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Sending…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/cloud/heartbeat", { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    if (d.ok) { status.textContent = "✓ Heartbeat accepted"; status.classList.add("ok"); }
+    else      { status.textContent = "Cloud rejected the heartbeat — check the daemon log"; status.classList.add("err"); }
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function unpairCloud() {
+  if (!confirm("Unpair from wattpost.io? Cloud heartbeats stop and the local dashboard is unaffected.")) return;
+  try {
+    const r = await fetch("/api/cloud/unpair", { method: "POST" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { alert(e.message); }
 }
 
 function renderWeatherForm(wc) {

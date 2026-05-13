@@ -9,6 +9,14 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- WattPost cloud (wattpost.io) — opt-in. Pair the appliance to a
+  cloud account from Settings → Integrations → WattPost cloud,
+  paste an 8-character code, daemon exchanges it for a long-lived
+  bearer token and starts pushing 5-minute heartbeats. Cloud's
+  multi-site dashboard shows online/offline per appliance and
+  flags overdue heartbeats. Local appliance keeps working with
+  no internet, no cloud, no account — strictly additive.
+
 - Solcast PV forecast: configurable in Settings → Integrations
   (user supplies their own free API key + resource UUID), polled
   every 3h by default, overlaid as a dashed line on the History
