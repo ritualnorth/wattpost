@@ -348,6 +348,33 @@ def index() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
+@get("/sw.js", sync_to_thread=False)
+def service_worker() -> File:
+    """Service worker must be served from the path it claims scope over
+    — at /sw.js it can intercept the whole site, at /web/sw.js it could
+    only see /web/* requests. So we mirror the file at the root.
+    Cache-Control: no-cache so a deployed SW update propagates next
+    refresh instead of being held by the browser for a week."""
+    path = _web_dir() / "sw.js"
+    return File(
+        path=path, media_type="application/javascript",
+        content_disposition_type="inline",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@get("/manifest.webmanifest", sync_to_thread=False)
+def manifest() -> File:
+    """Mirror the manifest at root too so PWA install prompts find it
+    without the /web/ prefix (some Android Chrome versions are picky)."""
+    path = _web_dir() / "manifest.webmanifest"
+    return File(
+        path=path,
+        media_type="application/manifest+json",
+        content_disposition_type="inline",
+    )
+
+
 def build_app(
     config: Config,
     db_path: str,
@@ -403,6 +430,8 @@ def build_app(
             tailscale_status,
             tailscale_up,
             tailscale_down,
+            service_worker,
+            manifest,
             create_rule,
             update_rule,
             delete_rule,

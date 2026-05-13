@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background — same brand-blue tint as the dashboard accent. Rounded
+       corners look natural in iOS's auto-mask, square works for
+       maskable on Android. -->
+  <rect width="512" height="512" rx="96" fill="#0a0d12"/>
+  <g transform="translate(96 96) scale(13.3)" stroke="#58a6ff" stroke-width="2"
+     fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Sign panel -->
+    <rect x="2" y="3" width="20" height="12" rx="1"/>
+    <!-- Two legs -->
+    <line x1="7" y1="15" x2="7" y2="22"/>
+    <line x1="17" y1="15" x2="17" y2="22"/>
+    <!-- Lightning bolt centred on the panel -->
+    <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z" fill="#58a6ff" stroke="none"/>
+  </g>
+</svg>

@@ -27,4 +27,11 @@ build-backend = "setuptools.build_meta"
 include = ["solar_monitor*"]
 
 [tool.setuptools.package-data]
-solar_monitor = ["web/*.html", "web/*.css", "web/*.js"]
+solar_monitor = [
+    "web/*.html",
+    "web/*.css",
+    "web/*.js",
+    "web/*.webmanifest",
+    "web/*.svg",
+    "web/*.png",
+]

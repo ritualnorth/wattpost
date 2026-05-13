@@ -1760,6 +1760,7 @@ const TRANSPORT_TYPES = [
   { value: "discord_webhook", label: "Discord",     keyField: "url",   placeholder: "https://discord.com/api/webhooks/…" },
   { value: "webhook",         label: "Webhook",     keyField: "url",   placeholder: "https://example.com/hook" },
   { value: "smtp",            label: "Email (SMTP)",keyField: "host",  placeholder: "smtp.gmail.com" },
+  { value: "mqtt",            label: "MQTT (LAN)",  keyField: "host",  placeholder: "127.0.0.1" },
 ];
 
 let alertsState = { rules: [], transports: [], editing: null };  // editing: {type:'rule'|'transport', id, mode:'edit'|'add'}
@@ -1988,6 +1989,15 @@ function transportTypeFields(type, cfg) {
         <label class="alerts-field-wide">To (comma-separated) <input type="text" name="to_addrs" value="${(cfg.to_addrs || []).join(", ")}" required /></label>
         <label class="alerts-checkbox"><input type="checkbox" name="use_starttls" ${cfg.use_starttls !== false ? "checked" : ""}/> STARTTLS</label>
         <label class="alerts-checkbox"><input type="checkbox" name="use_ssl" ${cfg.use_ssl ? "checked" : ""}/> SSL (port 465)</label>`;
+    case "mqtt":
+      return `
+        <label>Broker host <input type="text" name="host" value="${v("host", "127.0.0.1")}" required placeholder="127.0.0.1"/></label>
+        <label>Port <input type="number" name="port" value="${v("port", "1883")}" required /></label>
+        <label>Username <input type="text" name="username" value="${v("username")}" /></label>
+        <label>Password <input type="password" name="password" value="${cfg.password === "****" ? "" : v("password")}" placeholder="${cfg.password === "****" ? "(unchanged)" : ""}"/></label>
+        <label class="alerts-field-wide">Topic prefix <input type="text" name="topic_prefix" value="${v("topic_prefix", "wattpost/alerts")}" placeholder="wattpost/alerts"/></label>
+        <label>QoS <input type="number" name="qos" value="${v("qos", "1")}" min="0" max="2"/></label>
+        <label class="alerts-checkbox"><input type="checkbox" name="retain" ${cfg.retain ? "checked" : ""}/> Retain</label>`;
     default:
       return "";
   }

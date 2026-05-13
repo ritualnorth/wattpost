@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0a0d12" id="meta-theme-color" />
   <title>WattPost</title>
+  <!-- PWA: install-to-home-screen + offline shell. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/web/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/web/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="WattPost" />
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
   <!-- Resolve theme before stylesheets paint so there's no flash of the
        wrong palette. The preference is "system" | "dark" | "light";
        in "system" mode we honour prefers-color-scheme. -->
@@ -22,7 +36,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=76" />
+  <link rel="stylesheet" href="/web/styles.css?v=77" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -499,6 +513,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=76"></script>
+  <script src="/web/app.js?v=77"></script>
 </body>
 </html>
