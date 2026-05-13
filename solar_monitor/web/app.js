@@ -1462,8 +1462,17 @@ async function refreshDriftSparkline() {
       ],
       axes: [
         { stroke: pal.axis, grid: { stroke: pal.grid }, space: 80, size: 18 },
-        { stroke: pal.axis, grid: { stroke: pal.grid }, size: 36,
-          values: (_u, splits) => splits.map(v => v == null ? "" : `${(v*1000).toFixed(0)} mV`) },
+        {
+          stroke: pal.axis, grid: { stroke: pal.grid },
+          // Auto-size the gutter to the longest rendered label so
+          // "100 mV" doesn't clip to " mV" the way it did at size:36.
+          size: (u, values) => {
+            if (!values || !values.length) return 56;
+            const longest = values.reduce((m, s) => Math.max(m, (s || "").length), 0);
+            return Math.max(44, Math.min(96, longest * 7.5 + 14));
+          },
+          values: (_u, splits) => splits.map(v => v == null ? "" : `${(v*1000).toFixed(0)} mV`),
+        },
       ],
     }, [data.ts, data.values], root);
   } catch (e) { console.error("drift sparkline:", e); }
