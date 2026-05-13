@@ -920,12 +920,15 @@ main {
 }
 /* Portrait connector's vertical-dot keyframes — defined at the top level
    (not inside the @media block) because Safari ≤17 is finicky about
-   resolving keyframes references that are scoped to a conditional rule. */
+   resolving keyframes references that are scoped to a conditional rule.
+   The 9px reservation at the end was 22px when there was a down-
+   triangle to leave room for; now that the triangle is gone the dot
+   should travel until its bottom touches the line's bottom. */
 @keyframes flow-dot-v {
-  from { top: 0%;            opacity: 0; }
-  10%  {                     opacity: 1; }
-  90%  {                     opacity: 1; }
-  to   { top: calc(100% - 22px); opacity: 0; }
+  from { top: 0;                 opacity: 0; }
+  8%   {                         opacity: 1; }
+  92%  {                         opacity: 1; }
+  to   { top: calc(100% - 9px);  opacity: 0; }
 }
 .flow-arrow-label {
   font-family: var(--mono);
