@@ -59,6 +59,9 @@
   --chart-amber-fill: rgba(210,153,34,0.15);
   --body-bg-glow-1: rgba(88,166,255,0.06);
   --body-bg-glow-2: rgba(63,185,80,0.04);
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(63,185,80,0.85);
+  --donut-pulse-discharging-glow: rgba(210,153,34,0.85);
 
   /* Type */
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
@@ -118,7 +121,15 @@
   --chart-amber-fill: rgba(154,103,0,0.12);
   --body-bg-glow-1:   rgba(9,105,218,0.05);
   --body-bg-glow-2:   rgba(26,127,55,0.04);
+  /* In light mode pure white would just look like a gap in the ring, so
+     we use a saturated mid-tone of the action color that's clearly
+     lighter than the ring stroke. */
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
+  --donut-pulse-discharging-glow: rgba(154,103,0,0.7);
 }
+[data-theme="light"] #donut-wrap.charging .donut-pulse    { stroke: #5dd373; }
+[data-theme="light"] #donut-wrap.discharging .donut-pulse { stroke: #f1b73a; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -371,16 +382,21 @@ main {
   opacity: 0;
   transition: opacity 0.4s ease;
 }
+/* Pulse runs on top of the donut arc. We deliberately don't use --green /
+   --amber for the stroke itself — they're the *ring* colors and the pulse
+   would disappear against them. Use a near-white core so the pip is
+   visible in both themes, and tint the glow with the action color so it
+   still reads as "charging" or "discharging" at a glance. */
 #donut-wrap.charging .donut-pulse {
-  stroke: var(--green);
-  opacity: 0.9;
-  filter: drop-shadow(0 0 6px rgba(63,185,80,0.8));
+  stroke: var(--donut-pulse-stroke);
+  opacity: 0.95;
+  filter: drop-shadow(0 0 5px var(--donut-pulse-charging-glow));
   animation: pulse-cw 3.5s linear infinite;
 }
 #donut-wrap.discharging .donut-pulse {
-  stroke: var(--amber);
-  opacity: 0.9;
-  filter: drop-shadow(0 0 6px rgba(210,153,34,0.8));
+  stroke: var(--donut-pulse-stroke);
+  opacity: 0.95;
+  filter: drop-shadow(0 0 5px var(--donut-pulse-discharging-glow));
   animation: pulse-ccw 3.5s linear infinite;
 }
 @keyframes pulse-cw  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
