@@ -55,6 +55,24 @@ class BleModbusTransport(Transport):
     async def open(self) -> None:
         if self._client is not None and self._client.is_connected:
             return
+        try:
+            await self._open_once()
+            return
+        except TransportError as e:
+            # Most common cause of a "not advertising" timeout right
+            # after the daemon restarts is BlueZ still holding the
+            # previous Python process's connection — the dongle won't
+            # re-advertise until that's cleared. Kick it via DBus and
+            # try one more time before giving up.
+            log.warning("[%s] %s — trying to clear stale BlueZ state",
+                        self.id, e)
+            try:
+                await self._bluez_force_disconnect()
+            except Exception:
+                pass
+            await self._open_once()
+
+    async def _open_once(self) -> None:
         log.info("[%s] discovering %s", self.id, self.address)
         dev = await BleakScanner.find_device_by_address(
             self.address, timeout=self.discovery_timeout
@@ -70,6 +88,30 @@ class BleModbusTransport(Transport):
             raise TransportError(f"failed to connect to {self.address}")
         await self._client.start_notify(self.notify_char, self._on_notify)
         log.info("[%s] connected", self.id)
+
+    async def _bluez_force_disconnect(self) -> None:
+        """When BlueZ thinks a device is still connected (to a Python
+        process that's gone), the device won't re-advertise. Sending it
+        an explicit disconnect via DBus releases the cached connection
+        so the next discovery sees it again. Idempotent — no-op if the
+        device isn't tracked or already disconnected.
+
+        Implemented as a subprocess `bluetoothctl disconnect <MAC>`
+        rather than reaching into bleak's DBus internals — works
+        across bleak versions and easier to reason about."""
+        import asyncio
+        proc = await asyncio.create_subprocess_exec(
+            "bluetoothctl", "disconnect", self.address,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=5.0)
+        except asyncio.TimeoutError:
+            proc.kill()
+        # Brief pause so BlueZ surfaces the released state to its scan
+        # cache before our next discover() reads it.
+        await asyncio.sleep(1.0)
 
     async def close(self) -> None:
         if self._client is None:
