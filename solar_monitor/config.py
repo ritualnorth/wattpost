@@ -86,6 +86,14 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     appliance_id:      int | None = None
     label:             str  = ""
     heartbeat_minutes: int  = 5
+    # Cloudflare Tunnel credentials, returned by the cloud's
+    # /api/pair/exchange when the cloud has CF API access. Empty
+    # when the cloud hasn't yet had CF credentials configured
+    # (development, or pre-launch production) — appliance still
+    # works locally + pushes heartbeats, just doesn't expose itself
+    # over the tunnel.
+    tunnel_token:      str  = ""
+    tunnel_hostname:   str  = ""
 
 
 class WeatherCfg(msgspec.Struct, kw_only=True):

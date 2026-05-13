@@ -16,6 +16,7 @@ from .alerts import AlertEngine, AlertRule
 from .forecast import ForecastService
 from .weather import WeatherService
 from .cloud import CloudService
+from .tunnel import TunnelService
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -91,6 +92,17 @@ class PollScheduler:
                 self._cloud = CloudService(config.cloud, self)
             except Exception:
                 log.exception("cloud heartbeat service failed to initialise")
+
+        # Outbound Cloudflare Tunnel — exposes the local dashboard at
+        # `<slug>.wattpost.io`. Only spun up when the cloud has issued
+        # a tunnel token at pair time AND cloudflared is on PATH.
+        # Off entirely otherwise; appliance keeps working locally.
+        self._tunnel: TunnelService | None = None
+        if config.cloud is not None and TunnelService.is_available(config.cloud):
+            try:
+                self._tunnel = TunnelService(config.cloud)
+            except Exception:
+                log.exception("tunnel service failed to initialise")
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -181,6 +193,8 @@ class PollScheduler:
             await self._weather.start()
         if self._cloud is not None:
             await self._cloud.start()
+        if self._tunnel is not None:
+            await self._tunnel.start()
 
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
@@ -232,6 +246,8 @@ class PollScheduler:
             await self._weather.stop()
         if self._cloud is not None:
             await self._cloud.stop()
+        if self._tunnel is not None:
+            await self._tunnel.stop()
 
         log.info("scheduler stopped")
 
