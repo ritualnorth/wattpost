@@ -11,6 +11,9 @@ dependencies = [
     "litestar[standard]>=2.13",
     "aiosqlite>=0.20",
     "uvicorn>=0.30",
+    "aiomqtt>=2.0",        # MQTT exporter + (future) MQTT-publish alert transport
+    "httpx>=0.27",         # ntfy / Discord / generic-webhook alert transports
+    "aiosmtplib>=4.0",     # SMTP alert transport
 ]
 
 [project.scripts]
