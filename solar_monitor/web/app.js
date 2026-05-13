@@ -2514,7 +2514,7 @@ function renderIntegrationsPanel() {
     <div class="integration-row" data-integration="cloud">
       <div class="integration-row-main">
         <div class="integration-row-head">
-          <span class="integration-row-name">WattPost cloud (wattpost.io)</span>
+          <span class="integration-row-name">WattPost cloud (app.wattpost.io)</span>
           <span class="alerts-row-tag alerts-row-tag--${cloudConfigured ? "ok" : "warn"}">
             ${cloudConfigured ? "paired" : "not paired"}
           </span>
@@ -2522,7 +2522,7 @@ function renderIntegrationsPanel() {
         <div class="integration-row-sub">
           ${cloudConfigured
             ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}`
-            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.io")}" target="_blank" rel="noopener">wattpost.io</a> account for the multi-site dashboard + offline alerts.`
+            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://app.wattpost.io")}" target="_blank" rel="noopener">app.wattpost.io</a> account for the multi-site dashboard + offline alerts.`
           }
         </div>
       </div>
@@ -2718,12 +2718,12 @@ async function disableMqtt() {
 
 function renderCloudForm(cc) {
   const paired = !!cc.configured;
-  const endpoint = cc.endpoint || "https://wattpost.io";
+  const endpoint = cc.endpoint || "https://app.wattpost.io";
   return `
     <form class="alerts-form" data-form="cloud">
       <div class="alerts-form-grid">
         <label class="alerts-field-wide">Cloud endpoint
-          <input type="url" name="endpoint" value="${endpoint}" required placeholder="https://wattpost.io"/>
+          <input type="url" name="endpoint" value="${endpoint}" required placeholder="https://app.wattpost.io"/>
         </label>
         <label>Heartbeat (minutes)
           <input type="number" name="heartbeat_minutes" value="${cc.heartbeat_minutes ?? 5}" min="1" max="60" required/>
@@ -2745,7 +2745,7 @@ function renderCloudForm(cc) {
         <details class="alerts-repair">
           <summary>Pair with a different account…</summary>
           <p class="settings-foot">
-            Paste a pairing code from the (new) wattpost.io account. Submitting will
+            Paste a pairing code from the (new) app.wattpost.io account. Submitting will
             replace the existing pairing — this appliance's old row stays on the
             previous account until that user removes it.
           </p>
@@ -2878,7 +2878,7 @@ async function testCloudHeartbeat(form) {
 }
 
 async function unpairCloud() {
-  if (!confirm("Unpair from wattpost.io? Cloud heartbeats stop and the local dashboard is unaffected.")) return;
+  if (!confirm("Unpair from app.wattpost.io? Cloud heartbeats stop and the local dashboard is unaffected.")) return;
   try {
     const r = await fetch("/api/cloud/unpair", { method: "POST" });
     if (!r.ok) {
