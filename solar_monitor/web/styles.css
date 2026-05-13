@@ -1389,6 +1389,69 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .tomorrow-spark svg { display: block; width: 100%; }
 
+/* 7-day outlook strip: horizontal row of day-cards under the
+ * Tomorrow tile. Tomorrow's card is highlighted with a slightly
+ * brighter border so it reads as the "you are here" of the week.
+ * Cards scroll horizontally on narrow screens rather than wrapping —
+ * a 7-card row that wraps to 2 rows of 3+4 looks worse than one row
+ * the user can swipe. */
+.week-panel { border-color: rgba(210,153,34,0.18); }
+.week-panel .panel-header h2 .h-icon { color: var(--amber); }
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  gap: .55rem;
+  overflow-x: auto;
+  padding-bottom: .15rem;     /* room for any horizontal scrollbar */
+}
+@media (max-width: 720px) {
+  .week-strip {
+    grid-template-columns: repeat(7, 130px);   /* fixed width so it scrolls cleanly */
+  }
+}
+.week-card {
+  display: flex; flex-direction: column;
+  padding: .5rem .6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.week-card--featured {
+  border-color: rgba(210,153,34,0.55);
+  background: rgba(210,153,34,0.06);
+}
+.week-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .35rem;
+}
+.week-card-day {
+  font-weight: 600; font-size: .82rem; color: var(--text);
+  white-space: nowrap;
+}
+.week-card-date {
+  font-size: .68rem; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.week-card-spark {
+  margin: .35rem 0 .35rem;
+  height: 32px;
+  display: flex; align-items: stretch;
+}
+.week-card-spark svg { width: 100%; }
+.week-card-num {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+.week-card-num .meta-k { font-size: .68rem; font-family: inherit; }
+.week-card-foot {
+  font-size: .68rem; color: var(--text-2); margin-top: .2rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 /* Empty-state nudge for users without Solcast set up. Mid-weight —
  * present enough to be discovered, polite enough to be ignored. */
 .tomorrow-empty {

@@ -318,6 +318,7 @@ function applySnapshot(frame) {
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
   renderTomorrow();
+  renderWeek();
   renderCells();
   renderDeviceCards();
   populateChartSelectors();
@@ -887,6 +888,26 @@ async function ensureForecast(force = false) {
   return forecastData;
 }
 
+// Group forecast points into per-day buckets keyed by midnight epoch
+// (local time). Each bucket gets { wh: total energy, peak: {ts, w},
+// points: [...] }. Used by the 7-day outlook strip.
+function bucketByDay(points) {
+  const buckets = new Map();   // dayMid -> bucket
+  for (const p of points || []) {
+    const d = new Date((p.ts - 900) * 1000);   // slice mid-point
+    d.setHours(0, 0, 0, 0);
+    const dayMid = Math.floor(d.getTime() / 1000);
+    let b = buckets.get(dayMid);
+    if (!b) { b = { dayMid, wh: 0, peak: null, points: [] };
+              buckets.set(dayMid, b); }
+    const w = p.pv_w || 0;
+    b.wh += w * 0.5;
+    b.points.push({ ts: p.ts, w });
+    if (!b.peak || w > b.peak.w) b.peak = { ts: p.ts, w };
+  }
+  return [...buckets.values()].sort((a, b) => a.dayMid - b.dayMid);
+}
+
 // Bucket forecast points by local calendar day; returns
 // { todayWh, tomorrowWh, dayAfterWh, tomorrowPeak: {ts, w} | null,
 //   tomorrowPoints: [{ts, w}], dayAfterPoints: [...] }
@@ -975,6 +996,72 @@ function renderTomorrow() {
     $("#tomorrow-sub").textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
     drawTomorrowSpark(s.tomorrowPoints);
   });
+}
+
+// ---------- 7-DAY OUTLOOK STRIP ----------
+function renderWeek() {
+  const panel = $("#week-panel");
+  if (!panel) return;
+  ensureForecast().then(f => {
+    if (!f) { panel.hidden = true; return; }
+    const buckets = bucketByDay(f.points);
+    // Drop any buckets with no real energy — Solcast's window can
+    // include an in-progress past day that gives 0 kWh.
+    const days = buckets.filter(b => b.wh > 0).slice(0, 7);
+    if (days.length === 0) { panel.hidden = true; return; }
+    panel.hidden = false;
+    $("#week-sub").textContent = `${days.length}-day outlook · refreshed ${fmt.ago(f.fetched_at)}`;
+    drawWeekStrip(days);
+  });
+}
+
+function drawWeekStrip(days) {
+  const host = $("#week-strip");
+  if (!host) return;
+  // Common scale across all day cards so a quiet day visually reads
+  // as quiet next to a sunny one — otherwise each card auto-fits its
+  // own peak and the comparison loses meaning.
+  const peakWAcrossWeek = Math.max(...days.flatMap(d => d.points.map(p => p.w)), 1);
+  const todayMid = (() => { const d = new Date(); d.setHours(0,0,0,0); return Math.floor(d.getTime()/1000); })();
+  host.innerHTML = days.map(d => {
+    let label;
+    if (d.dayMid === todayMid) label = "Today";
+    else if (d.dayMid === todayMid + 86400) label = "Tomorrow";
+    else label = new Date(d.dayMid * 1000).toLocaleDateString([], { weekday: "short" });
+    const dateLabel = new Date(d.dayMid * 1000).toLocaleDateString([], { day: "numeric", month: "short" });
+    const kwh = (d.wh / 1000).toFixed(1);
+    const peakKw = d.peak ? (d.peak.w / 1000).toFixed(2) : "—";
+    const peakAt = d.peak ? new Date(d.peak.ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "";
+    const isTomorrow = d.dayMid === todayMid + 86400;
+    return `
+      <div class="week-card ${isTomorrow ? "week-card--featured" : ""}">
+        <div class="week-card-head">
+          <span class="week-card-day">${label}</span>
+          <span class="week-card-date">${dateLabel}</span>
+        </div>
+        <div class="week-card-spark">${weekSparkSvg(d.points, peakWAcrossWeek)}</div>
+        <div class="week-card-num">${kwh} <span class="meta-k">kWh</span></div>
+        <div class="week-card-foot">peak ${peakKw} kW${peakAt ? " · " + peakAt : ""}</div>
+      </div>`;
+  }).join("");
+}
+
+function weekSparkSvg(points, peakWAcrossWeek) {
+  if (!points.length) return "";
+  const W = 100, H = 32, padX = 2, padY = 2;
+  const t0 = points[0].ts, tN = points[points.length - 1].ts;
+  const span = Math.max(1, tN - t0);
+  const pts = points.map(p => {
+    const x = padX + ((p.ts - t0) / span) * (W - 2*padX);
+    const y = H - padY - (p.w / peakWAcrossWeek) * (H - 2*padY);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const area = `M${padX},${H - padY} L ${pts} L ${W - padX},${H - padY} Z`;
+  return `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
+      <path d="${area}" fill="rgba(210,153,34,0.18)"/>
+      <polyline points="${pts}" fill="none" stroke="#d29922" stroke-width="1.4" stroke-linejoin="round"/>
+    </svg>`;
 }
 
 function drawTomorrowSpark(points) {
@@ -1678,34 +1765,57 @@ function drawChart(label, metric, data, forecast = null) {
   dataCols.push(vals);
 
   // Build the combined timeline including forecast points so the X
-  // axis extends into the future. The forecast series is null for
-  // historic timestamps and carries values for future-only ones; the
-  // historic series is null beyond `ts[-1]`.
+  // axis extends into the future. Historic columns get null-padded
+  // past their last sample so all series share one X axis. The
+  // forecast contributes up to three series:
+  //   - p10 (invisible anchor, lower band edge)
+  //   - p90 (invisible anchor, upper band edge)
+  //   - median (the dashed line the user actually sees)
+  // The fill between p10 and p90 visualises Solcast's stated
+  // confidence interval — a wide band means the forecast model
+  // isn't sure, a narrow one means high confidence.
   let combinedTs = ts.slice();
   if (forecastFuture.length) {
     const lastHistoric = ts.length ? ts[ts.length - 1] : 0;
     const fTs = forecastFuture.map(p => p.ts).filter(t => t > lastHistoric);
     combinedTs = combinedTs.concat(fTs);
-    // Pad existing data columns so all arrays stay in lockstep with
-    // combinedTs length.
     const pad = new Array(fTs.length).fill(null);
     for (let i = 1; i < dataCols.length; i++) {
       dataCols[i] = dataCols[i].concat(pad);
     }
-    // Forecast series: null for the historic portion, then the future values.
-    const forecastCol = new Array(ts.length).fill(null);
+    const histPad = new Array(ts.length).fill(null);
+    const forecastCol = histPad.slice();
+    const p10Col      = histPad.slice();
+    const p90Col      = histPad.slice();
     const fTsSet = new Set(fTs);
+    const hasBand = forecastFuture.some(p =>
+      p.pv_w_p10 != null && p.pv_w_p90 != null
+    );
     for (const p of forecastFuture) {
       if (!fTsSet.has(p.ts)) continue;
       forecastCol.push(p.pv_w);
+      p10Col.push(p.pv_w_p10 ?? null);
+      p90Col.push(p.pv_w_p90 ?? null);
+    }
+    if (hasBand) {
+      const p10Idx = series.length;
+      series.push({
+        label: "p10", stroke: "transparent", width: 0, points: { show: false },
+        value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+      });
+      const p90Idx = series.length;
+      series.push({
+        label: "p90", stroke: "transparent", width: 0, points: { show: false },
+        value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+      });
+      dataCols.push(p10Col, p90Col);
+      bands = bands.concat([{ series: [p90Idx, p10Idx], fill: "rgba(210,153,34,0.13)" }]);
     }
     series.push({
       label: "forecast",
       stroke: pal.amber || "#d29922",
       width: 2,
-      // uPlot accepts a dash pattern via canvas-style `dash` option.
       dash: [6, 4],
-      fill: "rgba(210,153,34,0.10)",
       points: { show: false },
       value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
     });

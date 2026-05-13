@@ -222,6 +222,21 @@
         <div class="tomorrow-spark" id="tomorrow-spark" aria-hidden="true"></div>
       </section>
 
+      <!-- 7-DAY OUTLOOK (PV forecast — hidden until first fetch lands) -->
+      <section class="panel week-panel" id="week-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="17" rx="2"/>
+              <path d="M3 9h18M8 2v4M16 2v4"/>
+            </svg>
+            7-day outlook
+          </h2>
+          <div class="panel-sub" id="week-sub">—</div>
+        </div>
+        <div class="week-strip" id="week-strip"></div>
+      </section>
+
       <!-- TOMORROW EMPTY STATE (shown when no forecast is configured) -->
       <section class="panel tomorrow-empty" id="tomorrow-empty" hidden>
         <button class="tomorrow-empty-close" id="tomorrow-empty-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
