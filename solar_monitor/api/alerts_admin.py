@@ -28,7 +28,7 @@ from litestar.exceptions import HTTPException, NotFoundException
 
 from ..alerts import AlertRule
 from ..alerts.registry import NOTIFICATION_TRANSPORTS
-from ..config import AlertRuleCfg, Config
+from ..config import AlertRuleCfg, Config, QuietHoursCfg
 from ..scheduler import PollScheduler
 
 log = logging.getLogger(__name__)
@@ -313,3 +313,56 @@ async def delete_transport(transport_id: str, state: State) -> dict[str, Any]:
     _save_config(config_path, _mutate)
     log.info("notification transport deleted: %s", transport_id)
     return {"ok": True, "id": transport_id, "restart_required": True}
+
+
+# ---------- quiet hours CRUD ----------
+
+class QuietHoursPayload(msgspec.Struct, kw_only=True):
+    # `null` for either field disables quiet hours. We accept both
+    # ints and null so the UI can clear the window with one PUT.
+    start_hour: int | None = None
+    end_hour: int | None = None
+
+
+@put("/api/alerts/quiet_hours")
+async def update_quiet_hours(
+    data: QuietHoursPayload, state: State,
+) -> dict[str, Any]:
+    """Set or clear the quiet-hours window. Clearing requires
+    null/null (or equal start==end, which the engine treats as
+    disabled). The engine reads `quiet_hours` only at boot; runtime
+    changes return `restart_required: true` so the UI can prompt."""
+    config: Config = state["config"]
+    config_path: str = state.get("config_path", "config.yaml")
+
+    enabled = data.start_hour is not None and data.end_hour is not None
+    if enabled:
+        for v, name in ((data.start_hour, "start_hour"), (data.end_hour, "end_hour")):
+            if not (0 <= v <= 23):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"{name} must be in [0, 23]; got {v}",
+                )
+
+    new_qh = (
+        QuietHoursCfg(start_hour=data.start_hour, end_hour=data.end_hour)
+        if enabled else None
+    )
+    config.quiet_hours = new_qh
+
+    def _mutate(raw):
+        if enabled:
+            raw["quiet_hours"] = {
+                "start_hour": data.start_hour,
+                "end_hour":   data.end_hour,
+            }
+        else:
+            raw.pop("quiet_hours", None)
+        return raw
+
+    _save_config(config_path, _mutate)
+    log.info(
+        "quiet hours updated: %s",
+        f"{data.start_hour}..{data.end_hour}" if enabled else "disabled",
+    )
+    return {"ok": True, "restart_required": True}
