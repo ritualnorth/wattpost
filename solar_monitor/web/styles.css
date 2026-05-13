@@ -859,17 +859,12 @@ main {
 .kiosk-flow .flow-arrow.active::after {
   border-top-color: var(--to) !important;
 }
+/* The 9px haloed dot rendered as a chunky pin at the top of the
+   connector — its glow leaked into the tile above and dominated the
+   whole connector. At kiosk distance the colour-graded line +
+   chevron already convey direction; the dot is noise. Hide it. */
 .kiosk-flow .flow-conn .flow-arrow.active .dot {
-  width: 9px; height: 9px;
-  background: var(--to);
-  box-shadow: 0 0 12px var(--to);
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  animation: flow-dot-v 1.8s linear infinite;
-}
-.kiosk-flow .flow-conn .flow-arrow.reverse .dot {
-  animation-direction: reverse;
+  display: none;
 }
 .kiosk-flow .flow-arrow-label {
   position: absolute;
