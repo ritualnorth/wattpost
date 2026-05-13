@@ -5,3 +5,4 @@ from . import discord     # noqa: F401
 from . import webhook     # noqa: F401
 from . import smtp        # noqa: F401
 from . import mqtt        # noqa: F401
+from . import pushover    # noqa: F401

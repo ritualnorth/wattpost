@@ -198,7 +198,8 @@ async def list_alerts(state: State) -> dict[str, Any]:
     live_ids = set(scheduler._alerts.transport_ids)
 
     def _sanitise(cfg: dict) -> dict:
-        sensitive = {"password", "secret", "token", "api_key"}
+        sensitive = {"password", "secret", "token", "api_key",
+                     "app_token", "user_key"}
         return {
             k: ("****" if k.lower() in sensitive else v)
             for k, v in cfg.items()

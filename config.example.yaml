@@ -97,6 +97,12 @@ devices:
 #     from_addr: "WattPost <alerts@example.com>"
 #     to_addrs: [james@example.com, partner@example.com]
 #     use_starttls: true                          # default; set use_ssl on port 465 instead
+#
+#   - id: pushover_main
+#     type: pushover
+#     app_token: azGDORePK8gMaC0QOYAMyEEuzJnyUi    # https://pushover.net/apps/build (one-time setup)
+#     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
+#     # device: pixel-9                            # optional: only this device. Omit for all.
 
 # Alert rules — evaluated after every poll. Metric is a dotted path
 # into the alert context (bank.soc_pct, bank.netW, bank.meanV,
