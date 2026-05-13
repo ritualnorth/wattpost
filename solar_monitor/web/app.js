@@ -1132,8 +1132,10 @@ function renderWeek() {
     if (!f) { panel.hidden = true; return; }
     const buckets = bucketByDay(f.points);
     // Drop any buckets with no real energy — Solcast's window can
-    // include an in-progress past day that gives 0 kWh.
-    const days = buckets.filter(b => b.wh > 0).slice(0, 7);
+    // include an in-progress past day that gives 0 kWh. Cap at 5
+    // days so the grid stays balanced even when Solcast returns the
+    // full 7-day window; reads better at every viewport width.
+    const days = buckets.filter(b => b.wh > 0).slice(0, 5);
     if (days.length === 0) { panel.hidden = true; return; }
     panel.hidden = false;
     // Title carries the actual day count so it never contradicts the

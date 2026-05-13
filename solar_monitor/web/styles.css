@@ -1465,14 +1465,17 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .week-panel .panel-header h2 .h-icon { color: var(--amber); }
 .week-strip {
   display: grid;
-  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
   gap: .55rem;
   overflow-x: auto;
   padding-bottom: .15rem;     /* room for any horizontal scrollbar */
 }
 @media (max-width: 720px) {
   .week-strip {
-    grid-template-columns: repeat(7, 130px);   /* fixed width so it scrolls cleanly */
+    /* Pin to 5 fixed-width cards so the grid still feels intentional
+     * even when it overflows; the user can swipe to reach the later
+     * days rather than seeing them wrap badly. */
+    grid-template-columns: repeat(5, 130px);
   }
 }
 .week-card {
