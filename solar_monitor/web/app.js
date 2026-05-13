@@ -2244,6 +2244,31 @@ if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || 
 
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);
+// Export the currently-selected metric + range as a CSV download.
+// Browser handles the file save via the Content-Disposition header on
+// the response.
+$("#chart-export-csv")?.addEventListener("click", () => {
+  const label  = $("#sel-device").value;
+  const metric = $("#sel-metric").value;
+  if (!label || !metric) return;
+  let url = `/api/devices/${encodeURIComponent(label)}/history.csv?metric=${encodeURIComponent(metric)}`;
+  if (currentRange === "custom") {
+    const p = customRangeParams();
+    if (!p) return;
+    url += `&since=${p.since}&until=${p.until}&bucket=${p.bucket}`;
+  } else {
+    const [since, bucket] = sinceForRange(currentRange);
+    url += `&since=${since}&bucket=${bucket}`;
+  }
+  // Anchor + click is the most reliable cross-browser download trigger;
+  // window.location replace would also work but breaks the SPA back-stack.
+  const a = document.createElement("a");
+  a.href = url;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
 for (const btn of document.querySelectorAll("[data-range]")) {
   btn.addEventListener("click", () => {
     document.querySelectorAll("[data-range]").forEach(b => b.classList.remove("active"));

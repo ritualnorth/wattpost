@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=75" />
+  <link rel="stylesheet" href="/web/styles.css?v=76" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -228,6 +228,10 @@
               <button data-range="30d">30d</button>
               <button data-range="custom" id="btn-custom">Custom</button>
             </div>
+            <button id="chart-export-csv" class="chart-export-btn" title="Download the chart data as CSV">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              <span>CSV</span>
+            </button>
           </div>
         </div>
 
@@ -495,6 +499,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=75"></script>
+  <script src="/web/app.js?v=76"></script>
 </body>
 </html>
