@@ -62,3 +62,8 @@ Thumbs.db
 # Local notes / scratch
 NOTES.local.md
 scratch/
+
+# Cloud per-environment secrets — never commit. The template is
+# `cloud/.env.example`; copy → `cloud/.env` per machine.
+cloud/.env
+.env
