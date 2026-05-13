@@ -760,6 +760,102 @@ main {
     border-color: var(--accent);
   }
 }
+
+/* Kiosk view always renders the flow vertically, regardless of viewport.
+ * The host's column can be wide on a landscape tablet, but stacking is
+ * still the right read at a distance. Same rules as the portrait
+ * @media block above — applied via parent selector instead of viewport
+ * width. Properties that are also defined in the @media use the same
+ * !important / specificity tricks (.flow-conn parent for the dot). */
+.kiosk-flow .flow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.kiosk-flow .flow-col { width: 100%; }
+.kiosk-flow .flow-conn {
+  position: relative;
+  width: 100%;
+  height: 72px;
+  min-height: 0;
+  align-self: stretch;
+  padding: 0;
+  display: block;
+}
+.kiosk-flow .flow-arrow {
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+}
+.kiosk-flow .flow-arrow::before {
+  content: "";
+  position: absolute !important;
+  top: 2px !important;
+  bottom: 16px !important;
+  left: 50% !important;
+  right: auto !important;
+  width: 3px !important;
+  height: auto !important;
+  background: var(--border-2);
+  border-radius: 3px;
+  transform: translateX(-50%) !important;
+}
+.kiosk-flow .flow-arrow::after {
+  content: "";
+  position: absolute !important;
+  top: auto !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  right: auto !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-style: solid !important;
+  border-width: 14px 9px 0 9px !important;
+  border-color: var(--border-2) transparent transparent transparent !important;
+  transform: translateX(-50%) !important;
+  background: transparent !important;
+}
+.kiosk-flow .flow-arrow.active::before {
+  background: linear-gradient(180deg, var(--from), var(--to));
+}
+.kiosk-flow .flow-arrow.active::after {
+  border-top-color: var(--to) !important;
+}
+.kiosk-flow .flow-conn .flow-arrow.active .dot {
+  width: 9px; height: 9px;
+  background: var(--to);
+  box-shadow: 0 0 12px var(--to);
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  animation: flow-dot-v 1.8s linear infinite;
+}
+.kiosk-flow .flow-conn .flow-arrow.reverse .dot {
+  animation-direction: reverse;
+}
+.kiosk-flow .flow-arrow-label {
+  position: absolute;
+  top: calc(50% - 7px); left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  font-family: var(--mono);
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+  font-weight: 600;
+  color: var(--text-2);
+  z-index: 2;
+  white-space: nowrap;
+}
+.kiosk-flow .flow-arrow.active + .flow-arrow-label,
+.kiosk-flow .flow-conn:has(.flow-arrow.active) .flow-arrow-label {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .flow-arrow {
   width: 100%;
   height: 18px;
