@@ -776,13 +776,23 @@ main {
 .kiosk-flow .flow-conn {
   position: relative;
   width: 100%;
-  /* Squeeze the connectors when vertical space is tight (landscape
-     phone). On a tablet 72px is the right size. */
-  height: clamp(48px, 8vh, 72px);
+  /* Shorter than the portrait-phone version — at kiosk scale a stubby
+     connector pulls the tiles closer together and reads as one block.
+     Used to be clamp(48px, 8vh, 72px). */
+  height: clamp(28px, 5vh, 42px);
   min-height: 0;
   align-self: stretch;
   padding: 0;
   display: block;
+}
+/* Smaller arrow head + tighter line geometry to match. */
+.kiosk-flow .flow-arrow::before {
+  top: 2px !important;
+  bottom: 10px !important;
+  width: 3px !important;
+}
+.kiosk-flow .flow-arrow::after {
+  border-width: 9px 6px 0 6px !important;
 }
 .kiosk-flow .flow-arrow {
   position: absolute !important;
