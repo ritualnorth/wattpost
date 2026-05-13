@@ -81,8 +81,12 @@ Solcast returns three power values per 30-minute slice:
 | `pv_estimate10`   | The 10th-percentile case (cloudier than expected) |
 | `pv_estimate90`   | The 90th-percentile case (clearer than expected) |
 
-Today's UI shows only `pv_estimate` (the median). Confidence-band
-overlay is on the backlog.
+Today's UI shows the median as a dashed line on the History chart
+(when viewing `pv_power_w`) and fills the area between P10 and P90
+with translucent amber — a wide band means the model isn't sure
+(weather front coming through, dawn/dusk transitions), a narrow band
+means high confidence. The Tomorrow tile and 7-day outlook strip
+both use the median for their kWh figures.
 
 ## Troubleshooting
 

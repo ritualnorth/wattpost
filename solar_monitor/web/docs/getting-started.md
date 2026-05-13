@@ -20,10 +20,15 @@ same network.
   bank's net flow, and the loads pulling energy out. Connectors
   glow when there's active flow.
 - **Today**: cumulative energy in / out / charged for today.
+- **Right now** (optional): current temperature, cloud cover, wind,
+  sunrise / sunset from Open-Meteo. Free, no API key — see the
+  [current weather](#/docs/weather) doc.
 - **Tomorrow** (optional): PV forecast tile — expected kWh, peak time,
   day-after preview, sparkline. Appears once you've wired a free
   Solcast key in Settings → Integrations (see the
   [PV forecast](#/docs/forecast) doc).
+- **7-day outlook** (optional): one card per forecast day with a
+  mini sparkline and expected kWh. Appears with the forecast.
 - **Cell balance**: per-cell voltages for each smart battery, with a
   24-hour drift sparkline.
 - **History tab**: charts of any metric over 1h / 6h / 24h / 7d / 30d
@@ -47,3 +52,7 @@ same network.
    Integrations → Solcast. Free hobbyist key, 5 minutes of setup,
    adds tomorrow's expected kWh + a forecast overlay to the History
    chart. Walkthrough in the [PV forecast](#/docs/forecast) doc.
+5. **Add current weather** (optional): Settings → Integrations →
+   Open-Meteo. No API key needed, just your lat/lon. Fills the
+   "Right now" tile with conditions, sunrise/sunset. See the
+   [current weather](#/docs/weather) doc.

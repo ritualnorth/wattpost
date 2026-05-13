@@ -162,6 +162,23 @@ a key. The upside is privacy — your forecast never goes through
 anything we operate. Each appliance talks to Solcast directly over
 HTTPS using the user's own credentials.
 
+### Weather (`solar_monitor/weather/`)
+Sibling of `forecast/`, same shape. `OpenMeteoProvider` returns a
+normalised `CurrentWeather` (temp / cloud / wind / WMO code /
+sunrise / sunset), `WeatherService` runs the 15-minute poll loop,
+cache lands at `weather:current` in the same `kv` table.
+
+**Why a separate module from forecast/.** The two answer different
+questions and many users want one without the other (Open-Meteo
+needs no signup, Solcast does). Keeping them split also leaves
+room to add an `irradiance/` or `tariff/` module without inflating
+either neighbour.
+
+**No API key.** Open-Meteo's hobbyist endpoint is free and unkeyed —
+lat/lon is the only "credential." Future paid-tier providers
+(Tomorrow.io, Visual Crossing) can slot in with the same provider-
+registry pattern when needed.
+
 ### API (`solar_monitor/api/app.py`)
 **Litestar** because msgspec serialization is 10-20× faster than
 Pydantic, the WebSocket story is first-class, and a single process
