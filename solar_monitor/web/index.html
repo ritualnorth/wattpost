@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=59" />
+  <link rel="stylesheet" href="/web/styles.css?v=60" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -398,7 +398,7 @@
          ===================================================== -->
     <section class="route kiosk-route" data-route="kiosk">
       <div class="kiosk-stage">
-        <div class="kiosk-donut">
+        <div class="kiosk-donut donut-state" id="kiosk-donut-wrap">
           <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
             <circle class="donut-track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
             <circle class="donut-arc"   cx="100" cy="100" r="88" fill="none" stroke-width="14"
@@ -408,7 +408,7 @@
                     stroke-linecap="round" pathLength="100"
                     stroke-dasharray="6 94" transform="rotate(-90 100 100)"/>
           </svg>
-          <div class="donut-center donut-state" id="kiosk-donut-wrap">
+          <div class="donut-center">
             <div class="donut-pct"><span id="kiosk-soc">—</span><span class="donut-pct-unit">%</span></div>
             <div class="donut-label">state of charge</div>
             <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">—</span></div>
@@ -425,6 +425,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=59"></script>
+  <script src="/web/app.js?v=60"></script>
 </body>
 </html>
