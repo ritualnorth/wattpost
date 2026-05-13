@@ -1804,7 +1804,14 @@ const TRANSPORT_TYPES = [
   { value: "webhook",         label: "Webhook",     keyField: "url",   placeholder: "https://example.com/hook" },
   { value: "smtp",            label: "Email (SMTP)",keyField: "host",  placeholder: "smtp.gmail.com" },
   { value: "mqtt",            label: "MQTT (LAN)",  keyField: "host",  placeholder: "127.0.0.1" },
+  { value: "pushover",        label: "Pushover",    keyField: "user_key", placeholder: "u…" },
 ];
+
+// Field names treated like passwords: rendered blank with "(unchanged)"
+// placeholder when the server has masked them as "****", and not
+// re-sent on PUT if left empty (so editing other fields doesn't blank
+// the secret).
+const SECRET_FIELDS = new Set(["password", "app_token", "user_key"]);
 
 let alertsState = { rules: [], transports: [], editing: null };  // editing: {type:'rule'|'transport', id, mode:'edit'|'add'}
 
@@ -2041,6 +2048,11 @@ function transportTypeFields(type, cfg) {
         <label class="alerts-field-wide">Topic prefix <input type="text" name="topic_prefix" value="${v("topic_prefix", "wattpost/alerts")}" placeholder="wattpost/alerts"/></label>
         <label>QoS <input type="number" name="qos" value="${v("qos", "1")}" min="0" max="2"/></label>
         <label class="alerts-checkbox"><input type="checkbox" name="retain" ${cfg.retain ? "checked" : ""}/> Retain</label>`;
+    case "pushover":
+      return `
+        <label>App token <input type="password" name="app_token" value="${cfg.app_token === "****" ? "" : v("app_token")}" placeholder="${cfg.app_token === "****" ? "(unchanged)" : "azGDORePK8gMaC0…"}" required/></label>
+        <label>User key  <input type="password" name="user_key"  value="${cfg.user_key  === "****" ? "" : v("user_key")}"  placeholder="${cfg.user_key  === "****" ? "(unchanged)" : "uQiRzpo4DXghDmr…"}" required/></label>
+        <label>Device (optional) <input type="text" name="device" value="${v("device")}" placeholder="leave blank for all devices"/></label>`;
     default:
       return "";
   }
@@ -2139,13 +2151,17 @@ async function submitTransportForm(form) {
   const status = form.querySelector(".alerts-form-status");
   status.textContent = "Saving…"; status.className = "alerts-form-status";
   const type = form.elements["type"].value;
+  const editing = !!form.dataset.originalId;
   const extra = {};
   const fields = form.querySelectorAll("[data-transport-fields] input");
   fields.forEach(el => {
     if (el.type === "checkbox") {
       extra[el.name] = el.checked;
-    } else if (el.value !== "" || el.name === "password") {
-      if (el.name === "password" && el.value === "") return;  // don't overwrite with empty
+    } else if (el.value !== "" || (editing && SECRET_FIELDS.has(el.name))) {
+      // On edit, an empty secret means "leave the existing one alone" —
+      // skip it so the PUT doesn't blank it out. On create, fall through
+      // so an empty value is sent (and server-side validation can flag it).
+      if (editing && SECRET_FIELDS.has(el.name) && el.value === "") return;
       if (el.name === "to_addrs") {
         extra[el.name] = el.value.split(",").map(s => s.trim()).filter(Boolean);
       } else if (el.type === "number") {
@@ -2160,7 +2176,6 @@ async function submitTransportForm(form) {
     type,
     extra,
   };
-  const editing = !!form.dataset.originalId;
   const url = editing ? `/api/alerts/transports/${encodeURIComponent(payload.id)}` : "/api/alerts/transports";
   const method = editing ? "PUT" : "POST";
   try {
