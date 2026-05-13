@@ -737,17 +737,13 @@ main {
   .flow-arrow.reverse .dot {
     animation-direction: reverse !important;
   }
-  @keyframes flow-dot-v {
-    from { top: 0%;   opacity: 0; }
-    10%  {            opacity: 1; }
-    90%  {            opacity: 1; }
-    to   { top: calc(100% - 22px); opacity: 0; }
-  }
-  /* W label as a centered pill on the line — visually anchors the
-   * connector to a meaningful number rather than dangling off to the side */
+  /* (keyframes flow-dot-v live at top-of-file to dodge a Safari quirk) */
+  /* W label centered on the *line*, not the whole connector. The connector
+     is 72px tall but the bottom 14px is the down-triangle, so a flat
+     top:50% sits 7px below the line midpoint. calc() corrects for it. */
   .flow-arrow-label {
     position: absolute;
-    top: 50%; left: 50%;
+    top: calc(50% - 7px); left: 50%;
     transform: translate(-50%, -50%);
     background: var(--surface);
     padding: 3px 11px;
@@ -815,6 +811,15 @@ main {
   10%  { opacity: 1; }
   90%  { opacity: 1; }
   to   { left: calc(100% - 12px); opacity: 0; }
+}
+/* Portrait connector's vertical-dot keyframes — defined at the top level
+   (not inside the @media block) because Safari ≤17 is finicky about
+   resolving keyframes references that are scoped to a conditional rule. */
+@keyframes flow-dot-v {
+  from { top: 0%;            opacity: 0; }
+  10%  {                     opacity: 1; }
+  90%  {                     opacity: 1; }
+  to   { top: calc(100% - 22px); opacity: 0; }
 }
 .flow-arrow-label {
   font-family: var(--mono);
