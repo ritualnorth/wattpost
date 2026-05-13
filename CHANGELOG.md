@@ -9,6 +9,12 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- Charge efficiency: `/api/devices/{label}/efficiency` returns
+  SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
+  windows. Smart-battery device cards show an `η` tile picking the
+  shortest reliable window; the device detail page shows the full
+  4-window breakdown with greyed-out cells for windows that haven't
+  seen enough cycling.
 - History chart: "Compare packs" toggle overlays every smart_battery
   pack's metric on one chart. Auto-disabled when fewer than two
   packs are configured or when a non-battery device is selected.
