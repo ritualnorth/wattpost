@@ -44,7 +44,12 @@ class SolcastProvider(ForecastProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Accept": "application/json",
         }
-        params = {"format": "json"}
+        # Ask explicitly for 168 hours (7 days) at 30-min resolution.
+        # Solcast's default response length varies by tier and account
+        # state — sometimes only 3 days come back without `hours` set,
+        # which would silently shrink the daily-outlook strip. The
+        # hobbyist tier caps at 168 anyway, so this is the safe max.
+        params = {"format": "json", "hours": "168", "period": "PT30M"}
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
             r = await client.get(url, headers=headers, params=params)
         if r.status_code == 401:
