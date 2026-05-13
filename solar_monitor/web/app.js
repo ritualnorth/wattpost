@@ -1103,13 +1103,9 @@ function renderTomorrow() {
     }
     panel.hidden = false;
     renderTomorrowEmpty(false);
-    // Today's full-day forecast — what the user could have known at
-    // midnight. Distinct from the actual "PV today" tile (energy
-    // already delivered by the controller). Shows "—" when the
-    // forecast window starts mid-day and there's no useful today total
-    // (e.g. first poll after a fresh Solcast setup at 4pm).
-    $("#tomorrow-today-kwh").textContent = s.todayWh > 0
-      ? `${(s.todayWh / 1000).toFixed(2)} kWh` : "—";
+    // Tile is now forecast-Tomorrow-only — today's forecast lives as
+    // the first card in the daily-outlook strip below, where it's
+    // unambiguous against the actual "Today" panel further up.
     $("#tomorrow-kwh").textContent = `${(s.tomorrowWh / 1000).toFixed(2)} kWh`;
     if (s.tomorrowPeak) {
       $("#tomorrow-peak").textContent = `${(s.tomorrowPeak.w / 1000).toFixed(2)} kW`;
