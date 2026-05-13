@@ -53,12 +53,25 @@ class AlertRuleCfg(msgspec.Struct, kw_only=True):
     transports: list[str] = []
 
 
+class QuietHoursCfg(msgspec.Struct, kw_only=True):
+    """Window during which `warn`-severity alerts are buffered instead of
+    dispatched immediately. `alarm` always pages through. Hours are
+    integers 0-23 in the daemon's local timezone. Overnight windows
+    work — start > end means "from start_hour today to end_hour tomorrow".
+
+    Disabled when start_hour == end_hour or this whole struct is absent.
+    """
+    start_hour: int
+    end_hour: int
+
+
 class Config(msgspec.Struct, kw_only=True):
     transports: list[dict[str, Any]]
     devices: list[DeviceCfg]
     exporters: list[dict[str, Any]] = []  # optional
     notification_transports: list[dict[str, Any]] = []  # optional
     alerts: list[AlertRuleCfg] = []  # optional
+    quiet_hours: QuietHoursCfg | None = None  # optional
 
 
 def load_config(path: str | Path) -> Config:

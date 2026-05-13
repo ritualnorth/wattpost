@@ -94,15 +94,30 @@ class AlertEngine:
         self,
         rules: list[AlertRule],
         transports_cfg: list[dict],
+        quiet_hours: tuple[int, int] | None = None,
     ) -> None:
         self.rules = rules
         self.transports_cfg = transports_cfg
+        # (start_hour, end_hour) in local time. None or equal hours = disabled.
+        # Overnight windows (start > end) are supported.
+        if quiet_hours is not None and quiet_hours[0] == quiet_hours[1]:
+            quiet_hours = None
+        self.quiet_hours = quiet_hours
         self._transports: dict[str, NotificationTransport] = {}
         # rule_id -> ts of last fire (for cooldown gating)
         self._last_fired: dict[str, int] = {}
         # rule_id -> last AlertEvent (so the Settings UI can show recent
         # activity without round-tripping to storage)
         self._last_event: dict[str, AlertEvent] = {}
+        # Events deferred during quiet hours, flushed when the window
+        # ends. Tuple of (event, transport_ids) so we re-dispatch to the
+        # same targets the rule would have hit.
+        self._pending: list[tuple[AlertEvent, list[str]]] = []
+        # Tracks the quiet-hours state across evaluate() calls so we
+        # detect the falling edge (was in, now out) and flush. None
+        # until the first evaluate() so an existing in-window startup
+        # doesn't immediately fire empty digest.
+        self._was_quiet: bool | None = None
 
     @property
     def transport_ids(self) -> list[str]:
@@ -142,12 +157,38 @@ class AlertEngine:
         self._last_fired = {k: v for k, v in self._last_fired.items() if k in live_ids}
         self._last_event = {k: v for k, v in self._last_event.items() if k in live_ids}
 
+    def _is_quiet_now(self, ts: int | None = None) -> bool:
+        """Are we inside the configured quiet-hours window right now?"""
+        if self.quiet_hours is None:
+            return False
+        start, end = self.quiet_hours
+        hour = time.localtime(ts).tm_hour
+        if start < end:
+            # Same-day window, e.g. 13:00..17:00.
+            return start <= hour < end
+        # Overnight window, e.g. 22:00..07:00.
+        return hour >= start or hour < end
+
     async def evaluate(self, snapshot: dict) -> list[AlertEvent]:
         """Run every rule against the supplied snapshot. Returns the list
         of newly-fired events (post-cooldown). Never raises — a misbehaving
-        transport must not break the daemon."""
+        transport must not break the daemon.
+
+        Quiet hours: `warn`-severity events fire into `_pending` instead
+        of dispatching. When the window ends (next evaluate after the
+        end_hour passes), buffered events flush in one batch. `alarm`
+        severity always pages through immediately."""
         ctx = build_alert_context(snapshot)
         now = int(time.time())
+        in_quiet = self._is_quiet_now(now)
+
+        # Detect window-end edge and flush any buffered events. Skipped
+        # on the very first evaluate() so a daemon starting *inside* the
+        # window doesn't immediately fire phantom events.
+        if self._was_quiet is True and not in_quiet:
+            await self._flush_pending()
+        self._was_quiet = in_quiet
+
         fired: list[AlertEvent] = []
         for rule in self.rules:
             op = _OPS.get(rule.op)
@@ -170,10 +211,27 @@ class AlertEngine:
             )
             self._last_event[rule.id] = event
             fired.append(event)
-            await self._dispatch(event, rule.transports)
-            log.info("alert fired: %s (%s=%s %s %s)",
-                     rule.id, rule.metric, val, rule.op, rule.threshold)
+            if in_quiet and rule.severity != "alarm":
+                # Buffer; flushes when the quiet-hours window ends.
+                self._pending.append((event, list(rule.transports)))
+                log.info("alert buffered (quiet hours): %s (%s=%s %s %s)",
+                         rule.id, rule.metric, val, rule.op, rule.threshold)
+            else:
+                await self._dispatch(event, rule.transports)
+                log.info("alert fired: %s (%s=%s %s %s)",
+                         rule.id, rule.metric, val, rule.op, rule.threshold)
         return fired
+
+    async def _flush_pending(self) -> None:
+        """Dispatch every event buffered during quiet hours, in the
+        order they fired, then clear the buffer."""
+        if not self._pending:
+            return
+        log.info("quiet hours ended — flushing %d buffered alert(s)",
+                 len(self._pending))
+        pending, self._pending = self._pending, []
+        for event, transport_ids in pending:
+            await self._dispatch(event, transport_ids)
 
     async def test_fire(self, rule_id: str) -> AlertEvent | None:
         """Force a single rule to fire regardless of state, for the

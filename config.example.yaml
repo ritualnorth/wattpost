@@ -104,6 +104,14 @@ devices:
 #     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
 #     # device: pixel-9                            # optional: only this device. Omit for all.
 
+# Quiet hours — warn-severity alerts inside this window are buffered
+# and flushed when the window ends. alarm-severity always pages through
+# immediately. Hours are local time, 0-23. Overnight (start > end) works.
+# Omit or set start_hour == end_hour to disable.
+# quiet_hours:
+#   start_hour: 22    # 22:00 local
+#   end_hour:   7     # ...until 07:00 next morning
+
 # Alert rules — evaluated after every poll. Metric is a dotted path
 # into the alert context (bank.soc_pct, bank.netW, bank.meanV,
 # bank.worst_pack_drift_v, aggregate.max_cell_drift_v, or
