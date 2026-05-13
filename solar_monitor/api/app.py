@@ -36,6 +36,7 @@ from .setup import (
 from .alerts_admin import (
     create_rule, update_rule, delete_rule,
     create_transport, update_transport, delete_transport,
+    update_quiet_hours,
 )
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
@@ -214,6 +215,11 @@ async def list_alerts(state: State) -> dict[str, Any]:
         }
         for t in config.notification_transports
     ]
+    qh = config.quiet_hours
+    snap["quiet_hours"] = (
+        {"start_hour": qh.start_hour, "end_hour": qh.end_hour}
+        if qh is not None else None
+    )
     return snap
 
 
@@ -441,6 +447,7 @@ def build_app(
             create_transport,
             update_transport,
             delete_transport,
+            update_quiet_hours,
             list_setup_transports,
             known_devices,
             probe,

@@ -1952,7 +1952,7 @@ const TRANSPORT_TYPES = [
 // the secret).
 const SECRET_FIELDS = new Set(["password", "app_token", "user_key"]);
 
-let alertsState = { rules: [], transports: [], editing: null };  // editing: {type:'rule'|'transport', id, mode:'edit'|'add'}
+let alertsState = { rules: [], transports: [], quietHours: null, editing: null };  // editing: {type:'rule'|'transport'|'quiet_hours', id, mode:'edit'|'add'}
 
 async function refreshAlertsPanel() {
   const host = $("#settings-alerts");
@@ -1961,6 +1961,7 @@ async function refreshAlertsPanel() {
     const data = await api("/api/alerts");
     alertsState.rules = data.rules || [];
     alertsState.transports = data.transports || [];
+    alertsState.quietHours = data.quiet_hours || null;
   } catch (e) {
     host.innerHTML = `<div class="settings-empty">Could not load alerts: ${e.message}</div>`;
     return;
@@ -1973,7 +1974,8 @@ function renderAlertsPanel() {
   if (!host) return;
   const transportIds = alertsState.transports.map(t => t.id);
 
-  let html = `<div class="alerts-sub-head"><h4>Alert rules</h4>
+  let html = renderQuietHoursBlock();
+  html += `<div class="alerts-sub-head"><h4>Alert rules</h4>
     <button class="alerts-add-btn" data-add="rule">+ Add rule</button></div>`;
 
   if (alertsState.editing?.type === "rule" && alertsState.editing.mode === "add") {
@@ -2096,6 +2098,66 @@ function renderRuleForm(r, transportIds) {
       </fieldset>
       <div class="alerts-form-actions">
         <button type="submit" class="btn-action btn-action--primary">${editing ? "Save" : "Create rule"}</button>
+        <button type="button" class="btn-action" data-cancel-edit>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function renderQuietHoursBlock() {
+  const qh = alertsState.quietHours;
+  const editing = alertsState.editing?.type === "quiet_hours";
+  const summary = qh
+    ? `${pad2(qh.start_hour)}:00 → ${pad2(qh.end_hour)}:00 · warn-severity buffers until the window ends`
+    : "Off · every alert pages immediately, day or night";
+  if (editing) return renderQuietHoursForm(qh);
+  return `
+    <div class="alerts-sub-head">
+      <h4>Quiet hours</h4>
+      <button class="alerts-add-btn" data-edit-quiet>${qh ? "Edit" : "Configure"}</button>
+    </div>
+    <div class="alerts-row alerts-row--quiet">
+      <div class="alerts-row-main">
+        <div class="alerts-row-title">
+          <span class="alerts-row-name">${qh ? "Enabled" : "Disabled"}</span>
+          <span class="alerts-row-cond">${summary}</span>
+        </div>
+        <div class="alerts-row-meta">
+          <span class="alerts-row-tag">alarm severity always pages through</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function renderQuietHoursForm(qh) {
+  const enabled = !!qh;
+  const start = qh?.start_hour ?? 22;
+  const end   = qh?.end_hour   ?? 7;
+  return `
+    <div class="alerts-sub-head"><h4>Quiet hours</h4></div>
+    <form class="alerts-form" data-form="quiet_hours">
+      <label class="alerts-checkbox alerts-quiet-enable">
+        <input type="checkbox" name="enabled" ${enabled ? "checked" : ""}/>
+        Buffer warn-severity alerts during a daily quiet window
+      </label>
+      <div class="alerts-form-grid alerts-quiet-grid">
+        <label>Start hour
+          <input type="number" name="start_hour" min="0" max="23" value="${start}" required/>
+        </label>
+        <label>End hour
+          <input type="number" name="end_hour" min="0" max="23" value="${end}" required/>
+        </label>
+      </div>
+      <p class="settings-foot">
+        Hours are in local time (0-23). Overnight windows work — set
+        start &gt; end (e.g. 22 → 7) for a "from 10pm to 7am" buffer.
+        Alarm-severity alerts always page through, even inside the
+        window. Changes apply on next daemon restart.
+      </p>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">Save</button>
         <button type="button" class="btn-action" data-cancel-edit>Cancel</button>
         <span class="alerts-form-status"></span>
       </div>
@@ -2250,6 +2312,51 @@ function wireAlertsHandlers() {
     });
     f.addEventListener("submit", (e) => { e.preventDefault(); submitTransportForm(f); });
   });
+  host.querySelectorAll("[data-edit-quiet]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      alertsState.editing = { type: "quiet_hours", mode: "edit", id: null };
+      renderAlertsPanel();
+    });
+  });
+  host.querySelectorAll("form[data-form='quiet_hours']").forEach(f => {
+    // Disabling the toggle greys the hour inputs so the form's intent
+    // is obvious — saving with the box unchecked clears the window.
+    const enable = f.elements["enabled"];
+    const sync = () => {
+      const dis = !enable.checked;
+      f.elements["start_hour"].disabled = dis;
+      f.elements["end_hour"].disabled   = dis;
+    };
+    enable.addEventListener("change", sync);
+    sync();
+    f.addEventListener("submit", (e) => { e.preventDefault(); submitQuietHoursForm(f); });
+  });
+}
+
+async function submitQuietHoursForm(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  const enabled = form.elements["enabled"].checked;
+  const payload = enabled
+    ? { start_hour: parseInt(form.elements["start_hour"].value, 10),
+        end_hour:   parseInt(form.elements["end_hour"].value, 10) }
+    : { start_hour: null, end_hour: null };
+  try {
+    const r = await fetch("/api/alerts/quiet_hours", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    alertsState.editing = null;
+    await refreshAlertsPanel();
+  } catch (e) {
+    status.textContent = e.message;
+    status.classList.add("err");
+  }
 }
 
 async function submitRuleForm(form) {
