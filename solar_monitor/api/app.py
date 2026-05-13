@@ -50,6 +50,9 @@ from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
     unpair_appliance, trigger_heartbeat,
 )
+from .exporters_admin import (
+    get_mqtt_config, update_mqtt_config, test_mqtt,
+)
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve,
@@ -497,6 +500,9 @@ def build_app(
             pair_appliance,
             unpair_appliance,
             trigger_heartbeat,
+            get_mqtt_config,
+            update_mqtt_config,
+            test_mqtt,
             list_setup_transports,
             known_devices,
             probe,

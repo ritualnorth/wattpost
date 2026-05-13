@@ -2226,8 +2226,8 @@ function renderSettings() {
   // Daemon status implied from the same source as the header pill.
   const ok = lastRun && lastRun.errors_count === 0;
   $("#settings-daemon").textContent = ok ? "running, healthy" : (lastRun ? "running, errors" : "no data");
-  // MQTT we don't query directly; best effort message until /api/exporters exists
-  $("#settings-mqtt").textContent = "see config.yaml";
+  // MQTT export now has its own row in Settings → Integrations; the old
+  // "see config.yaml" placeholder was removed when that UI shipped.
   refreshAlertsPanel();
   refreshSystemInfo();
   refreshTailscale();
@@ -2413,21 +2413,23 @@ async function tailscaleDisconnect() {
 // One-shot fetch on settings open; mutates inline when the user
 // clicks Edit / Save / Test. State stays in module-scope so we don't
 // re-fetch on every render.
-let integrationsState = { forecast: null, weather: null, cloud: null, editing: null };
-// editing: null | "forecast" | "weather" | "cloud"
+let integrationsState = { forecast: null, weather: null, cloud: null, mqtt: null, editing: null };
+// editing: null | "forecast" | "weather" | "cloud" | "mqtt"
 
 async function refreshIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
   try {
-    const [fc, wc, cc] = await Promise.all([
+    const [fc, wc, cc, mc] = await Promise.all([
       api("/api/forecast/config"),
       api("/api/weather/config"),
       api("/api/cloud/config"),
+      api("/api/exporters/mqtt/config"),
     ]);
     integrationsState.forecast = fc;
     integrationsState.weather  = wc;
     integrationsState.cloud    = cc;
+    integrationsState.mqtt     = mc;
   } catch (e) {
     host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
     return;
@@ -2456,10 +2458,16 @@ function renderIntegrationsPanel() {
     wireCloudForm();
     return;
   }
+  if (integrationsState.editing === "mqtt") {
+    host.innerHTML = renderMqttForm(integrationsState.mqtt || {});
+    wireMqttForm();
+    return;
+  }
 
   const forecastConfigured = fc.configured;
   const weatherConfigured  = wc.configured;
   const cloudConfigured    = (integrationsState.cloud || {}).configured;
+  const mqttEnabled        = (integrationsState.mqtt || {}).enabled;
   host.innerHTML = `
     <div class="integration-row" data-integration="solcast">
       <div class="integration-row-main">
@@ -2523,6 +2531,27 @@ function renderIntegrationsPanel() {
           ${cloudConfigured ? "Edit" : "Pair"}
         </button>
       </div>
+    </div>
+    <div class="integration-row" data-integration="mqtt">
+      <div class="integration-row-main">
+        <div class="integration-row-head">
+          <span class="integration-row-name">MQTT export</span>
+          <span class="alerts-row-tag alerts-row-tag--${mqttEnabled ? "ok" : "warn"}">
+            ${mqttEnabled ? "enabled" : "not set up"}
+          </span>
+        </div>
+        <div class="integration-row-sub">
+          ${mqttEnabled
+            ? `Publishing to <code>${integrationsState.mqtt.host}:${integrationsState.mqtt.port}</code> under <code>${integrationsState.mqtt.topic_prefix}/</code>${integrationsState.mqtt.ha_discovery ? " · HA discovery on" : ""}`
+            : `Publish every poll snapshot to a local MQTT broker for Home Assistant, Node-RED, or your own subscribers. Local-LAN, no cloud.`
+          }
+        </div>
+      </div>
+      <div class="integration-row-actions">
+        <button class="alerts-add-btn" data-edit-mqtt>
+          ${mqttEnabled ? "Edit" : "Configure"}
+        </button>
+      </div>
     </div>`;
   $("[data-edit-forecast]")?.addEventListener("click", () => {
     integrationsState.editing = "forecast";
@@ -2536,6 +2565,155 @@ function renderIntegrationsPanel() {
     integrationsState.editing = "cloud";
     renderIntegrationsPanel();
   });
+  $("[data-edit-mqtt]")?.addEventListener("click", () => {
+    integrationsState.editing = "mqtt";
+    renderIntegrationsPanel();
+  });
+}
+
+function renderMqttForm(mc) {
+  const enabled = !!mc.enabled;
+  const v = (k, d = "") => mc[k] != null ? String(mc[k]) : d;
+  return `
+    <form class="alerts-form" data-form="mqtt">
+      <div class="alerts-form-grid">
+        <label>Broker host
+          <input type="text" name="host" value="${v("host")}" required placeholder="127.0.0.1"/>
+        </label>
+        <label>Port
+          <input type="number" name="port" value="${v("port", "1883")}" min="1" max="65535" required/>
+        </label>
+        <label>Username
+          <input type="text" name="username" value="${v("username")}" placeholder="(blank = anonymous)"/>
+        </label>
+        <label>Password
+          <input type="password" name="password"
+                 value="${mc.password === "****" ? "" : v("password")}"
+                 placeholder="${mc.password === "****" ? "(unchanged)" : "(blank = anonymous)"}"/>
+        </label>
+        <label class="alerts-field-wide">Topic prefix
+          <input type="text" name="topic_prefix" value="${v("topic_prefix", "solar")}" placeholder="solar"/>
+        </label>
+        <label>Client ID
+          <input type="text" name="client_id" value="${v("client_id", "solar-monitor")}"/>
+        </label>
+        <label>QoS
+          <select name="qos">
+            ${[0,1,2].map(q => `<option value="${q}" ${String(mc.qos ?? 0) === String(q) ? "selected" : ""}>${q}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <div class="alerts-form-grid alerts-form-grid--full" style="margin-top:.55rem">
+        <label class="alerts-checkbox"><input type="checkbox" name="retain" ${mc.retain !== false ? "checked" : ""}/> Retain published messages</label>
+        <label class="alerts-checkbox"><input type="checkbox" name="publish_per_metric" ${mc.publish_per_metric !== false ? "checked" : ""}/> Publish per-metric topics (otherwise only full-snapshot)</label>
+        <label class="alerts-checkbox"><input type="checkbox" name="ha_discovery" ${mc.ha_discovery ? "checked" : ""}/> Home Assistant MQTT discovery (auto-create sensors)</label>
+      </div>
+      <details class="alerts-repair">
+        <summary>Advanced — HA discovery options</summary>
+        <div class="alerts-form-grid">
+          <label>Discovery prefix
+            <input type="text" name="ha_discovery_prefix" value="${v("ha_discovery_prefix", "homeassistant")}"/>
+          </label>
+          <label>Node ID
+            <input type="text" name="ha_node_id" value="${v("ha_node_id", "solar_monitor")}"/>
+          </label>
+        </div>
+      </details>
+      <p class="settings-foot">
+        Publishes a full device snapshot to <code>&lt;prefix&gt;/&lt;label&gt;/state</code> after every
+        poll, plus a retained LWT at <code>&lt;prefix&gt;/_status</code>.
+        See the <a href="#/docs/integrations">integrations doc</a> for the topic schema.
+        Changes apply on next daemon restart.
+      </p>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">Save</button>
+        <button type="button" class="btn-action" data-test-mqtt>Test connection</button>
+        ${enabled
+          ? `<button type="button" class="btn-action alerts-icon-btn--danger" data-disable-mqtt>Disable</button>`
+          : ""}
+        <button type="button" class="btn-action" data-cancel-mqtt>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function wireMqttForm() {
+  const form = document.querySelector("form[data-form='mqtt']");
+  if (!form) return;
+  form.addEventListener("submit", (e) => { e.preventDefault(); saveMqttConfig(form); });
+  form.querySelector("[data-cancel-mqtt]")?.addEventListener("click", () => {
+    integrationsState.editing = null;
+    renderIntegrationsPanel();
+  });
+  form.querySelector("[data-test-mqtt]")?.addEventListener("click", () => testMqtt(form));
+  form.querySelector("[data-disable-mqtt]")?.addEventListener("click", () => disableMqtt());
+}
+
+function _mqttPayload(form, enabled = true) {
+  const pwd = form.elements["password"].value;
+  return {
+    enabled,
+    host:                form.elements["host"].value.trim(),
+    port:                parseInt(form.elements["port"].value, 10),
+    username:            form.elements["username"].value.trim(),
+    // Send "****" sentinel if blank — server preserves the existing one.
+    password:            pwd === "" ? "****" : pwd,
+    client_id:           form.elements["client_id"].value.trim(),
+    topic_prefix:        form.elements["topic_prefix"].value.trim(),
+    qos:                 parseInt(form.elements["qos"].value, 10),
+    retain:              form.elements["retain"].checked,
+    publish_per_metric:  form.elements["publish_per_metric"].checked,
+    ha_discovery:        form.elements["ha_discovery"].checked,
+    ha_discovery_prefix: form.elements["ha_discovery_prefix"].value.trim(),
+    ha_node_id:          form.elements["ha_node_id"].value.trim(),
+  };
+}
+
+async function saveMqttConfig(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/exporters/mqtt/config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_mqttPayload(form)),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function testMqtt(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Connecting…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/exporters/mqtt/test", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_mqttPayload(form)),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    status.textContent = `✓ Connected to ${d.host}:${d.port}`; status.classList.add("ok");
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function disableMqtt() {
+  if (!confirm("Disable the MQTT exporter? The broker still runs; we just stop publishing to it.")) return;
+  try {
+    const r = await fetch("/api/exporters/mqtt/config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: false }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { alert(e.message); }
 }
 
 function renderCloudForm(cc) {
