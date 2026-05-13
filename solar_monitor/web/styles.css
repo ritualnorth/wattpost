@@ -718,17 +718,24 @@ main {
   .flow-arrow.active::after {
     border-top-color: var(--to) !important;
   }
-  /* Animated dot drops top → bottom along the line */
+  /* Animated dot drops top → bottom along the line.
+     `!important` for the same reason as the ::before/::after rules above:
+     the landscape `.flow-arrow.active .dot` block sits later in source
+     order and would otherwise win on `top`, `transform`, and `animation`,
+     leaving the dot drifting left-to-right across the portrait pill. */
   .flow-arrow.active .dot {
-    position: absolute;
-    width: 9px; height: 9px;
+    position: absolute !important;
+    width: 9px !important; height: 9px !important;
     border-radius: 50%;
     background: var(--to);
     box-shadow: 0 0 12px var(--to);
-    left: 50%;
-    top: 0;
-    transform: translateX(-50%);
-    animation: flow-dot-v 1.8s linear infinite;
+    left: 50% !important;
+    top: 0 !important;
+    transform: translateX(-50%) !important;
+    animation: flow-dot-v 1.8s linear infinite !important;
+  }
+  .flow-arrow.reverse .dot {
+    animation-direction: reverse !important;
   }
   @keyframes flow-dot-v {
     from { top: 0%;   opacity: 0; }
