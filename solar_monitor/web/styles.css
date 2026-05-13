@@ -885,6 +885,19 @@ main {
   background: transparent;
   border-left-color: var(--to);
 }
+/* Drop the chunky arrow-head from the flow strip — line + moving dot
+   already convey direction, and the filled triangle reads as visual
+   noise at every scale we tried. */
+.flow-arrow::after { display: none !important; }
+/* And let the line run edge-to-edge now that there's no triangle to
+   leave room for. The dot animation already uses calc(100% - 12px)
+   for its travel range, so it stays within the line. Landscape uses
+   right:0 (horizontal connector); portrait used bottom:16px to leave
+   room for the down-triangle — now reclaimed as bottom:2px. */
+.flow-arrow::before {
+  right: 0 !important;
+  bottom: 2px !important;
+}
 /* Animated moving dot */
 .flow-arrow.active .dot {
   position: absolute;
