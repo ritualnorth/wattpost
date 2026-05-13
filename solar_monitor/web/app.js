@@ -1553,12 +1553,16 @@ function drawHeatmap(root, data) {
 // Hash-based. Default route = dashboard. Two forms:
 //   #/                   → named routes (dashboard / history / devices / ...)
 //   #/device/<label>     → per-device detail page (dispatched by device kind)
-const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings", "kiosk"]);
+const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings", "kiosk", "docs"]);
 
 function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
   const m = raw.match(/^device\/(.+)$/);
   if (m) return { name: "device", label: decodeURIComponent(m[1]) };
+  // docs/<slug> — strip the slug into a separate field.
+  const d = raw.match(/^docs\/(.+)$/);
+  if (d) return { name: "docs", slug: d[1] };
+  if (raw === "docs") return { name: "docs", slug: null };
   return { name: VALID_ROUTES.has(raw) ? raw : "dashboard" };
 }
 function currentRouteName() { return parseRoute().name; }
@@ -1582,6 +1586,7 @@ function setRoute(_unused) {
   if (route.name === "dashboard") refreshDriftSparkline();
   if (route.name === "device") renderDeviceDetail(route.label);
   if (route.name === "setup") onEnterSetup();
+  if (route.name === "docs")  onEnterDocs(route.slug);
   if (route.name === "kiosk") onEnterKiosk();
   else if (document.body.classList.contains("kiosk-active")) onLeaveKiosk();
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
@@ -2928,6 +2933,160 @@ function startDiagTimer() {
 }
 function stopDiagTimer() {
   if (diagTimer) { clearInterval(diagTimer); diagTimer = null; }
+}
+
+// ---------- docs (markdown topics) ----------
+// Tiny markdown renderer — handles the subset our bundled docs use:
+// # ## ### headings, **bold**, *italic*, `inline code`, ```fences```,
+// - / * / 1. lists, > blockquotes, --- rules, [text](url) links,
+// pipe tables, and plain paragraphs. Escapes HTML in source text so
+// the docs themselves can show <tags> safely.
+function escHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => (
+    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+  ));
+}
+function renderInline(s) {
+  let out = escHtml(s);
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
+  return out;
+}
+function renderMarkdown(src) {
+  const lines = src.replace(/\r\n?/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const ln = lines[i];
+    // Fenced code block
+    if (/^```/.test(ln)) {
+      const lang = ln.slice(3).trim();
+      i++;
+      const buf = [];
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++; // skip closing ```
+      out.push(`<pre><code data-lang="${escHtml(lang)}">${escHtml(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+    // Heading
+    const h = ln.match(/^(#{1,6})\s+(.+)$/);
+    if (h) {
+      const level = h[1].length;
+      out.push(`<h${level}>${renderInline(h[2])}</h${level}>`);
+      i++; continue;
+    }
+    // Horizontal rule
+    if (/^---+\s*$/.test(ln)) { out.push("<hr/>"); i++; continue; }
+    // Pipe table (header | --- | row …)
+    if (/^\s*\|.*\|\s*$/.test(ln) && i + 1 < lines.length && /^\s*\|[-:\s|]+\|\s*$/.test(lines[i + 1])) {
+      const split = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map(s => s.trim());
+      const head = split(ln);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        rows.push(split(lines[i])); i++;
+      }
+      const thead = head.map(c => `<th>${renderInline(c)}</th>`).join("");
+      const tbody = rows.map(r => `<tr>${r.map(c => `<td>${renderInline(c)}</td>`).join("")}</tr>`).join("");
+      out.push(`<table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table>`);
+      continue;
+    }
+    // Blockquote
+    if (/^>\s?/.test(ln)) {
+      const buf = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) {
+        buf.push(lines[i].replace(/^>\s?/, "")); i++;
+      }
+      out.push(`<blockquote>${renderMarkdown(buf.join("\n"))}</blockquote>`);
+      continue;
+    }
+    // Ordered list
+    if (/^\s*\d+\.\s+/.test(ln)) {
+      const items = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*\d+\.\s+/, "")); i++;
+      }
+      out.push(`<ol>${items.map(it => `<li>${renderInline(it)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    // Unordered list
+    if (/^\s*[-*]\s+/.test(ln)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*]\s+/, "")); i++;
+      }
+      out.push(`<ul>${items.map(it => `<li>${renderInline(it)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    // Blank line
+    if (/^\s*$/.test(ln)) { i++; continue; }
+    // Paragraph — gather consecutive non-blank, non-special lines.
+    const para = [ln];
+    i++;
+    while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|>\s?|---|\s*[-*]\s|\s*\d+\.\s|```)/.test(lines[i])) {
+      para.push(lines[i]); i++;
+    }
+    out.push(`<p>${renderInline(para.join(" "))}</p>`);
+  }
+  return out.join("\n");
+}
+
+let docsIndex = null;  // cached topic list
+let docsLoaded = false;
+
+async function onEnterDocs(slug) {
+  if (!docsLoaded) {
+    try {
+      const r = await fetch("/web/docs/index.json");
+      docsIndex = await r.json();
+      docsLoaded = true;
+    } catch (e) {
+      $("#docs-nav").innerHTML = `<div class="settings-empty">Could not load docs index: ${e.message}</div>`;
+      return;
+    }
+  }
+  renderDocsNav(slug);
+  if (slug) {
+    loadDocPage(slug);
+  } else if (docsIndex.topics?.length) {
+    // No slug — auto-open the first topic so the user isn't staring at
+    // an empty pane.
+    window.location.hash = `#/docs/${docsIndex.topics[0].slug}`;
+  }
+}
+
+function renderDocsNav(activeSlug) {
+  const host = $("#docs-nav");
+  if (!host || !docsIndex) return;
+  // Group by section in document order.
+  const sections = [];
+  for (const t of docsIndex.topics) {
+    let s = sections.find(x => x.name === t.section);
+    if (!s) { s = { name: t.section, topics: [] }; sections.push(s); }
+    s.topics.push(t);
+  }
+  host.innerHTML = sections.map(s => `
+    <div class="docs-nav-section">${escHtml(s.name)}</div>
+    ${s.topics.map(t => `
+      <a class="docs-nav-link ${t.slug === activeSlug ? "active" : ""}"
+         href="#/docs/${encodeURIComponent(t.slug)}">${escHtml(t.title)}</a>`).join("")}
+  `).join("");
+}
+
+async function loadDocPage(slug) {
+  const host = $("#docs-content");
+  if (!host) return;
+  host.innerHTML = `<p class="docs-placeholder">Loading…</p>`;
+  try {
+    const r = await fetch(`/web/docs/${encodeURIComponent(slug)}.md`);
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const md = await r.text();
+    host.innerHTML = renderMarkdown(md);
+  } catch (e) {
+    host.innerHTML = `<p class="docs-placeholder">Could not load "${escHtml(slug)}": ${escHtml(e.message)}</p>`;
+  }
 }
 
 // ---------- daemon restart ----------

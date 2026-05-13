@@ -34,4 +34,6 @@ solar_monitor = [
     "web/*.webmanifest",
     "web/*.svg",
     "web/*.png",
+    "web/docs/*.md",
+    "web/docs/*.json",
 ]

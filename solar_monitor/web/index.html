@@ -36,7 +36,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=78" />
+  <link rel="stylesheet" href="/web/styles.css?v=79" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -106,6 +106,10 @@
     <a class="nav-tab" data-tab="settings" href="#/settings">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Settings</span>
+    </a>
+    <a class="nav-tab" data-tab="docs" href="#/docs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Docs</span>
     </a>
   </nav>
 
@@ -482,6 +486,28 @@
     </section>
 
     <!-- =====================================================
+         ROUTE: Docs (markdown topics)
+         ===================================================== -->
+    <section class="route docs-route" data-route="docs">
+      <section class="panel docs-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Documentation
+          </h2>
+        </div>
+        <div class="docs-layout">
+          <nav id="docs-nav" class="docs-nav" aria-label="Documentation topics">
+            <div class="settings-empty">Loading topics…</div>
+          </nav>
+          <article id="docs-content" class="docs-content">
+            <p class="docs-placeholder">Pick a topic on the left.</p>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <!-- =====================================================
          ROUTE: Kiosk — chrome-free SoC + flow for wall-mounted tablets
          ===================================================== -->
     <section class="route kiosk-route" data-route="kiosk">
@@ -513,6 +539,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=78"></script>
+  <script src="/web/app.js?v=79"></script>
 </body>
 </html>
