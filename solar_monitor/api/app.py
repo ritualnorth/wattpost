@@ -104,6 +104,28 @@ async def device_lifetime(label: str, state: State) -> dict[str, Any]:
     return await store.battery_lifetime_stats(label)
 
 
+@get("/api/devices/{label:str}/efficiency")
+async def device_efficiency(label: str, state: State) -> dict[str, Any]:
+    """SoC-corrected charge efficiency for one battery pack over a
+    range of trailing windows. The shorter windows surface early — a
+    7d efficiency drop tells you something's going wrong before the
+    lifetime number catches up. The `reliable` flag on each window
+    tracks whether the pack saw enough throughput for the number to
+    be trustworthy."""
+    store: Store = state["store"]
+    now = int(time.time())
+    windows = {
+        "7d":   now - 7  * 86400,
+        "30d":  now - 30 * 86400,
+        "90d":  now - 90 * 86400,
+    }
+    out: dict[str, Any] = {"device": label, "windows": {}}
+    for name, since in windows.items():
+        out["windows"][name] = await store.battery_efficiency(label, since_ts=since)
+    out["windows"]["lifetime"] = await store.battery_efficiency(label, since_ts=None)
+    return out
+
+
 @get("/api/load_heatmap")
 async def load_heatmap(state: State, days: int = 30) -> dict[str, Any]:
     """Hour-of-day × day-of-week mean discharge wattage over the last N days."""
@@ -428,6 +450,7 @@ def build_app(
             device_history,
             device_history_csv,
             device_lifetime,
+            device_efficiency,
             load_heatmap,
             stream,
             list_alerts,

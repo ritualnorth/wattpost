@@ -835,6 +835,170 @@ class Store:
             "interval_samples": n_intervals,
         }
 
+    async def _coulomb_window(
+        self, device: str, since_ts: int | None = None,
+    ) -> tuple[float, float]:
+        """Trapezoid-integrate `current_a` for one device, optionally
+        bounded by since_ts. Returns (ah_in, ah_out) where both are
+        positive. Pairs include one sample taken before since_ts so the
+        first interval inside the window is fully accounted for —
+        prevents bias when the window starts mid-cycle."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        since_clause = ""
+        params: list[Any] = [device]
+        if since_ts is not None:
+            since_clause = " AND ts >= ?"
+            params.append(since_ts)
+
+        sql = (
+            "WITH paired AS ("
+            "  SELECT ts, value,"
+            "         LAG(ts)    OVER (ORDER BY ts) AS prev_ts,"
+            "         LAG(value) OVER (ORDER BY ts) AS prev_v"
+            "  FROM samples"
+            "  WHERE device = ? AND metric = 'current_a'"
+            ")"
+            "SELECT"
+            "  SUM(CASE WHEN avg_i > 0 THEN  avg_i * dt_h ELSE 0 END) AS ah_in,"
+            "  SUM(CASE WHEN avg_i < 0 THEN -avg_i * dt_h ELSE 0 END) AS ah_out "
+            "FROM ("
+            "  SELECT (prev_v + value) / 2.0 AS avg_i,"
+            "         (ts - prev_ts) / 3600.0 AS dt_h, ts"
+            "  FROM paired"
+            "  WHERE prev_ts IS NOT NULL"
+            "    AND (ts - prev_ts) BETWEEN 1 AND 3600"
+            f"{since_clause}"
+            ")"
+        )
+        async with self._db.execute(sql, params) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return 0.0, 0.0
+        return float(row[0] or 0), float(row[1] or 0)
+
+    async def _remaining_ah_near(
+        self, device: str, target_ts: int, direction: str = "after",
+    ) -> tuple[float | None, int | None]:
+        """Return (remaining_charge_ah, ts) for the sample closest to
+        target_ts on the specified side. direction='after' picks the
+        first sample at or after target_ts; 'before' picks the last
+        before. Returns (None, None) if no sample on that side."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        if direction == "after":
+            sql = (
+                "SELECT value, ts FROM samples "
+                "WHERE device = ? AND metric = 'remaining_charge_ah' "
+                "  AND ts >= ? ORDER BY ts ASC LIMIT 1"
+            )
+        else:
+            sql = (
+                "SELECT value, ts FROM samples "
+                "WHERE device = ? AND metric = 'remaining_charge_ah' "
+                "  AND ts <= ? ORDER BY ts DESC LIMIT 1"
+            )
+        async with self._db.execute(sql, (device, target_ts)) as cur:
+            row = await cur.fetchone()
+        if row is None or row[0] is None:
+            return None, None
+        return float(row[0]), int(row[1])
+
+    async def battery_efficiency(
+        self, device: str, since_ts: int | None = None,
+    ) -> dict[str, Any]:
+        """SoC-corrected coulomb efficiency for one smart battery pack
+        over a window.
+
+        Math: ah_in * η_charge - ah_out = (remaining_end - remaining_start)
+              => η_charge = (ah_out + Δremaining) / ah_in
+
+        Both `ah_in` and `ah_out` are positive Ah totals over the window;
+        Δremaining (in Ah) accounts for charge still in the pack at the
+        end vs the start, so a window that ends mid-charge doesn't
+        artificially depress the ratio.
+
+        We only mark the result `reliable` when total throughput is at
+        least one pack's worth — i.e. ah_in >= capacity_ah. With less
+        cycling, SoC measurement noise dominates the signal.
+
+        Window:
+          since_ts == None → lifetime
+          else → samples with ts >= since_ts
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        ah_in, ah_out = await self._coulomb_window(device, since_ts)
+
+        # Latest capacity for the reliability gate + cycle-equivalents.
+        capacity_ah = 100.0
+        async with self._db.execute(
+            "SELECT value FROM samples WHERE device = ? AND metric = 'capacity_ah' "
+            "ORDER BY ts DESC LIMIT 1",
+            (device,),
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0] is not None:
+                capacity_ah = float(row[0])
+
+        # Pin window start/end timestamps so the SoC delta sees the
+        # right boundaries. For lifetime, the start is the device's
+        # first remaining_charge_ah sample.
+        async with self._db.execute(
+            "SELECT MIN(ts), MAX(ts) FROM samples "
+            "WHERE device = ? AND metric = 'remaining_charge_ah'",
+            (device,),
+        ) as cur:
+            row = await cur.fetchone()
+            ts_first = int(row[0]) if row and row[0] is not None else None
+            ts_last  = int(row[1]) if row and row[1] is not None else None
+
+        start_target = since_ts if since_ts is not None else (ts_first or 0)
+        rem_start, rem_start_ts = await self._remaining_ah_near(
+            device, start_target, direction="after",
+        )
+        rem_end, rem_end_ts = (None, None)
+        if ts_last is not None:
+            rem_end, rem_end_ts = await self._remaining_ah_near(
+                device, ts_last, direction="before",
+            )
+
+        delta_remaining: float | None = None
+        if rem_start is not None and rem_end is not None:
+            delta_remaining = rem_end - rem_start
+
+        efficiency_pct: float | None = None
+        if ah_in > 0 and delta_remaining is not None:
+            # The corrected formula (see docstring).
+            eta = (ah_out + delta_remaining) / ah_in
+            # Round-trip is normally in [0.85, 1.02]. Anything outside is
+            # almost certainly a data artefact (sensor noise on a near-
+            # empty window). Cap to a sensible range so the UI never
+            # shows "126% efficiency" which would erode trust.
+            if 0.5 <= eta <= 1.05:
+                efficiency_pct = round(eta * 100, 2)
+
+        cycles = round(ah_in / capacity_ah, 2) if capacity_ah > 0 else 0
+        reliable = (
+            efficiency_pct is not None
+            and ah_in >= capacity_ah   # at least one cycle of throughput
+        )
+        return {
+            "device":            device,
+            "since_ts":          since_ts,
+            "ah_in":             round(ah_in, 2),
+            "ah_out":            round(ah_out, 2),
+            "remaining_start":   round(rem_start, 2)  if rem_start  is not None else None,
+            "remaining_end":     round(rem_end, 2)    if rem_end    is not None else None,
+            "delta_remaining":   round(delta_remaining, 2) if delta_remaining is not None else None,
+            "capacity_ah":       round(capacity_ah, 2),
+            "cycle_equivalents": cycles,
+            "efficiency_pct":    efficiency_pct,
+            "reliable":          reliable,
+        }
+
     async def last_poll_run(self) -> dict[str, Any] | None:
         if self._db is None:
             raise RuntimeError("Store not open")

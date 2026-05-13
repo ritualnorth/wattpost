@@ -1059,6 +1059,40 @@ async function ensureLifetime(label) {
   } catch (e) { return null; }
 }
 
+// ---------- charge efficiency cache ----------
+// Same 5-minute TTL as lifetime; the underlying queries do a full table
+// scan for coulomb integration, so we don't hit them every render.
+const efficiencyCache = {};
+async function ensureEfficiency(label) {
+  const now = Date.now();
+  const entry = efficiencyCache[label];
+  if (entry && (now - entry.fetchedAt) < 5 * 60 * 1000) return entry.data;
+  try {
+    const data = await api(`/api/devices/${encodeURIComponent(label)}/efficiency`);
+    efficiencyCache[label] = { data, fetchedAt: now };
+    return data;
+  } catch (e) { return null; }
+}
+
+// Pick the most informative efficiency value to surface in a single
+// "η" tile: prefer 30d if reliable, else 90d, else lifetime, else
+// show the 30d unreliable number with a "low cycles" caveat tag so
+// the user knows why it's grey.
+function efficiencyHeadline(data) {
+  const w = data?.windows || {};
+  for (const k of ["30d", "90d", "lifetime"]) {
+    if (w[k]?.reliable && w[k].efficiency_pct != null) {
+      return { window: k, value: w[k].efficiency_pct, reliable: true };
+    }
+  }
+  for (const k of ["30d", "90d", "lifetime"]) {
+    if (w[k]?.efficiency_pct != null) {
+      return { window: k, value: w[k].efficiency_pct, reliable: false };
+    }
+  }
+  return null;
+}
+
 // ---------- device cards ----------
 function renderDeviceCards() {
   const host = $("#device-cards");
@@ -1107,13 +1141,28 @@ function renderDeviceCards() {
       lifeBar.innerHTML = `
         <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">—</span></div>
         <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">—</span></div>
-        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>`;
+        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>
+        <div class="lt-cell" data-lt-eff title="Coulombic charge efficiency, SoC-corrected. Healthy LFP is 95-99%. Dropping &lt;93% over months hints at pack degradation."><span class="meta-k">η <span class="lt-eff-win">—</span></span><span class="lt-v" data-lt="eff">—</span></div>`;
       card.appendChild(lifeBar);
       ensureLifetime(dev.label).then(lt => {
         if (!lt) return;
         lifeBar.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "—";
         lifeBar.querySelector('[data-lt="ah_in"]').textContent = `${(+lt.ah_in).toFixed(1)} Ah`;
         lifeBar.querySelector('[data-lt="ah_out"]').textContent = `${(+lt.ah_out).toFixed(1)} Ah`;
+      });
+      ensureEfficiency(dev.label).then(eff => {
+        const cell = lifeBar.querySelector('[data-lt-eff]');
+        const val  = cell?.querySelector('[data-lt="eff"]');
+        const winLabel = cell?.querySelector('.lt-eff-win');
+        if (!cell || !val) return;
+        const h = efficiencyHeadline(eff);
+        if (!h) { val.textContent = "—"; return; }
+        val.textContent = `${h.value.toFixed(1)} %`;
+        if (winLabel) winLabel.textContent = h.window;
+        cell.classList.toggle("lt-cell--unreliable", !h.reliable);
+        if (!h.reliable) {
+          cell.title = "Not enough cycling yet for this efficiency number to be trustworthy. Comes back into focus once the pack has done at least one full cycle's worth of throughput inside the window.";
+        }
       });
     }
 
@@ -2874,6 +2923,21 @@ function buildLifetimeBlock(dev) {
         <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">—</span></div>
         <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">—</span></div>
         <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>
+        <div class="lt-cell" data-lt-eff
+             title="Coulombic charge efficiency, SoC-corrected. Healthy LFP is 95-99%. Dropping below ~93% over months hints at pack degradation.">
+          <span class="meta-k">η <span class="lt-eff-win">—</span></span>
+          <span class="lt-v" data-lt="eff">—</span>
+        </div>
+      </div>
+      <div class="dev-efficiency-detail" id="dd-eff-${dev.label}" hidden>
+        <h4>Charge efficiency by window</h4>
+        <div class="eff-grid" data-eff-grid></div>
+        <p class="settings-foot">
+          Only windows with at least one full cycle's worth of
+          throughput are shown in colour. Greyed entries don't yet
+          have enough cycling to be trustworthy. Numbers are
+          coulomb-corrected: <code>(Ah out + Δ remaining) / Ah in</code>.
+        </p>
       </div>
     </section>
   `;
@@ -2971,6 +3035,39 @@ function wireDeviceDetailChart(dev) {
       block.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "—";
       block.querySelector('[data-lt="ah_in"]').textContent = `${(+lt.ah_in).toFixed(1)} Ah`;
       block.querySelector('[data-lt="ah_out"]').textContent = `${(+lt.ah_out).toFixed(1)} Ah`;
+    });
+    ensureEfficiency(dev.label).then(eff => {
+      if (!eff) return;
+      const block = document.querySelector(`#dd-lifetime-${dev.label}`);
+      const detail = document.querySelector(`#dd-eff-${dev.label}`);
+      if (!block) return;
+      // Headline cell (same logic as device-card)
+      const cell = block.querySelector('[data-lt-eff]');
+      const val  = cell?.querySelector('[data-lt="eff"]');
+      const winLabel = cell?.querySelector('.lt-eff-win');
+      const h = efficiencyHeadline(eff);
+      if (h && val) {
+        val.textContent = `${h.value.toFixed(1)} %`;
+        if (winLabel) winLabel.textContent = h.window;
+        cell.classList.toggle("lt-cell--unreliable", !h.reliable);
+      }
+      // Per-window breakdown table — only shown on the device detail page
+      const grid = detail?.querySelector("[data-eff-grid]");
+      if (!grid) return;
+      const order = ["7d", "30d", "90d", "lifetime"];
+      grid.innerHTML = order.map(k => {
+        const w = eff.windows?.[k];
+        if (!w) return "";
+        const v = w.efficiency_pct;
+        const cls = w.reliable ? "" : " eff-cell--unreliable";
+        const txt = v == null ? "—" : `${v.toFixed(1)} %`;
+        return `<div class="eff-cell${cls}">
+          <span class="meta-k">${k}</span>
+          <span class="eff-cell-val">${txt}</span>
+          <span class="eff-cell-foot">${w.cycle_equivalents?.toFixed(2) ?? "—"} cyc</span>
+        </div>`;
+      }).join("");
+      detail.hidden = false;
     });
   }
 }

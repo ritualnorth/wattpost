@@ -1350,7 +1350,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 /* Lifetime stats strip on smart-battery cards */
 .dev-card-lifetime {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: .5rem;
   margin: .25rem 0 .65rem;
   padding: .5rem .55rem;
@@ -1365,6 +1365,56 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+.lt-cell--unreliable .lt-v,
+.lt-cell--unreliable .meta-k { color: var(--text-3, var(--text-2)); opacity: .55; }
+.lt-eff-win {
+  font-size: .7rem;
+  font-family: var(--mono);
+  color: var(--text-2);
+  text-transform: lowercase;
+}
+
+/* Per-window efficiency breakdown on the device detail page. Hidden
+ * until the fetch resolves so an unfinished smart_battery (no data
+ * yet) doesn't show an empty grid. */
+.dev-efficiency-detail {
+  margin-top: .75rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+.dev-efficiency-detail h4 {
+  margin: 0 0 .4rem; font-size: .82rem; color: var(--text-2);
+  font-weight: 600;
+}
+.eff-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+}
+.eff-cell {
+  display: flex; flex-direction: column;
+  padding: .5rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.eff-cell-val {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-top: .15rem;
+}
+.eff-cell-foot {
+  font-size: .7rem;
+  color: var(--text-2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+}
+.eff-cell--unreliable .eff-cell-val,
+.eff-cell--unreliable .eff-cell-foot,
+.eff-cell--unreliable .meta-k { opacity: .5; }
 
 /* Cell-drift trend sparkline */
 .cell-drift-trend {
