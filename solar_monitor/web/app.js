@@ -2563,7 +2563,22 @@ function renderCloudForm(cc) {
           <button type="button" class="btn-action alerts-icon-btn--danger" data-unpair-cloud>Disable</button>
           <button type="button" class="btn-action" data-cancel-cloud>Cancel</button>
           <span class="alerts-form-status"></span>
-        </div>` : `
+        </div>
+        <details class="alerts-repair">
+          <summary>Pair with a different account…</summary>
+          <p class="settings-foot">
+            Paste a pairing code from the (new) wattpost.io account. Submitting will
+            replace the existing pairing — this appliance's old row stays on the
+            previous account until that user removes it.
+          </p>
+          <label class="alerts-field-wide">New pairing code
+            <input type="text" name="code" placeholder="e.g. 8MR7EYS6" pattern="[A-Za-z0-9]{6,12}"
+                   maxlength="12" autocomplete="off" style="text-transform:uppercase; letter-spacing:.12em;"/>
+          </label>
+          <div class="alerts-form-actions">
+            <button type="button" class="btn-action btn-action--primary" data-repair-cloud>Pair with new account</button>
+          </div>
+        </details>` : `
         <label class="alerts-field-wide">Pairing code
           <input type="text" name="code" placeholder="e.g. 8MR7EYS6" required pattern="[A-Za-z0-9]{6,12}"
                  maxlength="12" autocomplete="off" style="text-transform:uppercase; letter-spacing:.12em;"/>
@@ -2595,6 +2610,35 @@ function wireCloudForm() {
   });
   form.querySelector("[data-test-cloud]")?.addEventListener("click", () => testCloudHeartbeat(form));
   form.querySelector("[data-unpair-cloud]")?.addEventListener("click", () => unpairCloud(form));
+  form.querySelector("[data-repair-cloud]")?.addEventListener("click", () => repairCloud(form));
+}
+
+async function repairCloud(form) {
+  const status = form.querySelector(".alerts-form-status");
+  const code = form.elements["code"]?.value?.trim().toUpperCase();
+  if (!code) {
+    status.textContent = "Enter a pairing code first."; status.classList.add("err");
+    return;
+  }
+  status.textContent = "Pairing…"; status.className = "alerts-form-status";
+  const payload = {
+    endpoint: form.elements["endpoint"].value.trim(),
+    code,
+  };
+  try {
+    const r = await fetch("/api/cloud/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    status.textContent = `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Restart daemon for heartbeats to switch over.`;
+    status.classList.add("ok");
+    setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 2000);
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
+  }
 }
 
 async function pairCloud(form) {
