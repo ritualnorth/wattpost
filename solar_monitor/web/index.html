@@ -22,7 +22,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=74" />
+  <link rel="stylesheet" href="/web/styles.css?v=75" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -416,10 +416,22 @@
             <p class="placeholder-status" style="margin-top:.5rem">Key entry + tier gating coming with v0.1.0.</p>
           </div>
           <div class="settings-block">
+            <h3>Network</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Tailscale lets you reach the dashboard from anywhere without port-forwarding or a public IP.
+              Free for personal use; we don't host anything.
+            </p>
+            <div id="settings-tailscale" class="ts-block">
+              <div class="settings-empty">Loading…</div>
+            </div>
+          </div>
+          <div class="settings-block">
             <h3>About</h3>
             <div class="settings-row"><span>Version</span><span class="v">v0.0.1</span></div>
-            <div class="settings-row"><span>Tailnet IP</span><span class="v">100.116.187.70</span></div>
             <div class="settings-row"><span>Daemon</span><span class="v" id="settings-daemon">—</span></div>
+            <div class="settings-row"><span>Uptime</span><span class="v" id="settings-uptime">—</span></div>
+            <div class="settings-row"><span>Python</span><span class="v" id="settings-python">—</span></div>
+            <div class="settings-row"><span>Disk (root)</span><span class="v" id="settings-disk">—</span></div>
           </div>
           <div class="settings-block">
             <h3>System</h3>
@@ -483,6 +495,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=74"></script>
+  <script src="/web/app.js?v=75"></script>
 </body>
 </html>

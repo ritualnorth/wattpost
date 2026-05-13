@@ -1602,6 +1602,144 @@ function renderSettings() {
   // MQTT we don't query directly; best effort message until /api/exporters exists
   $("#settings-mqtt").textContent = "see config.yaml";
   refreshAlertsPanel();
+  refreshSystemInfo();
+  refreshTailscale();
+}
+
+// ---------- system info (About block) ----------
+function fmtBytes(b) {
+  if (b == null) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let n = b, i = 0;
+  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(n >= 10 ? 0 : 1)} ${units[i]}`;
+}
+function fmtDuration(s) {
+  if (s == null) return "—";
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+async function refreshSystemInfo() {
+  let info;
+  try { info = await api("/api/system/info"); }
+  catch (_) { return; }
+  const d = info.disk || {};
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set("#settings-uptime", fmtDuration(info.uptime_seconds));
+  set("#settings-python", info.python || "—");
+  set(
+    "#settings-disk",
+    d.total
+      ? `${fmtBytes(d.used)} / ${fmtBytes(d.total)} · ${d.percent}% used`
+      : "—",
+  );
+}
+
+// ---------- Tailscale (Network block) ----------
+async function refreshTailscale() {
+  const host = $("#settings-tailscale");
+  if (!host) return;
+  let s;
+  try { s = await api("/api/system/tailscale/status"); }
+  catch (e) {
+    host.innerHTML = `<div class="settings-empty">Could not check Tailscale: ${e.message}</div>`;
+    return;
+  }
+  if (!s.installed) {
+    host.innerHTML = `
+      <div class="ts-state-row">
+        <div class="ts-state-main">
+          <span class="ts-state-title">Tailscale isn't installed</span>
+          <span class="ts-state-sub">Install on the appliance, then reload this page.</span>
+        </div>
+        <span class="ts-state-tag ts-state-tag--off">not installed</span>
+      </div>
+      <div class="ts-install">${s.install_hint || "curl -fsSL https://tailscale.com/install.sh | sh"}</div>`;
+    return;
+  }
+  let html = "";
+  if (s.logged_in && s.ipv4) {
+    const url = s.dns_name ? `http://${s.dns_name.replace(/\.$/, "")}:8000/` : `http://${s.ipv4}:8000/`;
+    html += `
+      <div class="ts-state-row">
+        <div class="ts-state-main">
+          <span class="ts-state-title">Connected · ${s.hostname || "wattpost"}</span>
+          <span class="ts-state-sub">${s.ipv4}${s.dns_name ? ` · ${s.dns_name.replace(/\.$/, "")}` : ""}</span>
+        </div>
+        <span class="ts-state-tag ts-state-tag--ok">on tailnet</span>
+      </div>
+      <div class="settings-foot">Open from anywhere: <a href="${url}">${url}</a></div>
+      <div class="ts-actions">
+        <button id="ts-disconnect" class="alerts-add-btn">Disconnect</button>
+      </div>`;
+  } else {
+    html += `
+      <div class="ts-state-row">
+        <div class="ts-state-main">
+          <span class="ts-state-title">Not connected</span>
+          <span class="ts-state-sub">${s.backend ? `state: ${s.backend}` : ""}</span>
+        </div>
+        <span class="ts-state-tag ts-state-tag--warn">offline</span>
+      </div>
+      <div class="ts-actions">
+        <button id="ts-connect" class="alerts-add-btn">Connect to my tailnet</button>
+      </div>`;
+  }
+  host.innerHTML = html;
+
+  const connect    = $("#ts-connect");
+  const disconnect = $("#ts-disconnect");
+  if (connect)    connect.addEventListener("click", tailscaleConnect);
+  if (disconnect) disconnect.addEventListener("click", tailscaleDisconnect);
+}
+
+async function tailscaleConnect() {
+  const host = $("#settings-tailscale");
+  if (!host) return;
+  host.innerHTML = `<div class="settings-empty">Starting Tailscale… (this can take a few seconds)</div>`;
+  try {
+    const r = await fetch("/api/system/tailscale/up", { method: "POST" });
+    const data = await r.json();
+    if (data.already_authed) {
+      // We're back on a known tailnet — refresh shows the connected pill.
+      await refreshTailscale();
+      return;
+    }
+    if (data.auth_url) {
+      host.innerHTML = `
+        <div class="ts-auth">
+          <span class="ts-auth-title">Log in to your tailnet to finish</span>
+          <a href="${data.auth_url}" target="_blank" rel="noopener">${data.auth_url}</a>
+          <span class="settings-foot">After authorising, refresh — this page should flip to "Connected · &lt;hostname&gt;".</span>
+        </div>
+        <div class="ts-actions">
+          <button id="ts-refresh" class="alerts-add-btn">I've authorised — refresh</button>
+        </div>`;
+      $("#ts-refresh")?.addEventListener("click", refreshTailscale);
+      return;
+    }
+    host.innerHTML = `<div class="settings-empty">Tailscale started but didn't return an auth URL. ${data.hint || ""}</div>`;
+  } catch (e) {
+    host.innerHTML = `<div class="settings-empty">Connect failed: ${e.message}</div>`;
+  }
+}
+
+async function tailscaleDisconnect() {
+  if (!confirm("Disconnect this appliance from your tailnet?")) return;
+  try {
+    const r = await fetch("/api/system/tailscale/down", { method: "POST" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    await refreshTailscale();
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 // ---------- alerts panel (full editor) ----------

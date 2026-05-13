@@ -37,6 +37,9 @@ from .alerts_admin import (
     create_rule, update_rule, delete_rule,
     create_transport, update_transport, delete_transport,
 )
+from .system import (
+    system_info, tailscale_status, tailscale_up, tailscale_down,
+)
 
 
 def _web_dir() -> Path:
@@ -336,6 +339,10 @@ def build_app(
             test_alert,
             restart_daemon,
             system_logs,
+            system_info,
+            tailscale_status,
+            tailscale_up,
+            tailscale_down,
             create_rule,
             update_rule,
             delete_rule,
