@@ -1150,6 +1150,18 @@ main {
 .range-btns button.active {
   color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
 }
+.chart-export-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer;
+  margin-left: auto; /* push to right end of chart-controls */
+}
+.chart-export-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
+.chart-export-btn svg { width: 14px; height: 14px; }
 /* ===== History chart panel ===== */
 /* No special tint — chart and heatmap panels on the same route share the
  * default panel background so they read as siblings. */

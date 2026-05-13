@@ -281,6 +281,65 @@ async def stream(state: State) -> Stream:
     )
 
 
+@get("/api/devices/{label:str}/history.csv")
+async def device_history_csv(
+    label: str,
+    state: State,
+    metric: str,
+    since: int | None = None,
+    until: int | None = None,
+    bucket: int | None = None,
+) -> Stream:
+    """Same args as device_history but emits CSV that Excel / Numbers /
+    Pandas all parse cleanly. ISO-8601 timestamps with a numeric epoch
+    column alongside for users who want to do arithmetic on it. min /
+    max columns appear when the underlying rollup has them."""
+    store: Store = state["store"]
+    now = int(time.time())
+    since = since if since is not None else now - 24 * 3600
+    until = until if until is not None else now
+    payload = await store.get_history(label, metric, since, until, bucket_seconds=bucket)
+
+    ts_list = payload.get("ts") or []
+    values  = payload.get("values") or []
+    mins    = payload.get("min") or []
+    maxs    = payload.get("max") or []
+    has_band = len(mins) == len(ts_list) and len(maxs) == len(ts_list) and ts_list
+
+    def _csv_cell(v: Any) -> str:
+        if v is None:
+            return ""
+        return str(v)
+
+    async def gen() -> AsyncIterator[bytes]:
+        header = "timestamp,epoch,value"
+        if has_band:
+            header += ",min,max"
+        yield (header + "\n").encode("utf-8")
+        for i, t in enumerate(ts_list):
+            try:
+                iso = time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(int(t)))
+            except Exception:
+                iso = ""
+            row = f"{iso},{int(t)},{_csv_cell(values[i] if i < len(values) else None)}"
+            if has_band:
+                row += f",{_csv_cell(mins[i] if i < len(mins) else None)}"
+                row += f",{_csv_cell(maxs[i] if i < len(maxs) else None)}"
+            yield (row + "\n").encode("utf-8")
+
+    safe_label = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)
+    safe_metric = "".join(c if c.isalnum() or c in "-_" else "_" for c in metric)
+    filename = f"{safe_label}_{safe_metric}_{since}_{until}.csv"
+    return Stream(
+        gen(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
 @get("/", sync_to_thread=False)
 def index() -> File:
     path = _web_dir() / "index.html"
@@ -332,6 +391,7 @@ def build_app(
             list_devices,
             device_latest,
             device_history,
+            device_history_csv,
             device_lifetime,
             load_heatmap,
             stream,
