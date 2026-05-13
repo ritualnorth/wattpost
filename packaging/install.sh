@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# WattPost install / upgrade script.
+#
+# Usage (as root, or via sudo):
+#   curl -sSL https://wattpost.cloud/install.sh | sudo bash
+#   # or, from a local checkout:
+#   sudo ./packaging/install.sh
+#
+# Idempotent: re-running upgrades the venv + service in place without
+# touching /etc/wattpost/config.yaml or the SQLite database.
+
+set -euo pipefail
+
+# ----- paths -----
+APP_USER="wattpost"
+APP_GROUP="wattpost"
+APP_ROOT="/opt/wattpost"
+APP_VENV="${APP_ROOT}/venv"
+CONFIG_DIR="/etc/wattpost"
+CONFIG_FILE="${CONFIG_DIR}/config.yaml"
+STATE_DIR="/var/lib/wattpost"
+SERVICE_DEST="/etc/systemd/system/wattpost.service"
+
+# Default: install from the local checkout (the directory this script
+# lives in). For a future remote-install path, override with
+# WATTPOST_SOURCE=git+https://... or a wheel URL.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE="${WATTPOST_SOURCE:-${REPO_ROOT}}"
+
+# ----- preflight -----
+if [[ $EUID -ne 0 ]]; then
+    echo "install.sh must run as root (sudo $0)" >&2
+    exit 1
+fi
+
+step() { echo -e "\n\033[1;36m==>\033[0m $*"; }
+warn() { echo -e "\033[1;33mwarn:\033[0m $*" >&2; }
+
+step "checking prerequisites"
+if ! command -v python3 >/dev/null; then
+    echo "python3 not found — apt install python3 first" >&2; exit 1
+fi
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+if [[ "$(printf '%s\n' "3.11" "${PYVER}" | sort -V | head -1)" != "3.11" ]]; then
+    echo "python ${PYVER} too old — need 3.11+" >&2; exit 1
+fi
+if ! command -v systemctl >/dev/null; then
+    echo "systemd not detected (this is intended for Pi OS / Debian)." >&2; exit 1
+fi
+if ! systemctl is-active --quiet bluetooth 2>/dev/null; then
+    warn "bluetooth service isn't active — make sure BlueZ is installed and running before first poll."
+fi
+
+# ----- user + dirs -----
+step "creating user/group ${APP_USER}"
+if ! getent group "${APP_GROUP}" >/dev/null; then
+    groupadd --system "${APP_GROUP}"
+fi
+if ! id "${APP_USER}" >/dev/null 2>&1; then
+    useradd --system --gid "${APP_GROUP}" \
+            --home-dir "${APP_ROOT}" --shell /usr/sbin/nologin \
+            "${APP_USER}"
+fi
+# bluetooth group: gives DBus access to BlueZ for BLE scans/connects.
+if getent group bluetooth >/dev/null; then
+    usermod -a -G bluetooth "${APP_USER}"
+fi
+
+step "preparing ${APP_ROOT}, ${CONFIG_DIR}, ${STATE_DIR}"
+mkdir -p "${APP_ROOT}" "${CONFIG_DIR}" "${STATE_DIR}"
+chown -R "${APP_USER}:${APP_GROUP}" "${APP_ROOT}" "${STATE_DIR}"
+chown "${APP_USER}:${APP_GROUP}" "${CONFIG_DIR}"
+
+# ----- venv -----
+step "installing venv at ${APP_VENV}"
+if [[ ! -x "${APP_VENV}/bin/python" ]]; then
+    python3 -m venv "${APP_VENV}"
+fi
+"${APP_VENV}/bin/pip" install --upgrade pip wheel >/dev/null
+"${APP_VENV}/bin/pip" install --upgrade "${SOURCE}"
+
+# ----- config (only if not present — don't clobber the user's edits) -----
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    step "seeding ${CONFIG_FILE} from config.example.yaml"
+    if [[ -f "${REPO_ROOT}/config.example.yaml" ]]; then
+        cp "${REPO_ROOT}/config.example.yaml" "${CONFIG_FILE}"
+    else
+        cat > "${CONFIG_FILE}" <<'YAML'
+# Edit via the Setup wizard at http://<this-pi>:8000/#/setup
+# or by hand. See https://github.com/ritualnorth/offgrid-monitor
+transports: []
+devices: []
+exporters: []
+notification_transports: []
+alerts: []
+YAML
+    fi
+    chown "${APP_USER}:${APP_GROUP}" "${CONFIG_FILE}"
+    chmod 0640 "${CONFIG_FILE}"
+else
+    step "keeping existing ${CONFIG_FILE}"
+fi
+
+# ----- systemd unit -----
+step "installing wattpost.service"
+install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"
+systemctl daemon-reload
+systemctl enable wattpost.service >/dev/null
+systemctl restart wattpost.service
+
+# ----- summary -----
+step "done"
+IP=$(hostname -I | awk '{print $1}')
+cat <<EOF
+
+WattPost is running. Open the dashboard:
+
+    http://${IP:-<this-pi>}:8000/
+
+Useful commands:
+    sudo systemctl status wattpost     # health
+    journalctl -u wattpost -f           # live logs
+    sudo systemctl restart wattpost     # apply config changes (the UI's
+                                        # "Restart daemon" button does the
+                                        # same via /api/system/restart)
+
+Config file:       ${CONFIG_FILE}
+Database:          ${STATE_DIR}/solar-monitor.db
+App + venv:        ${APP_ROOT}/
+
+EOF

@@ -1,0 +1,59 @@
+[Unit]
+Description=WattPost solar-monitor daemon
+Documentation=https://github.com/ritualnorth/offgrid-monitor
+# Bluetooth must be up before we try to discover the BT-2 dongle.
+# network-online.target lets the cloud sync + ntfy / Discord / SMTP
+# transports reach the outside world on first poll.
+After=bluetooth.service network-online.target
+Wants=bluetooth.service network-online.target
+
+[Service]
+Type=simple
+User=wattpost
+Group=wattpost
+# bluetooth group gives access to BlueZ DBus without root.
+SupplementaryGroups=bluetooth
+
+WorkingDirectory=/opt/wattpost
+Environment=PYTHONUNBUFFERED=1
+# Single source of truth for runtime paths so the install script and
+# pi-gen stage only have to set them in one place.
+Environment=WATTPOST_CONFIG=/etc/wattpost/config.yaml
+Environment=WATTPOST_DB=/var/lib/wattpost/solar-monitor.db
+
+ExecStart=/opt/wattpost/venv/bin/solar-monitor --log-level INFO serve \
+    --config ${WATTPOST_CONFIG} \
+    --db ${WATTPOST_DB} \
+    --interval 60 \
+    --port 8000 \
+    --host 0.0.0.0
+
+# /api/system/restart uses os.execv to re-exec the daemon. Restart=
+# on-failure means systemd also brings us back if the process crashes
+# for any reason that *doesn't* end in an execv.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+# Hardening — minimum capabilities, read-only filesystem except for
+# the state + log paths we explicitly need.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/wattpost /etc/wattpost
+# config.yaml gets rewritten in place by the setup wizard + alerts
+# editor, so /etc/wattpost has to be writable too.
+
+# journald captures stdout/stderr; the in-memory ring buffer also keeps
+# the last 500 lines for Settings → Diagnostics.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
