@@ -38,6 +38,11 @@ Versions follow [Semantic Versioning].
 - BLE transport now auto-recovers from "device not advertising"
   timeouts on daemon restart by clearing BlueZ's stale connection
   state (`bluetoothctl disconnect`) and retrying once
+- Tailscale endpoints surface real sudo errors to the UI instead of
+  returning `ok:true` and only logging — Enable HTTPS / Connect /
+  Disconnect now show a username-aware fix-it hint
+  (`packaging/dev-sudoers.sh` for dev shells, re-run `install.sh`
+  for production `wattpost` user)
 
 ## [0.0.1] — 2026-05-12
 Initial private commit. End-to-end working appliance against a live
