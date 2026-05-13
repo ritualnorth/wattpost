@@ -9,6 +9,9 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- History chart: "Compare packs" toggle overlays every smart_battery
+  pack's metric on one chart. Auto-disabled when fewer than two
+  packs are configured or when a non-battery device is selected.
 - Quiet hours: `config.yaml` accepts a `quiet_hours: {start_hour, end_hour}`
   block. Inside the window, warn-severity alerts buffer and flush
   when the window ends; alarm-severity always pages through.

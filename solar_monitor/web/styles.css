@@ -1150,6 +1150,10 @@ main {
 .range-btns button.active {
   color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
 }
+.chart-compare { user-select: none; cursor: pointer; }
+.chart-compare input { margin: 0; cursor: pointer; }
+.chart-compare.is-disabled { opacity: .4; cursor: not-allowed; }
+.chart-compare.is-disabled input { cursor: not-allowed; }
 .chart-export-btn {
   display: inline-flex; align-items: center; gap: .35rem;
   background: var(--surface-2); color: var(--text-2);
