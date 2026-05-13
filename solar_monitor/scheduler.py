@@ -13,6 +13,7 @@ import time
 from typing import Any
 
 from .alerts import AlertEngine, AlertRule
+from .forecast import ForecastService
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -61,6 +62,15 @@ class PollScheduler:
         self._alerts = AlertEngine(
             rules, config.notification_transports, quiet_hours=quiet_hours,
         )
+        # PV forecast service — only built when the user has configured
+        # a `forecast:` block. Stays None otherwise so the rest of the
+        # daemon doesn't pay for an unused feature.
+        self._forecast: ForecastService | None = None
+        if config.forecast is not None:
+            try:
+                self._forecast = ForecastService(config.forecast, store)
+            except Exception:
+                log.exception("forecast service failed to initialise")
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -144,6 +154,10 @@ class PollScheduler:
         # Bring up alert transports (ntfy / Discord / webhook / …).
         await self._alerts.start()
 
+        # Background forecast poller (only if configured).
+        if self._forecast is not None:
+            await self._forecast.start()
+
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
         self._maint_task = asyncio.create_task(self._maintenance(), name="maintenance")
@@ -188,6 +202,8 @@ class PollScheduler:
         self._exporters.clear()
 
         await self._alerts.stop()
+        if self._forecast is not None:
+            await self._forecast.stop()
 
         log.info("scheduler stopped")
 

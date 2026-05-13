@@ -1353,7 +1353,18 @@ async function refreshChart() {
   try { data = await api(url); }
   catch (e) { console.error(e); return; }
   updateStatStrip(metric, data);
-  drawChart(label, metric, data);
+
+  // PV forecast overlay: only meaningful when viewing pv_power_w (the
+  // charge controller's incoming PV). Best-effort — a missing or
+  // unconfigured forecast just falls through to a normal chart.
+  let forecast = null;
+  if (metric === "pv_power_w") {
+    try {
+      const f = await api("/api/forecast/pv");
+      if (f?.points?.length) forecast = f;
+    } catch (e) { /* swallow — no forecast is fine */ }
+  }
+  drawChart(label, metric, data, forecast);
 }
 
 async function refreshChartCompare(metric, selectedLabel) {
@@ -1468,7 +1479,7 @@ function updateStatStrip(metric, data) {
   $("#cs-res").textContent = `${s.count ?? 0} pts · ${tableLabel}`;
 }
 
-function drawChart(label, metric, data) {
+function drawChart(label, metric, data, forecast = null) {
   const root = $("#chart");
   if (chart) { chart.destroy(); chart = null; }
   const unit = unitFromKey(metric);
@@ -1478,6 +1489,17 @@ function drawChart(label, metric, data) {
   const vals = data.values;
   const hasBand = Array.isArray(data.min) && Array.isArray(data.max) &&
                   data.min.length === ts.length && data.min.length > 0;
+
+  // Filter forecast to future-only points so we don't visually overlap
+  // the observed line in the past (where the forecast is now a known
+  // bad prediction). We keep one point from the most recent historic
+  // value as the anchor so the dashed line joins up cleanly at the
+  // "now" boundary instead of starting in mid-air.
+  let forecastFuture = [];
+  if (forecast?.points?.length) {
+    const now = Math.floor(Date.now() / 1000);
+    forecastFuture = forecast.points.filter(p => p.ts >= now);
+  }
 
   // Build series + data matrix in lockstep so indices always line up.
   //   series[0] = x (always)
@@ -1504,7 +1526,7 @@ function drawChart(label, metric, data) {
     bands = [{ series: [2, 1], fill: pal.bandFill }];
   }
 
-  // Main line — last series, always visible.
+  // Main line — last historic series, always visible.
   series.push({
     label: prettyKey(metric),
     stroke: pal.accent,
@@ -1515,11 +1537,46 @@ function drawChart(label, metric, data) {
   });
   dataCols.push(vals);
 
-  // Auto-fit X scale to actual data — uPlot otherwise extends the visible
-  // range to weird year boundaries when only a tiny slice has data (which
-  // is what's happening on a freshly-seeded daemon).
-  const tsMin = ts.length ? ts[0] : null;
-  const tsMax = ts.length ? ts[ts.length - 1] : null;
+  // Build the combined timeline including forecast points so the X
+  // axis extends into the future. The forecast series is null for
+  // historic timestamps and carries values for future-only ones; the
+  // historic series is null beyond `ts[-1]`.
+  let combinedTs = ts.slice();
+  if (forecastFuture.length) {
+    const lastHistoric = ts.length ? ts[ts.length - 1] : 0;
+    const fTs = forecastFuture.map(p => p.ts).filter(t => t > lastHistoric);
+    combinedTs = combinedTs.concat(fTs);
+    // Pad existing data columns so all arrays stay in lockstep with
+    // combinedTs length.
+    const pad = new Array(fTs.length).fill(null);
+    for (let i = 1; i < dataCols.length; i++) {
+      dataCols[i] = dataCols[i].concat(pad);
+    }
+    // Forecast series: null for the historic portion, then the future values.
+    const forecastCol = new Array(ts.length).fill(null);
+    const fTsSet = new Set(fTs);
+    for (const p of forecastFuture) {
+      if (!fTsSet.has(p.ts)) continue;
+      forecastCol.push(p.pv_w);
+    }
+    series.push({
+      label: "forecast",
+      stroke: pal.amber || "#d29922",
+      width: 2,
+      // uPlot accepts a dash pattern via canvas-style `dash` option.
+      dash: [6, 4],
+      fill: "rgba(210,153,34,0.10)",
+      points: { show: false },
+      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+    });
+    dataCols.push(forecastCol);
+    dataCols[0] = combinedTs;
+  }
+
+  // Auto-fit X scale to whatever timeline we ended up with — historical
+  // only, or historical + forecast extension.
+  const tsMin = combinedTs.length ? combinedTs[0] : null;
+  const tsMax = combinedTs.length ? combinedTs[combinedTs.length - 1] : null;
   const xScale = (tsMin != null && tsMax != null && tsMax > tsMin)
     ? { time: true, range: [tsMin, tsMax] }
     : { time: true };
@@ -1797,6 +1854,7 @@ function renderSettings() {
   refreshAlertsPanel();
   refreshSystemInfo();
   refreshTailscale();
+  refreshIntegrationsPanel();
 }
 
 // ---------- system info (About block) ----------
@@ -1970,6 +2028,185 @@ async function tailscaleDisconnect() {
     await refreshTailscale();
   } catch (e) {
     alert(e.message);
+  }
+}
+
+// ---------- integrations panel (Solcast for now) ----------
+//
+// One-shot fetch on settings open; mutates inline when the user
+// clicks Edit / Save / Test. State stays in module-scope so we don't
+// re-fetch on every render.
+let integrationsState = { forecast: null, editing: false };
+
+async function refreshIntegrationsPanel() {
+  const host = $("#settings-integrations");
+  if (!host) return;
+  try {
+    integrationsState.forecast = await api("/api/forecast/config");
+  } catch (e) {
+    host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
+    return;
+  }
+  renderIntegrationsPanel();
+}
+
+function renderIntegrationsPanel() {
+  const host = $("#settings-integrations");
+  if (!host) return;
+  const fc = integrationsState.forecast || {};
+  if (integrationsState.editing) {
+    host.innerHTML = renderForecastForm(fc);
+    wireForecastForm();
+    return;
+  }
+  const configured = fc.configured;
+  host.innerHTML = `
+    <div class="integration-row" data-integration="solcast">
+      <div class="integration-row-main">
+        <div class="integration-row-head">
+          <span class="integration-row-name">Solcast PV forecast</span>
+          <span class="alerts-row-tag alerts-row-tag--${configured ? "ok" : "warn"}">
+            ${configured ? "configured" : "not set up"}
+          </span>
+        </div>
+        <div class="integration-row-sub">
+          ${configured
+            ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "—"}…`
+            : `Sign up at <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">solcast.com</a> for a free hobbyist API key.`
+          }
+        </div>
+      </div>
+      <div class="integration-row-actions">
+        <button class="alerts-add-btn" data-edit-forecast>
+          ${configured ? "Edit" : "Configure"}
+        </button>
+      </div>
+    </div>`;
+  $("[data-edit-forecast]")?.addEventListener("click", () => {
+    integrationsState.editing = true;
+    renderIntegrationsPanel();
+  });
+}
+
+function renderForecastForm(fc) {
+  const apiKeyMasked = fc.api_key === "****";
+  return `
+    <form class="alerts-form" data-form="forecast">
+      <div class="alerts-form-grid">
+        <label>API key
+          <input type="password" name="api_key"
+                 value="${apiKeyMasked ? "" : ""}"
+                 placeholder="${apiKeyMasked ? "(unchanged)" : "your Solcast API key"}"
+                 ${apiKeyMasked ? "" : "required"} autocomplete="off"/>
+        </label>
+        <label>Resource ID
+          <input type="text" name="resource_id"
+                 value="${fc.resource_id || ""}"
+                 placeholder="e.g. abcd-1234-…" required/>
+        </label>
+        <label>Poll every (hours)
+          <input type="number" name="poll_hours"
+                 value="${fc.poll_hours ?? 3}" min="1" max="24" required/>
+        </label>
+      </div>
+      <p class="settings-foot">
+        Hobbyist tier allows 10 API calls/day. 3 hours = 8/day, which leaves
+        room for retries. Find your resource ID at
+        <a href="https://toolkit.solcast.com.au/rooftop-sites" target="_blank" rel="noopener">solcast.com → My Sites</a>.
+      </p>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">Save</button>
+        <button type="button" class="btn-action" data-test-forecast>Test</button>
+        ${fc.configured
+          ? `<button type="button" class="btn-action alerts-icon-btn--danger" data-clear-forecast>Disable</button>`
+          : ""}
+        <button type="button" class="btn-action" data-cancel-forecast>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function wireForecastForm() {
+  const form = document.querySelector("form[data-form='forecast']");
+  if (!form) return;
+  form.addEventListener("submit", (e) => { e.preventDefault(); saveForecastConfig(form); });
+  form.querySelector("[data-cancel-forecast]")?.addEventListener("click", () => {
+    integrationsState.editing = false;
+    renderIntegrationsPanel();
+  });
+  form.querySelector("[data-test-forecast]")?.addEventListener("click", () => testForecast(form));
+  form.querySelector("[data-clear-forecast]")?.addEventListener("click", () => clearForecast(form));
+}
+
+function _forecastPayload(form) {
+  const ak = form.elements["api_key"].value;
+  return {
+    provider:    "solcast",
+    api_key:     ak === "" ? "****" : ak,    // sentinel for "keep existing"
+    resource_id: form.elements["resource_id"].value.trim(),
+    poll_hours:  parseInt(form.elements["poll_hours"].value, 10),
+  };
+}
+
+async function saveForecastConfig(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/forecast/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_forecastPayload(form)),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = false;
+    await refreshIntegrationsPanel();
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
+  }
+}
+
+async function testForecast(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Testing…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/forecast/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(_forecastPayload(form)),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    const peak = d.peak_ts ? new Date(d.peak_ts * 1000).toLocaleString() : null;
+    status.textContent = peak
+      ? `✓ ${d.points} forecast points · next peak ${(d.peak_w / 1000).toFixed(2)} kW at ${peak}`
+      : `✓ ${d.points} forecast points received`;
+    status.classList.add("ok");
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
+  }
+}
+
+async function clearForecast(form) {
+  if (!confirm("Disable Solcast forecast? Existing cached data is dropped.")) return;
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Disabling…";
+  try {
+    const r = await fetch("/api/forecast/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "solcast", api_key: null, resource_id: null, poll_hours: 3 }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = false;
+    await refreshIntegrationsPanel();
+  } catch (e) {
+    status.textContent = e.message; status.classList.add("err");
   }
 }
 

@@ -9,6 +9,12 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
+- Solcast PV forecast: configurable in Settings → Integrations
+  (user supplies their own free API key + resource UUID), polled
+  every 3h by default, overlaid as a dashed line on the History
+  chart when viewing pv_power_w. New SQLite `kv` table caches
+  the most recent fetch so a daemon restart doesn't blank the
+  overlay.
 - Charge efficiency: `/api/devices/{label}/efficiency` returns
   SoC-corrected coulombic efficiency over 7d / 30d / 90d / lifetime
   windows. Smart-battery device cards show an `η` tile picking the

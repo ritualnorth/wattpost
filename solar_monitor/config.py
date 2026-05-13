@@ -53,6 +53,19 @@ class AlertRuleCfg(msgspec.Struct, kw_only=True):
     transports: list[str] = []
 
 
+class ForecastCfg(msgspec.Struct, kw_only=True):
+    """Third-party PV forecast integration. Each user supplies their
+    own credentials — we don't proxy. Currently only `solcast` is
+    implemented; structured this way so adding tomorrow.io / forecast.solar
+    is a new provider class, not a config-schema change."""
+    provider: str = "solcast"
+    api_key: str
+    resource_id: str
+    # Cadence of the poll loop. Solcast hobbyist tier is 10 calls/day,
+    # so 3 hours (8/day) leaves a comfortable buffer.
+    poll_hours: int = 3
+
+
 class QuietHoursCfg(msgspec.Struct, kw_only=True):
     """Window during which `warn`-severity alerts are buffered instead of
     dispatched immediately. `alarm` always pages through. Hours are
@@ -72,6 +85,7 @@ class Config(msgspec.Struct, kw_only=True):
     notification_transports: list[dict[str, Any]] = []  # optional
     alerts: list[AlertRuleCfg] = []  # optional
     quiet_hours: QuietHoursCfg | None = None  # optional
+    forecast: ForecastCfg | None = None  # optional
 
 
 def load_config(path: str | Path) -> Config:

@@ -123,6 +123,15 @@ CREATE TABLE IF NOT EXISTS poll_runs (
     errors_count  INTEGER NOT NULL,
     errors_json   TEXT
 );
+
+-- Small key/value scratch table for cached blobs (forecast payloads,
+-- third-party integration state, etc). Use it for things too small to
+-- warrant their own schema; anything bigger should get a real table.
+CREATE TABLE IF NOT EXISTS kv (
+    k          TEXT PRIMARY KEY,
+    v          TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+);
 """
 
 # Retention windows (seconds). Each lower-resolution table keeps data for
@@ -177,6 +186,34 @@ class Store:
 
     async def __aexit__(self, *_: Any) -> None:
         await self.close()
+
+    # ---------- key/value scratch ----------
+
+    async def kv_set(self, key: str, value: str) -> None:
+        """Upsert a string blob under `key`. Caller is responsible for
+        serialising (JSON, etc.); we treat the body as opaque so this
+        stays cheap and provider-agnostic."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        await self._db.execute(
+            "INSERT INTO kv (k, v, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(k) DO UPDATE SET v = excluded.v, "
+            "                              updated_at = excluded.updated_at",
+            (key, value, int(time.time())),
+        )
+        await self._db.commit()
+
+    async def kv_get(self, key: str) -> tuple[str, int] | None:
+        """Returns (value, updated_at) or None if not set."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        async with self._db.execute(
+            "SELECT v, updated_at FROM kv WHERE k = ?", (key,),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        return str(row[0]), int(row[1])
 
     # ---------- writes ----------
 

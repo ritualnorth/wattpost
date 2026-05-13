@@ -104,6 +104,18 @@ devices:
 #     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
 #     # device: pixel-9                            # optional: only this device. Omit for all.
 
+# PV forecast — optional. When set, the daemon polls Solcast (or
+# another supported provider) every poll_hours and caches the result;
+# the History chart overlays the forecast on pv_power_w. Sign up
+# free at https://solcast.com/free-rooftop-solar-forecasting for a
+# residential API key, register your rooftop array, paste the
+# resource UUID below.
+# forecast:
+#   provider: solcast
+#   api_key:  <your-36-char-key>
+#   resource_id: <site-uuid>
+#   poll_hours: 3   # 8 calls/day; Solcast hobbyist limit is 10/day
+
 # Quiet hours — warn-severity alerts inside this window are buffered
 # and flushed when the window ends. alarm-severity always pages through
 # immediately. Hours are local time, 0-23. Overnight (start > end) works.
