@@ -129,6 +129,40 @@ if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
 fi
 rm -f "${SUDOERS_FILE}.tmp"
 
+# ----- cloudflared (optional, for cloud tunnel) -----
+# Install Cloudflare's cloudflared binary so the daemon can expose
+# the local dashboard at <slug>.wattpost.io once it's paired to the
+# cloud. Idempotent: skipped if already installed. Apt-managed (via
+# Cloudflare's signed repo) so `apt upgrade` keeps it current.
+#
+# Skip entirely on architectures Cloudflare doesn't ship for —
+# tunnel will simply stay off, appliance keeps working locally.
+if ! command -v cloudflared >/dev/null; then
+    step "installing cloudflared (for cloud tunnel — optional)"
+    ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
+    case "${ARCH}" in
+        amd64|arm64|armhf)
+            if ! [ -f /usr/share/keyrings/cloudflare-main.gpg ]; then
+                curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+                    | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+            fi
+            if ! [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
+                CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")"
+                echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
+https://pkg.cloudflare.com/cloudflared ${CODENAME} main" \
+                    > /etc/apt/sources.list.d/cloudflared.list
+            fi
+            apt-get update -qq
+            apt-get install -y cloudflared
+            ;;
+        *)
+            warn "cloudflared not available for arch '${ARCH}' — cloud tunnel will be disabled."
+            ;;
+    esac
+else
+    step "cloudflared already installed ($(cloudflared --version 2>/dev/null | head -1))"
+fi
+
 # ----- systemd unit -----
 step "installing wattpost.service"
 install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"

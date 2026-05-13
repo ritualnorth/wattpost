@@ -160,6 +160,8 @@ async def pair_appliance(
         appliance_id=body.get("appliance_id"),
         label=body.get("label") or "",
         heartbeat_minutes=(config.cloud.heartbeat_minutes if config.cloud else 5),
+        tunnel_token=body.get("tunnel_token") or "",
+        tunnel_hostname=body.get("tunnel_hostname") or "",
     )
     config.cloud = new_c
 
@@ -208,10 +210,17 @@ async def trigger_heartbeat(state: State) -> dict[str, Any]:
 
 
 def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "endpoint":          c.endpoint,
         "bearer_token":      c.bearer_token,
         "appliance_id":      c.appliance_id,
         "label":             c.label,
         "heartbeat_minutes": c.heartbeat_minutes,
     }
+    # Only persist tunnel fields when they're set — keeps existing
+    # config.yaml files free of empty placeholders.
+    if c.tunnel_token:
+        out["tunnel_token"]    = c.tunnel_token
+    if c.tunnel_hostname:
+        out["tunnel_hostname"] = c.tunnel_hostname
+    return out
