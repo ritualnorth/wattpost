@@ -27,7 +27,7 @@ STAGE_NAME="stage-wattpost"
 mkdir -p "${BUILD_ROOT}"
 
 if [ ! -d "${PIGEN_DIR}" ]; then
-    echo "==> cloning pi-gen"
+    echo "==> cloning pi-gen (arm64 branch — pi-gen still splits 32/64-bit by branch)"
     git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen "${PIGEN_DIR}"
 fi
 
@@ -44,6 +44,14 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/nul
 # check without installing a conflicting non-static package.
 sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
 sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || true
+
+# Force pi-gen's Docker builder to use a Debian Bookworm base, not the
+# Trixie default. We're building a Bookworm rootfs (RELEASE=bookworm
+# below). Bootstrapping from a Trixie host into a Bookworm chroot leaves
+# the chroot's debian-archive-keyring out of sync with the InRelease
+# signatures it'll see → "NO_PUBKEY" failures in stage0/00-configure-apt.
+# Pinning the host to Bookworm keeps the keyring lineage consistent.
+sed -i 's|debian:trixie|debian:bookworm|g' "${PIGEN_DIR}/build-docker.sh"
 
 # Link our stage into pi-gen's stages dir.
 ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
