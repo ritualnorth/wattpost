@@ -79,6 +79,10 @@ jobs:
         id: locate
         run: |
           set -euo pipefail
+          # Pi-gen runs the actual build under sudo, so build/pi-gen/
+          # ends up root-owned. Reclaim ownership for the runner user
+          # so subsequent steps (sha256, upload, scp) can write to it.
+          sudo chown -R "$(id -u):$(id -g)" build/pi-gen/deploy
           IMG=$(find build/pi-gen/deploy -maxdepth 2 -name '*.img.xz' -type f | head -n1)
           if [ -z "$IMG" ]; then
             echo "No .img.xz under build/pi-gen/deploy:" >&2
