@@ -32,7 +32,7 @@ Clicking **Open site →** on a card at `app.wattpost.io`:
 3. `cloudflared` on the appliance proxies it to `localhost:80`
 4. The appliance's daemon serves the same dashboard you'd see on the LAN
 
-Auth's seamless: the cloud already authenticated you when you signed in, and the appliance trusts loopback traffic (the request reaches it from `127.0.0.1` via cloudflared) — see [Local web password](/docs/local-password) for the full trust model.
+No second login: the cloud already authenticated you when you signed in, and the appliance trusts loopback traffic (the request reaches it from `127.0.0.1` via cloudflared) — see [Local web password](/docs/local-password) for the full trust model.
 
 ## Unpair
 

@@ -33,13 +33,12 @@ The auth URL is a **one-time, ~10-minute token** that adds the
 appliance to whichever Tailscale account first opens it. Treat it
 like a password — only open it on your device.
 
-## WattPost cloud (paid, coming soon)
+## WattPost cloud (beta)
 
-A managed alternative: we open an outbound tunnel from your
-appliance to `wattpost.cloud` and give you a stable subdomain like
-`https://your-slug.wattpost.cloud/`. No Tailscale account, no auth
-URL, no install. Subscription-funded (we cover the relay + the
-domain).
+A managed alternative: we open an outbound Cloudflare Tunnel from
+your appliance to `wattpost.io` and give you a stable subdomain like
+`https://<slug>.wattpost.io/`. No Tailscale account, no auth URL, no
+install. Free during beta; pricing TBD.
 
-Choose whichever fits — Tailscale if you're technical and want zero
-recurring cost, cloud if you want "plug in and it just works".
+Choose whichever fits. Tailscale is free and self-managed. The cloud
+tier is one-click; it will require a subscription once it leaves beta.
