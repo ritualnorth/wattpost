@@ -183,13 +183,53 @@ body {
 .demo-banner strong { font-weight: 800; letter-spacing: .05em; margin-right: .35rem; }
 .demo-banner a { color: #1a1a0a; font-weight: 700; text-decoration: underline; }
 .demo-banner a:hover { text-decoration: none; }
-body.is-demo .alerts-add-btn[data-edit-cloud],
-body.is-demo button[data-rename],
-body.is-demo button[data-delete] {
-  /* Visual hint that these won't work — server still 403s them
-   * regardless, but we want users to understand why. */
-  opacity: .55;
+/* Demo mode: lock down every settings interaction up front so
+ * visitors don't fill out a form just to get a 403 on save. The
+ * read-only middleware is still the source of truth — this is the
+ * UX layer that signals "view only" before the click.
+ *
+ * Rules:
+ *  - All buttons / inputs / selects / textareas inside .settings-block
+ *    grey out, lose pointer-events, lose hover. Read-only stays
+ *    readable, just clearly inert.
+ *  - The Setup CTA card hides its button (the wizard mutates config).
+ *  - Each .settings-block gets a "View only — demo mode" badge via
+ *    a ::before pseudo-element, so visitors understand why.
+ */
+body.is-demo .settings-block { position: relative; }
+body.is-demo .settings-block::before {
+  content: "View only · demo mode";
+  position: absolute; top: .75rem; right: 1rem;
+  font-size: .68rem; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--amber, #d29922);
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.30);
+  padding: .15rem .5rem; border-radius: 999px;
+  pointer-events: none;
 }
+body.is-demo .settings-block input,
+body.is-demo .settings-block select,
+body.is-demo .settings-block textarea,
+body.is-demo .settings-block button,
+body.is-demo .settings-block .alerts-add-btn,
+body.is-demo .settings-block .settings-toggle input {
+  pointer-events: none;
+  opacity: .55;
+  cursor: not-allowed;
+}
+/* Re-enable navigation-only controls the user might still click for
+ * info — accordion toggles, theme picker (cosmetic), kiosk-mode
+ * toggle (purely a client preference, no server side). */
+body.is-demo .settings-block .theme-opt,
+body.is-demo .settings-block details > summary,
+body.is-demo .settings-block [data-kiosk-toggle] {
+  pointer-events: auto; opacity: 1; cursor: pointer;
+}
+/* Hide the bottom-of-page "Restart wattpost" / "Update now" CTAs
+ * entirely on demo — no useful read-only view of them. */
+body.is-demo #settings-restart,
+body.is-demo #settings-update-apply { display: none !important; }
 
 /* ---------------- header ---------------- */
 .app-header {
