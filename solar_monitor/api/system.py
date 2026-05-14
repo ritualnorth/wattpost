@@ -18,6 +18,7 @@ import time
 from typing import Any
 
 from litestar import get, post
+from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 
 log = logging.getLogger(__name__)
@@ -70,6 +71,39 @@ def _disk_usage_exists(path: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# ---------- self-update check ----------
+
+@get("/api/system/update")
+async def update_state(state: State) -> dict[str, Any]:
+    """Current vs latest version of WattPost, from the daily manifest
+    poll. UI uses this to surface "Update available" on Settings →
+    About."""
+    scheduler = state["scheduler"]
+    updater = getattr(scheduler, "_updater", None)
+    if updater is None:
+        from .. import __version__ as v
+        return {
+            "current_version": v,
+            "latest_version":  None,
+            "has_update":      False,
+            "last_checked_at": None,
+            "last_error":      "update checker not running",
+        }
+    return updater.state.as_dict()
+
+
+@post("/api/system/update/check", status_code=202)
+async def update_check_now(state: State) -> dict[str, Any]:
+    """Force a one-off manifest fetch — Settings UI's "Check now"
+    button. Independent of the 24h background loop."""
+    scheduler = state["scheduler"]
+    updater = getattr(scheduler, "_updater", None)
+    if updater is None:
+        raise HTTPException(status_code=500, detail="update checker not running")
+    await updater.check_once()
+    return updater.state.as_dict()
 
 
 # ---------- Tailscale ----------

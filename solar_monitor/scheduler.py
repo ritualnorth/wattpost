@@ -17,6 +17,7 @@ from .forecast import ForecastService
 from .weather import WeatherService
 from .cloud import CloudService
 from .tunnel import TunnelService
+from .update import UpdateChecker
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
@@ -103,6 +104,15 @@ class PollScheduler:
                 self._tunnel = TunnelService(config.cloud)
             except Exception:
                 log.exception("tunnel service failed to initialise")
+
+        # Self-update *check* — polls the cloud's release manifest
+        # daily and exposes the result on /api/system/update so the
+        # UI can show "v0.0.x available". No auto-apply yet.
+        self._updater: UpdateChecker | None = None
+        try:
+            self._updater = UpdateChecker()
+        except Exception:
+            log.exception("update checker failed to initialise")
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -195,6 +205,8 @@ class PollScheduler:
             await self._cloud.start()
         if self._tunnel is not None:
             await self._tunnel.start()
+        if self._updater is not None:
+            await self._updater.start()
 
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
@@ -248,6 +260,8 @@ class PollScheduler:
             await self._cloud.stop()
         if self._tunnel is not None:
             await self._tunnel.stop()
+        if self._updater is not None:
+            await self._updater.stop()
 
         log.info("scheduler stopped")
 

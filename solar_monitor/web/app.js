@@ -2265,7 +2265,50 @@ async function refreshSystemInfo() {
       ? `${fmtBytes(d.used)} / ${fmtBytes(d.total)} · ${d.percent}% used`
       : "—",
   );
+  refreshUpdateState();
 }
+
+async function refreshUpdateState() {
+  let u;
+  try { u = await api("/api/system/update"); }
+  catch (_) { return; }
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set("#settings-version", "v" + (u.current_version || "?"));
+  // "Latest available" row is shown only when the cloud reported a
+  // newer version. When current === latest, we keep the row hidden
+  // — less noise, and the "Check now" button below still shows
+  // freshness so users know the check is happening.
+  const row = $("#settings-update-row");
+  if (row) row.hidden = !u.has_update;
+  if (u.has_update) {
+    set("#settings-update-latest", "v" + u.latest_version);
+    const a = $("#settings-update-link");
+    if (a && u.release_url) {
+      a.href = u.release_url;
+      a.hidden = false;
+    }
+    row?.classList.add("settings-row--update");
+  } else {
+    row?.classList.remove("settings-row--update");
+  }
+  if (u.last_checked_at) {
+    set("#settings-update-checked", fmt.ago(u.last_checked_at)
+      + (u.last_error ? ` · last error: ${u.last_error}` : ""));
+  } else {
+    set("#settings-update-checked", "never");
+  }
+}
+
+document.getElementById("settings-update-now")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true; btn.textContent = "Checking…";
+  try {
+    await fetch("/api/system/update/check", { method: "POST" });
+    await refreshUpdateState();
+  } finally {
+    btn.disabled = false; btn.textContent = "Check now";
+  }
+});
 
 // ---------- Tailscale (Network block) ----------
 async function refreshTailscale() {

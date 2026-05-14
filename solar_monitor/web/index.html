@@ -549,11 +549,24 @@
           </div>
           <div class="settings-block">
             <h3>About</h3>
-            <div class="settings-row"><span>Version</span><span class="v">v0.0.1</span></div>
+            <div class="settings-row"><span>Version</span><span class="v" id="settings-version">—</span></div>
+            <div class="settings-row" id="settings-update-row" hidden>
+              <span>Latest available</span>
+              <span class="v">
+                <span id="settings-update-latest">—</span>
+                <a id="settings-update-link" href="#" target="_blank" rel="noopener" hidden>Release notes ↗</a>
+              </span>
+            </div>
             <div class="settings-row"><span>Daemon</span><span class="v" id="settings-daemon">—</span></div>
             <div class="settings-row"><span>Uptime</span><span class="v" id="settings-uptime">—</span></div>
             <div class="settings-row"><span>Python</span><span class="v" id="settings-python">—</span></div>
             <div class="settings-row"><span>Disk (root)</span><span class="v" id="settings-disk">—</span></div>
+            <div class="settings-row"><span>Update check</span>
+              <span class="v">
+                <span id="settings-update-checked">—</span>
+                <button id="settings-update-now" class="alerts-add-btn" type="button">Check now</button>
+              </span>
+            </div>
           </div>
           <div class="settings-block">
             <h3>System</h3>
