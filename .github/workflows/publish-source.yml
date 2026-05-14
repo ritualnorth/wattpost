@@ -45,7 +45,11 @@ jobs:
           # /tmp on the host isn't visible to it.
           OUT_DIR="${GITHUB_WORKSPACE}/_release_out"
           mkdir -p "${OUT_DIR}"
-          tar -czf "${OUT_DIR}/${NAME}" \
+          # -h dereferences symlinks at archive time. solar_monitor/web/docs/
+          # is a symlink into /docs/ (single source of truth for docs across
+          # appliance + cloud); -h folds the real .md files into the tarball
+          # so the appliance is self-contained after install.
+          tar -czhf "${OUT_DIR}/${NAME}" \
               --exclude='./solar_monitor/__pycache__' \
               --exclude='./solar_monitor/**/__pycache__' \
               --exclude='*.egg-info' \

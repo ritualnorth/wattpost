@@ -2210,6 +2210,9 @@ function currentRouteName() { return parseRoute().name; }
 
 function setRoute(_unused) {
   const route = parseRoute();
+  // Mirror current route onto <body> so route-conditional CSS (e.g.
+  // hiding the help FAB on /docs) has a hook without needing JS.
+  document.body.dataset.route = route.name;
   document.querySelectorAll(".route").forEach(s => {
     s.classList.toggle("active", s.dataset.route === route.name);
   });
@@ -4700,7 +4703,7 @@ let docsLoaded = false;
 async function onEnterDocs(slug) {
   if (!docsLoaded) {
     try {
-      const r = await fetch("/web/docs/index.json");
+      const r = await fetch("/web/docs/index.appliance.json");
       docsIndex = await r.json();
       docsLoaded = true;
     } catch (e) {
