@@ -53,8 +53,32 @@ sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || tr
 sed -i 's|debian-archive-keyring\.pgp|debian-archive-keyring.gpg|g' \
     "${PIGEN_DIR}/stage0/00-configure-apt/files/debian.sources"
 
-# Link our stage into pi-gen's stages dir.
-ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
+# Copy our stage into pi-gen's tree. Symlinking doesn't work in Docker
+# mode — pi-gen's Dockerfile does `COPY . /pi-gen/` which can't follow
+# a symlink whose target lives outside the build context, so when the
+# build sequence reaches `stage-wattpost` it sees a dangling path and
+# `realpath` aborts. Plain copy bakes the stage into the image.
+rm -rf "${PIGEN_DIR}/${STAGE_NAME}"
+cp -r  "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
+
+# Also stage the WattPost source tree inside pi-gen so it gets baked
+# into the container image. The original 00-copy-source script relied
+# on a $WATTPOST_SRC host path that's invisible to the Docker build;
+# we now ship the source inside the stage and rsync from a known
+# in-container location.
+SRC_STAGE_DIR="${PIGEN_DIR}/${STAGE_NAME}/00-copy-source/wattpost-src"
+rm -rf "${SRC_STAGE_DIR}"
+mkdir -p "${SRC_STAGE_DIR}"
+rsync -a \
+      --exclude '.git/' \
+      --exclude '.venv/' \
+      --exclude '__pycache__/' \
+      --exclude '*.egg-info/' \
+      --exclude 'build/' \
+      --exclude 'config.yaml' \
+      --exclude 'solar-monitor.db*' \
+      --exclude '.claude/' \
+      "${REPO_ROOT}/" "${SRC_STAGE_DIR}/"
 
 # Skip the desktop stages (3, 4, 5) and use lite (stage 2) as the base
 # our stage builds on. SKIP_IMAGES on stages we don't ship.
@@ -71,9 +95,6 @@ DISABLE_FIRST_BOOT_USER_RENAME=1
 ENABLE_SSH=1
 STAGE_LIST="stage0 stage1 stage2 ${STAGE_NAME}"
 EOF
-
-# Pass the source path to the staged 00-copy-source script.
-export WATTPOST_SRC="${REPO_ROOT}"
 
 echo "==> running pi-gen build via Docker (~1–2 hours)"
 cd "${PIGEN_DIR}"
