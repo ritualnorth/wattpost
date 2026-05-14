@@ -27,8 +27,13 @@ CACHE_KEY = "forecast:pv"
 
 # Providers register themselves here. Adding tomorrow.io is just a new
 # module imported by forecast/__init__.py that appends a factory.
+from . import synthetic as _synth_mod
+
 PROVIDERS = {
-    "solcast": _solcast_mod.build,
+    "solcast":   _solcast_mod.build,
+    # Demo-only fake forecast; never makes a network call. Selected by
+    # the demo.wattpost.io container's config.yaml.
+    "synthetic": _synth_mod.build,
 }
 
 
