@@ -45,29 +45,23 @@ jobs:
           docker-images: true
           swap-storage: false
 
-      - name: Install pi-gen build dependencies
-        # Pi-gen's dependencies_check is misleading: it suggests
-        # installing both `qemu-user-binfmt` and `qemu-user-static`,
-        # but on Ubuntu those Conflict (both register the same
-        # binfmt handlers — apt refuses to install both). The right
-        # combo on the GH runner is:
-        #   - qemu-user-static  (static qemu binaries pi-gen invokes
-        #     for arm64 emulation; postinst auto-registers binfmt
-        #     entries via update-binfmts, no separate package needed)
-        #   - libarchive-tools  (bsdtar — pi-gen stage scripts use it)
-        #   - arch-test         (host capability probe)
-        # If pi-gen's dep-check ever rejects this set, the answer is
-        # almost certainly NOT to add qemu-user-binfmt back.
+      - name: Install pi-gen build dependencies (Docker-mode build)
+        # We use pi-gen's Docker mode (`build-docker.sh`) which runs
+        # the actual build inside a Debian-based container with the
+        # full pi-gen toolchain + correct keyrings baked in. The host
+        # only needs:
+        #   - docker  (already on GitHub-hosted ubuntu runners)
+        #   - git     (for the pi-gen clone)
+        #   - qemu-user-static + binfmt registration (so the kernel
+        #     can route arm64 binaries through qemu inside the
+        #     privileged container)
+        # Six failed attempts of fighting Ubuntu's apt/qemu/keyring
+        # mismatch with pi-gen's host-mode build convinced us that
+        # the host-mode path isn't worth maintaining.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            git quilt parted qemu-user-static \
-            debootstrap zerofree zip dosfstools libcap2-bin grep rsync \
-            xz-utils file kmod bc gpg pigz libarchive-tools arch-test \
-            debian-archive-keyring
-          # Debian archive keys live in /usr/share/keyrings/ once the
-          # package is installed; debootstrap and the chroot's apt
-          # automatically pick them up from there, so no extra wiring.
+            git qemu-user-static
 
       - name: Build image
         run: |
