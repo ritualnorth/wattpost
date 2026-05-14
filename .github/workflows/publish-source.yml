@@ -40,18 +40,21 @@ jobs:
           SHA=$(git rev-parse --short HEAD)
           VERSION=$(grep -E '^__version__' solar_monitor/__init__.py | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
           NAME="wattpost-source-${VERSION}+${SHA}.tar.gz"
-          mkdir -p /tmp/out
-          # tar from repo root, including only the appliance bits.
-          # --exclude order matters: outer-first.
-          tar -czf "/tmp/out/${NAME}" \
+          # Output goes inside $GITHUB_WORKSPACE because appleboy/scp-action
+          # runs in a Docker container that only mounts the workspace —
+          # /tmp on the host isn't visible to it.
+          OUT_DIR="${GITHUB_WORKSPACE}/_release_out"
+          mkdir -p "${OUT_DIR}"
+          tar -czf "${OUT_DIR}/${NAME}" \
               --exclude='./solar_monitor/__pycache__' \
               --exclude='./solar_monitor/**/__pycache__' \
               --exclude='*.egg-info' \
               ./solar_monitor ./packaging ./pyproject.toml ./README.md
-          ( cd /tmp/out && sha256sum "${NAME}" > "${NAME}.sha256" )
+          ( cd "${OUT_DIR}" && sha256sum "${NAME}" > "${NAME}.sha256" )
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          ls -lah /tmp/out
+          echo "out_dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
+          ls -lah "${OUT_DIR}"
 
       - name: Upload to releases.wattpost.io
         uses: appleboy/scp-action@v0.1.7
@@ -59,9 +62,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "/tmp/out/*"
+          source: "_release_out/*"
           target: /srv/wattpost-releases/source/
-          strip_components: 2
+          strip_components: 1
 
       - name: Update `latest` symlink
         uses: appleboy/ssh-action@v1.0.3
