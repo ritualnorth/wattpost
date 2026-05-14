@@ -128,38 +128,44 @@ jobs:
       # container serves anonymously as releases.wattpost.io. The
       # private repo's GH-release path above stays as an internal
       # archive; this is what end-users actually hit.
-      - name: Publish to releases.wattpost.io (scp)
+      #
+      # NOT using appleboy/scp-action — that's a Docker action, and
+      # pi-gen's 90-minute build seems to disrupt GH Actions' internal
+      # Docker state (the action's image gets garbage-collected). Plain
+      # ssh/scp commands have no such dependency.
+      - name: Publish to releases.wattpost.io (scp) + symlink update
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: |
-            ${{ steps.locate.outputs.image }}
-            ${{ steps.locate.outputs.checksum }}
-          target: /srv/wattpost-releases/img/
-          strip_components: 3   # drop build/pi-gen/deploy/ prefix
-
-      # Repoint the `latest` symlink to whatever filename we just
-      # uploaded so /api/releases/latest can serve a stable URL.
-      - name: Update `latest` symlink
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
+        env:
+          SSH_KEY:  ${{ secrets.VPS_SSH_KEY }}
+          SSH_USER: ${{ secrets.VPS_USER }}
+          SSH_HOST: ${{ secrets.VPS_HOST }}
+          IMG:      ${{ steps.locate.outputs.image }}
+          CHECKSUM: ${{ steps.locate.outputs.checksum }}
+        run: |
+          set -euo pipefail
+          # Write the SSH key to a tmp file. mode 0600 is required by
+          # ssh/scp; otherwise they refuse to use the key.
+          KEY_FILE=$(mktemp)
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$KEY_FILE"
+          chmod 0600 "$KEY_FILE"
+          SSH_OPTS=(-i "$KEY_FILE"
+                    -o StrictHostKeyChecking=accept-new
+                    -o UserKnownHostsFile=/dev/null
+                    -o LogLevel=ERROR)
+          # Upload both artefacts.
+          scp "${SSH_OPTS[@]}" "$IMG" "$CHECKSUM" \
+              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/"
+          # Repoint latest.img.xz → newest dated file, by mtime.
+          ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SSH_HOST}" "
             set -euo pipefail
             cd /srv/wattpost-releases/img
-            # Pick the freshest .img.xz by mtime.
-            newest=$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
-            if [ -n "$newest" ]; then
-              ln -sfn "$newest" latest.img.xz
-              ln -sfn "$newest.sha256" latest.img.xz.sha256
-              echo "latest.img.xz → $newest"
-            else
-              echo "no .img.xz files found — leaving latest alone" >&2
+            newest=\$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
+            if [ -z \"\$newest\" ]; then
+              echo 'no .img.xz files found — refusing to repoint latest' >&2
               exit 1
             fi
+            ln -sfn \"\$newest\" latest.img.xz
+            ln -sfn \"\$newest.sha256\" latest.img.xz.sha256
+            echo \"latest.img.xz → \$newest\"
+          "
