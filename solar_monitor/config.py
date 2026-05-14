@@ -59,8 +59,11 @@ class ForecastCfg(msgspec.Struct, kw_only=True):
     implemented; structured this way so adding tomorrow.io / forecast.solar
     is a new provider class, not a config-schema change."""
     provider: str = "solcast"
-    api_key: str
-    resource_id: str
+    # Solcast needs both; the synthetic demo provider ignores them.
+    # Defaulting to empty strings lets the demo's config.yaml configure
+    # `provider: synthetic` without dummy values cluttering the schema.
+    api_key: str = ""
+    resource_id: str = ""
     # Cadence of the poll loop. Solcast hobbyist tier is 10 calls/day,
     # so 3 hours (8/day) leaves a comfortable buffer.
     poll_hours: int = 3

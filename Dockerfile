@@ -36,11 +36,29 @@ ENV PYTHONUNBUFFERED=1 \
     WATTPOST_CONFIG=/app/demo-config.yaml \
     WATTPOST_DB=/var/lib/wattpost/solar-monitor.db
 
-# Minimal config — synthetic poller doesn't actually read the
-# transports/devices list, but the daemon's config loader expects
-# something parseable. Forecast + weather + cloud all off in demo.
+# Demo config. The synthetic poller doesn't read transports/devices,
+# but the rest of the daemon's config loader expects something
+# parseable. Weather + forecast wired so the dashboard's weather tile
+# and Solcast forecast strip are populated — the synthetic forecast
+# provider needs no API key and never hits the network. Weather uses
+# real Open-Meteo (free, no key) seeded with a London coordinate
+# (visitors get an actual-looking forecast for "somewhere"). Coords
+# can be tweaked if we ever theme the demo around a different site.
 RUN mkdir -p /var/lib/wattpost && \
-    printf 'transports: []\ndevices: []\nexporters: []\nnotification_transports: []\nalerts: []\n' \
+    printf '%s\n' \
+      'transports: []' \
+      'devices: []' \
+      'exporters: []' \
+      'notification_transports: []' \
+      'alerts: []' \
+      'forecast:' \
+      '  provider: synthetic' \
+      '  poll_hours: 24' \
+      'weather:' \
+      '  provider: openmeteo' \
+      '  lat: 51.5074' \
+      '  lon: -0.1278' \
+      '  poll_minutes: 15' \
         > /app/demo-config.yaml
 
 EXPOSE 8000
