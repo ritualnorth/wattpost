@@ -172,6 +172,25 @@ else
     step "cloudflared already installed ($(cloudflared --version 2>/dev/null | head -1))"
 fi
 
+# ----- version file (read by motd) -----
+# Cheap source of truth that doesn't require invoking the venv. Read
+# from the source's solar_monitor/__init__.py at install time.
+INIT_VERSION="$(grep -E '^__version__' "${SOURCE}/solar_monitor/__init__.py" 2>/dev/null \
+                | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+if [ -n "${INIT_VERSION}" ]; then
+    echo "${INIT_VERSION}" > "${CONFIG_DIR}/version"
+    chmod 0644 "${CONFIG_DIR}/version"
+fi
+
+# ----- MOTD banner -----
+# Drop our SSH login banner. /etc/update-motd.d/ is read on every login
+# (when PAM motd is enabled, default on Debian/Pi OS). Numeric prefix
+# orders us early so the WattPost block shows up at the top.
+step "installing SSH login banner (/etc/update-motd.d/10-wattpost)"
+if [ -d "${SCRIPT_DIR}/motd" ] && [ -d /etc/update-motd.d ]; then
+    install -m 0755 "${SCRIPT_DIR}/motd/10-wattpost" /etc/update-motd.d/10-wattpost
+fi
+
 # ----- systemd unit -----
 step "installing wattpost.service"
 install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"
