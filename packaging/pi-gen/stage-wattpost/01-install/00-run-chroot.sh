@@ -6,9 +6,10 @@
 # We invoke the same install.sh that hobbyists use for a manual install
 # so there's a single source of truth for the install logic.
 
-# /tmp/wattpost-src is copied in by the parent stage's
-# 01-copy-source.sh (runs before this — see pi-gen's stage runner).
-INSTALL_DIR=/tmp/wattpost-src
+# /opt/wattpost-src is rsync'd in by the parent stage's
+# 00-copy-source/00-run.sh. Using /opt (not /tmp) because pi-gen
+# mounts a fresh tmpfs over /tmp on chroot entry.
+INSTALL_DIR=/opt/wattpost-src
 
 if [ ! -d "${INSTALL_DIR}/packaging" ]; then
     echo "WattPost source not staged at ${INSTALL_DIR}" >&2
@@ -24,5 +25,7 @@ WATTPOST_SOURCE="${INSTALL_DIR}" bash packaging/install.sh
 systemctl disable --now wattpost.service 2>/dev/null || true
 systemctl enable wattpost.service
 
-# Tidy: don't ship the build source on the customer's SD card.
-rm -rf "${INSTALL_DIR}"
+# Keep the source tree around at /opt/wattpost-src on the running
+# image — this is the same tree the Update-now button's helper
+# operates on (atomic-swap a new tarball into place + re-run
+# install.sh). Don't rm it; that would break in-place upgrades.
