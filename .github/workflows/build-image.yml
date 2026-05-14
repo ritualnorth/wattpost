@@ -143,29 +143,32 @@ jobs:
           CHECKSUM: ${{ steps.locate.outputs.checksum }}
         run: |
           set -euo pipefail
-          # Write the SSH key to a tmp file. mode 0600 is required by
-          # ssh/scp; otherwise they refuse to use the key.
-          KEY_FILE=$(mktemp)
-          trap 'rm -f "$KEY_FILE"' EXIT
-          printf '%s\n' "$SSH_KEY" > "$KEY_FILE"
-          chmod 0600 "$KEY_FILE"
-          SSH_OPTS=(-i "$KEY_FILE"
-                    -o StrictHostKeyChecking=accept-new
-                    -o UserKnownHostsFile=/dev/null
-                    -o LogLevel=ERROR)
+          # Standard ~/.ssh layout. printenv preserves the env var
+          # bytes verbatim (printf "$SSH_KEY" gets bitten by trailing-
+          # newline / multiline-secret gotchas across runners).
+          mkdir -p ~/.ssh
+          printenv SSH_KEY > ~/.ssh/id_release
+          chmod 0600 ~/.ssh/id_release
+          # Trust-on-first-use: scan + record fingerprint instead of
+          # disabling host-key checking entirely.
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # Quick sanity: can we open a session at all? Verbose so any
+          # auth failure is visible in CI logs.
+          ssh -v -i ~/.ssh/id_release -o BatchMode=yes \
+              "${SSH_USER}@${SSH_HOST}" 'echo OK_AUTH'
           # Upload both artefacts.
-          scp "${SSH_OPTS[@]}" "$IMG" "$CHECKSUM" \
+          scp -v -i ~/.ssh/id_release "$IMG" "$CHECKSUM" \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/"
           # Repoint latest.img.xz → newest dated file, by mtime.
-          ssh "${SSH_OPTS[@]}" "${SSH_USER}@${SSH_HOST}" "
+          ssh -i ~/.ssh/id_release "${SSH_USER}@${SSH_HOST}" '
             set -euo pipefail
             cd /srv/wattpost-releases/img
-            newest=\$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
-            if [ -z \"\$newest\" ]; then
-              echo 'no .img.xz files found — refusing to repoint latest' >&2
+            newest=$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
+            if [ -z "$newest" ]; then
+              echo "no .img.xz files found — refusing to repoint latest" >&2
               exit 1
             fi
-            ln -sfn \"\$newest\" latest.img.xz
-            ln -sfn \"\$newest.sha256\" latest.img.xz.sha256
-            echo \"latest.img.xz → \$newest\"
-          "
+            ln -sfn "$newest" latest.img.xz
+            ln -sfn "$newest.sha256" latest.img.xz.sha256
+            echo "latest.img.xz -> $newest"
+          '
