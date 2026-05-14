@@ -34,10 +34,16 @@ fi
 # Make sure binfmt_misc is registered for arm64 on the host. Pi-gen's
 # Docker container does the heavy lifting, but the host kernel needs
 # binfmt registrations so foreign binaries route through qemu inside
-# the privileged container. On a fresh Ubuntu runner this isn't always
-# set up, so explicitly register via the well-known container.
+# the privileged container.
 echo "==> registering qemu binfmt handlers (host kernel)"
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 || true
+
+# pi-gen's build-docker.sh does its own host preflight: looks for
+# `qemu-aarch64` on PATH. On Ubuntu the qemu-user-static package
+# provides the `-static` suffix only, so symlink that satisfies the
+# check without installing a conflicting non-static package.
+sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
+sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || true
 
 # Link our stage into pi-gen's stages dir.
 ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
