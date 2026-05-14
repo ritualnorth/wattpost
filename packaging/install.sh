@@ -115,38 +115,21 @@ else
     step "keeping existing ${CONFIG_FILE}"
 fi
 
-# ----- first-boot web password -----
-# The local web UI is password-gated for write endpoints (see
-# solar_monitor/web_auth.py). If no hash exists yet AND we're not
-# building a demo image, generate a short random passphrase so the
-# operator has something to log in with on first boot. Plaintext is
-# stored at /etc/wattpost/web-password (mode 0640 root:wattpost) so
-# the MOTD can print it on SSH; the hash lives at
-# /etc/wattpost/web-password.hash and is what the daemon reads.
+# ----- local web UI password (opt-in) -----
+# By default, the local dashboard accepts any LAN client — same trust
+# model as Pi-hole, Solar Assistant, Home Assistant Yellow. Most
+# off-grid setups have a single trusted network, and the cloud
+# tunnel's auth is the strong gate for remote access. Security-
+# conscious users (shared housing, corporate LAN, multi-tenant
+# warehouses) opt in via `wattpost-config → Set local web password`,
+# which writes /etc/wattpost/web-password.hash. The middleware
+# (solar_monitor/web_auth.py) auto-detects the hash file's presence
+# and starts enforcing.
 #
-# Skip generation if either file already exists (re-runs of install.sh
-# during upgrade must NOT rotate the password).
-if [[ "${WATTPOST_DEMO:-0}" != "1" ]] \
-   && [[ ! -f "${CONFIG_DIR}/web-password.hash" ]]; then
-    step "generating initial web UI password"
-    # 5-byte random hex → 10 hex chars → ~40 bits. Plenty for LAN
-    # access; users can change it via wattpost-config. Prefix makes
-    # the password human-readable ("wattpost-7f3a2b") and brand-able.
-    WP_PASS="wattpost-$(openssl rand -hex 5)"
-    echo "${WP_PASS}" > "${CONFIG_DIR}/web-password"
-    chmod 0640 "${CONFIG_DIR}/web-password"
-    chgrp "${APP_GROUP}" "${CONFIG_DIR}/web-password" || true
-    # Hash via the daemon's own argon2-cffi — pyproject.toml lists it
-    # so the venv definitely has it at this point.
-    "${APP_VENV}/bin/python" -c "
-from solar_monitor.web_auth import hash_password
-import sys
-sys.stdout.write(hash_password('${WP_PASS}'))
-" > "${CONFIG_DIR}/web-password.hash"
-    chmod 0640 "${CONFIG_DIR}/web-password.hash"
-    chgrp "${APP_GROUP}" "${CONFIG_DIR}/web-password.hash" || true
-    unset WP_PASS
-fi
+# install.sh deliberately does NOT auto-generate. Auto-creating a
+# password the user didn't ask for puts a "wattpost-7f3a2b" string in
+# their notes/password-manager forever, even though they'll never
+# need it — pure friction.
 
 # ----- sudoers fragment for Tailscale -----
 # Settings → Network needs to run `tailscale up / logout / serve` from
