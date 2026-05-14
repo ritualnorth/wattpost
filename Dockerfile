@@ -43,10 +43,10 @@ RUN mkdir -p /var/lib/wattpost && \
 
 EXPOSE 8000
 
-# `solar-monitor serve` reads $WATTPOST_CONFIG / $WATTPOST_DB via
-# the CLI's env-var fallback already; pass the right flags for
-# explicit + traceable startup.
-CMD ["python", "-m", "solar_monitor", "serve", \
+# Use the installed `solar-monitor` console script (pyproject.toml's
+# [project.scripts] → solar_monitor.cli:main). The package itself
+# has no __main__.py, so `python -m solar_monitor` would error.
+CMD ["solar-monitor", "serve", \
      "--config", "/app/demo-config.yaml", \
      "--db", "/var/lib/wattpost/solar-monitor.db", \
      "--interval", "60", \
