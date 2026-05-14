@@ -143,21 +143,42 @@ jobs:
           CHECKSUM: ${{ steps.locate.outputs.checksum }}
         run: |
           set -euo pipefail
-          # Standard ~/.ssh layout. printenv preserves the env var
-          # bytes verbatim (printf "$SSH_KEY" gets bitten by trailing-
-          # newline / multiline-secret gotchas across runners).
           mkdir -p ~/.ssh
           printenv SSH_KEY > ~/.ssh/id_release
           chmod 0600 ~/.ssh/id_release
-          # Trust-on-first-use: scan + record fingerprint instead of
-          # disabling host-key checking entirely.
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          # Quick sanity: can we open a session at all? Verbose so any
-          # auth failure is visible in CI logs.
-          ssh -v -i ~/.ssh/id_release -o BatchMode=yes \
+
+          # Azure (runner) → Contabo path silently drops idle TCP every
+          # so often. Keepalives surface a dead connection in ~60s
+          # instead of waiting out the 6h job timeout, and ConnectTimeout
+          # caps the initial dial. ServerAliveCountMax=4 keeps long scp
+          # transfers alive even through a brief network hiccup.
+          SSH_COMMON=(-i ~/.ssh/id_release
+                      -o BatchMode=yes
+                      -o ConnectTimeout=20
+                      -o ServerAliveInterval=15
+                      -o ServerAliveCountMax=4)
+
+          # Retry helper: any ssh/scp call gets 3 attempts with backoff.
+          # Most failures are transient route-flap, so retry > log-and-die.
+          retry() {
+            local n=0
+            until "$@"; do
+              n=$((n+1))
+              if [ "$n" -ge 3 ]; then
+                echo "FAIL after $n attempts: $*" >&2
+                return 1
+              fi
+              echo "retry $n: $*" >&2
+              sleep $((10 * n))
+            done
+          }
+
+          # Preflight: confirm we can open a session at all.
+          retry ssh -v "${SSH_COMMON[@]}" \
               "${SSH_USER}@${SSH_HOST}" 'echo OK_AUTH'
           # Upload both artefacts.
-          scp -v -i ~/.ssh/id_release "$IMG" "$CHECKSUM" \
+          retry scp -v "${SSH_COMMON[@]}" "$IMG" "$CHECKSUM" \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/"
           # Build the manifest.json the cloud reads at request time.
           # Cloud's releases.get_latest() fetches this file every 60s,
@@ -184,10 +205,10 @@ jobs:
             "source_sha256_url": "https://releases.wattpost.io/source/latest.tar.gz.sha256"
           }
           JSON
-          scp -i ~/.ssh/id_release /tmp/manifest.json \
+          retry scp "${SSH_COMMON[@]}" /tmp/manifest.json \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/manifest.json"
           # Repoint latest.img.xz → newest dated file, by mtime.
-          ssh -i ~/.ssh/id_release "${SSH_USER}@${SSH_HOST}" "
+          retry ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" "
             set -euo pipefail
             cd /srv/wattpost-releases/img
             ln -sfn '${FNAME}' latest.img.xz
