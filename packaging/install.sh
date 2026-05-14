@@ -121,18 +121,40 @@ fi
 # the Connect / Disconnect / HTTPS-serve buttons would all 500 with a
 # permission error. Limited to the three exact subcommands, so the
 # escalation surface stays tight.
-step "granting wattpost user sudo access to /usr/bin/tailscale"
-SUDOERS_FILE="/etc/sudoers.d/wattpost-tailscale"
+step "granting wattpost user sudo access for tailscale + update helper"
+SUDOERS_FILE="/etc/sudoers.d/wattpost"
 cat > "${SUDOERS_FILE}.tmp" <<'SUDO'
 # Allow the wattpost daemon to manage its Tailscale connection from
 # the dashboard's Settings → Network block.
 wattpost ALL=(root) NOPASSWD: /usr/bin/tailscale up *, /usr/bin/tailscale logout, /usr/bin/tailscale serve *
+# Allow the wattpost daemon to fire the in-place upgrade helper from
+# the dashboard's "Update now" button (and from wattpost-config). The
+# helper itself is a fixed, trusted script — locked to no args so the
+# daemon can't pass a malicious source URL.
+wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-update
 SUDO
 # visudo -c validates syntax before we move it into /etc/sudoers.d/
 if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
     install -m 0440 "${SUDOERS_FILE}.tmp" "${SUDOERS_FILE}"
 fi
 rm -f "${SUDOERS_FILE}.tmp"
+# Clean up the old filename so we don't end up with two sudoers
+# entries for the same user after upgrade.
+rm -f /etc/sudoers.d/wattpost-tailscale
+
+# Install the update helper. Root-owned, world-readable, world-
+# executable — sudoers takes care of who can actually run it.
+step "installing wattpost-update helper"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-update" ]; then
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/cli/wattpost-update" /usr/local/bin/wattpost-update
+    # Pre-create the log file with permissions that let the wattpost
+    # daemon read it back via /api/system/update/log. The helper runs
+    # as root and writes to it; the daemon (group wattpost) reads.
+    touch /var/log/wattpost-update.log
+    chgrp wattpost /var/log/wattpost-update.log
+    chmod 0644 /var/log/wattpost-update.log
+fi
 
 # ----- cloudflared (optional, for cloud tunnel) -----
 # Install Cloudflare's cloudflared binary so the daemon can expose

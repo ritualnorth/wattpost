@@ -11,6 +11,7 @@ import asyncio
 import getpass
 import json
 import logging
+import os
 import platform
 import shutil
 import sys
@@ -104,6 +105,74 @@ async def update_check_now(state: State) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="update checker not running")
     await updater.check_once()
     return updater.state.as_dict()
+
+
+@post("/api/system/update/apply", status_code=202)
+async def update_apply() -> dict[str, Any]:
+    """Trigger an in-place upgrade of WattPost.
+
+    Backgrounds the `wattpost-update` helper script so the daemon can
+    restart mid-flight (install.sh does `systemctl restart wattpost`
+    at the end) without orphaning the update process.
+
+    The helper is sudo-NOPASSWD allowlisted in /etc/sudoers.d/wattpost
+    so the daemon's wattpost user can fire it. Helper handles tarball
+    download, sha256 verify, atomic swap into /opt/wattpost-src, then
+    runs install.sh. Live log at /var/log/wattpost-update.log.
+    """
+    if not os.path.exists("/usr/local/bin/wattpost-update"):
+        raise HTTPException(
+            status_code=500,
+            detail="wattpost-update helper not found — reinstall to fix",
+        )
+    # setsid + nohup so the child survives this Python process getting
+    # SIGTERM'd by install.sh's `systemctl restart wattpost`. We don't
+    # await the result — the caller gets a 202 immediately and polls
+    # /api/system/update/log for progress.
+    try:
+        await asyncio.create_subprocess_exec(
+            "/usr/bin/setsid", "sudo", "-n",
+            "/usr/local/bin/wattpost-update",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=f"could not start updater: {e}")
+    return {
+        "ok": True,
+        "log_path": "/var/log/wattpost-update.log",
+    }
+
+
+@get("/api/system/update/log")
+async def update_log() -> dict[str, Any]:
+    """Tail of /var/log/wattpost-update.log — UI polls this every few
+    seconds during an in-progress update to render live progress."""
+    path = "/var/log/wattpost-update.log"
+    if not os.path.exists(path):
+        return {"lines": [], "running": False}
+    try:
+        with open(path, "r") as f:
+            tail = f.readlines()[-200:]
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=f"cannot read log: {e}")
+    # "running" heuristic: if the lock file is held the updater is
+    # mid-flight. flock leaves the file around; existence isn't enough
+    # so we just check the lock state via a non-blocking flock.
+    running = False
+    try:
+        with open("/run/wattpost-update.lock", "r") as lf:
+            import fcntl
+            try:
+                fcntl.flock(lf.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+            except BlockingIOError:
+                running = True
+    except OSError:
+        pass
+    return {"lines": tail, "running": running}
 
 
 # ---------- Tailscale ----------

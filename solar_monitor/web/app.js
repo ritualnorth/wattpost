@@ -2310,6 +2310,68 @@ document.getElementById("settings-update-now")?.addEventListener("click", async 
   }
 });
 
+// Update-now: fire-and-poll. /api/system/update/apply backgrounds the
+// helper and 202s immediately; we then poll /api/system/update/log
+// every 2s to surface progress. install.sh restarts the daemon mid-
+// flight so /api/system/update/log will briefly 502 (cloudflared not
+// proxying yet) — we tolerate that and resume polling once the daemon
+// comes back up.
+document.getElementById("settings-update-apply")?.addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  if (!confirm("Apply update now? The daemon will restart at the end of the install (dashboard reconnects automatically in ~30s).")) return;
+  btn.disabled = true; btn.textContent = "Updating…";
+  const row = $("#settings-update-progress-row");
+  const out = $("#settings-update-progress");
+  if (row) row.hidden = false;
+  if (out) out.textContent = "starting…";
+  try {
+    const r = await fetch("/api/system/update/apply", { method: "POST" });
+    if (!r.ok) {
+      const t = await r.text();
+      if (out) out.textContent = `failed to start: ${t}`;
+      btn.disabled = false; btn.textContent = "Update now";
+      return;
+    }
+  } catch (e) {
+    if (out) out.textContent = `failed to start: ${e}`;
+    btn.disabled = false; btn.textContent = "Update now";
+    return;
+  }
+  // Poll the log.
+  let consecutive502 = 0;
+  const poll = async () => {
+    try {
+      const r = await fetch("/api/system/update/log");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      consecutive502 = 0;
+      if (out) {
+        out.textContent = (data.lines || []).join("");
+        out.scrollTop = out.scrollHeight;
+      }
+      if (data.running) {
+        setTimeout(poll, 2000);
+      } else {
+        // Lock released → either done or never started. Refresh
+        // overall update state so the version flips.
+        setTimeout(() => { refreshUpdateState(); }, 2000);
+        btn.disabled = false; btn.textContent = "Update now";
+      }
+    } catch (e) {
+      consecutive502 += 1;
+      if (consecutive502 > 40) {
+        // ~80s of unreachable daemon — give up auto-polling and let
+        // the user refresh manually.
+        if (out) out.textContent += `\n[connection lost — refresh the page once the daemon is back]`;
+        btn.disabled = false; btn.textContent = "Update now";
+        return;
+      }
+      setTimeout(poll, 2000);
+    }
+  };
+  setTimeout(poll, 1500);
+});
+
 // ---------- Tailscale (Network block) ----------
 async function refreshTailscale() {
   const host = $("#settings-tailscale");
