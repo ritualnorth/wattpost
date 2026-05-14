@@ -31,7 +31,7 @@ happens, and your config gets pushed whenever you change it. After a
 hardware failure:
 
 1. Flash a fresh SD card.
-2. Log into `wattpost.cloud`.
+2. Log into `app.wattpost.io`.
 3. Pick the site, hit **Restore**.
 4. ~10 minutes later you're back: history, paired BLE addresses,
    alert rules, exporter config — everything.

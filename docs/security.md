@@ -28,9 +28,9 @@ Three ways, in order of difficulty:
    `https://wattpost.<your-tailnet>.ts.net/` — green padlock, no
    warning, no install. Works both at home and remotely.
 
-2. **WattPost cloud** (when it ships).
-   Paid managed remote access at `https://<slug>.wattpost.cloud/`.
-   Real cert maintained by us. See *Remote access*.
+2. **WattPost cloud** (beta).
+   Managed remote access at `https://<slug>.wattpost.io/` via
+   Cloudflare Tunnel. Real cert maintained by us. See *Remote access*.
 
 3. **Browser exceptions**.
    If you'd rather keep using `http://<pi-ip>:8000`, every browser
