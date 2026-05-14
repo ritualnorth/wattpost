@@ -31,19 +31,29 @@ if [ ! -d "${PIGEN_DIR}" ]; then
     git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen "${PIGEN_DIR}"
 fi
 
-# Make sure binfmt_misc is registered for arm64 on the host. Pi-gen's
-# Docker container does the heavy lifting, but the host kernel needs
-# binfmt registrations so foreign binaries route through qemu inside
-# the privileged container.
-echo "==> registering qemu binfmt handlers (host kernel)"
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 || true
+# binfmt_misc is registered by docker/setup-qemu-action in CI (qemu 9.x
+# from tonistiigi/binfmt:latest, which has the arm64 fixes Python 3.13
+# needs). For local invocations without that step run, fall back to
+# multiarch/qemu-user-static so the script still works on a dev box —
+# tag the fallback so a green-line CI run isn't subject to the older
+# qemu version.
+if ! grep -q "qemu-aarch64" /proc/sys/fs/binfmt_misc/qemu-aarch64* 2>/dev/null; then
+    echo "==> registering qemu binfmt handlers (host kernel — local fallback)"
+    docker run --rm --privileged tonistiigi/binfmt:latest --install arm64,arm >/dev/null 2>&1 \
+        || docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 \
+        || true
+fi
 
 # pi-gen's build-docker.sh does its own host preflight: looks for
-# `qemu-aarch64` on PATH. On Ubuntu the qemu-user-static package
-# provides the `-static` suffix only, so symlink that satisfies the
-# check without installing a conflicting non-static package.
-sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
-sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || true
+# `qemu-aarch64` on PATH. tonistiigi/binfmt puts its qemu under a
+# different path so symlink the apt-shipped static binary as a
+# fallback (it's still installed as a build-host dep).
+if command -v qemu-aarch64-static >/dev/null; then
+    sudo ln -sf "$(command -v qemu-aarch64-static)" /usr/bin/qemu-aarch64 2>/dev/null || true
+fi
+if command -v qemu-arm-static >/dev/null; then
+    sudo ln -sf "$(command -v qemu-arm-static)" /usr/bin/qemu-arm 2>/dev/null || true
+fi
 
 # Defensive: rewrite the Signed-By path in stage0/debian.sources to the
 # .gpg filename (present in every Debian release since at least
