@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Build a WattPost SD image via pi-gen.
 #
-# Requirements on the build host (Debian / Ubuntu x86_64 or arm64):
-#   sudo apt install -y git quilt parted qemu-user-static debootstrap zerofree \
-#       zip dosfstools libcap2-bin grep rsync xz-utils file kmod bc gpg pigz
+# Uses pi-gen's Docker-mode build (build-docker.sh) — runs the whole
+# build inside a Debian-based container so we don't have to fight the
+# host-deps mismatch when running on Ubuntu (different qemu package
+# split, missing Debian archive keys, etc). The container has it all
+# baked in.
+#
+# Host requirements (Debian / Ubuntu, anything with Docker really):
+#   docker  (CLI + dockerd, including buildx)
+#   git
+#   sudo    (build-docker.sh needs it for loopback mount + chroot)
 #
 # Usage:
 #   ./packaging/build-image.sh
 #
-# Produces ./build/deploy/wattpost-YYYY-MM-DD-wattpost-lite.img.xz
-# in ~1–2 hours.
+# Produces ./build/pi-gen/deploy/*.img.xz in ~1–2 hours.
 
 set -euo pipefail
 
@@ -25,35 +31,13 @@ if [ ! -d "${PIGEN_DIR}" ]; then
     git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen "${PIGEN_DIR}"
 fi
 
-# Ubuntu workaround: pi-gen's `depends` file lists both
-# qemu-user-binfmt and qemu-user-static. On Debian/Raspbian these
-# coexist; on Ubuntu they Conflict (both register the same binfmt
-# handlers — apt refuses to install both). qemu-user-static alone
-# provides the static qemu binaries pi-gen actually uses, plus
-# auto-registers binfmt via update-binfmts in its postinst.
-#
-# pi-gen's depends file uses either `package` or `package:command`
-# per line; match both forms when stripping. Also print what we did
-# so future failures are easier to diagnose from the CI log.
-if [ -f "${PIGEN_DIR}/depends" ]; then
-    echo "==> pi-gen depends BEFORE strip:"
-    grep -nE 'qemu|binfmt' "${PIGEN_DIR}/depends" || true
-    # depends format is `binary:package` per line. We want to strip
-    # any line whose *package* (right of the colon) is qemu-user-binfmt,
-    # regardless of which binary it claims to provide. Also catches a
-    # bare `qemu-user-binfmt` line if upstream ever drops the prefix.
-    sed -i -E '/(^|:)qemu-user-binfmt$/d' "${PIGEN_DIR}/depends"
-    # Pi-gen's check looks for the *command* on PATH. On Ubuntu we
-    # only have qemu-arm-static (the static variant), not qemu-arm.
-    # Symlink so the command-existence half of the check passes too.
-    # The kernel's binfmt_misc redirects arm/aarch64 binaries through
-    # qemu-*-static at exec time anyway, so this is just placating
-    # the dep check.
-    sudo ln -sf /usr/bin/qemu-arm-static    /usr/bin/qemu-arm    2>/dev/null || true
-    sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
-    echo "==> pi-gen depends AFTER strip:"
-    grep -nE 'qemu|binfmt' "${PIGEN_DIR}/depends" || echo "  (no qemu/binfmt lines)"
-fi
+# Make sure binfmt_misc is registered for arm64 on the host. Pi-gen's
+# Docker container does the heavy lifting, but the host kernel needs
+# binfmt registrations so foreign binaries route through qemu inside
+# the privileged container. On a fresh Ubuntu runner this isn't always
+# set up, so explicitly register via the well-known container.
+echo "==> registering qemu binfmt handlers (host kernel)"
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 || true
 
 # Link our stage into pi-gen's stages dir.
 ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
@@ -77,9 +61,14 @@ EOF
 # Pass the source path to the staged 00-copy-source script.
 export WATTPOST_SRC="${REPO_ROOT}"
 
-echo "==> running pi-gen build (~1–2 hours)"
+echo "==> running pi-gen build via Docker (~1–2 hours)"
 cd "${PIGEN_DIR}"
-sudo -E ./build.sh
+# build-docker.sh builds (or pulls) a pre-baked pigen-builder image
+# that has the right Debian keyrings + tools, then runs the actual
+# build inside it. Stops + restarts cleanly between stages.
+# CONTAINER_NAME pinned so re-runs reuse the same docker container
+# (faster cached apt + debootstrap on re-builds).
+sudo CONTAINER_NAME=pigen-builder -E ./build-docker.sh
 
 echo
 echo "==> done"
