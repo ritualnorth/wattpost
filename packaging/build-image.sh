@@ -25,6 +25,17 @@ if [ ! -d "${PIGEN_DIR}" ]; then
     git clone --depth 1 --branch arm64 https://github.com/RPi-Distro/pi-gen "${PIGEN_DIR}"
 fi
 
+# Ubuntu workaround: pi-gen's `depends` file lists both
+# qemu-user-binfmt and qemu-user-static. On Debian/Raspbian these
+# coexist; on Ubuntu they Conflict (both register the same binfmt
+# handlers — apt refuses to install both). qemu-user-static alone
+# provides the static qemu binaries pi-gen actually uses, plus
+# auto-registers binfmt via update-binfmts in its postinst, so
+# dropping qemu-user-binfmt from the dep list is safe.
+if [ -f "${PIGEN_DIR}/depends" ]; then
+    sed -i '/^qemu-user-binfmt$/d' "${PIGEN_DIR}/depends"
+fi
+
 # Link our stage into pi-gen's stages dir.
 ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
 
