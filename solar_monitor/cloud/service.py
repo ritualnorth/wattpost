@@ -76,23 +76,29 @@ class CloudService:
         return True
 
     async def _build_payload(self) -> dict[str, Any]:
-        """Pull SoC + net power from the scheduler's last snapshot.
+        """Pull SoC + net power from the store's `bank` pseudo-device.
         Defensive about every step — a half-built snapshot during
-        startup should not crash the heartbeat task."""
+        startup should not crash the heartbeat task.
+
+        Why the store and not scheduler.last_result: `last_result` is
+        the raw poll output (real devices: battery_0, rover_mppt etc).
+        The aggregate "bank" pseudo-device is computed *inside*
+        record_poll() and lives in the `latest` table; the heartbeat
+        was previously looking for it in last_result and finding
+        nothing → soc_pct + net_w shipped as nulls.
+        """
         import time
         soc_pct = None
         net_w = None
         try:
-            last = self.scheduler.last_result or {}
-            devices = last.get("devices") or []
-            for d in devices:
-                if d.get("label") == "bank":
-                    latest = d.get("latest") or {}
-                    soc_pct = latest.get("soc_pct")
-                    net_w   = latest.get("power_w")
-                    break
+            store = getattr(self.scheduler, "store", None)
+            if store is not None:
+                latest = await store.get_latest()
+                bank = latest.get("bank") or {}
+                soc_pct = bank.get("soc_pct")
+                net_w   = bank.get("power_w")
         except Exception:
-            log.exception("cloud heartbeat: could not read snapshot")
+            log.exception("cloud heartbeat: could not read bank state")
 
         # Free-form extras for the cloud dashboard to render later.
         # Keep this concise — the cloud caps extras at 2 KiB.
