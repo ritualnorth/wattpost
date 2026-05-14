@@ -143,14 +143,21 @@ action_change_port() {
     fi
 }
 
-action_reset_web_password() {
+action_local_password() {
     needs_root || return 0
-    if ! confirm "Reset web password?" "Generates a new random password for the local dashboard (the page at http://wattpost.local). All existing browser sessions are signed out. Continue?"; then
-        return 0
+    local existing
+    existing=$( [ -f /etc/wattpost/web-password.hash ] && echo "yes" || echo "no" )
+    local title body
+    if [ "${existing}" = "yes" ]; then
+        title="Reset web password?"
+        body="Generates a NEW random password for the local dashboard\n(http://wattpost.local). All existing browser sessions are\nsigned out. Continue?"
+    else
+        title="Set web password?"
+        body="By default the local dashboard accepts any LAN client.\nSetting a password gates write endpoints (settings, restart,\nconfig changes) behind it. Cloud tunnel access is unaffected.\n\nContinue?"
     fi
-    # 5-byte random hex → "wattpost-xxxxxxxxxx" — same recipe as
-    # packaging/install.sh's first-boot generator. Argon2-hash via
-    # the venv's python (where argon2-cffi is installed).
+    if ! confirm "${title}" "${body}"; then return 0; fi
+    # "wattpost-<5-hex>" — short, human-readable, brand-able. Argon2
+    # hash via the venv's python (argon2-cffi is in pyproject.toml).
     local new_pw
     new_pw="wattpost-$(${SUDO} openssl rand -hex 5)"
     ${SUDO} sh -c "echo '${new_pw}' > /etc/wattpost/web-password && \
@@ -167,7 +174,20 @@ sys.stdout.write(hash_password('${new_pw}'))
     # otherwise an attacker with an old cookie can outlive a password
     # reset.
     ${SUDO} systemctl restart wattpost
-    msg "Password reset" "New web password:\n\n    ${new_pw}\n\nBookmark it — the MOTD also shows it until you delete /etc/wattpost/web-password.\n\nAll existing browser sessions have been signed out."
+    msg "Web password ${existing/yes/reset}${existing/no/set}" \
+        "New web password:\n\n    ${new_pw}\n\nBookmark it — the MOTD also shows it until you delete\n/etc/wattpost/web-password.\n\nAll existing browser sessions have been signed out."
+}
+
+action_clear_local_password() {
+    needs_root || return 0
+    if [ ! -f /etc/wattpost/web-password.hash ]; then
+        msg "Already cleared" "No local web password is currently set — the LAN already has open access to the dashboard."
+        return 0
+    fi
+    if ! confirm "Clear web password?" "Removes the local password. The dashboard reverts to LAN-trusted (any device on your network can access + change settings).\n\nCloud tunnel access is unaffected.\n\nContinue?"; then return 0; fi
+    ${SUDO} rm -f /etc/wattpost/web-password /etc/wattpost/web-password.hash
+    ${SUDO} systemctl restart wattpost
+    msg "Cleared" "Local password removed. Any LAN client can now access the dashboard. Set a new one any time via this menu."
 }
 
 action_pair_status() {
@@ -242,7 +262,7 @@ main_menu() {
                 "3" "Live log tail (Ctrl+C returns)" \
                 "4" "Restart wattpost service" \
                 "5" "Change web port" \
-                "6" "Reset web password" \
+                "6" "Set / reset web password" \
                 "7" "Cloud pairing status" \
                 "8" "Unpair from cloud" \
                 "9" "Check for updates" \
@@ -255,7 +275,7 @@ main_menu() {
                 3) action_logs_follow ;;
                 4) action_restart ;;
                 5) action_change_port ;;
-                6) action_reset_web_password ;;
+                6) action_local_password ;;
                 7) action_pair_status ;;
                 8) action_unpair ;;
                 9) action_update_check ;;
@@ -271,7 +291,7 @@ main_menu() {
             echo "  3) Live log tail"
             echo "  4) Restart wattpost"
             echo "  5) Change web port"
-            echo "  6) Reset web password"
+            echo "  6) Set / reset web password"
             echo "  7) Cloud pairing status"
             echo "  8) Unpair from cloud"
             echo "  9) Check for updates"
@@ -286,7 +306,7 @@ main_menu() {
                 3) action_logs_follow ;;
                 4) action_restart ;;
                 5) action_change_port ;;
-                6) action_reset_web_password ;;
+                6) action_local_password ;;
                 7) action_pair_status ;;
                 8) action_unpair ;;
                 9) action_update_check ;;
