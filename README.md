@@ -142,6 +142,11 @@ per device kind, register the vendor, add one import line to
 
 Full recipe: [docs/adding-a-vendor.md](docs/adding-a-vendor.md).
 
+## Releases + cloud
+
+- [docs/cloud-architecture.md](docs/cloud-architecture.md) — UniFi-style pattern: cloud as router + overview, appliance as source of truth, tunnel for remote access
+- [docs/release-pipeline.md](docs/release-pipeline.md) — how features reach a customer's Pi: SD image build, source tarballs, in-place Update-now flow, the self-hosted `releases.wattpost.io` infrastructure
+
 ## Licence
 
 Proprietary. All rights reserved. See [LICENSE.txt](LICENSE.txt).
