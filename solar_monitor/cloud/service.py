@@ -51,7 +51,7 @@ class CloudService:
         """Build + send one heartbeat. Returns True on 2xx, False on
         anything else. Used by the loop and also exposed for the
         Settings UI's "Send heartbeat now" button."""
-        payload = self._build_payload()
+        payload = await self._build_payload()
         url = f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat"
         headers = {
             "Authorization": f"Bearer {self.cfg.bearer_token}",
@@ -75,10 +75,11 @@ class CloudService:
             return False
         return True
 
-    def _build_payload(self) -> dict[str, Any]:
+    async def _build_payload(self) -> dict[str, Any]:
         """Pull SoC + net power from the scheduler's last snapshot.
         Defensive about every step — a half-built snapshot during
         startup should not crash the heartbeat task."""
+        import time
         soc_pct = None
         net_w = None
         try:
@@ -109,6 +110,26 @@ class CloudService:
             extras["alert_count"] = alert_count
         except Exception:
             pass
+        # Today's energy aggregates — surface on the cloud card so the
+        # user can see "RV: 1.4 kWh in, 0.6 kWh out today" without
+        # opening the local site. One DB read per heartbeat (~5 min)
+        # is cheap; failure to read is non-fatal.
+        try:
+            store = getattr(self.scheduler, "store", None)
+            if store is not None:
+                now = int(time.time())
+                local = time.localtime(now)
+                midnight = int(time.mktime(
+                    (local.tm_year, local.tm_mon, local.tm_mday,
+                     0, 0, 0, 0, 0, -1)
+                ))
+                tot = await store.today_aggregate(midnight, now)
+                # round to whole Wh — the cloud renders in kWh anyway.
+                extras["pv_today_wh"]   = int(tot.get("pv_today_wh") or 0)
+                extras["load_today_wh"] = int(tot.get("load_today_wh") or 0)
+        except Exception:
+            log.warning("cloud heartbeat: today_aggregate read failed",
+                        exc_info=True)
 
         return {
             "soc_pct": soc_pct,
