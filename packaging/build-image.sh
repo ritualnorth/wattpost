@@ -30,10 +30,17 @@ fi
 # coexist; on Ubuntu they Conflict (both register the same binfmt
 # handlers — apt refuses to install both). qemu-user-static alone
 # provides the static qemu binaries pi-gen actually uses, plus
-# auto-registers binfmt via update-binfmts in its postinst, so
-# dropping qemu-user-binfmt from the dep list is safe.
+# auto-registers binfmt via update-binfmts in its postinst.
+#
+# pi-gen's depends file uses either `package` or `package:command`
+# per line; match both forms when stripping. Also print what we did
+# so future failures are easier to diagnose from the CI log.
 if [ -f "${PIGEN_DIR}/depends" ]; then
-    sed -i '/^qemu-user-binfmt$/d' "${PIGEN_DIR}/depends"
+    echo "==> pi-gen depends BEFORE strip:"
+    grep -nE '^(qemu|binfmt)' "${PIGEN_DIR}/depends" || true
+    sed -i -E '/^qemu-user-binfmt(:|$)/d' "${PIGEN_DIR}/depends"
+    echo "==> pi-gen depends AFTER strip:"
+    grep -nE '^(qemu|binfmt)' "${PIGEN_DIR}/depends" || echo "  (no qemu/binfmt lines)"
 fi
 
 # Link our stage into pi-gen's stages dir.
