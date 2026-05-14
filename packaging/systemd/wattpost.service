@@ -47,7 +47,15 @@ TimeoutStopSec=15
 
 # Hardening — minimum capabilities, read-only filesystem except for
 # the state + log paths we explicitly need.
-NoNewPrivileges=true
+#
+# NoNewPrivileges is intentionally NOT set. The daemon needs to invoke
+# `sudo` for two narrow, explicit cases that the sudoers entry pins:
+#   1. `sudo tailscale up/serve/logout` — Settings → Network buttons
+#   2. `sudo /usr/local/bin/wattpost-update` — Update-now button
+# NoNewPrivileges=true would block both because sudo is setuid root.
+# The risk is limited: the sudoers rule only allows those exact
+# commands, and the rest of the hardening (ProtectSystem, ProtectHome,
+# RestrictNamespaces, etc) still applies to the daemon itself.
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true

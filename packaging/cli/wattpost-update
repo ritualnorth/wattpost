@@ -1,0 +1,93 @@
+#!/bin/bash
+# WattPost in-place upgrade helper.
+#
+# Triggered by:
+#   1. POST /api/system/update/apply on the running daemon (which
+#      sudo-execs this script in the background so the daemon can
+#      restart without killing the update mid-flight).
+#   2. Manually: `sudo /usr/local/bin/wattpost-update`
+#
+# Steps:
+#   1. Download the latest source tarball from releases.wattpost.io
+#   2. Verify SHA256
+#   3. Extract to /opt/wattpost-src/ (replacing previous contents)
+#   4. Run packaging/install.sh from that tree → reinstalls venv,
+#      systemd unit, etc. install.sh restarts the wattpost service
+#      at the end so we don't have to.
+#
+# All output goes to /var/log/wattpost-update.log so the daemon (and
+# the user via wattpost-config) can tail it.
+#
+# Idempotent — running twice with the same upstream version is a no-op
+# at the venv-install layer (pip detects equivalence).
+
+set -euo pipefail
+
+LOG=/var/log/wattpost-update.log
+SRC_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}"
+SHA_URL="${SRC_URL}.sha256"
+SRC_DIR=/opt/wattpost-src
+TMP_TAR="$(mktemp --suffix=.tar.gz)"
+TMP_SHA="$(mktemp --suffix=.sha256)"
+LOCK=/run/wattpost-update.lock
+
+# Run only one update at a time. flock returns 1 on contention; we
+# fail fast rather than queueing because the user pressing Update Now
+# twice should see "already updating" rather than two parallel
+# tarballs racing.
+exec 200>"${LOCK}"
+flock -n 200 || {
+    echo "$(date -Is) ERROR another update is already running" | tee -a "${LOG}" >&2
+    exit 11
+}
+
+cleanup() {
+    rm -f "${TMP_TAR}" "${TMP_SHA}" || true
+}
+trap cleanup EXIT
+
+log() { echo "$(date -Is) $*" | tee -a "${LOG}"; }
+
+log "==> WattPost update starting"
+log "    source: ${SRC_URL}"
+
+# Fetch tarball + sha256 in parallel-ish (curl is sequential but fast
+# enough). Fail loud on any 4xx/5xx — `set -e` + `curl -f`.
+log "    downloading tarball..."
+curl -fsSL --connect-timeout 10 --max-time 300 -o "${TMP_TAR}" "${SRC_URL}"
+log "    downloading sha256..."
+curl -fsSL --connect-timeout 10 --max-time 30  -o "${TMP_SHA}" "${SHA_URL}"
+
+# The sha256 file format is `<hash>  <filename>` — replace the
+# filename with our tmp path so sha256sum -c can validate in-place.
+expected_hash=$(awk '{print $1}' "${TMP_SHA}")
+echo "${expected_hash}  ${TMP_TAR}" | sha256sum -c - --quiet
+log "    sha256 verified"
+
+# Extract to a fresh staging dir, atomic-swap into place. If the
+# extract fails halfway we don't leave /opt/wattpost-src in a torn
+# state.
+NEW_DIR="${SRC_DIR}.new"
+OLD_DIR="${SRC_DIR}.old"
+rm -rf "${NEW_DIR}"
+mkdir -p "${NEW_DIR}"
+tar -xzf "${TMP_TAR}" -C "${NEW_DIR}"
+log "    extracted to ${NEW_DIR}"
+
+if [ -d "${SRC_DIR}" ]; then
+    rm -rf "${OLD_DIR}"
+    mv "${SRC_DIR}" "${OLD_DIR}"
+fi
+mv "${NEW_DIR}" "${SRC_DIR}"
+log "    swapped into ${SRC_DIR}"
+
+# Run install.sh from the new tree. WATTPOST_SOURCE points at the new
+# source so install.sh's pip install uses the new code (rather than
+# searching for solar_monitor up the tree).
+log "    running install.sh..."
+WATTPOST_SOURCE="${SRC_DIR}" bash "${SRC_DIR}/packaging/install.sh" 2>&1 | tee -a "${LOG}"
+
+log "==> update complete"
+# install.sh restarts wattpost at the end; the API endpoint that
+# invoked us returns its 202 long before this point, so the dashboard
+# can show a "reconnecting…" banner without us blocking.
