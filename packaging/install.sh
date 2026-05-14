@@ -86,7 +86,12 @@ fi
 # that case for other reasons.
 find "${SOURCE}" -maxdepth 3 -name '*.egg-info' -type d \
     -exec rm -rf {} + 2>/dev/null || true
-"${APP_VENV}/bin/pip" install --upgrade "${SOURCE}"
+# --prefer-binary: when pi-gen runs this inside a qemu-emulated chroot,
+# Python-C-extension compilation is glacial. All our deps publish
+# aarch64 wheels on PyPI; this flag tells pip to grab those even when
+# a newer sdist exists. Native installs are unaffected (wheel still
+# chosen first by default).
+"${APP_VENV}/bin/pip" install --prefer-binary --upgrade "${SOURCE}"
 
 # ----- config (only if not present — don't clobber the user's edits) -----
 if [[ ! -f "${CONFIG_FILE}" ]]; then
