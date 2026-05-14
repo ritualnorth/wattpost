@@ -1,0 +1,89 @@
+name: Publish appliance source
+
+# Builds a tar.gz of the appliance source on every push to main that
+# touches the appliance and uploads it to releases.wattpost.io. This
+# is what `/api/system/update/apply` on a paired appliance pulls down
+# to get new features without a fresh SD-card flash.
+#
+# Tarball includes: solar_monitor/, packaging/, pyproject.toml,
+# README.md. Excludes: cloud/ (private), .github/, dev artefacts.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'solar_monitor/**'
+      - 'packaging/**'
+      - 'pyproject.toml'
+      - '.github/workflows/publish-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish:
+    name: tar + scp to VPS
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need history so we can stamp the tarball with the commit SHA.
+          fetch-depth: 0
+
+      - name: Build tarball
+        id: tarball
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse --short HEAD)
+          VERSION=$(grep -E '^__version__' solar_monitor/__init__.py | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          NAME="wattpost-source-${VERSION}+${SHA}.tar.gz"
+          mkdir -p /tmp/out
+          # tar from repo root, including only the appliance bits.
+          # --exclude order matters: outer-first.
+          tar -czf "/tmp/out/${NAME}" \
+              --exclude='./solar_monitor/__pycache__' \
+              --exclude='./solar_monitor/**/__pycache__' \
+              --exclude='*.egg-info' \
+              ./solar_monitor ./packaging ./pyproject.toml ./README.md
+          ( cd /tmp/out && sha256sum "${NAME}" > "${NAME}.sha256" )
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          ls -lah /tmp/out
+
+      - name: Upload to releases.wattpost.io
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "/tmp/out/*"
+          target: /srv/wattpost-releases/source/
+          strip_components: 2
+
+      - name: Update `latest` symlink
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /srv/wattpost-releases/source
+            newest=$(ls -1t wattpost-source-*.tar.gz 2>/dev/null | head -1)
+            if [ -n "$newest" ]; then
+              ln -sfn "$newest" latest.tar.gz
+              ln -sfn "$newest.sha256" latest.tar.gz.sha256
+              echo "latest.tar.gz → $newest"
+            else
+              echo "no source tarballs found" >&2
+              exit 1
+            fi
+            # Keep only the 10 most recent tarballs — older ones are
+            # historical only; appliances pulling "latest" don't care.
+            ls -1t wattpost-source-*.tar.gz 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f
+            ls -1t wattpost-source-*.tar.gz.sha256 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f

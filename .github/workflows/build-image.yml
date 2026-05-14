@@ -107,6 +107,8 @@ jobs:
       # creates the release if it doesn't exist, or appends to an
       # existing one — so we can re-run on the same tag to repair a
       # failed upload without losing the original release body.
+      # Private repo → these assets aren't anonymously downloadable;
+      # the public-facing copy is the scp-to-VPS step below.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -116,3 +118,44 @@ jobs:
             ${{ steps.locate.outputs.checksum }}
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+      # Public-facing release channel: scp the .img.xz + sha256 to the
+      # VPS at /srv/wattpost-releases/img/, which the shared-caddy
+      # container serves anonymously as releases.wattpost.io. The
+      # private repo's GH-release path above stays as an internal
+      # archive; this is what end-users actually hit.
+      - name: Publish to releases.wattpost.io (scp)
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: |
+            ${{ steps.locate.outputs.image }}
+            ${{ steps.locate.outputs.checksum }}
+          target: /srv/wattpost-releases/img/
+          strip_components: 3   # drop build/pi-gen/deploy/ prefix
+
+      # Repoint the `latest` symlink to whatever filename we just
+      # uploaded so /api/releases/latest can serve a stable URL.
+      - name: Update `latest` symlink
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /srv/wattpost-releases/img
+            # Pick the freshest .img.xz by mtime.
+            newest=$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
+            if [ -n "$newest" ]; then
+              ln -sfn "$newest" latest.img.xz
+              ln -sfn "$newest.sha256" latest.img.xz.sha256
+              echo "latest.img.xz → $newest"
+            else
+              echo "no .img.xz files found — leaving latest alone" >&2
+              exit 1
+            fi
