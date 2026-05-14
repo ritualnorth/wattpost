@@ -2650,7 +2650,7 @@ function renderIntegrationsPanel() {
     <div class="integration-row" data-integration="cloud">
       <div class="integration-row-main">
         <div class="integration-row-head">
-          <span class="integration-row-name">WattPost cloud (app.wattpost.io)</span>
+          <span class="integration-row-name">WattPost cloud</span>
           <span class="alerts-row-tag alerts-row-tag--${cloudConfigured ? "ok" : "warn"}">
             ${cloudConfigured ? "paired" : "not paired"}
           </span>
