@@ -159,16 +159,38 @@ jobs:
           # Upload both artefacts.
           scp -v -i ~/.ssh/id_release "$IMG" "$CHECKSUM" \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/"
+          # Build the manifest.json the cloud reads at request time.
+          # Cloud's releases.get_latest() fetches this file every 60s,
+          # so within a couple minutes of this scp finishing, the
+          # /download page + /api/releases/latest reflect the new
+          # build automatically. No commit-to-cloud step.
+          VERSION=$(grep -E '^__version__' solar_monitor/__init__.py \
+                    | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          SHA=$(awk '{print $1}' "$CHECKSUM")
+          SIZE=$(stat -c %s "$IMG")
+          FNAME=$(basename "$IMG")
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          cat > /tmp/manifest.json <<JSON
+          {
+            "version":      "${VERSION}",
+            "released_at":  "${NOW}",
+            "image_filename": "${FNAME}",
+            "image_url":    "https://releases.wattpost.io/img/latest.img.xz",
+            "sha256":       "${SHA}",
+            "sha256_url":   "https://releases.wattpost.io/img/latest.img.xz.sha256",
+            "size_bytes":   ${SIZE},
+            "release_url":  "https://wattpost.io/download",
+            "source_url":   "https://releases.wattpost.io/source/latest.tar.gz",
+            "source_sha256_url": "https://releases.wattpost.io/source/latest.tar.gz.sha256"
+          }
+          JSON
+          scp -i ~/.ssh/id_release /tmp/manifest.json \
+              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/manifest.json"
           # Repoint latest.img.xz → newest dated file, by mtime.
-          ssh -i ~/.ssh/id_release "${SSH_USER}@${SSH_HOST}" '
+          ssh -i ~/.ssh/id_release "${SSH_USER}@${SSH_HOST}" "
             set -euo pipefail
             cd /srv/wattpost-releases/img
-            newest=$(ls -1t wattpost-*.img.xz 2>/dev/null | head -1)
-            if [ -z "$newest" ]; then
-              echo "no .img.xz files found — refusing to repoint latest" >&2
-              exit 1
-            fi
-            ln -sfn "$newest" latest.img.xz
-            ln -sfn "$newest.sha256" latest.img.xz.sha256
-            echo "latest.img.xz -> $newest"
-          '
+            ln -sfn '${FNAME}' latest.img.xz
+            ln -sfn '${FNAME}.sha256' latest.img.xz.sha256
+            echo 'latest.img.xz -> ${FNAME}'
+          "
