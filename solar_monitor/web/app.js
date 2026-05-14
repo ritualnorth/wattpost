@@ -4666,20 +4666,48 @@ function renderMarkdown(src) {
       out.push(`<blockquote>${renderMarkdown(buf.join("\n"))}</blockquote>`);
       continue;
     }
-    // Ordered list
+    // Ordered list — captures multi-line items: any subsequent line
+    // indented by 2+ spaces (and not a new marker) is folded into the
+    // current item. Without this, hard-wrapped 80-char list items
+    // render as half-bullet/half-paragraph with mismatched fonts.
     if (/^\s*\d+\.\s+/.test(ln)) {
       const items = [];
-      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*\d+\.\s+/, "")); i++;
+      while (i < lines.length) {
+        const m = lines[i].match(/^\s*\d+\.\s+(.+)$/);
+        if (!m) break;
+        let buf = m[1];
+        i++;
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !/^\s*[-*]\s+|^\s*\d+\.\s+/.test(lines[i])) {
+          buf += " " + lines[i].trim();
+          i++;
+        }
+        items.push(buf);
       }
       out.push(`<ol>${items.map(it => `<li>${renderInline(it)}</li>`).join("")}</ol>`);
       continue;
     }
-    // Unordered list
+    // Unordered list — same continuation rule as ordered.
     if (/^\s*[-*]\s+/.test(ln)) {
       const items = [];
-      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
-        items.push(lines[i].replace(/^\s*[-*]\s+/, "")); i++;
+      while (i < lines.length) {
+        const m = lines[i].match(/^(\s*)[-*]\s+(.+)$/);
+        if (!m) break;
+        const indent = m[1].length;
+        let buf = m[2];
+        i++;
+        // Consume continuation lines indented strictly more than the
+        // marker. Stops at blank line, new marker, or unindented text.
+        while (i < lines.length && /^\s{2,}\S/.test(lines[i]) && !/^\s*[-*]\s+|^\s*\d+\.\s+/.test(lines[i])) {
+          buf += " " + lines[i].trim();
+          i++;
+        }
+        items.push(buf);
+        // Allow blank line between siblings without exiting the list.
+        if (i < lines.length && /^\s*$/.test(lines[i])
+            && i + 1 < lines.length && /^\s*[-*]\s+/.test(lines[i + 1])) {
+          i++;
+        }
+        void indent;
       }
       out.push(`<ul>${items.map(it => `<li>${renderInline(it)}</li>`).join("")}</ul>`);
       continue;
