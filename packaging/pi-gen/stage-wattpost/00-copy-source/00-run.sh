@@ -11,13 +11,28 @@
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="${HERE}/wattpost-src"
 
+echo "[stage-wattpost/00-copy-source] HERE=${HERE}"
+echo "[stage-wattpost/00-copy-source] SRC=${SRC}"
+echo "[stage-wattpost/00-copy-source] ROOTFS_DIR=${ROOTFS_DIR:-<unset>}"
+
 if [ ! -d "${SRC}" ]; then
     echo "WattPost source not staged at ${SRC} — did build-image.sh run?" >&2
+    echo "  HERE listing:" >&2
+    ls -la "${HERE}/" >&2 || true
     exit 1
 fi
 
-mkdir -p "${ROOTFS_DIR}/tmp/wattpost-src"
+echo "[stage-wattpost/00-copy-source] SRC contents (top level):"
+ls -la "${SRC}/" | head -20
+
+DEST="${ROOTFS_DIR}/tmp/wattpost-src"
+mkdir -p "${DEST}"
 rsync -a --delete \
       --exclude '__pycache__/' \
       --exclude '*.egg-info/' \
-      "${SRC}/" "${ROOTFS_DIR}/tmp/wattpost-src/"
+      "${SRC}/" "${DEST}/"
+
+echo "[stage-wattpost/00-copy-source] DEST after rsync:"
+ls -la "${DEST}/" | head -20
+echo "[stage-wattpost/00-copy-source] DEST sanity: packaging/ dir present? $([ -d "${DEST}/packaging" ] && echo YES || echo NO)"
+echo "[stage-wattpost/00-copy-source] DEST file count: $(find "${DEST}" -type f | wc -l)"
