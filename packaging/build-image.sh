@@ -77,6 +77,7 @@ cp -r  "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}
 # we now ship the source inside the stage and rsync from a known
 # in-container location.
 SRC_STAGE_DIR="${PIGEN_DIR}/${STAGE_NAME}/00-copy-source/wattpost-src"
+echo "==> staging WattPost source from ${REPO_ROOT} → ${SRC_STAGE_DIR}"
 rm -rf "${SRC_STAGE_DIR}"
 mkdir -p "${SRC_STAGE_DIR}"
 rsync -a \
@@ -89,6 +90,19 @@ rsync -a \
       --exclude 'solar-monitor.db*' \
       --exclude '.claude/' \
       "${REPO_ROOT}/" "${SRC_STAGE_DIR}/"
+# Sanity: bail loudly if we didn't actually stage anything — the
+# chroot-side install.sh chokes on an empty source tree with a less
+# obvious "/tmp/wattpost-src not found" later.
+if [ ! -f "${SRC_STAGE_DIR}/pyproject.toml" ]; then
+    echo "ERROR: WattPost source staging failed —" >&2
+    echo "  ${SRC_STAGE_DIR}/pyproject.toml is missing." >&2
+    echo "  REPO_ROOT contents:" >&2
+    ls -la "${REPO_ROOT}/" | head -20 >&2
+    echo "  Staging dir contents:" >&2
+    ls -la "${SRC_STAGE_DIR}/" | head -20 >&2
+    exit 1
+fi
+echo "    staged $(du -sh "${SRC_STAGE_DIR}" | awk '{print $1}'), $(find "${SRC_STAGE_DIR}" -type f | wc -l) files"
 
 # Skip the desktop stages (3, 4, 5) and use lite (stage 2) as the base
 # our stage builds on. SKIP_IMAGES on stages we don't ship.
