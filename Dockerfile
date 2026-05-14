@@ -22,12 +22,14 @@ RUN apt-get -y update \
 
 WORKDIR /app
 
-# Install Python deps first so wheel-caching helps source-only edits.
+# Copy source FIRST then pip install — setuptools' find-packages
+# resolves at install time, so if solar_monitor/ isn't on disk yet
+# `pip install .` installs the entry-point script but no actual
+# package, and the script crashes on import. (Bit us once already.)
 COPY pyproject.toml /app/
+COPY solar_monitor /app/solar_monitor
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --prefer-binary .
-
-COPY solar_monitor /app/solar_monitor
 
 ENV PYTHONUNBUFFERED=1 \
     WATTPOST_DEMO=1 \
