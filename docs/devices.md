@@ -1,7 +1,8 @@
 # Adding devices
 
 WattPost reads telemetry from devices that speak Modbus over BLE
-(via a Renogy BT-1 / BT-2 dongle today; Victron / JK-BMS coming).
+(via a Renogy BT-1 / BT-2 dongle today; Victron and JK BMS are on
+the roadmap).
 
 ## Already paired one BT-2 dongle?
 

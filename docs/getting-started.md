@@ -6,7 +6,7 @@ WattPost is a Raspberry Pi appliance that polls your off-grid solar gear over Bl
 
 - A Raspberry Pi 4 or 5 (any RAM size — even the 1 GB Pi 4 is plenty).
 - An 8 GB+ microSD card.
-- A supported BLE dongle. For Renogy gear, that's a [BT-1 or BT-2](/docs/supported-hardware). For Victron, the device's built-in Smart Bluetooth. For JK BMS, the JK BLE module.
+- A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) (Victron and JK BMS are on the roadmap, not in this release).
 - A USB-C power supply (Pi 4 / 5 official is ideal).
 
 ## Flash the SD card
@@ -28,7 +28,7 @@ You should see the **WattPost dashboard** with a state-of-charge donut, power fl
 
 ## Pair your first device
 
-Settings → **Devices & setup** → **Pair a new device** scans for any Renogy / Victron / JK device in range. Tap the one you want and confirm. The dashboard starts filling in within ~10 seconds of the first poll.
+Settings → **Devices & setup** → **Pair a new device** scans for Renogy gear in range. Tap the one you want and confirm. The dashboard starts filling in within ~10 seconds of the first poll.
 
 ## What's next?
 
