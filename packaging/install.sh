@@ -212,6 +212,16 @@ if [ -d "${SCRIPT_DIR}/motd" ] && [ -d /etc/update-motd.d ]; then
     install -m 0755 "${SCRIPT_DIR}/motd/10-wattpost" /etc/update-motd.d/10-wattpost
 fi
 
+# ----- wattpost-config CLI -----
+# The raspi-config-style menu for "I just SSH'd in, now what?" — wraps
+# the most common admin actions (logs, restart, port change, pair
+# status). Installed at /usr/local/bin so it's on root's $PATH without
+# editing /etc/profile.
+step "installing wattpost-config CLI"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-config" ]; then
+    install -m 0755 "${SCRIPT_DIR}/cli/wattpost-config" /usr/local/bin/wattpost-config
+fi
+
 # ----- systemd unit -----
 step "installing wattpost.service"
 install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"
