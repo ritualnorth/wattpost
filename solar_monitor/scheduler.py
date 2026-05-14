@@ -180,8 +180,15 @@ class PollScheduler:
         # zero hardware required — used by demo.wattpost.io.
         import os
         if os.environ.get("WATTPOST_DEMO") == "1":
-            from .demo import SyntheticPoller
+            from .demo import SyntheticPoller, seed_history
             log.info("WATTPOST_DEMO=1 — using synthetic poller (no real BLE)")
+            # Backfill 30 days of synthetic history so charts have
+            # something to draw immediately. Idempotent — skips if
+            # the store already has recent data.
+            try:
+                await seed_history(self.store, days=30, step_minutes=60)
+            except Exception:
+                log.exception("demo history seed failed (non-fatal)")
             self._poller = SyntheticPoller(self.config)
         else:
             self._poller = Poller(self.config)

@@ -359,14 +359,21 @@ class Store:
 
     # ---------- writes ----------
 
-    async def record_poll(self, result: dict[str, Any]) -> None:
-        """Persist a single `orchestrator.poll_once()` result."""
+    async def record_poll(
+        self, result: dict[str, Any], ts_override: int | None = None,
+    ) -> None:
+        """Persist a single `orchestrator.poll_once()` result.
+
+        `ts_override` is only used by the demo history-seeding path —
+        it lets us insert historical rows at past timestamps. Real
+        polls always use the current clock.
+        """
         if self._db is None:
             raise RuntimeError("Store not open")
 
         ts_str = result.get("timestamp")
         # Use seconds since epoch for storage; chart code wants this anyway.
-        ts = int(time.time())
+        ts = int(ts_override) if ts_override is not None else int(time.time())
         elapsed_ms = int(round(result.get("elapsed_seconds", 0) * 1000))
         errors = result.get("errors", []) or []
         devices: dict[str, dict] = result.get("devices") or {}
