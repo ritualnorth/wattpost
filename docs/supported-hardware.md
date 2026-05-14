@@ -2,7 +2,7 @@
 
 WattPost polls battery management systems, charge controllers, and shunts over **Bluetooth**. Most off-grid users already have a BLE-capable device or dongle; WattPost reuses it instead of adding a new gateway.
 
-Missing your kit? [Open an issue](https://github.com/ritualnorth/offgrid-monitor/issues) — if the BLE protocol is publicly documented (or we can borrow a sniffer), we can usually add a vendor in a release or two.
+Missing your kit? Email [support@wattpost.io](mailto:support@wattpost.io) with the device name + protocol details — if the BLE protocol is publicly documented (or we can borrow a sniffer), we can usually add a vendor in a release or two.
 
 ## Renogy
 

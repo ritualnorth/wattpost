@@ -60,10 +60,10 @@ If cloudflared is missing entirely, run install.sh again — it apt-installs the
 
 ## "Setting forecast / weather but no data"
 
-- **Solcast forecast** — needs a hobbyist API key + a registered rooftop site. Free tier is 10 polls/day; we poll every 3h (8/day). [Solcast signup](https://toolkit.solcast.com.au/register/hobbyist).
+- **Solcast forecast** — needs a hobbyist API key + a registered rooftop site. Free tier is 10 polls/day; we poll every 3h (8/day). [Solcast hobbyist signup](https://solcast.com/free-rooftop-solar-forecasting).
 - **Open-Meteo weather** — needs **lat/lon** set in Settings → Integrations → Weather. No API key. If you don't see data, double-check the coords and the daemon's network access (`curl https://api.open-meteo.com/v1/forecast?latitude=51.5&longitude=-0.1`).
 
 ## Other "ask the docs" places
 
 - The dashboard's **Docs** tab (in-app) has the same content offline-cached.
-- The [GitHub issues](https://github.com/ritualnorth/offgrid-monitor/issues) — search before you open one.
+- Email [support@wattpost.io](mailto:support@wattpost.io) — include the appliance version (Settings → About) and a copy of `journalctl -u wattpost --since '10 minutes ago'`.
