@@ -25,14 +25,20 @@ fi
 echo "[stage-wattpost/00-copy-source] SRC contents (top level):"
 ls -la "${SRC}/" | head -20
 
-DEST="${ROOTFS_DIR}/tmp/wattpost-src"
+# IMPORTANT: stage the source under /opt, NOT /tmp. Pi-gen mounts a
+# fresh tmpfs over /tmp when entering the chroot for *-chroot.sh
+# scripts, so anything we drop in ROOTFS_DIR/tmp/ is invisible from
+# inside the chroot (we hit this bug in pi-gen #15–#17). /opt is a
+# plain directory with no special mount behaviour, so files survive
+# the chroot transition.
+DEST="${ROOTFS_DIR}/opt/wattpost-src"
 mkdir -p "${DEST}"
 rsync -a --delete \
       --exclude '__pycache__/' \
       --exclude '*.egg-info/' \
       "${SRC}/" "${DEST}/"
 
-echo "[stage-wattpost/00-copy-source] DEST after rsync:"
+echo "[stage-wattpost/00-copy-source] DEST=${DEST} after rsync:"
 ls -la "${DEST}/" | head -20
 echo "[stage-wattpost/00-copy-source] DEST sanity: packaging/ dir present? $([ -d "${DEST}/packaging" ] && echo YES || echo NO)"
 echo "[stage-wattpost/00-copy-source] DEST file count: $(find "${DEST}" -type f | wc -l)"
