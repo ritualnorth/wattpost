@@ -90,4 +90,9 @@ jobs:
             git pull --ff-only origin main
             docker compose pull wattpost-demo
             docker compose up -d wattpost-demo
+            # Hot-reload Caddy so it picks up any Caddyfile change that
+            # rode along with this deploy (e.g. a new site block for
+            # demo.wattpost.io). Hot reload is much faster than restart
+            # and doesn't drop in-flight connections on the other sites.
+            docker exec shared-caddy caddy reload --config /etc/caddy/Caddyfile || true
             docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/ritualnorth/offgrid-monitor"
