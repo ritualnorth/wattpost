@@ -146,6 +146,7 @@ Full recipe: [docs/adding-a-vendor.md](docs/adding-a-vendor.md).
 
 - [docs/cloud-architecture.md](docs/cloud-architecture.md) — UniFi-style pattern: cloud as router + overview, appliance as source of truth, tunnel for remote access
 - [docs/release-pipeline.md](docs/release-pipeline.md) — how features reach a customer's Pi: SD image build, source tarballs, in-place Update-now flow, the self-hosted `releases.wattpost.io` infrastructure
+- [docs/saas-api.md](docs/saas-api.md) — planning doc for the public REST API (`/api/v1/*`). Not yet implemented; design agreed
 
 ## Licence
 
