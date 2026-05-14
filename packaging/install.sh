@@ -182,6 +182,27 @@ if [ -n "${INIT_VERSION}" ]; then
     chmod 0644 "${CONFIG_DIR}/version"
 fi
 
+# ----- web port -----
+# Default to 80 on a Pi-style SD-card install (single-purpose appliance,
+# users hit http://wattpost.local without typing a port) and 8000 on
+# anything else (Docker hosts, manual installs on shared machines where
+# port 80 is taken). Operator can force-pick by setting WATTPOST_PORT
+# before running install.sh, or by editing /etc/wattpost/port.env and
+# `systemctl restart wattpost` afterwards. The systemd unit reads this
+# via EnvironmentFile= so a port change doesn't require a unit edit.
+if [ -z "${WATTPOST_PORT:-}" ]; then
+    # Pi OS image ships /etc/rpi-issue (and similar). If that's
+    # missing, assume a shared host and default to 8000.
+    if [ -f /etc/rpi-issue ] || [ -f /etc/rpi-eeprom-update-2025.05 ]; then
+        WATTPOST_PORT=80
+    else
+        WATTPOST_PORT=8000
+    fi
+fi
+step "web port: ${WATTPOST_PORT}"
+echo "WATTPOST_PORT=${WATTPOST_PORT}" > "${CONFIG_DIR}/port.env"
+chmod 0644 "${CONFIG_DIR}/port.env"
+
 # ----- MOTD banner -----
 # Drop our SSH login banner. /etc/update-motd.d/ is read on every login
 # (when PAM motd is enabled, default on Debian/Pi OS). Numeric prefix
@@ -201,11 +222,17 @@ systemctl restart wattpost.service
 # ----- summary -----
 step "done"
 IP=$(hostname -I | awk '{print $1}')
+# Show port in the URL only when it's not the default :80 (which is
+# implicit in any browser).
+PORT_SUFFIX=""
+if [ "${WATTPOST_PORT}" != "80" ]; then
+    PORT_SUFFIX=":${WATTPOST_PORT}"
+fi
 cat <<EOF
 
 WattPost is running. Open the dashboard:
 
-    http://${IP:-<this-pi>}:8000/
+    http://${IP:-<this-pi>}${PORT_SUFFIX}/
 
 Useful commands:
     sudo systemctl status wattpost     # health
