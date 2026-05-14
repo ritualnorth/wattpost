@@ -177,12 +177,73 @@ async def pair_appliance(
         return raw
     _save_config(config_path, _mutate)
     log.info("paired with cloud (appliance_id=%s)", new_c.appliance_id)
+
+    # Hot-start the cloud + tunnel services in the live daemon so the
+    # first heartbeat fires NOW, not after a manual restart. Previously
+    # the only way to "complete" pairing was to restart wattpost —
+    # confusing UX since the user already clicked Save. We still flag
+    # restart_required so the UI nudges the user, but the appliance is
+    # already showing up online by then.
+    scheduler = state.get("scheduler") if hasattr(state, "get") else state["scheduler"]
+    hot_started = await _hot_start_cloud(scheduler, new_c)
+
     return {
         "ok": True,
         "appliance_id": new_c.appliance_id,
         "label": new_c.label,
-        "restart_required": True,
+        # Only force a restart prompt when in-process start failed —
+        # otherwise the daemon is fully paired right now.
+        "restart_required": not hot_started,
     }
+
+
+async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
+    """Spin up CloudService + TunnelService against the live scheduler
+    after a successful pair. Returns True iff at least the heartbeat
+    service is up; False (with a logged exception) tells the caller to
+    still ask the user to restart.
+
+    Imports are local so this module can be loaded by tests that don't
+    pull in the full scheduler graph."""
+    try:
+        from ..cloud.service import CloudService
+        from ..tunnel.service import TunnelService
+    except Exception:
+        log.exception("hot-start: failed to import service modules")
+        return False
+    if scheduler is None:
+        log.warning("hot-start: scheduler not in app state, skipping")
+        return False
+    # Heartbeat service.
+    try:
+        old = getattr(scheduler, "_cloud", None)
+        if old is not None:
+            try:
+                await old.stop()
+            except Exception:
+                log.warning("hot-start: stopping old cloud svc raised", exc_info=True)
+        new_svc = CloudService(cfg, scheduler)
+        scheduler._cloud = new_svc
+        await new_svc.start()
+    except Exception:
+        log.exception("hot-start: cloud heartbeat service failed to start")
+        return False
+    # Tunnel — best-effort; success here is bonus, not required.
+    try:
+        if TunnelService.is_available(cfg):
+            old_t = getattr(scheduler, "_tunnel", None)
+            if old_t is not None:
+                try:
+                    await old_t.stop()
+                except Exception:
+                    log.warning("hot-start: stopping old tunnel raised", exc_info=True)
+            t = TunnelService(cfg)
+            scheduler._tunnel = t
+            await t.start()
+    except Exception:
+        log.exception("hot-start: tunnel service failed to start (non-fatal)")
+    log.info("hot-start: cloud heartbeat live without daemon restart")
+    return True
 
 
 @post("/api/cloud/unpair", status_code=200)
@@ -208,10 +269,25 @@ async def trigger_heartbeat(state: State) -> dict[str, Any]:
     scheduler = state["scheduler"]
     svc = getattr(scheduler, "_cloud", None)
     if svc is None:
-        raise HTTPException(
-            status_code=400,
-            detail="cloud heartbeat service not running. Pair first.",
-        )
+        # Daemon started before pair (or pair didn't hot-start for some
+        # reason). If config has a bearer token now, bring the service
+        # up rather than telling the user to "pair first" — which is
+        # misleading and what was hitting people who paired without
+        # restarting the daemon.
+        config: Config = state["config"]
+        if config.cloud is not None and config.cloud.bearer_token:
+            ok_started = await _hot_start_cloud(scheduler, config.cloud)
+            if not ok_started:
+                raise HTTPException(
+                    status_code=500,
+                    detail="couldn't start heartbeat service — check daemon logs",
+                )
+            svc = getattr(scheduler, "_cloud", None)
+        if svc is None:
+            raise HTTPException(
+                status_code=400,
+                detail="cloud heartbeat service not running. Pair first.",
+            )
     ok = await svc.heartbeat_once()
     return {"ok": ok}
 
