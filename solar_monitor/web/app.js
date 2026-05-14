@@ -3886,9 +3886,16 @@ if (statusEl && legendEl) {
   });
   legendEl.querySelector(".status-legend-link")?.addEventListener("click", close);
 }
+// If the URL path is /kiosk (real server route, hits anonymously even
+// when local-auth is on), flip the SPA into kiosk mode by setting the
+// hash before initial setRoute runs. Bookmarkable, shareable, and the
+// auth middleware whitelists this exact path.
+if (window.location.pathname === "/kiosk") {
+  window.location.hash = "#/kiosk";
+}
 // If this device is set to default-to-kiosk and the URL has no explicit
 // hash, redirect before the initial setRoute runs.
-if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
+else if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
   window.location.hash = "#/kiosk";
 }
 

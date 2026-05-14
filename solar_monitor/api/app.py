@@ -393,6 +393,22 @@ def index() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
+@get("/kiosk", sync_to_thread=False)
+def kiosk_index() -> File:
+    """Public, chrome-free wall-display view of the SoC + flow.
+
+    Serves the same SPA bundle as `/`; the boot script in app.js
+    detects `location.pathname === '/kiosk'` and flips the SPA into
+    kiosk mode before first render. Real server-side path (rather
+    than the previous `/#/kiosk` hash route) so the local-auth
+    middleware can whitelist this single URL without exposing the
+    rest of the dashboard."""
+    path = _web_dir() / "index.html"
+    if not path.exists():
+        raise NotFoundException("index.html missing")
+    return File(path=path, media_type="text/html", content_disposition_type="inline")
+
+
 @get("/login", sync_to_thread=False)
 def login_page() -> File:
     """Static HTML login form. POSTs to /api/login → cookie + redirect.
@@ -675,6 +691,7 @@ def build_app(
             probe,
             add_device,
             index,
+            kiosk_index,
             login_page,
             do_login,
             do_logout,
