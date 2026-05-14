@@ -78,6 +78,13 @@ async def get_cloud_config(state: State) -> dict[str, Any]:
         "label":             c.label,
         # Token is intentionally masked — the UI never gets the real one.
         "bearer_token":      "****",
+        # Tunnel surface: hostname is shown on Integrations so the
+        # operator can copy/click it; tunnel_enabled is true once a
+        # token has been issued at pair time (CF creds were configured
+        # on the cloud), false for older/legacy pairings that need a
+        # re-pair to pick up a token.
+        "tunnel_enabled":    bool(c.tunnel_token),
+        "tunnel_hostname":   c.tunnel_hostname or None,
     }
 
 

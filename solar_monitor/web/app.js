@@ -2564,7 +2564,11 @@ function renderIntegrationsPanel() {
         </div>
         <div class="integration-row-sub">
           ${cloudConfigured
-            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}`
+            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
+                integrationsState.cloud.tunnel_hostname
+                  ? ` · remote: <a href="https://${integrationsState.cloud.tunnel_hostname}/" target="_blank" rel="noopener">${integrationsState.cloud.tunnel_hostname}</a>`
+                  : (integrationsState.cloud.tunnel_enabled === false ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel — re-pair to enable remote access</span>` : "")
+              }`
             : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://app.wattpost.io")}" target="_blank" rel="noopener">app.wattpost.io</a> account for the multi-site dashboard + offline alerts.`
           }
         </div>
