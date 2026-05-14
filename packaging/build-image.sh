@@ -37,10 +37,22 @@ fi
 # so future failures are easier to diagnose from the CI log.
 if [ -f "${PIGEN_DIR}/depends" ]; then
     echo "==> pi-gen depends BEFORE strip:"
-    grep -nE '^(qemu|binfmt)' "${PIGEN_DIR}/depends" || true
-    sed -i -E '/^qemu-user-binfmt(:|$)/d' "${PIGEN_DIR}/depends"
+    grep -nE 'qemu|binfmt' "${PIGEN_DIR}/depends" || true
+    # depends format is `binary:package` per line. We want to strip
+    # any line whose *package* (right of the colon) is qemu-user-binfmt,
+    # regardless of which binary it claims to provide. Also catches a
+    # bare `qemu-user-binfmt` line if upstream ever drops the prefix.
+    sed -i -E '/(^|:)qemu-user-binfmt$/d' "${PIGEN_DIR}/depends"
+    # Pi-gen's check looks for the *command* on PATH. On Ubuntu we
+    # only have qemu-arm-static (the static variant), not qemu-arm.
+    # Symlink so the command-existence half of the check passes too.
+    # The kernel's binfmt_misc redirects arm/aarch64 binaries through
+    # qemu-*-static at exec time anyway, so this is just placating
+    # the dep check.
+    sudo ln -sf /usr/bin/qemu-arm-static    /usr/bin/qemu-arm    2>/dev/null || true
+    sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
     echo "==> pi-gen depends AFTER strip:"
-    grep -nE '^(qemu|binfmt)' "${PIGEN_DIR}/depends" || echo "  (no qemu/binfmt lines)"
+    grep -nE 'qemu|binfmt' "${PIGEN_DIR}/depends" || echo "  (no qemu/binfmt lines)"
 fi
 
 # Link our stage into pi-gen's stages dir.
