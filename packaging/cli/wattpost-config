@@ -1,0 +1,289 @@
+#!/bin/bash
+# WattPost interactive setup CLI — the raspi-config-style blue-screen
+# menu users land on when they SSH into a freshly-flashed Pi.
+#
+# Wraps the most common admin actions so non-technical users don't need
+# to remember `systemctl`, `journalctl`, or which env file holds what.
+# Installed at /usr/local/bin/wattpost-config by packaging/install.sh.
+
+set -euo pipefail
+
+# Whiptail ships with Pi OS / Debian-derivatives; dialog is an
+# acceptable fallback on stripped-down systems. If neither is present
+# we degrade gracefully to plain-text prompts so the script still works
+# over a minimal serial console.
+TUI=""
+if command -v whiptail >/dev/null 2>&1; then
+    TUI=whiptail
+elif command -v dialog >/dev/null 2>&1; then
+    TUI=dialog
+fi
+
+BACKTITLE="WattPost setup"
+CONFIG_DIR=/etc/wattpost
+CONFIG_FILE=${CONFIG_DIR}/config.yaml
+PORT_FILE=${CONFIG_DIR}/port.env
+VERSION_FILE=${CONFIG_DIR}/version
+
+# ---------------- helpers ----------------
+
+msg() {
+    # Title, body. Renders in whiptail if available; otherwise plain.
+    local title="$1"; shift
+    if [ -n "${TUI}" ]; then
+        ${TUI} --backtitle "${BACKTITLE}" --title "${title}" \
+               --msgbox "$*" 18 76
+    else
+        echo
+        echo "=== ${title} ==="
+        echo "$*"
+        echo
+        printf 'Press enter to continue. '
+        read -r _
+    fi
+}
+
+confirm() {
+    # Title, body. Returns 0 yes / 1 no.
+    local title="$1"; shift
+    if [ -n "${TUI}" ]; then
+        ${TUI} --backtitle "${BACKTITLE}" --title "${title}" \
+               --yesno "$*" 12 76
+    else
+        printf '%s [y/N]: ' "$*"
+        read -r ans
+        [ "${ans}" = "y" ] || [ "${ans}" = "Y" ]
+    fi
+}
+
+needs_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        if ! command -v sudo >/dev/null; then
+            msg "Permission needed" "This option needs root and sudo isn't installed."
+            return 1
+        fi
+        SUDO=sudo
+    else
+        SUDO=""
+    fi
+}
+
+# ---------------- actions ----------------
+
+action_status() {
+    needs_root || return 0
+    local out
+    out="$(${SUDO} systemctl status wattpost --no-pager -n 0 2>&1 || true)"
+    msg "Daemon status" "${out}"
+}
+
+action_logs_recent() {
+    needs_root || return 0
+    local out
+    out="$(${SUDO} journalctl -u wattpost --no-pager -n 80 2>&1 | tail -60 || true)"
+    if [ -n "${TUI}" ]; then
+        ${TUI} --backtitle "${BACKTITLE}" --title "Recent logs (last 80 lines)" \
+               --scrolltext --msgbox "${out}" 25 100
+    else
+        echo "${out}"
+        printf 'Press enter to continue. '
+        read -r _
+    fi
+}
+
+action_logs_follow() {
+    # Falls back out of the TUI for a live tail; user hits Ctrl+C to
+    # come back.
+    needs_root || return 0
+    if [ -n "${TUI}" ]; then
+        clear
+        echo "Live wattpost log (Ctrl+C to return to the menu):"
+        echo
+    fi
+    ${SUDO} journalctl -u wattpost -f -n 30 || true
+}
+
+action_restart() {
+    needs_root || return 0
+    if confirm "Restart wattpost?" "This briefly drops Bluetooth polls + the dashboard."; then
+        ${SUDO} systemctl restart wattpost
+        msg "Restarted" "wattpost service restarted. Recent logs:\n\n$(${SUDO} journalctl -u wattpost --no-pager -n 8 | tail -8)"
+    fi
+}
+
+action_change_port() {
+    needs_root || return 0
+    local current new
+    current="$(awk -F= '/^WATTPOST_PORT=/{print $2}' "${PORT_FILE}" 2>/dev/null || echo '80')"
+    if [ -n "${TUI}" ]; then
+        new="$(${TUI} --backtitle "${BACKTITLE}" --title "Web port" \
+                       --inputbox "Port the dashboard listens on. 80 needs CAP_NET_BIND_SERVICE (already granted by our unit); 8080 is a common pick when 80 is taken." \
+                       12 76 "${current}" 3>&1 1>&2 2>&3)" || return 0
+    else
+        printf 'New port [current %s]: ' "${current}"
+        read -r new
+    fi
+    [ -z "${new}" ] && return 0
+    case "${new}" in
+        ''|*[!0-9]*)
+            msg "Bad port" "'${new}' is not a number."
+            return 0;;
+    esac
+    if [ "${new}" -lt 1 ] || [ "${new}" -gt 65535 ]; then
+        msg "Bad port" "Port must be 1-65535."
+        return 0
+    fi
+    ${SUDO} sh -c "echo 'WATTPOST_PORT=${new}' > '${PORT_FILE}'"
+    ${SUDO} chmod 0644 "${PORT_FILE}"
+    if confirm "Restart wattpost to apply?" "Port change takes effect after restart. Restart now?"; then
+        ${SUDO} systemctl restart wattpost
+        msg "Done" "Dashboard now on port ${new}."
+    else
+        msg "Saved" "Port saved. Run 'sudo systemctl restart wattpost' when you're ready."
+    fi
+}
+
+action_pair_status() {
+    if grep -qE '^  bearer_token:' "${CONFIG_FILE}" 2>/dev/null; then
+        local label tunnel
+        label="$(awk '/^cloud:/{f=1} f && /^  label:/{print substr($0, index($0,$2)); exit}' "${CONFIG_FILE}" | tr -d '"')"
+        tunnel="$(awk '/^cloud:/{f=1} f && /^  tunnel_hostname:/{print $2; exit}' "${CONFIG_FILE}")"
+        msg "Cloud pairing" "Paired as: ${label:-?}\nTunnel host: ${tunnel:-not provisioned}\n\nManage from app.wattpost.io → your account → Sites,\nor unpair below."
+    else
+        msg "Cloud pairing" "Not paired with WattPost cloud.\n\nPair from the dashboard: Settings → Integrations → WattPost cloud → Pair.\n(The browser flow is friendlier than typing pairing codes over SSH.)"
+    fi
+}
+
+action_unpair() {
+    needs_root || return 0
+    if ! grep -qE '^  bearer_token:' "${CONFIG_FILE}" 2>/dev/null; then
+        msg "Not paired" "There's no cloud pairing to remove."
+        return 0
+    fi
+    if confirm "Unpair from cloud?" "Removes the bearer token + tunnel from this appliance. Cloud-side cleanup happens on next dashboard delete. Continue?"; then
+        # Strip the cloud: block in place. Awk drops everything from
+        # 'cloud:' until the next zero-indented section.
+        ${SUDO} awk 'BEGIN{drop=0} /^cloud:/{drop=1; next} drop && /^[a-zA-Z]/{drop=0} !drop{print}' \
+              "${CONFIG_FILE}" > /tmp/wattpost-config.new \
+            && ${SUDO} mv /tmp/wattpost-config.new "${CONFIG_FILE}" \
+            && ${SUDO} systemctl restart wattpost
+        msg "Unpaired" "Cloud config cleared + daemon restarted."
+    fi
+}
+
+action_update_check() {
+    needs_root || return 0
+    local out
+    out="$(${SUDO} curl -fsS -m 10 http://127.0.0.1:${WATTPOST_PORT:-80}/api/system/update 2>/dev/null || echo 'could not reach daemon')"
+    msg "Update status" "${out}\n\n(To apply an available update, use the dashboard's Update button — auto-apply is on the v0.0.x roadmap.)"
+}
+
+action_reboot() {
+    needs_root || return 0
+    if confirm "Reboot the Pi?" "Disconnects you from SSH. The dashboard comes back ~30s after reboot."; then
+        ${SUDO} systemctl reboot
+    fi
+}
+
+action_about() {
+    local v host ip port port_sfx
+    v="$(cat "${VERSION_FILE}" 2>/dev/null || echo '?')"
+    host="$(hostname 2>/dev/null || echo 'wattpost')"
+    ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    port="$(awk -F= '/^WATTPOST_PORT=/{print $2}' "${PORT_FILE}" 2>/dev/null || echo '80')"
+    if [ "${port}" = "80" ]; then port_sfx=""; else port_sfx=":${port}"; fi
+    msg "About WattPost" "Version:    ${v}\nHostname:   ${host}\nLAN IP:     ${ip:-unknown}\nWeb port:   ${port}\n\nGitHub:     https://github.com/ritualnorth/offgrid-monitor\nDashboard:  http://${host}.local${port_sfx}\nDocs:       open the dashboard → Docs"
+}
+
+# ---------------- main loop ----------------
+
+main_menu() {
+    while true; do
+        if [ -n "${TUI}" ]; then
+            local choice
+            choice=$(${TUI} --backtitle "${BACKTITLE}" \
+                            --title "WattPost setup" \
+                            --cancel-button "Quit" \
+                            --menu "Pick an option:" 20 76 12 \
+                "1" "Daemon status" \
+                "2" "Recent logs (last 80 lines)" \
+                "3" "Live log tail (Ctrl+C returns)" \
+                "4" "Restart wattpost service" \
+                "5" "Change web port" \
+                "6" "Cloud pairing status" \
+                "7" "Unpair from cloud" \
+                "8" "Check for updates" \
+                "9" "Reboot Pi" \
+                "0" "About WattPost" \
+                3>&1 1>&2 2>&3) || break
+            case "${choice}" in
+                1) action_status ;;
+                2) action_logs_recent ;;
+                3) action_logs_follow ;;
+                4) action_restart ;;
+                5) action_change_port ;;
+                6) action_pair_status ;;
+                7) action_unpair ;;
+                8) action_update_check ;;
+                9) action_reboot ;;
+                0) action_about ;;
+            esac
+        else
+            echo
+            echo "  WattPost setup"
+            echo "  --------------"
+            echo "  1) Daemon status"
+            echo "  2) Recent logs"
+            echo "  3) Live log tail"
+            echo "  4) Restart wattpost"
+            echo "  5) Change web port"
+            echo "  6) Cloud pairing status"
+            echo "  7) Unpair from cloud"
+            echo "  8) Check for updates"
+            echo "  9) Reboot Pi"
+            echo "  0) About"
+            echo "  q) Quit"
+            printf 'Choice: '
+            read -r choice
+            case "${choice}" in
+                1) action_status ;;
+                2) action_logs_recent ;;
+                3) action_logs_follow ;;
+                4) action_restart ;;
+                5) action_change_port ;;
+                6) action_pair_status ;;
+                7) action_unpair ;;
+                8) action_update_check ;;
+                9) action_reboot ;;
+                0) action_about ;;
+                q|Q) break ;;
+            esac
+        fi
+    done
+}
+
+# Non-interactive helpers — `wattpost-config --status`, etc — let
+# users script this without going through the menu.
+case "${1:-}" in
+    --status)        action_status ;;
+    --logs)          action_logs_recent ;;
+    --restart)       action_restart ;;
+    --pair-status)   action_pair_status ;;
+    --update-check)  action_update_check ;;
+    --about)         action_about ;;
+    "")              main_menu ;;
+    *)
+        cat <<EOF
+Usage: wattpost-config [option]
+
+With no option, opens the interactive menu.
+
+  --status        Show systemctl status of the wattpost service
+  --logs          Print recent journal logs
+  --restart       Restart the wattpost service
+  --pair-status   Show whether we're paired with the cloud
+  --update-check  Ask the daemon if an update is available
+  --about         Print version + hostname + URL
+EOF
+        ;;
+esac
