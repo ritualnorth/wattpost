@@ -4,3 +4,6 @@ python3-pip
 bluez
 bluez-tools
 ca-certificates
+curl
+gnupg
+lsb-release
