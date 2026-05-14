@@ -455,6 +455,39 @@ def build_app(
         html_mode=False,
     )
 
+    # Demo-mode read-only middleware. When WATTPOST_DEMO=1 we 403 any
+    # state-changing HTTP method except a small allowlist of paths the
+    # dashboard needs to function (none currently — the local
+    # dashboard's POSTs are all writes, so this is empty). Pure ASGI
+    # middleware so we can match by request scope without going through
+    # Litestar's route system.
+    import os as _os
+    _DEMO = _os.environ.get("WATTPOST_DEMO") == "1"
+
+    class _ReadOnlyDemoMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope.get("type") != "http" or not _DEMO:
+                await self.app(scope, receive, send)
+                return
+            method = scope.get("method", "GET").upper()
+            if method in ("GET", "HEAD", "OPTIONS"):
+                await self.app(scope, receive, send)
+                return
+            # Reject every write with a clear 403. The dashboard catches
+            # this and shows a "read-only demo" toast.
+            await send({
+                "type": "http.response.start",
+                "status": 403,
+                "headers": [(b"content-type", b"application/json")],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": b'{"detail":"This is a read-only demo. Buy a Pi to track real batteries."}',
+            })
+
     return Litestar(
         route_handlers=[
             health,
@@ -516,6 +549,7 @@ def build_app(
         ],
         on_startup=[on_startup],
         on_shutdown=[on_shutdown],
+        middleware=[_ReadOnlyDemoMiddleware] if _DEMO else [],
         cors_config=CORSConfig(allow_origins=["*"]),
         debug=False,
     )

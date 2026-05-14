@@ -63,6 +63,10 @@ async def system_info() -> dict[str, Any]:
         # (e.g. an external USB SSD on a Pi).
         "disk_state": _disk_usage("/var/lib/wattpost")
                       if _disk_usage_exists("/var/lib/wattpost") else None,
+        # Demo flag — the UI renders a persistent banner when this is
+        # true so visitors to demo.wattpost.io understand the data is
+        # synthetic. Set by WATTPOST_DEMO=1 on the demo container.
+        "demo": os.environ.get("WATTPOST_DEMO") == "1",
     }
 
 
