@@ -147,9 +147,13 @@ if ! command -v cloudflared >/dev/null; then
                     | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
             fi
             if ! [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
-                CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME:-bookworm}")"
+                # Cloudflare ships `bookworm` + `any` distros only —
+                # no `trixie` repo as of mid-2026. The package is a
+                # statically-linked Go binary, so the bookworm package
+                # works fine on a trixie host. Pin to bookworm to
+                # avoid "Release file not found" on newer Pi OS.
                 echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
-https://pkg.cloudflare.com/cloudflared ${CODENAME} main" \
+https://pkg.cloudflare.com/cloudflared bookworm main" \
                     > /etc/apt/sources.list.d/cloudflared.list
             fi
             apt-get update -qq

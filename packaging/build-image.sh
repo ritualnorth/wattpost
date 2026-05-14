@@ -45,14 +45,11 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/nul
 sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
 sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || true
 
-# Pi-gen's stage0 sources point at `debian-archive-keyring.pgp` —
-# that filename only exists on a Trixie chroot. On a Bookworm chroot
-# (our RELEASE), the same package installs `debian-archive-keyring.gpg`
-# (.gpg, not .pgp). apt then fails to verify InRelease signatures with
-# NO_PUBKEY because `Signed-By:` points at a missing file. Patch the
-# sources to reference the actual file present on Bookworm.
-# (raspi.sources stays untouched — its `.pgp` file is installed by
-#  pi-gen's own 00-run.sh from files/, so that keyring path is correct.)
+# Defensive: rewrite the Signed-By path in stage0/debian.sources to the
+# .gpg filename (present in every Debian release since at least
+# bookworm). Pi-gen ships `.pgp` which only exists on Trixie+; the
+# rewrite makes this wrapper robust if we ever switch RELEASE backwards
+# again or pi-gen rolls forward off Trixie. No-op when both files exist.
 sed -i 's|debian-archive-keyring\.pgp|debian-archive-keyring.gpg|g' \
     "${PIGEN_DIR}/stage0/00-configure-apt/files/debian.sources"
 
@@ -63,7 +60,7 @@ ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME
 # our stage builds on. SKIP_IMAGES on stages we don't ship.
 cat > "${PIGEN_DIR}/config" <<EOF
 IMG_NAME=wattpost
-RELEASE=bookworm
+RELEASE=trixie
 DEPLOY_COMPRESSION=xz
 LOCALE_DEFAULT=en_GB.UTF-8
 TIMEZONE_DEFAULT=Europe/London
