@@ -2255,6 +2255,15 @@ async function refreshSystemInfo() {
   let info;
   try { info = await api("/api/system/info"); }
   catch (_) { return; }
+  // Demo banner: revealed once at boot when the daemon reports
+  // WATTPOST_DEMO=1. Set body class too so other components (alert
+  // editor, settings forms) can grey themselves out visually even
+  // though the server-side middleware already 403s their submits.
+  if (info.demo) {
+    const banner = document.getElementById("demo-banner");
+    if (banner) banner.hidden = false;
+    document.body.classList.add("is-demo");
+  }
   const d = info.disk || {};
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set("#settings-uptime", fmtDuration(info.uptime_seconds));

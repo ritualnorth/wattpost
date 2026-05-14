@@ -175,7 +175,16 @@ class PollScheduler:
     async def start(self) -> None:
         if self._task is not None and not self._task.done():
             return
-        self._poller = Poller(self.config)
+        # Demo mode swaps the real BLE poller for a synthetic data
+        # generator (solar_monitor/demo.py). Same poll() contract,
+        # zero hardware required — used by demo.wattpost.io.
+        import os
+        if os.environ.get("WATTPOST_DEMO") == "1":
+            from .demo import SyntheticPoller
+            log.info("WATTPOST_DEMO=1 — using synthetic poller (no real BLE)")
+            self._poller = SyntheticPoller(self.config)
+        else:
+            self._poller = Poller(self.config)
         await self._poller.open()
 
         # Bring up any configured exporters.

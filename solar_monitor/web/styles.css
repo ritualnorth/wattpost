@@ -168,6 +168,29 @@ body {
   flex-shrink: 0;
 }
 
+/* ---------------- demo banner ---------------- */
+.demo-banner {
+  background: linear-gradient(90deg, #d29922, #f0b429);
+  color: #1a1a0a;
+  padding: .55rem 1rem;
+  text-align: center;
+  font-size: .9rem;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0,0,0,0.15);
+  position: relative;
+  z-index: 20;
+}
+.demo-banner strong { font-weight: 800; letter-spacing: .05em; margin-right: .35rem; }
+.demo-banner a { color: #1a1a0a; font-weight: 700; text-decoration: underline; }
+.demo-banner a:hover { text-decoration: none; }
+body.is-demo .alerts-add-btn[data-edit-cloud],
+body.is-demo button[data-rename],
+body.is-demo button[data-delete] {
+  /* Visual hint that these won't work — server still 403s them
+   * regardless, but we want users to understand why. */
+  opacity: .55;
+}
+
 /* ---------------- header ---------------- */
 .app-header {
   position: sticky;
