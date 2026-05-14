@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
-from litestar import Litestar, get, post
+from litestar import Litestar, Request, Response, get, post
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.exceptions import NotFoundException
@@ -393,6 +393,56 @@ def index() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
+@get("/login", sync_to_thread=False)
+def login_page() -> File:
+    """Static HTML login form. POSTs to /api/login → cookie + redirect.
+    Served as a file (not a template) so the appliance has no Jinja
+    runtime dep for what's a 60-line page."""
+    path = _web_dir() / "login.html"
+    if not path.exists():
+        raise NotFoundException("login.html missing")
+    return File(path=path, media_type="text/html", content_disposition_type="inline")
+
+
+@post("/api/login", status_code=200)
+async def do_login(data: dict, request: Request) -> Response:
+    """Verify the supplied password, drop a session cookie. Returns
+    the URL the caller should redirect to (the `next` query param if
+    safe, else `/`). Demo-mode + no-password installs short-circuit
+    above this in the middleware, so we don't have to handle them."""
+    from .. import web_auth as _wa
+    pw = (data or {}).get("password") or ""
+    if not _wa.verify_password(pw):
+        return Response({"ok": False, "detail": "wrong password"}, status_code=401)
+    token = _wa.issue_session()
+    # Validate `next` to only allow same-origin relative paths.
+    nxt = (data or {}).get("next") or "/"
+    if not isinstance(nxt, str) or not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = "/"
+    resp = Response({"ok": True, "redirect": nxt})
+    resp.set_cookie(
+        key=_wa.SESSION_COOKIE_NAME,
+        value=token,
+        max_age=_wa.SESSION_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+        secure=False,  # appliance is HTTP on the LAN; cloud tunnel is HTTPS but the cookie is the local one
+    )
+    return resp
+
+
+@post("/api/logout", status_code=200, sync_to_thread=False)
+def do_logout(request: Request) -> Response:
+    from .. import web_auth as _wa
+    token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
+    if token:
+        _wa.revoke_session(token)
+    resp = Response({"ok": True})
+    resp.delete_cookie(key=_wa.SESSION_COOKIE_NAME, path="/")
+    return resp
+
+
 @get("/sw.js", sync_to_thread=False)
 def service_worker() -> File:
     """Service worker must be served from the path it claims scope over
@@ -488,6 +538,86 @@ def build_app(
                 "body": b'{"detail":"This is a read-only demo. Buy a Pi to track real batteries."}',
             })
 
+    # Local-auth middleware. Trust model in solar_monitor/web_auth.py:
+    #   - demo mode: bypass entirely
+    #   - no password set on the appliance: bypass (first-boot grace,
+    #     or self-hosted dev who skipped install.sh)
+    #   - source IP is loopback: trusted (the cloud tunnel proxies via
+    #     localhost; LAN clients can't fake that)
+    #   - anonymous paths (/kiosk, /web/static, /login, /api/login,
+    #     /api/heartbeat): always allowed
+    #   - GET on /api/* read endpoints: allowed when "read-only public"
+    #     mode is on (default for v0 so kiosks-on-wifi keep working
+    #     unchanged); the toggle moves to Settings → System later
+    #   - everything else: needs a valid wp_local_session cookie
+    #     → 401 (for /api/*) or redirect to /login (for HTML routes)
+    from .. import web_auth as _web_auth
+    # Allow GETs on any path while we ship the strict default. This
+    # gives existing installs a soft landing — the password is set
+    # silently, the UI keeps loading, and writes start prompting for
+    # login. Operator can flip strict mode in Settings later.
+    _READONLY_PUBLIC = True
+
+    class _LocalAuthMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope.get("type") != "http":
+                await self.app(scope, receive, send)
+                return
+            # Bypass: demo mode (public read-only by design),
+            # password not yet set (install.sh hasn't run / new dev
+            # box without a config'd password), tunnel-loopback source.
+            if _DEMO or not _web_auth.password_is_set() \
+                    or _web_auth.is_loopback_source(scope):
+                await self.app(scope, receive, send)
+                return
+            path = scope.get("path", "/")
+            if _web_auth.is_anonymous_path(path):
+                await self.app(scope, receive, send)
+                return
+            method = scope.get("method", "GET").upper()
+            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS"):
+                await self.app(scope, receive, send)
+                return
+            # Look up the session cookie.
+            cookie_header = b""
+            for k, v in scope.get("headers", []):
+                if k == b"cookie":
+                    cookie_header = v
+                    break
+            token = None
+            for part in cookie_header.decode("latin-1").split(";"):
+                part = part.strip()
+                if part.startswith(_web_auth.SESSION_COOKIE_NAME + "="):
+                    token = part.split("=", 1)[1]
+                    break
+            if _web_auth.is_session_valid(token):
+                await self.app(scope, receive, send)
+                return
+            # Reject.
+            if path.startswith("/api/"):
+                body = b'{"detail":"login required","login_url":"/login"}'
+                await send({
+                    "type": "http.response.start",
+                    "status": 401,
+                    "headers": [(b"content-type", b"application/json")],
+                })
+                await send({"type": "http.response.body", "body": body})
+            else:
+                # HTML route → 302 to the login page, preserving the
+                # original URL so we can bounce back after login.
+                qs = scope.get("query_string", b"").decode("latin-1")
+                full = path + (("?" + qs) if qs else "")
+                loc = f"/login?next={full}".encode("latin-1")
+                await send({
+                    "type": "http.response.start",
+                    "status": 302,
+                    "headers": [(b"location", loc)],
+                })
+                await send({"type": "http.response.body", "body": b""})
+
     return Litestar(
         route_handlers=[
             health,
@@ -545,11 +675,20 @@ def build_app(
             probe,
             add_device,
             index,
+            login_page,
+            do_login,
+            do_logout,
             static_router,
         ],
         on_startup=[on_startup],
         on_shutdown=[on_shutdown],
-        middleware=[_ReadOnlyDemoMiddleware] if _DEMO else [],
+        # Middleware order matters: read-only-demo first so demo
+        # writes 403 early; local-auth second so non-demo installs
+        # get login-gated. Both no-op when their condition isn't
+        # met.
+        middleware=(
+            ([_ReadOnlyDemoMiddleware] if _DEMO else []) + [_LocalAuthMiddleware]
+        ),
         cors_config=CORSConfig(allow_origins=["*"]),
         debug=False,
     )

@@ -68,12 +68,24 @@ else
 fi
 
 # --- print ---
+# Web password line — only shown when the install plaintext file
+# still exists (operator hasn't deleted it). After changing the
+# password via wattpost-config the file is removed and this line
+# disappears.
+WEB_PASS_LINE=""
+if [ -r /etc/wattpost/web-password ]; then
+    WP_PASS="$(cat /etc/wattpost/web-password 2>/dev/null)"
+    if [ -n "${WP_PASS}" ]; then
+        WEB_PASS_LINE="  Web password: ${BOLD}${AMBER}${WP_PASS}${RESET}  ${DIM}(change with 'wattpost-config' → Reset web password)${RESET}\n"
+    fi
+fi
+
 cat <<EOF
 
 ${AMBER}${BOLD}  WattPost${RESET} ${DIM}v${VERSION}${RESET}    ${DIM}uptime: ${UPTIME}${RESET}
 
   Dashboard:  ${BOLD}${DASH_URL}${RESET}
-  Daemon:     ${DAEMON}
+$(printf "${WEB_PASS_LINE}")  Daemon:     ${DAEMON}
   Cloud:      ${CLOUD}
   Tunnel:     ${TUNNEL}
   Tailscale:  ${TS}
