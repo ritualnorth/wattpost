@@ -232,3 +232,133 @@ class SyntheticPoller:
             "elapsed_seconds": round(time.time() - started, 3),
         }
         return result
+
+
+# ---------------- history seeding ----------------
+
+def _snapshot_at(ts: float, soc_pct: float) -> dict[str, Any]:
+    """Build the same shape SyntheticPoller.poll() returns, for a
+    given past timestamp + carry-forward SoC. Used by seed_history()."""
+    local = time.localtime(ts)
+    hod = local.tm_hour + local.tm_min / 60.0
+    pv_w = _pv_curve(hod)
+    load_w = _load_curve(hod)
+    net_w = pv_w - load_w
+
+    bank_v = 12.0 + (soc_pct / 100.0) * 1.4
+    bank_a = net_w / bank_v if bank_v > 0 else 0.0
+
+    # Cheaper pack derivation for backfill — no per-pack jitter, just
+    # the headline numbers. Charts read from the shunt aggregate anyway.
+    packs = {}
+    pack_drifts = [+0.6, -0.3, -1.1]
+    for i, drift in enumerate(pack_drifts):
+        pack_soc = max(15.0, min(99.5, soc_pct + drift))
+        packs[f"battery_{i}"] = {
+            "_vendor":         "renogy",
+            "_kind":           "smart_battery",
+            "_slave_id":       0x30 + i,
+            "voltage_v":       round(bank_v, 3),
+            "current_a":       round(bank_a / 3.0, 3),
+            "soc_pct":         round(pack_soc, 1),
+            "temperature_c":   22.0 + i * 0.5,
+            "cycle_count":     180 + i * 12,
+            "remaining_ah":    round(BANK_CAPACITY_AH / 3 * pack_soc / 100, 2),
+            "capacity_ah":     round(BANK_CAPACITY_AH / 3, 1),
+            "cell_drift_v":    0.012 + i * 0.004,
+        }
+    shunt = {
+        "_vendor":          "renogy",
+        "_kind":            "shunt",
+        "_slave_id":        0x60,
+        "voltage_v":        round(bank_v, 3),
+        "current_a":        round(bank_a, 3),
+        "power_w":          round(net_w, 1),
+        "soc_pct":          round(soc_pct, 1),
+        "remaining_ah":     round(BANK_CAPACITY_AH * soc_pct / 100, 2),
+        "capacity_ah":      BANK_CAPACITY_AH,
+        "bank_capacity_ah": BANK_CAPACITY_AH,
+        "temperature_c":    22.0,
+    }
+    # PV today integration restarts each calendar day.
+    midnight = ts - (hod * 3600.0)
+    pv_today_wh = 0.0
+    # Approximate cumulative-half-sine integral up to hod:
+    sunrise, sunset = 6.5, 18.5
+    if hod > sunrise:
+        done = min(1.0, (hod - sunrise) / (sunset - sunrise))
+        full_day_wh = PV_PEAK_W * (sunset - sunrise) * (2.0 / math.pi)
+        cum = 0.5 * (1.0 - math.cos(done * math.pi))
+        pv_today_wh = full_day_wh * cum
+    rover = {
+        "_vendor":            "renogy",
+        "_kind":              "charge_controller",
+        "_slave_id":          0x01,
+        "battery_voltage_v":  round(bank_v, 3),
+        "battery_current_a":  round(max(0.0, pv_w / max(bank_v, 1.0)), 3),
+        "battery_soc_pct":    round(soc_pct, 1),
+        "pv_voltage_v":       round(36.0 if pv_w > 5 else 0, 2),
+        "pv_current_a":       round(pv_w / 36.0 if pv_w > 5 else 0, 3),
+        "pv_power_w":         round(pv_w, 1),
+        "energy_today_wh":    round(pv_today_wh, 1),
+        "controller_temp_c":  24.0,
+        "battery_temp_c":     22.0,
+    }
+    return {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(ts)),
+        "devices":   {**packs, "shunt_main": shunt, "rover_mppt": rover},
+        "errors":    [],
+        "elapsed_seconds": 0.0,
+    }
+
+
+async def seed_history(store, days: int = 30, step_minutes: int = 60) -> int:
+    """Backfill `days` of synthetic history into the store at
+    `step_minutes` cadence. Idempotent — bails fast if the store
+    already has samples from the last 2 hours (i.e. a live run, not a
+    fresh demo restart).
+
+    Returns the number of synthetic polls inserted.
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    # Idempotency check via the existing `latest` table.
+    try:
+        latest = await store.get_latest()
+        if latest and any(
+            d.get("_updated_at", 0) > time.time() - 7200 for d in latest.values()
+        ):
+            log.info("demo history: store already populated, skipping backfill")
+            return 0
+    except Exception:
+        # Fresh DB with no tables — fall through and seed.
+        pass
+
+    log.info("demo history: seeding %dd × %dm cadence", days, step_minutes)
+    now = int(time.time())
+    start = now - days * 86400
+    step = step_minutes * 60
+
+    # SoC starts at the daily-low end so the integration ramps up
+    # plausibly during the first morning.
+    soc = 55.0
+    bank_wh = BANK_CAPACITY_AH * NOMINAL_V
+    n = 0
+    ts = start
+    while ts < now:
+        local = time.localtime(ts)
+        hod = local.tm_hour + local.tm_min / 60.0
+        net_w = _pv_curve(hod) - _load_curve(hod)
+        dt_h = step / 3600.0
+        soc = max(15.0, min(99.5, soc + (net_w * dt_h / bank_wh) * 100.0))
+        snap = _snapshot_at(ts, soc)
+        await store.record_poll(snap, ts_override=ts)
+        n += 1
+        ts += step
+
+    # Carry SoC forward into the live poller so the first live point
+    # connects smoothly with the end of the backfill.
+    _state["soc_pct"] = soc
+    _state["last_ts"] = float(now)
+    log.info("demo history: seeded %d polls; SoC handed off at %.1f%%", n, soc)
+    return n
