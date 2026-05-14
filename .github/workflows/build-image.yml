@@ -50,22 +50,26 @@ jobs:
           swap-storage: false
 
       - name: Install pi-gen build dependencies (Docker-mode build)
-        # We use pi-gen's Docker mode (`build-docker.sh`) which runs
-        # the actual build inside a Debian-based container with the
-        # full pi-gen toolchain + correct keyrings baked in. The host
-        # only needs:
-        #   - docker  (already on GitHub-hosted ubuntu runners)
-        #   - git     (for the pi-gen clone)
-        #   - qemu-user-static + binfmt registration (so the kernel
-        #     can route arm64 binaries through qemu inside the
-        #     privileged container)
-        # Six failed attempts of fighting Ubuntu's apt/qemu/keyring
-        # mismatch with pi-gen's host-mode build convinced us that
-        # the host-mode path isn't worth maintaining.
+        # qemu-user-static here only satisfies build-docker.sh's
+        # `which qemu-aarch64` preflight — the actual emulation runs
+        # through the binfmt handlers installed by the action below,
+        # which uses qemu 9.x (host's apt qemu is unused at runtime).
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             git qemu-user-static
+
+      - name: Set up QEMU (newer binfmt + qemu 9.x)
+        # tonistiigi/binfmt:latest ships qemu 9.x with the arm64
+        # mmap/segfault fixes that bit pi-gen #12 and #14
+        # (Python 3.13 cache_tag invocation under qemu crashed with
+        # SIGSEGV intermittently — flaky under Ubuntu's apt qemu, even
+        # the 24.04 8.x version). Pinning to this action removes that
+        # whole class of failures.
+        uses: docker/setup-qemu-action@v3
+        with:
+          image: tonistiigi/binfmt:latest
+          platforms: arm64,arm
 
       - name: Build image
         run: |
