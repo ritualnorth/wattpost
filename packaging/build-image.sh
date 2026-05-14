@@ -45,13 +45,16 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/nul
 sudo ln -sf /usr/bin/qemu-aarch64-static /usr/bin/qemu-aarch64 2>/dev/null || true
 sudo ln -sf /usr/bin/qemu-arm-static     /usr/bin/qemu-arm     2>/dev/null || true
 
-# Force pi-gen's Docker builder to use a Debian Bookworm base, not the
-# Trixie default. We're building a Bookworm rootfs (RELEASE=bookworm
-# below). Bootstrapping from a Trixie host into a Bookworm chroot leaves
-# the chroot's debian-archive-keyring out of sync with the InRelease
-# signatures it'll see → "NO_PUBKEY" failures in stage0/00-configure-apt.
-# Pinning the host to Bookworm keeps the keyring lineage consistent.
-sed -i 's|debian:trixie|debian:bookworm|g' "${PIGEN_DIR}/build-docker.sh"
+# Pi-gen's stage0 sources point at `debian-archive-keyring.pgp` —
+# that filename only exists on a Trixie chroot. On a Bookworm chroot
+# (our RELEASE), the same package installs `debian-archive-keyring.gpg`
+# (.gpg, not .pgp). apt then fails to verify InRelease signatures with
+# NO_PUBKEY because `Signed-By:` points at a missing file. Patch the
+# sources to reference the actual file present on Bookworm.
+# (raspi.sources stays untouched — its `.pgp` file is installed by
+#  pi-gen's own 00-run.sh from files/, so that keyring path is correct.)
+sed -i 's|debian-archive-keyring\.pgp|debian-archive-keyring.gpg|g' \
+    "${PIGEN_DIR}/stage0/00-configure-apt/files/debian.sources"
 
 # Link our stage into pi-gen's stages dir.
 ln -snf "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
