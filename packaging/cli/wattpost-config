@@ -173,8 +173,13 @@ action_unpair() {
 
 action_update_check() {
     needs_root || return 0
-    local out
-    out="$(${SUDO} curl -fsS -m 10 http://127.0.0.1:${WATTPOST_PORT:-80}/api/system/update 2>/dev/null || echo 'could not reach daemon')"
+    local port out
+    # Always read the live port from the same env file the unit reads —
+    # avoids drift between "what the menu thinks" and "what the daemon
+    # listens on".
+    port="$(awk -F= '/^WATTPOST_PORT=/{print $2}' "${PORT_FILE}" 2>/dev/null || echo '80')"
+    out="$(curl -fsS -m 10 http://127.0.0.1:${port}/api/system/update 2>/dev/null \
+           || echo 'could not reach daemon (is it running? check option 1).')"
     msg "Update status" "${out}\n\n(To apply an available update, use the dashboard's Update button — auto-apply is on the v0.0.x roadmap.)"
 }
 
