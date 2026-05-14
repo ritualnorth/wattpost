@@ -46,11 +46,19 @@ jobs:
           swap-storage: false
 
       - name: Install pi-gen build dependencies
+        # The list tracks what pi-gen's own dependencies_check refuses
+        # to start without. As of mid-2025 they added qemu-user-binfmt
+        # (formerly bundled with qemu-user-static), libarchive-tools
+        # (for bsdtar — used in the stage runner), and arch-test (host
+        # capability probe). Keep this list in sync with pi-gen
+        # upstream when a build dies in <5 seconds with "Required
+        # dependencies not installed".
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            git quilt parted qemu-user-static debootstrap zerofree \
-            zip dosfstools libcap2-bin grep rsync xz-utils file kmod bc gpg pigz
+            git quilt parted qemu-user-static qemu-user-binfmt \
+            debootstrap zerofree zip dosfstools libcap2-bin grep rsync \
+            xz-utils file kmod bc gpg pigz libarchive-tools arch-test
 
       - name: Build image
         run: |
