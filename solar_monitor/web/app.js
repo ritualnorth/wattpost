@@ -190,6 +190,25 @@ let currentRange = "24h";
 let lastRun = null;
 let todayAggregate = null;  // /api/today result, refreshed alongside devices
 
+// ---------- demo-mode banner (one-shot, runs at boot) ----------
+// /api/system/info exposes `demo: true|false` from the WATTPOST_DEMO=1
+// container env. The Settings → About flow also reads this and toggles
+// the banner, but Settings isn't visited on most page loads — pull the
+// check up to boot so the banner appears immediately on every page,
+// kiosk mode included.
+(async () => {
+  try {
+    const r = await fetch("/api/system/info");
+    if (!r.ok) return;
+    const info = await r.json();
+    if (info.demo) {
+      const b = document.getElementById("demo-banner");
+      if (b) b.hidden = false;
+      document.body.classList.add("is-demo");
+    }
+  } catch (_) { /* no banner on fetch failure */ }
+})();
+
 // ---------- theme ----------
 // Preference is "system" | "dark" | "light". The inline <head> script sets
 // the resolved data-theme before paint to avoid FOUC; here we react to
