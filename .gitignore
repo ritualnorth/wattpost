@@ -67,3 +67,6 @@ scratch/
 # `cloud/.env.example`; copy → `cloud/.env` per machine.
 cloud/.env
 .env
+
+# Claude Code local state
+.claude/
