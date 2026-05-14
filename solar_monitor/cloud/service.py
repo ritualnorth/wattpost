@@ -97,6 +97,11 @@ class CloudService:
         # Keep this concise — the cloud caps extras at 2 KiB.
         extras: dict[str, Any] = {}
         try:
+            from .. import __version__
+            extras["version"] = __version__
+        except Exception:
+            pass
+        try:
             alert_count = len([
                 r for r in (getattr(self.scheduler._alerts, "rules", []) or [])
                 if r.id in getattr(self.scheduler._alerts, "_last_fired", {})
