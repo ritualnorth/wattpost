@@ -170,4 +170,4 @@ Use the [JSON API datasource](https://grafana.github.io/grafana-json-datasource/
 - Live streaming over SSE
 - Per-token rate limit enforcement (currently reported but not enforced)
 
-Spec discussion in [docs/saas-api.md](https://github.com/ritualnorth/offgrid-monitor/blob/main/docs/saas-api.md) (private repo).
+Have ideas or hit a problem? Email [support@wattpost.io](mailto:support@wattpost.io) — the v2 backlog is operator-driven and we'd rather build what you need than guess.

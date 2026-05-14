@@ -18,7 +18,7 @@ We recommend backing up those two files periodically; the dashboard's Settings �
 
 ## Can I add hardware that's not on the supported list?
 
-[Open an issue](https://github.com/ritualnorth/offgrid-monitor/issues) with the gear name + protocol details. If the BLE / Modbus / VE.Direct protocol is publicly documented (or we can borrow a sniffer), we can usually add support in a release or two. Vendor-locked devices that require their cloud auth — those we won't add.
+Email [support@wattpost.io](mailto:support@wattpost.io) with the gear name + protocol details. If the BLE / Modbus / VE.Direct protocol is publicly documented (or we can borrow a sniffer), we can usually add support in a release or two. Vendor-locked devices that require their cloud auth — those we won't add.
 
 ## How do I get updates?
 

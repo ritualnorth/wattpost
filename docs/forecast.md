@@ -96,7 +96,7 @@ try again.
 
 **"404 Not Found" on Test** — the Resource ID doesn't match this
 account, or the rooftop site was deleted. Find your UUID at
-[toolkit.solcast.com.au/rooftop-sites](https://toolkit.solcast.com.au/rooftop-sites).
+your [Solcast toolkit](https://toolkit.solcast.com.au) account.
 
 **"429 Rate-limited"** — the daemon (or some other process using the
 same key) blew through 10 calls today. Wait 24 h or lower the poll
