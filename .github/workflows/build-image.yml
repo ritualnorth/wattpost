@@ -63,7 +63,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             git quilt parted qemu-user-static \
             debootstrap zerofree zip dosfstools libcap2-bin grep rsync \
-            xz-utils file kmod bc gpg pigz libarchive-tools arch-test
+            xz-utils file kmod bc gpg pigz libarchive-tools arch-test \
+            debian-archive-keyring
+          # Debian archive keys live in /usr/share/keyrings/ once the
+          # package is installed; debootstrap and the chroot's apt
+          # automatically pick them up from there, so no extra wiring.
 
       - name: Build image
         run: |
