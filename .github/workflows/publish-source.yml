@@ -70,12 +70,15 @@ jobs:
           target: /srv/wattpost-releases/source/
           strip_components: 1
 
-      - name: Update `latest` symlink
+      - name: Update `latest` symlink + manifest version
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          NEW_VERSION: ${{ steps.tarball.outputs.version }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: NEW_VERSION
           script: |
             set -euo pipefail
             cd /srv/wattpost-releases/source
@@ -94,3 +97,28 @@ jobs:
                 | xargs -r rm -f
             ls -1t wattpost-source-*.tar.gz.sha256 2>/dev/null | tail -n +11 \
                 | xargs -r rm -f
+
+            # Bump the version + source SHA + released_at on the
+            # img/manifest.json so paired appliances see "Update
+            # available" within the next manifest-poll cycle. Image
+            # fields (image_url, image_filename, sha256, size_bytes)
+            # are left untouched — they're owned by pi-gen's
+            # build-image.yml, not source-only releases.
+            MANIFEST=/srv/wattpost-releases/img/manifest.json
+            if [ -f "${MANIFEST}" ]; then
+              SOURCE_SHA=$(awk '{print $1}' "${newest}.sha256")
+              NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+              python3 - "$MANIFEST" "$NEW_VERSION" "$SOURCE_SHA" "$NOW" <<'PY'
+            import json, sys, pathlib
+            path, version, src_sha, now = sys.argv[1:]
+            p = pathlib.Path(path)
+            m = json.loads(p.read_text())
+            m["version"]     = version
+            m["released_at"] = now
+            m["source_sha256"] = src_sha
+            p.write_text(json.dumps(m, indent=2) + "\n")
+            print(f"manifest: version={version} released_at={now}")
+            PY
+            else
+              echo "manifest.json missing — skipping manifest bump"
+            fi

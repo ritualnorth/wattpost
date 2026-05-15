@@ -84,7 +84,10 @@ def _disk_usage_exists(path: str) -> bool:
 async def update_state(state: State) -> dict[str, Any]:
     """Current vs latest version of WattPost, from the daily manifest
     poll. UI uses this to surface "Update available" on Settings →
-    About."""
+    About. Also reports the deployment type so the UI shows the right
+    update path — Docker users can't fire wattpost-update, they need
+    `docker compose pull` on the host."""
+    deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
     scheduler = state["scheduler"]
     updater = getattr(scheduler, "_updater", None)
     if updater is None:
@@ -95,8 +98,11 @@ async def update_state(state: State) -> dict[str, Any]:
             "has_update":      False,
             "last_checked_at": None,
             "last_error":      "update checker not running",
+            "deployment":      deployment,
         }
-    return updater.state.as_dict()
+    state_dict = updater.state.as_dict()
+    state_dict["deployment"] = deployment
+    return state_dict
 
 
 @post("/api/system/update/check", status_code=202)

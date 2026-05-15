@@ -54,6 +54,11 @@ COPY docs         /docs
 # point and `python -m solar_monitor` resolve.
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+# Tells the daemon's update-checker that this install is Docker —
+# the dashboard shows "docker compose pull" copy instead of an
+# Update-now button that wouldn't work (wattpost-update helper
+# isn't part of the image).
+ENV WATTPOST_DEPLOYMENT=docker
 
 # Mountpoints the operator should bind to host volumes so config + DB
 # survive `docker compose pull && up -d`.

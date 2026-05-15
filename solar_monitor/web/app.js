@@ -2327,6 +2327,19 @@ async function refreshUpdateState() {
       a.hidden = false;
     }
     row?.classList.add("settings-row--update");
+
+    // Docker installs can't fire the in-place updater — the
+    // wattpost-update helper isn't in the image. Hide the Apply
+    // button and surface the right shell command instead.
+    const applyBtn = $("#settings-update-apply");
+    const dockerHint = $("#settings-update-docker-hint");
+    if (u.deployment === "docker") {
+      if (applyBtn) applyBtn.hidden = true;
+      if (dockerHint) dockerHint.hidden = false;
+    } else {
+      if (applyBtn) applyBtn.hidden = false;
+      if (dockerHint) dockerHint.hidden = true;
+    }
   } else {
     row?.classList.remove("settings-row--update");
   }
