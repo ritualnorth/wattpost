@@ -1964,14 +1964,24 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 }
 .settings-row {
   display: flex; justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
   padding: .25rem 0;
   font-size: .87rem;
   color: var(--text-2);
+}
+.settings-row > span:first-child {
+  /* Keep the label readable when the value is long — small viewports
+   * were wrapping "Latest available" to two lines because the value
+   * had a version + link + button competing for the same line. */
+  flex-shrink: 0;
 }
 .settings-row .v {
   color: var(--text);
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
 }
 .settings-block--cta {
   /* spans the whole row, more visual weight than the data blocks */

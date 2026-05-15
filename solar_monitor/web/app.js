@@ -2328,11 +2328,13 @@ async function refreshUpdateState() {
   if (showRow) {
     set("#settings-update-latest", "v" + u.latest_version);
     const a = $("#settings-update-link");
-    if (a && u.release_url) {
-      a.href = u.release_url;
+    if (a) {
+      // Always route to the in-app hash route — the appliance
+      // dashboard uses hash routing (#/docs/<slug>), not server
+      // paths. The manifest's release_url is shaped for the
+      // wattpost.io marketing site and would 404 here.
+      a.href = "#/docs/release-notes";
       a.hidden = false;
-    } else if (a) {
-      a.hidden = true;
     }
     row?.classList.add("settings-row--update");
   } else {
