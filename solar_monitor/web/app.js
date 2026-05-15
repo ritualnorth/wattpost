@@ -2994,7 +2994,13 @@ async function repairCloud(form) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
-    status.textContent = `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Restart daemon for heartbeats to switch over.`;
+    // restart_required is only true when the server-side hot-start
+    // failed. Default path: daemon's already heartbeating live, no
+    // restart needed. The old hardcoded "Restart daemon" copy was a
+    // regression that re-broke a documented UX gotcha.
+    status.textContent = d.restart_required
+      ? `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Restart the daemon to switch over.`
+      : `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Heartbeats are live now.`;
     status.classList.add("ok");
     setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 2000);
   } catch (e) {
@@ -3017,7 +3023,10 @@ async function pairCloud(form) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
-    status.textContent = `✓ Paired (${d.label || "—"} #${d.appliance_id}). Restart daemon for heartbeats to start.`;
+    // See note above — hot-start makes the daemon live immediately.
+    status.textContent = d.restart_required
+      ? `✓ Paired (${d.label || "—"} #${d.appliance_id}). Restart the daemon to start heartbeats.`
+      : `✓ Paired (${d.label || "—"} #${d.appliance_id}). Heartbeats are live now.`;
     status.classList.add("ok");
     setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 1500);
   } catch (e) {

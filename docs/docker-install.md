@@ -144,10 +144,11 @@ while it runs.
 
 The Docker image:
 
-- **Doesn't** carry `cloudflared` — the cloud-tunnel feature is
-  Pi-only (the binary doesn't have a clean Linux multi-distro story
-  yet). If you want remote access on Docker, use Tailscale on the
-  host directly.
+- **Carries `cloudflared`** in the image, so the paired-cloud
+  feature's "Open site" tunnel works identically to the Pi
+  install — your appliance's local dashboard is reachable at
+  `<your-slug>.wattpost.io` over the Cloudflare Tunnel once
+  pairing is complete.
 - **Doesn't** ship the `wattpost-config` whiptail TUI. Configure via
   the dashboard's Settings UI or by editing the volume's
   `config.yaml`.
