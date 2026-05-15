@@ -35,22 +35,20 @@ services:
   wattpost:
     image: ghcr.io/ritualnorth/wattpost-appliance:latest
     container_name: wattpost
-    # Host networking is the simplest BLE-passthrough path on Linux.
-    # Trade-off: the container is on the host network, so :8000 binds
-    # the host directly.
     network_mode: host
-    # Bluetooth via the host's bluetoothd over DBus. Least-privilege
-    # path; fall back to `privileged: true` if your distro's bluez
-    # is patchy with the cap_add combo below.
     volumes:
-      - /var/run/dbus:/var/run/dbus
+      - /run/dbus:/var/run/dbus
       - ./wattpost-config:/etc/wattpost
       - ./wattpost-data:/var/lib/wattpost
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
     restart: unless-stopped
 ```
+
+That combo is the least-privilege path that reliably reaches the host's BlueZ on Ubuntu / Debian. If your distro is unusual and BLE still doesn't show up under **Settings → Setup**, replace `cap_add`/`security_opt` with `privileged: true` — same result, bigger hammer.
 
 Then:
 
