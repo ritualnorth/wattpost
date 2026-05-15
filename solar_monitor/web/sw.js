@@ -14,7 +14,11 @@
  * index.html change so old shells are evicted on first visit after a
  * deploy.
  */
-const CACHE_VERSION = 'wattpost-v1';
+// Bump on every PR that touches index.html, app.js or styles.css —
+// the inner cache-busters (?v=NN) don't help if the cached index.html
+// itself is what's stale. Suffix corresponds to the current app.js
+// version so future-me can see at a glance what's pinned.
+const CACHE_VERSION = 'wattpost-v2-app94-css84';
 const SHELL = [
   '/',
   '/web/styles.css',
