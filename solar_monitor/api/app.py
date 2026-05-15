@@ -120,9 +120,23 @@ async def list_devices(state: State) -> dict[str, Any]:
     store: Store = state["store"]
     devs = await store.list_devices()
     latest = await store.get_latest()
+    # Join in the transport id from the live config so the dashboard
+    # can wire per-device delete buttons (which need transport +
+    # slave_id to address the row). device_meta doesn't carry it,
+    # so we look it up by (slave_id, label) match against config.
+    config = state.get("config")
+    by_label = {}
+    if config is not None:
+        for cfg_dev in getattr(config, "devices", []) or []:
+            label = cfg_dev.get("label") if isinstance(cfg_dev, dict) else getattr(cfg_dev, "label", None)
+            if label:
+                by_label[label] = (cfg_dev.get("transport") if isinstance(cfg_dev, dict)
+                                   else getattr(cfg_dev, "transport", None))
     return {
         "devices": [
-            {**d, "latest": latest.get(d["label"], {})}
+            {**d,
+             "transport": by_label.get(d["label"]),
+             "latest": latest.get(d["label"], {})}
             for d in devs
         ]
     }
