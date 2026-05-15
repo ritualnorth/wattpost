@@ -525,7 +525,18 @@ class Store:
         #
         # Source preference: a shunt (if present) wins over smart-battery
         # summation — matches the JS bank-aggregate logic.
-        bank = self._compute_bank_aggregate(devices)
+        #
+        # Critically, we DON'T recompute from "what responded this cycle"
+        # alone — on a lossy BLE link, individual packs can miss a poll
+        # cycle, which would flip pack_count from 3 → 2 and halve the
+        # bank's capacity/current/voltage for a minute. Instead, augment
+        # this cycle's devices with the most-recent snapshot of any
+        # smart_battery/shunt from the `latest` table that's still fresh.
+        # A pack that's been silent longer than BANK_AGGREGATE_STALE_S
+        # gets dropped — the bank reflects current reality, not a frozen
+        # version of an unplugged pack.
+        augmented = await self._augment_for_bank(devices, now_ts=ts)
+        bank = self._compute_bank_aggregate(augmented)
         if bank:
             for k, val in bank.items():
                 if val is None:
@@ -580,6 +591,54 @@ class Store:
         except Exception:
             await db.rollback()
             raise
+
+    # Packs silent longer than this drop OUT of the bank aggregate.
+    # 5 min covers the ~1 min poll cadence plus a few cycles of missed
+    # polls (which is normal on a noisy BLE link without meaning the
+    # pack is gone). Beyond that, treat it as actually offline — the
+    # bank shrinks to match.
+    BANK_AGGREGATE_STALE_S = 300
+
+    async def _augment_for_bank(
+        self, devices: dict[str, dict], now_ts: int,
+    ) -> dict[str, dict]:
+        """Return a copy of `devices` plus any cached smart_battery /
+        shunt entries from the latest table that didn't respond this
+        cycle but were last seen recently enough to still count as
+        present. Lets the bank aggregate stay stable across single
+        missed polls — without this, pack_count flickers between
+        N and N-1 every time the BLE link drops a packet."""
+        out = dict(devices)
+        try:
+            async with self._db.execute(
+                "SELECT device, vendor, kind, slave_id, last_seen "
+                "FROM device_meta WHERE kind IN ('smart_battery', 'shunt')"
+            ) as cur:
+                rows = await cur.fetchall()
+        except Exception:
+            log.exception("bank aggregate: device_meta lookup failed")
+            return out
+
+        # For each pack that's both already-seen-recently AND not in
+        # this cycle's response set, pull its latest snapshot and
+        # graft it in. Skip stale ones.
+        for label, vendor, kind, slave_id, last_seen in rows:
+            if label in out:
+                continue
+            if last_seen is None or (now_ts - int(last_seen)) > self.BANK_AGGREGATE_STALE_S:
+                continue
+            snap: dict = {
+                "_vendor": vendor, "_kind": kind, "_slave_id": slave_id,
+                "_last_seen": last_seen,
+            }
+            async with self._db.execute(
+                "SELECT metric, value_num, value_str FROM latest WHERE device = ?",
+                (label,),
+            ) as mc:
+                for metric, value_num, value_str in await mc.fetchall():
+                    snap[metric] = value_num if value_num is not None else value_str
+            out[label] = snap
+        return out
 
     def _compute_bank_aggregate(self, devices: dict[str, dict]) -> dict[str, float] | None:
         """Compute bank-level aggregate metrics from one poll's per-device
