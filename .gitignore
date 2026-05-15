@@ -64,8 +64,12 @@ NOTES.local.md
 scratch/
 
 # Cloud per-environment secrets — never commit. The template is
-# `cloud/.env.example`; copy → `cloud/.env` per machine.
+# `cloud/.env.example`; copy → `cloud/.env` per machine. The
+# wildcard catches one-off envs like `cloud/.env.stripe-setup` used
+# by the provisioning script.
 cloud/.env
+cloud/.env.*
+!cloud/.env.example
 .env
 
 # Claude Code local state
