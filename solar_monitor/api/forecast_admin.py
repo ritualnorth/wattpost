@@ -9,6 +9,7 @@ Splits into three concerns:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import shutil
@@ -26,6 +27,7 @@ from ..forecast.service import CACHE_KEY
 from ..forecast.solcast import SolcastProvider
 from ..scheduler import PollScheduler
 from ..storage.sqlite import Store
+from .setup import _hot_reload_bg
 
 log = logging.getLogger(__name__)
 
@@ -163,7 +165,10 @@ async def update_forecast_config(
             return raw
         _save_config(config_path, _mutate)
         log.info("forecast integration cleared")
-        return {"ok": True, "configured": False, "restart_required": True}
+        # Background hot-reload — picks up the cleared config within
+        # a few seconds without a user-visible restart.
+        asyncio.create_task(_hot_reload_bg(state))
+        return {"ok": True, "configured": False, "restart_required": False}
 
     # Preserve existing api_key when the UI sends "****" sentinel
     # (Settings form leaves the password input blank to keep the
@@ -199,7 +204,8 @@ async def update_forecast_config(
     _save_config(config_path, _mutate)
     log.info("forecast integration configured (%s, every %dh)",
              new_fc.provider, new_fc.poll_hours)
-    return {"ok": True, "configured": True, "restart_required": True}
+    asyncio.create_task(_hot_reload_bg(state))
+    return {"ok": True, "configured": True, "restart_required": False}
 
 
 @post("/api/forecast/test")
