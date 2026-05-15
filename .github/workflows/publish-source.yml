@@ -70,6 +70,21 @@ jobs:
           target: /srv/wattpost-releases/source/
           strip_components: 1
 
+      - name: Upload CHANGELOG.md to releases root
+        # Lives at the releases-root, not under source/, because it
+        # describes the cross-cutting release history rather than
+        # belonging to any one tarball. The appliance's update
+        # checker fetches it on every manifest poll so the dashboard
+        # can preview release notes BEFORE the user installs the
+        # new version.
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "CHANGELOG.md"
+          target: /srv/wattpost-releases/
+
       - name: Update `latest` symlink + manifest version
         uses: appleboy/ssh-action@v1.0.3
         env:

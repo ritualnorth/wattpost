@@ -5037,9 +5037,23 @@ async function loadDocPage(slug) {
   if (!host) return;
   host.innerHTML = `<p class="docs-placeholder">Loading…</p>`;
   try {
-    const r = await fetch(`/web/docs/${encodeURIComponent(slug)}.md`);
-    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    const md = await r.text();
+    // release-notes is special: prefer the live cache from
+    // /api/releases/changelog so users can see "what's in 0.0.3"
+    // BEFORE they install 0.0.3. The bundled .md only knows about
+    // versions <= the running release. Fall back to bundled if the
+    // cache is empty (first boot, or offline since boot).
+    let md = null;
+    if (slug === "release-notes") {
+      try {
+        const r = await fetch("/api/releases/changelog");
+        if (r.ok && r.status !== 204) md = await r.text();
+      } catch (_) { /* fall through to bundled */ }
+    }
+    if (md == null) {
+      const r = await fetch(`/web/docs/${encodeURIComponent(slug)}.md`);
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      md = await r.text();
+    }
     host.innerHTML = renderMarkdown(md);
   } catch (e) {
     host.innerHTML = `<p class="docs-placeholder">Could not load "${escHtml(slug)}": ${escHtml(e.message)}</p>`;

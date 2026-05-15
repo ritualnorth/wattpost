@@ -16,9 +16,14 @@ Versions follow [Semantic Versioning].
   on older ones). Setup wizard's Scan step now works against both
   generations without manual config.
 - About → Update surfaces the new version number and a "Release
-  notes ↗" link to `/docs/release-notes` whenever an update is
-  available, so users can see what changed before deciding to
-  apply.
+  notes →" link to the in-app `#/docs/release-notes` page
+  whenever an update is available, so users can see what changed
+  before deciding to apply.
+- Release notes are now fetched live from `releases.wattpost.io`
+  on every manifest poll and cached on the appliance. Means the
+  dashboard can preview a not-yet-installed version's changelog
+  entry — bundled docs only cover versions ≤ the running release.
+  Falls back to bundled `docs/release-notes.md` when offline.
 
 ### Changed
 - Settings → About: Docker installs no longer show an in-app
