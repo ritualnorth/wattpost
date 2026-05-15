@@ -50,7 +50,13 @@ class CloudService:
     async def heartbeat_once(self) -> bool:
         """Build + send one heartbeat. Returns True on 2xx, False on
         anything else. Used by the loop and also exposed for the
-        Settings UI's "Send heartbeat now" button."""
+        Settings UI's "Send heartbeat now" button.
+
+        Also dispatches any commands the cloud handed back. Dispatch
+        happens AFTER the heartbeat returns 2xx — so a flaky network
+        round-trip doesn't half-execute a command. Each command's
+        status transitions are PATCHed back to the cloud as the
+        appliance progresses through pick-up → apply → terminal."""
         payload = await self._build_payload()
         url = f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat"
         headers = {
@@ -73,7 +79,110 @@ class CloudService:
         if r.status_code >= 400:
             log.warning("cloud heartbeat HTTP %s: %s", r.status_code, r.text[:200])
             return False
+
+        # Dispatch any commands the cloud queued for us. Best-effort
+        # — failures dispatching one command shouldn't stop the
+        # heartbeat from being considered successful, since the
+        # heartbeat write itself already succeeded.
+        try:
+            body = r.json()
+            commands = body.get("commands") or []
+            for cmd in commands:
+                # Spawn as a task so a long-running command (e.g. an
+                # update that takes 30s) doesn't block the next
+                # scheduled heartbeat. The dispatcher does its own
+                # serialization within a single command type.
+                asyncio.create_task(self._dispatch_command(cmd))
+        except Exception as e:
+            log.warning("cloud heartbeat: failed to parse command list: %s", e)
         return True
+
+    async def _dispatch_command(self, cmd: dict[str, Any]) -> None:
+        """Apply a single cloud-queued command. Reports status
+        transitions back to /api/heartbeat/command/{id} as it goes.
+
+        Only handles `kind='update'` today. Unknown kinds get marked
+        failed with a clear error message so they don't sit forever
+        as 'queued' on the dashboard."""
+        cmd_id = cmd.get("id")
+        kind   = cmd.get("kind")
+        if not isinstance(cmd_id, int):
+            log.warning("cloud command missing id: %r", cmd)
+            return
+
+        if kind != "update":
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"appliance doesn't handle kind={kind!r}",
+            )
+            return
+
+        # Docker installs can't run wattpost-update — that helper
+        # only exists on Pi installs (where it's bundled by pi-gen).
+        # Fail fast and visibly rather than letting the user think
+        # we're "applying…" for an action we can't take.
+        import os
+        if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="cloud-triggered updates are not supported on "
+                      "Docker installs — run `docker compose pull && "
+                      "docker compose up -d` on the host instead",
+            )
+            return
+
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        # Invoke wattpost-update detached — it'll restart this
+        # daemon mid-flight, so we have no way to await it OR to
+        # PATCH the terminal status from here. The cloud auto-
+        # reconciles: when the next heartbeat arrives with a newer
+        # `version` field, the server marks any `applying` update
+        # commands as success. A 10-minute server-side watchdog
+        # marks the rest as failed if no heartbeat lands.
+        try:
+            await asyncio.create_subprocess_exec(
+                "wattpost-update",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            log.info("cloud update: wattpost-update spawned for cmd %d", cmd_id)
+        except Exception as e:
+            log.exception("cloud update: failed to spawn wattpost-update")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"failed to start updater: {type(e).__name__}: {e}",
+            )
+
+    async def _patch_command_status(
+        self, cmd_id: int, status: str, *, error: str | None = None,
+    ) -> None:
+        """PATCH /api/heartbeat/command/{id} to report a status
+        transition. Best-effort — failures here are logged but
+        don't cascade (a half-reported command on the dashboard
+        is preferable to crashing the heartbeat path)."""
+        url = (f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat/"
+               f"command/{cmd_id}")
+        body: dict[str, Any] = {"status": status}
+        if error:
+            body["error"] = error
+        headers = {
+            "Authorization": f"Bearer {self.cfg.bearer_token}",
+            "Content-Type":  "application/json",
+        }
+        try:
+            async with httpx.AsyncClient(
+                timeout=10.0, follow_redirects=True,
+            ) as client:
+                r = await client.patch(url, json=body, headers=headers)
+            if r.status_code >= 400:
+                log.warning(
+                    "cloud command status PATCH HTTP %s for cmd %d→%s: %s",
+                    r.status_code, cmd_id, status, r.text[:200],
+                )
+        except Exception as e:
+            log.warning("cloud command status PATCH failed (cmd %d→%s): %s",
+                        cmd_id, status, e)
 
     async def _build_payload(self) -> dict[str, Any]:
         """Pull SoC + net power from the store's `bank` pseudo-device.
