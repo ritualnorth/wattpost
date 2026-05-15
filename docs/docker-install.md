@@ -154,3 +154,20 @@ The Docker image:
   `config.yaml`.
 - **Doesn't** auto-update via the daemon's "Update now" button —
   that's image-replacement (`docker compose pull`) instead.
+- **Doesn't** include the in-app Tailscale toggle. Tailscale in
+  a container is fiddly (needs `/dev/net/tun`, custom caps, a
+  sidecar pattern) — we don't recommend it. Two paths for
+  remote access:
+  1. **Pair the appliance to [WattPost Cloud](pairing.md)** —
+     handles tunnels, multi-site dashboards, and remote
+     management. The path we maintain end-to-end.
+  2. **Install Tailscale on the host** directly (not in the
+     container). Once it's on your tailnet, you reach the
+     appliance dashboard at `http://<host-name>:8000/` from
+     anywhere on your tailnet. No app changes needed; the
+     daemon still binds `0.0.0.0:8000` like normal.
+
+  Pi installs keep the in-app Tailscale UI — sudoers + `tailscale
+  serve` are pre-wired on the SD image because that environment
+  is consistent across customers. Containers vary too much for
+  us to support automating it.
