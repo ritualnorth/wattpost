@@ -4569,7 +4569,19 @@ async function wizScan() {
       renderScanResults(alive, /*partial*/ false);
     }
   } catch (e) {
-    status.textContent = `Scan failed: ${e.message}`;
+    // A save's hot-reload kills the scan stream — that's expected,
+    // not an error. Detect via the wizState.saveInFlight counter:
+    // any save in flight when the stream tore down means the abort
+    // came from us, not from a real failure. Tell the user honestly
+    // so they know the scan paused, didn't crash.
+    if ((wizState.saveInFlight || 0) > 0) {
+      status.textContent = alive.length
+        ? `Scan paused — ${alive.length} device(s) found so far. Click Scan to continue.`
+        : `Scan paused while adding a device. Click Scan to continue.`;
+      renderScanResults(alive, /*partial*/ false);
+    } else {
+      status.textContent = `Scan failed: ${e.message}`;
+    }
   } finally {
     btn.disabled = false;
     wizState.scanResults = alive;
@@ -4723,6 +4735,11 @@ function wizExpandRow(row) {
     const save = form.querySelector("button[type='submit']");
     save.disabled = true;
     save.textContent = "Saving…";
+    // Tell the scan loop "an in-flight save is about to kill your
+    // stream — don't treat that as a real error." Cleared after the
+    // save settles, regardless of outcome. Concurrent saves bump
+    // the counter so the last one to finish clears it.
+    wizState.saveInFlight = (wizState.saveInFlight || 0) + 1;
     try {
       const r = await fetch("/api/setup/add_device", {
         method: "POST",
@@ -4737,6 +4754,18 @@ function wizExpandRow(row) {
       });
       if (!r.ok) {
         const detail = await r.json().catch(() => ({}));
+        // "Already configured" can fire when the response from a
+        // previous save was disrupted (e.g. the scan stream dying
+        // killed our network state). Treat as soft success: pull
+        // the existing record + render Saved so the row stops
+        // begging for input.
+        if (r.status === 409 && /already configured/i.test(detail.detail || "")) {
+          wizState.knownKeys.add(wizKnownKey(wizState.transport, slave));
+          row.classList.add("known");
+          row.querySelector(".wiz-row-action").innerHTML =
+            `<span class="wiz-saved">Saved · ${escHtml(label)}</span>`;
+          return;
+        }
         throw new Error(detail.detail || `${r.status} ${r.statusText}`);
       }
       const data = await r.json();
@@ -4751,6 +4780,20 @@ function wizExpandRow(row) {
       msg.className = "wiz-error";
       msg.textContent = e.message;
       form.appendChild(msg);
+    } finally {
+      wizState.saveInFlight = Math.max(0, (wizState.saveInFlight || 1) - 1);
+      // Refresh server-side state so the UI doesn't drift if a
+      // previous save's response was eaten by the stream tear-down.
+      // Best-effort — failures here are silent.
+      try {
+        const kr = await fetch("/api/setup/known_devices");
+        if (kr.ok) {
+          const kd = await kr.json();
+          wizState.knownKeys = new Set(
+            kd.devices.map(d => wizKnownKey(d.transport, d.slave_id)),
+          );
+        }
+      } catch (_) { /* ignore */ }
     }
   });
 }
