@@ -10,6 +10,7 @@ no-op here — both fields are public coordinates.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import shutil
@@ -23,6 +24,7 @@ from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 
 from ..config import Config, WeatherCfg
+from .setup import _hot_reload_bg
 from ..weather.service import CACHE_KEY
 from ..weather.openmeteo import OpenMeteoProvider
 
@@ -96,7 +98,10 @@ async def update_weather_config(
             return raw
         _save_config(config_path, _mutate)
         log.info("weather integration cleared")
-        return {"ok": True, "configured": False, "restart_required": True}
+        # Background hot-reload — the running scheduler picks up the
+        # cleared config within a few seconds, no user-visible restart.
+        asyncio.create_task(_hot_reload_bg(state))
+        return {"ok": True, "configured": False, "restart_required": False}
 
     if not (-90 <= data.lat <= 90 and -180 <= data.lon <= 180):
         raise HTTPException(status_code=400,
@@ -121,7 +126,8 @@ async def update_weather_config(
     _save_config(config_path, _mutate)
     log.info("weather integration configured (%s @ %.4f, %.4f, every %dm)",
              new_w.provider, new_w.lat, new_w.lon, new_w.poll_minutes)
-    return {"ok": True, "configured": True, "restart_required": True}
+    asyncio.create_task(_hot_reload_bg(state))
+    return {"ok": True, "configured": True, "restart_required": False}
 
 
 @post("/api/weather/test")

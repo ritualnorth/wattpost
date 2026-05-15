@@ -2426,6 +2426,14 @@ async function refreshUpdateState() {
   const dockerRow = $("#settings-update-docker-row");
   if (dockerRow) dockerRow.hidden = !isDocker;
 
+  // Hide the in-flight progress row whenever there's no update to
+  // apply. Without this it stuck around after a Pi user finished an
+  // earlier update — and on Docker it never makes sense (Apply is
+  // disabled). The apply handler unhides it on click; otherwise
+  // it's always hidden.
+  const progressRow = $("#settings-update-progress-row");
+  if (progressRow && !showRow) progressRow.hidden = true;
+
   if (u.last_checked_at) {
     set("#settings-update-checked", fmt.ago(u.last_checked_at)
       + (u.last_error ? ` · last error: ${u.last_error}` : ""));
