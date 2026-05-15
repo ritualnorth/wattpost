@@ -133,6 +133,15 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+html {
+  /* Disable iOS Safari + Android Chrome's auto text-inflation.
+   * Mobile browsers will otherwise scale up text in long-prose
+   * containers (most visible on /docs body content), bypassing the
+   * font-size rules we set and making body text 2x the nav text on
+   * the same page. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   font-family: var(--font);
   font-size: 14px;
@@ -2794,6 +2803,19 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   margin: .85rem 0;
   font-size: .88rem;
   width: 100%;
+  /* Wide markdown tables (the SD-card vs Docker comparison in
+   * docker-install.md is the canonical case) get a horizontal
+   * scroll bar instead of overflowing the viewport on mobile.
+   * `display: block` is what lets `overflow-x` work on a table. */
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.docs-content td code {
+  /* Don't wrap inline-code chips that live inside table cells —
+   * "docker compose pull && up -d" reads better as one chunk that
+   * the cell scrolls to than as wrapping fragments. */
+  white-space: nowrap;
 }
 .docs-content th, .docs-content td {
   text-align: left;
