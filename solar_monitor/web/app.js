@@ -2313,10 +2313,12 @@ async function refreshUpdateState() {
   catch (_) { return; }
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set("#settings-version", "v" + (u.current_version || "?"));
-  // "Latest available" row is shown only when the cloud reported a
-  // newer version. When current === latest, we keep the row hidden
-  // — less noise, and the "Check now" button below still shows
-  // freshness so users know the check is happening.
+
+  const isDocker = u.deployment === "docker";
+
+  // "Latest available" row appears only when there's a real update
+  // to surface. On Pi installs this is the only update touchpoint;
+  // on Docker we also show a persistent hint row below.
   const row = $("#settings-update-row");
   if (row) row.hidden = !u.has_update;
   if (u.has_update) {
@@ -2327,22 +2329,23 @@ async function refreshUpdateState() {
       a.hidden = false;
     }
     row?.classList.add("settings-row--update");
-
-    // Docker installs can't fire the in-place updater — the
-    // wattpost-update helper isn't in the image. Hide the Apply
-    // button and surface the right shell command instead.
-    const applyBtn = $("#settings-update-apply");
-    const dockerHint = $("#settings-update-docker-hint");
-    if (u.deployment === "docker") {
-      if (applyBtn) applyBtn.hidden = true;
-      if (dockerHint) dockerHint.hidden = false;
-    } else {
-      if (applyBtn) applyBtn.hidden = false;
-      if (dockerHint) dockerHint.hidden = true;
-    }
   } else {
     row?.classList.remove("settings-row--update");
   }
+
+  // Apply button: only on Pi installs with an actual pending update.
+  // Docker users update via `docker compose pull` on the host — no
+  // in-app button, by design (matches Immich, Pi-hole, Vaultwarden
+  // conventions).
+  const applyBtn = $("#settings-update-apply");
+  if (applyBtn) applyBtn.hidden = isDocker || !u.has_update;
+
+  // Persistent "Updates: docker compose pull..." row, always on for
+  // Docker so users discover the right command before they ever look
+  // for an in-app updater.
+  const dockerRow = $("#settings-update-docker-row");
+  if (dockerRow) dockerRow.hidden = !isDocker;
+
   if (u.last_checked_at) {
     set("#settings-update-checked", fmt.ago(u.last_checked_at)
       + (u.last_error ? ` · last error: ${u.last_error}` : ""));
