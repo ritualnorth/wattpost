@@ -33,12 +33,17 @@ scp → VPS                   scp → VPS
 
 ## What gets released
 
-Two artefacts, two channels, two cadences:
+Three artefacts, three pipelines, all triggered by **git tags** for
+release builds — only the Docker `:edge` channel publishes on every
+commit. This keeps version numbers honest and stops the "Update
+available" badge from nagging users on every fix-commit.
 
 | Artefact                 | Source pipeline               | URL                                              | Trigger                                          |
 | ------------------------ | ----------------------------- | ------------------------------------------------ | ------------------------------------------------ |
-| `wattpost-source-*.tar.gz` | `.github/workflows/publish-source.yml` | `https://releases.wattpost.io/source/latest.tar.gz` | Every push to `main` touching `solar_monitor/`, `packaging/`, or `pyproject.toml` |
+| `wattpost-source-*.tar.gz` | `.github/workflows/publish-source.yml` | `https://releases.wattpost.io/source/latest.tar.gz` | Git tag `v*` (or manual `workflow_dispatch`)     |
 | `wattpost-*.img.xz`        | `.github/workflows/build-image.yml`     | `https://releases.wattpost.io/img/latest.img.xz`    | Git tag `v*` (or manual `workflow_dispatch`)     |
+| `ghcr.io/.../wattpost-appliance:latest` | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Git tag `v*` — gets `:vX.Y.Z`, `:X.Y`, `:latest` |
+| `ghcr.io/.../wattpost-appliance:edge`   | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Every push to `main` — gets `:edge`, `:sha-<short>` |
 
 The source tarball is what the appliance's **Update now** button pulls down for in-place upgrades. The `.img.xz` is what a new user flashes onto a fresh SD card via Raspberry Pi Imager.
 
@@ -57,18 +62,60 @@ Both are anonymously fetchable. There's no auth on `releases.wattpost.io` becaus
 A normal main push automatically:
 
 - Rebuilds + deploys the cloud (`build-cloud-image.yml`)
-- Bundles a new source tarball if the push touches the appliance (`publish-source.yml` → `releases.wattpost.io/source/latest.tar.gz`)
+- Builds + pushes the appliance Docker image as `:edge` and
+  `:sha-<short>` (`build-appliance-image.yml`)
 
-That's enough to flow features to **already-paired appliances** via the Update-now button. Cutting a fresh SD image is a deliberate step:
+That's the bleeding-edge channel — fine for our dev environment
+and tester opt-in (`image: ghcr.io/ritualnorth/wattpost-appliance:edge`),
+NOT what customers should track. It deliberately does NOT bump the
+manifest version or build a source tarball, so paired Pi
+appliances don't get nagged on every fix commit.
 
-1. Bump `__version__` in `solar_monitor/__init__.py`.
-2. Update `LATEST["version"]` and `LATEST["released_at"]` in `cloud/wattpost_cloud/releases.py` so paired appliances see "new version available" in Settings → About.
-3. Commit, push to main.
-4. Tag: `git tag v0.0.X && git push --tags`.
-5. `build-image.yml` runs (pi-gen, ~90 min) → attaches `.img.xz` to a GH Release in the private repo (internal archive) AND scp's to `/srv/wattpost-releases/img/`. The `latest.img.xz` symlink is repointed at the new filename automatically.
-6. Verify: `curl -sI https://releases.wattpost.io/img/latest.img.xz` should 200; the `/download` page on `wattpost.io` should now link to the new build.
+**To cut a real release that flows to customers**:
 
-The pi-gen workflow takes the longest, so the rule of thumb is: tag → take a 90 min break → check it landed. The CI emails on failure.
+1. Bump `__version__` in `solar_monitor/__init__.py` (e.g. `0.0.3` → `0.0.4`).
+2. Move the `[Unreleased]` block in `CHANGELOG.md` to a new
+   `[0.0.4] — YYYY-MM-DD` section. Leave `[Unreleased]` empty
+   above it for the next batch.
+3. Commit: `git commit -am "Release v0.0.4"`.
+4. Tag: `git tag v0.0.4 && git push origin main v0.0.4`.
+5. CI then automatically:
+   - `build-appliance-image.yml` builds + pushes `:v0.0.4`, `:0.0`,
+     `:latest` Docker tags to GHCR. Docker users on `:latest` pull
+     this on their next `docker compose pull && up -d`.
+   - `publish-source.yml` builds the source tarball + bumps
+     `releases.wattpost.io/img/manifest.json` to `0.0.4`. Pi users'
+     "Update available" badge lights up within their next 24h poll
+     (or via Check now).
+   - `build-image.yml` runs (pi-gen, ~90 min) → attaches `.img.xz`
+     to a GH Release AND scp's to `/srv/wattpost-releases/img/`.
+     `latest.img.xz` symlink repointed automatically. New customers
+     downloading via `/download` get the fresh image.
+6. Verify (after ~90 min): `curl -sI https://releases.wattpost.io/img/latest.img.xz`
+   should 200; `/download` page on `wattpost.io` should link to the
+   new build; a paired Pi appliance should show "Update available
+   v0.0.4" within an hour.
+
+The pi-gen workflow takes the longest, so the rule of thumb is:
+tag → take a 90 min break → check it landed. The CI emails on
+failure.
+
+### Customer-side update paths
+
+| Install type | Channel | Command / action | Notes |
+| --- | --- | --- | --- |
+| Pi (SD card) | Stable | "Update now" button in Settings → About | Reads manifest → fetches new source tarball → wattpost-update swaps + restarts daemon |
+| Docker, stable | `image: ghcr.io/ritualnorth/wattpost-appliance:latest` | `docker compose pull && docker compose up -d` | Pulls the most recent tagged release |
+| Docker, edge | `image: ghcr.io/ritualnorth/wattpost-appliance:edge` | Same | Every main commit. Opt-in for testers. |
+| Docker, pinned | `image: ghcr.io/.../wattpost-appliance:0.0.4` | Pull when ready | Pinned forever. Use when you want reproducibility above all. |
+
+### What if I forgot to bump __version__?
+
+Tag still triggers everything, but `__version__` inside the
+shipped code will be wrong vs. the tag. CI doesn't validate this
+yet — worth adding eventually (see backlog: validate
+`__version__` matches tag in CI). For now, just be disciplined:
+bump in the same commit as the tag, easy to remember.
 
 ## How an appliance updates
 

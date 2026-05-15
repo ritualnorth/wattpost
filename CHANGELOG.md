@@ -8,6 +8,85 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.4] — 2026-05-15
+
+### Added
+- **Cloud-managed updates for Pi appliances.** Multi-site
+  dashboard renders an amber "v0.0.x → v0.0.y" pill on cards
+  running behind `releases.LATEST` and a one-click
+  "Update to v0.0.y" button that queues the action; the
+  appliance picks it up on its next heartbeat, runs
+  `wattpost-update`, and the cloud auto-reconciles the command
+  to "success" when the new version reports in.
+- **Stripe billing (v1).** $5 per appliance per month, 14-day
+  free trial, Stripe-managed grace period. Subscribe / Manage
+  billing buttons in the cloud dashboard and account page.
+  Webhook ingestion mirrors subscription state into the
+  `appliances` table.
+- **Per-device delete button on the appliance Devices tab** —
+  one click + confirm to drop a slave from polling, no trip
+  through the Setup wizard.
+- **Bank aggregate pinned to the top of the Devices tab.**
+  Previously filtered out; now the headline reading sits where
+  users look first.
+- **Live-streaming Setup → Scan.** The wizard now shows
+  "Probed N of 17 · X responded" with results streaming in as
+  each slave answers, instead of staring at a spinner for ~60s
+  while the full sweep finishes.
+- **SQLite migration framework on the appliance.** Future
+  schema changes evolve existing databases via PRAGMA
+  user_version instead of breaking customers.
+- **`cloudflared` bundled in the Docker image.** The paired-
+  cloud "Open site" tunnel now works identically on Pi and
+  Docker installs.
+
+### Changed
+- **BLE auto-detects the notify characteristic** per BT-2
+  firmware generation (`fff1` first, `ffd2` fallback). Setup
+  wizard's scan finds Renogy devices reliably across both
+  generations without manual config.
+- **BLE self-heals stale BlueZ state** on connect failures —
+  the daemon now sends `bluetoothctl disconnect` + `remove`
+  on the retry path, recovering from "device disconnected
+  during service discovery" without operator intervention.
+- **Bank aggregate is now stable across single-pack poll drops.**
+  Previously recomputed from "what answered this cycle";
+  now augmented with cached snapshots from any pack last
+  seen within 5 min. `pack_count` no longer flips between
+  3 and 2 on a noisy BLE link.
+- **Cross-subdomain session.** Cookie scoped to
+  `.wattpost.io` so a logged-in user clicking "Download" or
+  visiting `wattpost.io/docs` stays signed in instead of
+  apparently logging out.
+- **Hot-reload wizard writes.** add_device / add_transport /
+  add_forecast / add_weather + their deletes all now return
+  in <10ms with a background hot-reload, instead of awaiting
+  the ~5s scheduler swap. No more "saving…" hangs during
+  scans.
+- **Update notes now fetched live** from
+  `releases.wattpost.io/CHANGELOG.md`, so the in-app
+  "Release notes →" link previews entries for a version the
+  user hasn't installed yet.
+- **Marketing + docs theme defaults to system** preference,
+  not hardcoded dark.
+
+### Fixed
+- **"Setup needed" pill stuck on amber** despite a healthy
+  appliance — SSE snapshot's `poll_run` was missing the
+  `transports` field, so every tick reset the dashboard's
+  view to "no transports configured".
+- **Pairing flow re-introduced "Restart daemon"** UX after the
+  hot-start path was added; UI now respects the
+  `restart_required: false` response.
+- **About → Update section** showed "Latest available —" and
+  a stuck "Update progress: waiting…" on Docker after earlier
+  manual Update-Now clicks. Both rows now hide when there's
+  nothing to apply.
+- **Setup wizard locked users out** when the BLE link was
+  idle-dropped — the transport row went disabled with no
+  recovery. Now: row stays clickable, scan auto-reopens the
+  link.
+
 ## [0.0.3] — 2026-05-15
 
 ### Added

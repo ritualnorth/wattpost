@@ -1,21 +1,22 @@
 name: Publish appliance source
 
-# Builds a tar.gz of the appliance source on every push to main that
-# touches the appliance and uploads it to releases.wattpost.io. This
-# is what `/api/system/update/apply` on a paired appliance pulls down
-# to get new features without a fresh SD-card flash.
+# Builds a tar.gz of the appliance source on tagged releases and
+# uploads it to releases.wattpost.io. This is what
+# `/api/system/update/apply` on a paired appliance pulls down to
+# get new features without a fresh SD-card flash.
 #
 # Tarball includes: solar_monitor/, packaging/, pyproject.toml,
 # README.md. Excludes: cloud/ (private), .github/, dev artefacts.
+#
+# Only fires on `v*` tag pushes — NOT on every main commit. That
+# way the manifest version bump (= "Update available" badge on
+# every paired Pi appliance) only happens at deliberate release
+# points, not on every fix commit. See docs/release-pipeline.md
+# for the full ritual.
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'solar_monitor/**'
-      - 'packaging/**'
-      - 'pyproject.toml'
-      - '.github/workflows/publish-source.yml'
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
