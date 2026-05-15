@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.6] — 2026-05-15
+
+### Added
+- **Cloud dashboard shows weather + PV forecast per site.**
+  Each heartbeat now ships the appliance's cached weather
+  snapshot (temperature, conditions, sunset) and Solcast
+  forecast totals (today + tomorrow kWh). The cloud card
+  surfaces a quiet strip — e.g. *"☀ 16°C · Mostly clear ·
+  Sunset 19:42 · Today 4.2 kWh PV · Tomorrow 5.1 kWh"* — so a
+  glance at app.wattpost.io tells you whether your off-grid
+  setup is going to make it through the day.
+- **Appliance reports its install method** in the heartbeat
+  (`pi` vs `docker`). The cloud uses this to hide the
+  "Update now" button on Docker installs (where the action
+  has to happen on the host via `docker compose pull`).
+
+### Changed
+- Update notes pulled from `releases.wattpost.io/CHANGELOG.md`
+  remain the same source as before — this entry will appear
+  in the dashboard's "Release notes" link.
+
 ## [0.0.5] — 2026-05-15
 
 ### Changed
