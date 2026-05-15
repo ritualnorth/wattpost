@@ -27,10 +27,25 @@ LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
 #     with network_mode: host).
 #   - libffi8: argon2-cffi runtime.
 #   - ca-certificates: HTTPS to alert webhooks / Solcast / Open-Meteo.
+#   - curl: only needed to fetch cloudflared in the next layer.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        bluez bluez-tools libffi8 ca-certificates dbus \
+        bluez bluez-tools libffi8 ca-certificates dbus curl \
  && rm -rf /var/lib/apt/lists/*
+
+# cloudflared — Cloudflare Tunnel client. Used by the paired-cloud
+# flow to expose this appliance's dashboard at <slug>.wattpost.io
+# without the user having to port-forward or run a reverse proxy.
+# Pi installs get it from the SD image's apt setup; for Docker we
+# pin a known-good static binary so the tunnel feature works
+# identically across both deployment types. Architecture detected
+# from dpkg so the multi-arch image picks the right one.
+ARG CLOUDFLARED_VERSION=2024.12.2
+RUN ARCH=$(dpkg --print-architecture) \
+ && curl -fsSL -o /usr/local/bin/cloudflared \
+      "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${ARCH}" \
+ && chmod +x /usr/local/bin/cloudflared \
+ && /usr/local/bin/cloudflared --version
 
 WORKDIR /app
 

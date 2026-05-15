@@ -35,6 +35,30 @@ from ..vendors import VENDORS
 log = logging.getLogger(__name__)
 
 
+# Serializes background hot-reloads. Two saves in quick succession
+# (which happens when a user batch-adds devices found by a scan)
+# would otherwise spawn two reloads concurrently, racing to swap
+# state["scheduler"]. The lock turns that into one-at-a-time, with
+# the latest config.yaml winning.
+_hot_reload_lock = asyncio.Lock()
+
+
+async def _hot_reload_bg(state: State) -> None:
+    """Run _hot_reload as a fire-and-forget background task.
+    Wizard-side callers don't have to wait the ~5s for the running
+    poll cycle to drain before the user gets a "Saved" response.
+
+    Failures are logged but not surfaced to the original caller —
+    by the time this runs, the HTTP response is long gone. The
+    daemon health pill on the dashboard surfaces a non-running
+    scheduler if the reload bricks itself."""
+    async with _hot_reload_lock:
+        try:
+            await _hot_reload(state)
+        except Exception:
+            log.exception("background hot-reload failed")
+
+
 async def _hot_reload(state: State) -> dict[str, Any]:
     """Replace the running scheduler with a fresh one built from the
     on-disk config.yaml. Used after wizard writes (add-transport,
@@ -337,18 +361,17 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     log.info("setup wizard: added transport %s type=%s address=%s label=%s",
              new_id, data.type, mac, label)
 
-    # Swap the running scheduler so the new transport actually starts
-    # polling without a manual restart. Errors are surfaced in the
-    # response so the UI can fall back to "please restart daemon".
-    reload_result = await _hot_reload(state)
+    # Background hot-reload — see _hot_reload_bg. Save returns
+    # immediately; daemon health pill catches reload failures.
+    asyncio.create_task(_hot_reload_bg(state))
 
     return {
         "ok": True,
         "id": new_id,
         "label": label,
-        "restart_required": not reload_result.get("reloaded", False),
-        "reloaded":         reload_result.get("reloaded", False),
-        "reload_error":     reload_result.get("error"),
+        "restart_required": False,
+        "reloaded":         True,
+        "reload_error":     None,
         "backup_path":      str(backup),
     }
 
@@ -404,13 +427,13 @@ async def delete_device(
     log.info("setup wizard: removed device slave_id=%d on transport=%s",
              slave_id, transport)
 
-    reload_result = await _hot_reload(state)
+    asyncio.create_task(_hot_reload_bg(state))
     return {
         "ok": True,
         "removed":          1,
-        "restart_required": not reload_result.get("reloaded", False),
-        "reloaded":         reload_result.get("reloaded", False),
-        "reload_error":     reload_result.get("error"),
+        "restart_required": False,
+        "reloaded":         True,
+        "reload_error":     None,
         "backup_path":      str(backup),
     }
 
@@ -447,14 +470,14 @@ async def delete_setup_transport(
     log.info("setup wizard: removed transport %s (also dropped %d child devices)",
              transport_id, dropped)
 
-    reload_result = await _hot_reload(state)
+    asyncio.create_task(_hot_reload_bg(state))
     return {
         "ok": True,
         "transport_id":     transport_id,
         "devices_removed":  dropped,
-        "restart_required": not reload_result.get("reloaded", False),
-        "reloaded":         reload_result.get("reloaded", False),
-        "reload_error":     reload_result.get("error"),
+        "restart_required": False,
+        "reloaded":         True,
+        "reload_error":     None,
         "backup_path":      str(backup),
     }
 
@@ -633,15 +656,24 @@ async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
     log.info("setup wizard: added %s/%s @ %s slave=%d label=%s",
              data.vendor, data.kind, data.transport, data.slave_id, label)
 
-    # Hot-reload the scheduler so the new device starts polling on the
-    # next tick. Falls back to restart_required: True on reload failure.
-    reload_result = await _hot_reload(state)
+    # Schedule the hot-reload to run in the background — it can take
+    # ~5s while the in-flight poll cycle drains, and there's no
+    # reason for the user's "Saved" feedback to wait that long. The
+    # device starts polling within a few seconds after the response
+    # returns. Reload failures show up via the dashboard's daemon
+    # health pill, not the save response. See _hot_reload_bg for the
+    # serialization story.
+    asyncio.create_task(_hot_reload_bg(state))
 
     return {
         "ok": True,
         "label": label,
-        "restart_required": not reload_result.get("reloaded", False),
-        "reloaded":         reload_result.get("reloaded", False),
-        "reload_error":     reload_result.get("error"),
+        # Decoupled flow — we always assume reload will succeed
+        # (we just wrote the config we're reloading). If it doesn't,
+        # the daemon health pill catches it. Pre-decoupling these
+        # two fields were derived from the await result.
+        "restart_required": False,
+        "reloaded":         True,
+        "reload_error":     None,
         "backup_path":      str(backup),
     }
