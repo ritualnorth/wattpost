@@ -4408,13 +4408,18 @@ async function wizLoadTransports() {
       return;
     }
     host.innerHTML = transports.map(t => `
-      <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${t.id}" ${t.open ? '' : 'disabled'}>
-        <div class="wiz-transport-main">
-          <span class="wiz-transport-id">${t.id}</span>
-          <span class="wiz-transport-addr">${t.address || ''}</span>
-        </div>
-        <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline'}</span>
-      </button>
+      <div class="wiz-transport-row">
+        <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${escHtml(t.id)}" ${t.open ? '' : 'disabled'}>
+          <div class="wiz-transport-main">
+            <span class="wiz-transport-id">${escHtml(t.id)}</span>
+            <span class="wiz-transport-addr">${escHtml(t.address || '')}</span>
+          </div>
+          <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline'}</span>
+        </button>
+        <button class="wiz-transport-del" data-del-transport="${escHtml(t.id)}" title="Disconnect + remove this transport">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+        </button>
+      </div>
     `).join("");
     host.querySelectorAll(".wiz-transport").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -4425,6 +4430,9 @@ async function wizLoadTransports() {
         $("#wiz-scan-results").innerHTML = "";
         $("#wiz-scan-status").textContent = "";
       });
+    });
+    host.querySelectorAll("[data-del-transport]").forEach(btn => {
+      btn.addEventListener("click", () => wizDeleteTransport(btn.dataset.delTransport));
     });
   } catch (e) {
     host.innerHTML = `<div class="wiz-empty">Could not load transports: ${e.message}</div>`;
@@ -4481,7 +4489,11 @@ function renderScanResults(alive) {
           </div>
         </div>
         <div class="wiz-row-action">
-          ${known ? '' : `<button class="btn-action btn-action--primary wiz-add-btn">+ Add</button>`}
+          ${known
+            ? `<button class="wiz-transport-del" data-del-device="${r.slave_id}" title="Remove this device">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+               </button>`
+            : `<button class="btn-action btn-action--primary wiz-add-btn">+ Add</button>`}
         </div>
       </div>
     `;
@@ -4489,7 +4501,71 @@ function renderScanResults(alive) {
   host.querySelectorAll(".wiz-row").forEach(row => {
     const btn = row.querySelector(".wiz-add-btn");
     if (btn) btn.addEventListener("click", () => wizExpandRow(row));
+    const delBtn = row.querySelector("[data-del-device]");
+    if (delBtn) delBtn.addEventListener("click", () => wizDeleteDevice(+delBtn.dataset.delDevice));
   });
+}
+
+async function wizDeleteDevice(slaveId) {
+  if (!wizState.transport) return;
+  if (!confirm(
+    `Remove device on slave ${slaveId} from transport ${wizState.transport}?\n\n` +
+    "Polling stops immediately. The current config.yaml is backed up to .bak."
+  )) return;
+  let res;
+  try {
+    const r = await fetch(
+      `/api/setup/devices/${slaveId}?transport=${encodeURIComponent(wizState.transport)}`,
+      { method: "DELETE" },
+    );
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    alert("Couldn't remove device: " + (e.message || String(e)));
+    return;
+  }
+  // Re-render the scan list so the row flips back to "+ Add" / no
+  // trash icon, then reload transports list for fresh state.
+  await wizLoadTransports();
+  if (res.reload_error) {
+    alert(`Device removed, but hot-reload failed: ${res.reload_error}\nRestart the daemon.`);
+  }
+}
+
+async function wizDeleteTransport(transportId) {
+  if (!confirm(
+    `Disconnect and remove transport "${transportId}"?\n\n` +
+    "This also removes every device configured on it. " +
+    "The current config.yaml is backed up to .bak. Continue?"
+  )) return;
+  let res;
+  try {
+    const r = await fetch(
+      `/api/setup/transports/${encodeURIComponent(transportId)}`,
+      { method: "DELETE" },
+    );
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    alert("Couldn't remove transport: " + (e.message || String(e)));
+    return;
+  }
+  if (wizState.transport === transportId) {
+    wizState.transport = null;
+    $("#wiz-step-scan").hidden = true;
+  }
+  await wizLoadTransports();
+  if (res.devices_removed > 0) {
+    // Surface the cascade so the user isn't surprised later that
+    // their device list shrank.
+    console.info(`Removed ${res.devices_removed} child device(s) along with transport ${transportId}`);
+  }
 }
 
 function wizExpandRow(row) {

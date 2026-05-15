@@ -2207,6 +2207,32 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   margin-top: .55rem;
 }
 .wiz-result-info { flex: 1 1 auto; min-width: 0; }
+/* Transport list row: button-styled card on the left + small trash
+ * delete on the right. Clicking the trash disconnects the BT-2 and
+ * removes the entry from config.yaml (cascades to its devices). */
+.wiz-transport-row {
+  display: flex; align-items: stretch; gap: .4rem;
+  margin-bottom: .4rem;
+}
+.wiz-transport-row .wiz-transport { flex: 1 1 auto; margin: 0; }
+.wiz-transport-del {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.wiz-transport-del:hover {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.6);
+  background: rgba(248, 81, 73, 0.08);
+}
+.wiz-transport-del svg { width: 16px; height: 16px; }
+
 .wiz-vendor-hint {
   display: inline-block;
   margin-left: .4rem;
