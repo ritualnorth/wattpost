@@ -26,11 +26,35 @@ container. For those, use the SD-card path.
 
 ```bash
 mkdir -p ~/wattpost && cd ~/wattpost
+```
 
-# Grab the example compose file
-curl -fsSL https://raw.githubusercontent.com/ritualnorth/offgrid-monitor/main/docker-compose.example.yml \
-  -o docker-compose.yml
+Save the following as `~/wattpost/docker-compose.yml`:
 
+```yaml
+services:
+  wattpost:
+    image: ghcr.io/ritualnorth/wattpost-appliance:latest
+    container_name: wattpost
+    # Host networking is the simplest BLE-passthrough path on Linux.
+    # Trade-off: the container is on the host network, so :8000 binds
+    # the host directly.
+    network_mode: host
+    # Bluetooth via the host's bluetoothd over DBus. Least-privilege
+    # path; fall back to `privileged: true` if your distro's bluez
+    # is patchy with the cap_add combo below.
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ./wattpost-config:/etc/wattpost
+      - ./wattpost-data:/var/lib/wattpost
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    restart: unless-stopped
+```
+
+Then:
+
+```bash
 docker compose up -d
 ```
 
