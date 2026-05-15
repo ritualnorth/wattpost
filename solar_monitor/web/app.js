@@ -4457,18 +4457,30 @@ async function wizLoadTransports() {
     // No `disabled` on offline rows — the scan endpoint auto-reopens
     // a dropped BLE link, so users should always be able to select
     // and try. The pill text tells them what to expect.
+    const selectTransport = (id) => {
+      wizState.transport = id;
+      host.querySelectorAll(".wiz-transport").forEach(
+        b => b.classList.toggle("active", b.dataset.id === id),
+      );
+      $("#wiz-step-scan").hidden = false;
+      $("#wiz-scan-results").innerHTML = "";
+      $("#wiz-scan-status").textContent = "";
+    };
     host.querySelectorAll(".wiz-transport").forEach(btn => {
-      btn.addEventListener("click", () => {
-        wizState.transport = btn.dataset.id;
-        host.querySelectorAll(".wiz-transport").forEach(b => b.classList.toggle("active", b === btn));
-        $("#wiz-step-scan").hidden = false;
-        $("#wiz-scan-results").innerHTML = "";
-        $("#wiz-scan-status").textContent = "";
-      });
+      btn.addEventListener("click", () => selectTransport(btn.dataset.id));
     });
     host.querySelectorAll("[data-del-transport]").forEach(btn => {
       btn.addEventListener("click", () => wizDeleteTransport(btn.dataset.delTransport));
     });
+    // Auto-select when there's only one transport — there's no
+    // meaningful "pick" to make, so making the user tap a row before
+    // Scan works is friction with no upside. The previous fix told
+    // users to "Pick a transport above first" but the wizard didn't
+    // make obvious that the row was tappable; this short-circuits
+    // that whole UX trap.
+    if (transports.length === 1 && !wizState.transport) {
+      selectTransport(transports[0].id);
+    }
   } catch (e) {
     host.innerHTML = `<div class="wiz-empty">Could not load transports: ${e.message}</div>`;
   }
