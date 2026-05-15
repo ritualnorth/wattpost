@@ -170,6 +170,91 @@ PRAGMAS = (
 )
 
 
+# ---------- Schema migrations ----------
+#
+# `SCHEMA` above is CREATE-IF-NOT-EXISTS only — safe to run forever on
+# an existing DB, but it can't *evolve* an existing table (rename a
+# column, add a NOT NULL constraint, etc.). For those, we need a real
+# migration runner.
+#
+# Strategy: use SQLite's built-in `PRAGMA user_version` as the
+# bookkeeper. Every migration here gets a monotonic integer; on boot
+# we read the stored user_version, run any with a higher number than
+# stored, then write the new max version. Idempotent — re-running
+# against an up-to-date DB is a no-op.
+#
+# Adding a migration:
+#   1. Pick the next integer.
+#   2. Add (N, "short name", SQL_or_async_callable) to MIGRATIONS.
+#   3. Bump SCHEMA_VERSION to N.
+#   4. Test against a copy of a real customer DB before tagging a
+#      release — schema mistakes are forever for self-hosted users.
+#
+# Why not Alembic: the cloud uses Alembic because it has a single
+# Postgres + a managed deploy. The appliance has thousands of
+# self-hosted SQLite files, no central control plane to bless a
+# revision id, and the simplicity of `PRAGMA user_version` is a
+# better fit. If migrations get genuinely complex, revisit.
+#
+# Adding a NEW TABLE doesn't need a migration — add it to SCHEMA
+# above with CREATE IF NOT EXISTS and it'll appear on next boot.
+# Migrations are for ALTERing tables that already exist.
+SCHEMA_VERSION = 1
+
+MIGRATIONS: list[tuple[int, str, str]] = [
+    # (version, description, SQL).
+    # Placeholder for the first real migration. Example shape:
+    #   (1, "samples: add quality column",
+    #    "ALTER TABLE samples ADD COLUMN quality INTEGER DEFAULT 0"),
+]
+
+
+async def _apply_migrations(db) -> None:
+    """Run any unapplied schema migrations against the open
+    connection. Reads / writes `PRAGMA user_version`. Each migration
+    runs in its own transaction — a failure leaves the previous
+    versions applied and the user_version pointing at the highest
+    that succeeded, so an admin can investigate without losing
+    intermediate state.
+
+    Logged at INFO so a recovering customer can see in their daemon
+    logs which migration ran (or stalled)."""
+    async with db.execute("PRAGMA user_version") as cur:
+        row = await cur.fetchone()
+    current = int(row[0] if row else 0)
+
+    pending = [m for m in MIGRATIONS if m[0] > current]
+    if not pending:
+        log.debug("schema up-to-date at version %d", current)
+        return
+
+    log.info("applying %d schema migration(s) from v%d → v%d",
+             len(pending), current, max(m[0] for m in pending))
+    for version, name, sql in sorted(pending, key=lambda m: m[0]):
+        log.info("migration v%d: %s", version, name)
+        try:
+            if callable(sql):
+                await sql(db)
+            else:
+                await db.executescript(sql)
+            # user_version must be set AFTER the migration body so a
+            # crash mid-migration leaves user_version pointing at the
+            # last successful step. aiosqlite's default isolation
+            # level commits DDL automatically; we follow with a
+            # synchronous commit() to make sure the version bump
+            # lands on disk before the next migration runs.
+            await db.execute(f"PRAGMA user_version = {version}")
+            await db.commit()
+        except Exception:
+            log.exception(
+                "migration v%d (%s) FAILED — DB left at user_version=%d. "
+                "Daemon will keep booting against the old schema; investigate "
+                "before applying further changes.",
+                version, name, current,
+            )
+            raise
+
+
 class Store:
     """Async SQLite telemetry store. One open connection per instance.
 
@@ -189,7 +274,11 @@ class Store:
         self._db = await aiosqlite.connect(self.path)
         for pragma in PRAGMAS:
             await self._db.execute(pragma)
+        # Base schema first — CREATE-IF-NOT-EXISTS so this is safe to
+        # run against an existing DB. Then run any pending migrations
+        # to evolve from one schema_version to the next.
         await self._db.executescript(SCHEMA)
+        await _apply_migrations(self._db)
         await self._db.commit()
         log.info("storage open at %s", self.path)
 
