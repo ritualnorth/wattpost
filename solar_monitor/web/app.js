@@ -4651,11 +4651,16 @@ async function wizAddTransportFromMac(mac, name) {
     alert("Couldn't add transport: " + (e.message || String(e)));
     return;
   }
-  stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
-  // Refresh the transports list so the new one shows up — but the
-  // running daemon hasn't loaded it yet, so its open-state will be
-  // false until restart. The "restart required" message above is the
-  // honest signal.
+  if (res.reloaded) {
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now — give it ~10 s.`;
+  } else if (res.reload_error) {
+    stat.textContent = `Added ${res.label}, but hot-reload failed: ${res.reload_error}. Restart the daemon to apply.`;
+  } else {
+    stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
+  }
+  // Give the new scheduler a moment to open the transport, then
+  // refresh the list so the open=true state shows up.
+  await new Promise(r => setTimeout(r, 1500));
   await wizLoadTransports();
 }
 

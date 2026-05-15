@@ -32,6 +32,68 @@ from ..vendors import VENDORS
 log = logging.getLogger(__name__)
 
 
+async def _hot_reload(state: State) -> dict[str, Any]:
+    """Replace the running scheduler with a fresh one built from the
+    on-disk config.yaml. Used after wizard writes (add-transport,
+    add-device) so the user doesn't have to manually restart the
+    daemon — flow ends with "polling started" instead of "now click
+    Restart daemon".
+
+    Strategy:
+      1. Re-read config.yaml from disk.
+      2. await scheduler.stop()  — waits for any in-flight poll.
+      3. Construct a new PollScheduler with the same Store (so the
+         database connection survives and history is uninterrupted).
+      4. await new_scheduler.start().
+      5. Swap into app.state. Subsequent endpoints see the new
+         scheduler + config.
+
+    Returns a dict so the caller can include reload status / errors
+    in their own response. Never raises — if reload fails, we keep
+    the old scheduler stopped and log the failure; the dashboard
+    surfaces it via the daemon-stopped state on the next poll.
+    """
+    from ..config import load_config
+    from ..scheduler import PollScheduler
+    config_path: str = state.get("config_path", "config.yaml")
+
+    try:
+        new_config = load_config(config_path)
+    except Exception as e:
+        log.exception("hot-reload: config parse failed (%s) — keeping old scheduler", e)
+        return {"reloaded": False, "error": f"config parse: {e}"}
+
+    old_scheduler: PollScheduler = state["scheduler"]
+    store = state["store"]
+    interval = old_scheduler.interval_seconds
+    maintenance = getattr(old_scheduler, "maintenance_interval_seconds", 600)
+
+    try:
+        await old_scheduler.stop()
+    except Exception as e:
+        log.exception("hot-reload: old scheduler stop raised (%s) — continuing anyway", e)
+
+    new_scheduler = PollScheduler(
+        new_config, store,
+        interval_seconds=interval,
+        maintenance_interval_seconds=maintenance,
+    )
+    try:
+        await new_scheduler.start()
+    except Exception as e:
+        log.exception("hot-reload: new scheduler start failed (%s)", e)
+        # state["scheduler"] is the now-stopped old one. Leave it in
+        # place so health endpoints can read its dead state — better
+        # than silently swallowing the start failure.
+        return {"reloaded": False, "error": f"start failed: {e}"}
+
+    state["scheduler"] = new_scheduler
+    state["config"]    = new_config
+    log.info("hot-reload: scheduler swapped — %d transports, %d devices, %d alerts",
+             len(new_config.transports), len(new_config.devices), len(new_config.alerts))
+    return {"reloaded": True}
+
+
 # Slave IDs we try by default — covers Renogy factory conventions:
 #   1, 16:      charge controllers (Rover/Wanderer/Adventurer)
 #   32–55:      smart batteries (battery_index + 32, or 48-63)
@@ -272,12 +334,19 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     log.info("setup wizard: added transport %s type=%s address=%s label=%s",
              new_id, data.type, mac, label)
 
+    # Swap the running scheduler so the new transport actually starts
+    # polling without a manual restart. Errors are surfaced in the
+    # response so the UI can fall back to "please restart daemon".
+    reload_result = await _hot_reload(state)
+
     return {
         "ok": True,
         "id": new_id,
         "label": label,
-        "restart_required": True,
-        "backup_path": str(backup),
+        "restart_required": not reload_result.get("reloaded", False),
+        "reloaded":         reload_result.get("reloaded", False),
+        "reload_error":     reload_result.get("error"),
+        "backup_path":      str(backup),
     }
 
 
@@ -441,9 +510,15 @@ async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
     log.info("setup wizard: added %s/%s @ %s slave=%d label=%s",
              data.vendor, data.kind, data.transport, data.slave_id, label)
 
+    # Hot-reload the scheduler so the new device starts polling on the
+    # next tick. Falls back to restart_required: True on reload failure.
+    reload_result = await _hot_reload(state)
+
     return {
         "ok": True,
         "label": label,
-        "restart_required": True,
-        "backup_path": str(backup),
+        "restart_required": not reload_result.get("reloaded", False),
+        "reloaded":         reload_result.get("reloaded", False),
+        "reload_error":     reload_result.get("error"),
+        "backup_path":      str(backup),
     }
