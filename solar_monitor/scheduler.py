@@ -161,6 +161,21 @@ class PollScheduler:
         latest = await self.store.get_latest()
         last_run = await self.store.last_poll_run()
         today = await self.store.today_aggregate(midnight, now)
+
+        # Count configured + open transports the same way the REST
+        # /api/poll_run does — otherwise every SSE tick handed the
+        # dashboard a poll_run with no transports field, the pill
+        # logic treated that as `configured: 0`, and a healthy
+        # appliance painted "Setup needed" until the next manual
+        # /api/poll_run fetch.
+        configured = 0
+        open_count = 0
+        if self._poller is not None:
+            configured = len(self._poller._transports)
+            for t in self._poller._transports.values():
+                client = getattr(t, "_client", None)
+                if client and getattr(client, "is_connected", False):
+                    open_count += 1
         return {
             "type": "snapshot",
             "ts": now,
@@ -168,6 +183,10 @@ class PollScheduler:
             "poll_run": {
                 "last_run": last_run,
                 "scheduler_running": self._task is not None and not self._task.done(),
+                "transports": {
+                    "configured": configured,
+                    "open":       open_count,
+                },
             },
             "today": today,
         }
