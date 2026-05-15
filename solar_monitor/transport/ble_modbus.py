@@ -26,18 +26,21 @@ log = logging.getLogger(__name__)
 
 # Default GATT UUIDs for Renogy BT-1 / BT-2 and lookalikes.
 #
-# Write goes to `ffd0/ffd1` (write-without-response). Notifications
-# vary by firmware: newer BT-2 fires them on `ffd0/ffd2` (same
-# service as the write char); older BT-1/BT-2 fires them on
-# `fff0/fff1` (a separate service). _open_once() auto-detects which
-# is actually present in the published GATT tree and subscribes to
-# the right one. If an explicit notify_char is passed via config we
-# honor it and skip detection.
+# Write goes to `ffd0/ffd1` (write-without-response). Modbus
+# responses come back on `fff0/fff1` — even though the same dongle
+# also advertises `ffd0/ffd2` as notify-capable, BT-TH-* firmware
+# delivers replies on fff1 in practice (matches what
+# cyrils/renogy-bt has used for years against real Renogy gear).
+# We keep `ffd2` as a fallback candidate for non-Renogy lookalikes
+# that wire it up differently. _open_once() walks the published
+# GATT tree and picks the first candidate that's actually present
+# with the notify property. If config pins notify_char we honor
+# it and skip detection.
 DEFAULT_WRITE_CHAR  = "0000ffd1-0000-1000-8000-00805f9b34fb"
 DEFAULT_NOTIFY_CHAR = "0000fff1-0000-1000-8000-00805f9b34fb"
 _NOTIFY_CANDIDATES  = (
-    "0000ffd2-0000-1000-8000-00805f9b34fb",
-    "0000fff1-0000-1000-8000-00805f9b34fb",
+    "0000fff1-0000-1000-8000-00805f9b34fb",   # Renogy BT-TH-*
+    "0000ffd2-0000-1000-8000-00805f9b34fb",   # generic lookalike
 )
 
 # How long to wait for the BT module to advertise during discovery.
