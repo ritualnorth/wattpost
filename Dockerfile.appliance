@@ -19,7 +19,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.source="https://github.com/ritualnorth/offgrid-monitor"
 LABEL org.opencontainers.image.description="WattPost appliance — off-grid solar monitor daemon for Renogy gear over Bluetooth"
-LABEL org.opencontainers.image.licenses="Proprietary"
+LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
 
 # System deps:
 #   - bluez + bluez-tools: BlueZ CLI (only needed for diagnostics; the

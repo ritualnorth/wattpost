@@ -498,12 +498,18 @@ async def probe(data: ProbeRequest, state: State) -> dict[str, Any]:
         for v, suggested_kind, register, count in _MODEL_PROBES:
             try:
                 frame = build_read_holding(sid, register, count)
+                # 2.5 s timeout — first probe after a fresh BLE
+                # connect often hits ~1.5 s on its first round-trip
+                # before settling. 1.2 s was clipping legit responses
+                # on cold links.
                 resp = await t.request(
-                    frame, expected_read_response_len(count), timeout=1.2
+                    frame, expected_read_response_len(count), timeout=2.5,
                 )
                 verify_response(resp, sid)
             except Exception as e:
                 err = type(e).__name__
+                log.debug("probe slave=%d vendor=%s reg=%d failed: %s",
+                          sid, v, register, e)
                 continue
 
             payload = resp[3:3 + count * 2]

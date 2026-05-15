@@ -4477,7 +4477,17 @@ async function wizScan() {
 function renderScanResults(alive) {
   const host = $("#wiz-scan-results");
   if (!alive.length) {
-    host.innerHTML = `<div class="wiz-empty">No devices answered. Check the transport is connected and the gear is powered on, then try again.</div>`;
+    host.innerHTML = `<div class="wiz-empty">
+      <p><strong>No Renogy devices responded.</strong></p>
+      <p>The BT-2 is connected to the daemon, but nothing on its RS-485 side answered Modbus. Most common causes, in order:</p>
+      <ol style="margin:.5rem 0 .5rem 1.2rem">
+        <li><strong>The BT-2 isn't plugged into a powered Renogy device.</strong> Push it firmly into the RJ45 / RJ12 comms port on a charge controller or battery; that device needs power (solar panel connected for an MPPT, or a battery being load-tested).</li>
+        <li><strong>The Renogy device is asleep.</strong> DCC chargers / some BMS units go to sleep with no solar input. Cover the panels with a cloth and shine a torch on them, or attach a small load to wake them.</li>
+        <li><strong>Non-standard slave ID.</strong> We probe 1, 16, 32–36, 48–55, 96, 97 (Renogy factory defaults). If you've reconfigured a device's slave ID via the Renogy app, you'll need to add the device manually for now.</li>
+        <li><strong>Cold BLE link.</strong> If the BT-2 only just connected, try Scan one more time — first round-trip is occasionally slow enough to time out.</li>
+      </ol>
+      <p class="settings-foot">Diagnostics tab in Settings has live daemon logs if you want to see what each probe is doing.</p>
+    </div>`;
     return;
   }
   host.innerHTML = alive.map(r => {
