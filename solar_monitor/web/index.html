@@ -57,20 +57,22 @@
   </div>
 
   <header class="app-header">
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <div class="brand" id="app-brand">
+      <!-- White-label users on Installer tier replace the SVG with
+           their own logo URL + the title with brand_name. Default
+           WattPost mark stays as-is for everyone else. JS swaps via
+           /api/branding on page load. -->
+      <svg class="logo" id="app-brand-logo-default" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
            aria-label="WattPost">
-        <!-- Roadside sign: rectangular panel on top, two legs going down. -->
         <rect x="2" y="3" width="20" height="12" rx="1"/>
-        <!-- Two legs supporting the sign -->
         <line x1="7" y1="15" x2="7" y2="22"/>
         <line x1="17" y1="15" x2="17" y2="22"/>
-        <!-- Lightning bolt centred on the panel -->
         <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
               fill="currentColor" stroke="none"/>
       </svg>
-      <span class="title">WattPost</span>
+      <img class="logo" id="app-brand-logo-custom" alt="" hidden />
+      <span class="title" id="app-brand-title">WattPost</span>
     </div>
     <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
       <span class="dot"></span>

@@ -118,6 +118,26 @@ async def update_check_now(state: State) -> dict[str, Any]:
     return updater.state.as_dict()
 
 
+@get("/api/branding")
+async def appliance_branding(state: State) -> dict[str, Any]:
+    """White-label branding for this appliance, cached from the cloud
+    on each heartbeat. Empty dict when the owner isn't on Installer
+    tier (or hasn't paired to the cloud at all) — the dashboard
+    falls back to the default WattPost brand in that case."""
+    store = state["store"]
+    try:
+        row = await store.kv_get("cloud.branding")
+    except Exception:
+        return {}
+    if row is None:
+        return {}
+    import json
+    try:
+        return json.loads(row[0])
+    except Exception:
+        return {}
+
+
 @get("/api/releases/changelog")
 async def release_changelog(state: State) -> Response:
     """Cached upstream CHANGELOG.md, refreshed by the update checker

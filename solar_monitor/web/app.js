@@ -2317,6 +2317,37 @@ function setRoute(_unused) {
 
 window.addEventListener("hashchange", () => setRoute(currentRouteName()));
 
+// White-label branding — applied once at page load. Cached via the
+// cloud heartbeat into the appliance kv table; /api/branding hands
+// it back here. When unset (Hobby/Pro accounts, or no cloud pair),
+// stays on the default WattPost mark. Re-renders on next page load
+// after a heartbeat picks up changes (no live hot-swap needed —
+// branding updates are rare).
+(async function applyBranding() {
+  let b;
+  try {
+    const r = await fetch("/api/branding");
+    if (!r.ok) return;
+    b = await r.json();
+  } catch (_) { return; }
+  if (!b || (!b.brand_name && !b.brand_logo_url)) return;
+  if (b.brand_name) {
+    const title = document.getElementById("app-brand-title");
+    if (title) title.textContent = b.brand_name;
+    document.title = b.brand_name;
+  }
+  if (b.brand_logo_url) {
+    const def = document.getElementById("app-brand-logo-default");
+    const cus = document.getElementById("app-brand-logo-custom");
+    if (def && cus) {
+      cus.src = b.brand_logo_url;
+      cus.alt = b.brand_name || "Logo";
+      cus.hidden = false;
+      def.hidden = true;
+    }
+  }
+})();
+
 // ---------- settings panel ----------
 function renderSettings() {
   if (lastRun) {
