@@ -242,6 +242,14 @@ class CloudService:
             extras["version"] = __version__
         except Exception:
             pass
+        # Tell the cloud whether we're a Pi or Docker install. Used
+        # by the dashboard to hide the cloud-triggered Update button
+        # on Docker installs (where wattpost-update isn't bundled).
+        # WATTPOST_DEPLOYMENT is set to 'docker' by docker-compose.yml;
+        # the pi-gen image leaves it unset, which the cloud reads as
+        # 'pi'.
+        import os as _os
+        extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
         try:
             alert_count = len([
                 r for r in (getattr(self.scheduler._alerts, "rules", []) or [])
