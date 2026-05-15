@@ -87,11 +87,30 @@ async def today(state: State) -> dict[str, Any]:
 
 @get("/api/poll_run")
 async def last_poll_run(state: State) -> dict[str, Any]:
+    """Header status pill data source. Includes BLE-side health so the
+    pill can flip to "no BLE" / "setup needed" without a separate
+    polling loop in the UI."""
     store: Store = state["store"]
     scheduler: PollScheduler = state["scheduler"]
+    config: Config = state["config"]
+    # Count configured vs. open transports. Anything with a live
+    # BleakClient that's_connected counts as open. Cheap; runs in
+    # the scheduler's process so no DBus calls here.
+    configured_transports = len(config.transports)
+    open_transports = 0
+    for tcfg in config.transports:
+        tid = tcfg.get("id")
+        t = scheduler.get_transport(tid) if tid else None
+        client = getattr(t, "_client", None) if t else None
+        if client and getattr(client, "is_connected", False):
+            open_transports += 1
     return {
-        "last_run": await store.last_poll_run(),
+        "last_run":          await store.last_poll_run(),
         "scheduler_running": scheduler._task is not None and not scheduler._task.done(),
+        "transports": {
+            "configured": configured_transports,
+            "open":       open_transports,
+        },
     }
 
 
