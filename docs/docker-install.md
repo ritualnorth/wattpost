@@ -95,6 +95,51 @@ image: ghcr.io/ritualnorth/wattpost-appliance:sha-abc1234
 - `./wattpost-data:/var/lib/wattpost` — SQLite database (history,
   rollups). Back this up.
 
+> ⚠️ **You MUST mount both directories**, either as bind mounts (the
+> example uses `./wattpost-config` + `./wattpost-data` in your
+> compose project folder) or as named Docker volumes. If you skip
+> them, Docker gives the container an **anonymous volume** that is
+> created fresh every time the container is recreated — your history
+> and config will silently reset to zero on the next `docker compose
+> pull && up -d`. The `docker-compose.example.yml` we publish always
+> mounts them; don't strip those lines out.
+
+## Updates retain your data
+
+When a new release ships:
+
+```bash
+docker compose pull         # fetches the new image
+docker compose up -d        # recreates the container with the new image
+```
+
+The container is replaced, but `./wattpost-config` and
+`./wattpost-data` are host directories — they're untouched.
+
+- **Config (`config.yaml`)** stays exactly as you left it. Devices,
+  transports, alerts, integrations — all preserved.
+- **History (SQLite DB)** is preserved. Raw samples, 1-minute /
+  1-hour / 1-day rollups, the cached PV forecast — all there.
+- **Schema migrations**, when we ship them, run automatically on
+  the first boot of the new image (`PRAGMA user_version` tracks
+  what's been applied — the daemon logs every migration at INFO so
+  you can audit it). Migrations are forward-only and have to be
+  additive or in-place; nothing destructive happens to your data.
+
+## Backups
+
+For belt-and-braces, a periodic copy of `./wattpost-data` is the
+whole backup — it's a single SQLite file. Restore is "stop the
+container, replace the file, start the container."
+
+```bash
+# nightly cron, on the host
+sqlite3 ./wattpost-data/solar-monitor.db ".backup '/path/to/backup-$(date +%F).db'"
+```
+
+SQLite's online backup API is hot — no need to stop the daemon
+while it runs.
+
 ## Differences from the SD-card install
 
 The Docker image:
