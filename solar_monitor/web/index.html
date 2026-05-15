@@ -15,7 +15,15 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        // updateViaCache: 'none' tells the browser to bypass the
+        // HTTP cache when fetching sw.js itself. Without it, iOS
+        // Safari can hold the old SW for hours after a deploy,
+        // serving the old app.js even though the container's been
+        // updated. This makes SW updates propagate within ~1
+        // page load instead of "whenever Safari feels like it".
+        navigator.serviceWorker.register('/sw.js', {
+          updateViaCache: 'none',
+        }).catch(() => {});
       });
     }
   </script>
