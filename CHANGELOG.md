@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.5] — 2026-05-15
+
+### Changed
+- **Setup wizard BLE scan now flags "recently visible but
+  missing" dongles** — when a BT-2 was seen in the last 15 min
+  but doesn't respond to the active scan, the wizard surfaces
+  it with a likely-cause hint (most commonly: the Renogy mobile
+  app is holding the connection). Replaces the previous silent
+  empty-list outcome.
+- **Docker installs no longer show Tailscale UI rows.**
+  Tailscale doesn't run inside the container, so the rows were
+  dead toggles. Pi installs are unchanged.
+
+### Fixed
+- **iOS Safari text inflation** on `/docs` made body text ~2×
+  nav text. Pinned with `text-size-adjust: 100%`.
+- **Docs grid overflowed viewport** on narrow mobile screens —
+  wide tables now horizontally scroll, grid cells respect
+  viewport width.
+
 ## [0.0.4] — 2026-05-15
 
 ### Added
