@@ -22,6 +22,7 @@
 
     { "slug": "backup",          "title": "Backup & disaster recovery", "section": "Operations" },
     { "slug": "troubleshooting", "title": "Troubleshooting",            "section": "Operations" },
-    { "slug": "faq",             "title": "FAQ",                        "section": "Operations" }
+    { "slug": "faq",             "title": "FAQ",                        "section": "Operations" },
+    { "slug": "license",         "title": "License",                    "section": "Operations" }
   ]
 }
