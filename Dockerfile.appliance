@@ -1,0 +1,77 @@
+# WattPost appliance — Docker image.
+#
+# A docker-distributed alternative to the SD-card install. Same Python
+# daemon (solar_monitor) running under the same `solar-monitor serve`
+# entry point — only the deployment surface differs.
+#
+# BLE passthrough: Bluetooth on Linux Docker requires either
+#   (a) network_mode: host + access to /var/run/dbus (recommended)
+# or
+#   (b) --privileged (last resort)
+# macOS / Windows / WSL2 can't pass host BLE through, so this image is
+# Linux-host only for the appliance use case. See docker-compose.example.yml
+# at the repo root.
+#
+# Updates: `docker compose pull && docker compose up -d`. No source-
+# tarball swap, no Update-now button — image replacement is the update.
+
+FROM python:3.12-slim
+
+LABEL org.opencontainers.image.source="https://github.com/ritualnorth/offgrid-monitor"
+LABEL org.opencontainers.image.description="WattPost appliance — off-grid solar monitor daemon for Renogy gear over Bluetooth"
+LABEL org.opencontainers.image.licenses="Proprietary"
+
+# System deps:
+#   - bluez + bluez-tools: BlueZ CLI (only needed for diagnostics; the
+#     daemon talks to BLE via bleak which uses host DBus when running
+#     with network_mode: host).
+#   - libffi8: argon2-cffi runtime.
+#   - ca-certificates: HTTPS to alert webhooks / Solcast / Open-Meteo.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        bluez bluez-tools libffi8 ca-certificates dbus \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Two-step install for dep-layer cache:
+#   1. Copy pyproject.toml + a stub package so pip resolves deps to a
+#      cached layer.
+#   2. Copy the real source on top so the console-script entry-point
+#      can actually find solar_monitor at import time.
+COPY pyproject.toml /app/
+RUN mkdir -p /app/solar_monitor \
+ && touch /app/solar_monitor/__init__.py \
+ && pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir . \
+ && rm -rf /app/solar_monitor
+
+COPY solar_monitor /app/solar_monitor
+COPY packaging    /app/packaging
+COPY docs         /docs
+
+# Belt+braces: expose /app on PYTHONPATH so both the installed entry
+# point and `python -m solar_monitor` resolve.
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Mountpoints the operator should bind to host volumes so config + DB
+# survive `docker compose pull && up -d`.
+VOLUME ["/etc/wattpost", "/var/lib/wattpost"]
+
+# Default config path mirrors the Pi install layout so docs +
+# wattpost-config TUI behave identically.
+ENV WATTPOST_CONFIG=/etc/wattpost/config.yaml
+ENV WATTPOST_DB_PATH=/var/lib/wattpost/solar-monitor.db
+
+# Web UI port. Host-network mode means this is a hint, not a binding.
+EXPOSE 8000
+
+# First-boot bootstrap: if /etc/wattpost/config.yaml doesn't exist on
+# the mounted volume, drop a minimal default in so the daemon starts
+# without errors and the user can edit through Settings → Devices.
+COPY packaging/docker/entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
+
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+CMD ["solar-monitor", "serve", "--config", "/etc/wattpost/config.yaml", "--port", "8000"]
