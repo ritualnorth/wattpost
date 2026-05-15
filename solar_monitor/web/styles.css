@@ -2195,6 +2195,28 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .wiz-ble-status.wiz-ble-bad  .wiz-ble-dot { background: #f85149; }
 .wiz-ble-warn-text { color: #d29922; }
 .wiz-ble-status code { background: transparent; padding: 0; font-size: .85em; }
+
+/* "Find my dongle" result rows. Each is a flex card with the device
+ * name + MAC on the left and a "Use this" button on the right. */
+.wiz-result-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+  padding: .65rem .8rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2);
+  margin-top: .55rem;
+}
+.wiz-result-info { flex: 1 1 auto; min-width: 0; }
+.wiz-vendor-hint {
+  display: inline-block;
+  margin-left: .4rem;
+  padding: 1px 7px;
+  font-size: .72rem;
+  border-radius: 999px;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.32);
+}
 .wiz-step-head {
   display: inline-flex; align-items: center; gap: 0.55rem;
   font-weight: 600; color: var(--text);

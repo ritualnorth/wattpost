@@ -4393,9 +4393,18 @@ async function wizLoadTransports() {
     if (!transports.length) {
       host.innerHTML = `<div class="wiz-empty">
         <p><strong>No BLE transport configured.</strong></p>
-        <p>A "transport" is one BT-2 dongle (or similar) the daemon connects to. Until that's set up, scanning for devices can't run.</p>
-        <p class="settings-foot">A one-click "Find my dongle" wizard is coming. For now, add a transport entry to <code>config.yaml</code> and restart the daemon — see <a href="/web/docs/devices.md" target="_blank" rel="noopener">Adding devices</a> for the exact YAML.</p>
+        <p>A "transport" is one BT-2 dongle (or similar) the daemon connects to. Click below to scan for nearby Bluetooth devices and pick yours — no config files.</p>
+        <div class="wiz-controls">
+          <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <span>Find my dongle</span>
+          </button>
+          <span id="wiz-find-status" class="wiz-status"></span>
+        </div>
+        <div id="wiz-find-results" class="wiz-results"></div>
       </div>`;
+      // Click handler — scan, list results, attach per-row use-this binds.
+      document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
       return;
     }
     host.innerHTML = transports.map(t => `
@@ -4553,6 +4562,101 @@ $("#wiz-scan-btn").addEventListener("click", wizScan);
 function onEnterSetup() {
   wizLoadTransports();
   wizCheckBleStatus();
+}
+
+// "Find my dongle" — scans BLE for ~8 s and surfaces every advertising
+// device the host can see. User picks theirs by name pattern (BT-2
+// dongles advertise as BT-TH-…) or by the MAC printed on the dongle.
+async function wizFindDongle() {
+  const btn   = document.getElementById("wiz-find-dongle-btn");
+  const stat  = document.getElementById("wiz-find-status");
+  const list  = document.getElementById("wiz-find-results");
+  if (!btn) return;
+  btn.disabled = true;
+  stat.textContent = "Scanning Bluetooth for 8 seconds…";
+  list.innerHTML = "";
+  let data;
+  try {
+    const r = await fetch("/api/setup/ble_scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seconds: 8 }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    data = await r.json();
+  } catch (e) {
+    stat.textContent = "";
+    list.innerHTML = `<div class="wiz-empty">${escHtml(e.message || String(e))}</div>`;
+    btn.disabled = false;
+    return;
+  }
+  stat.textContent = `Found ${data.devices?.length || 0} device(s) in ${data.scanned_seconds || 8} s`;
+  btn.disabled = false;
+
+  if (!data.devices?.length) {
+    list.innerHTML = `<div class="wiz-empty">Nothing visible. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
+    return;
+  }
+  // Build a row per discovered device. Renogy hint stays on top
+  // (sorted server-side); each row offers "Use this".
+  list.innerHTML = data.devices.map(d => {
+    const nameStr = d.name
+      ? `<strong>${escHtml(d.name)}</strong>`
+      : `<em class="settings-foot">(no name)</em>`;
+    const rssi = d.rssi != null ? `${d.rssi} dBm` : "—";
+    const hint = (d.name || "").toLowerCase().startsWith("bt-th")
+      ? `<span class="wiz-vendor-hint">looks like a Renogy BT-2</span>` : "";
+    return `
+      <div class="wiz-result-row">
+        <div class="wiz-result-info">
+          ${nameStr} ${hint}
+          <div class="settings-foot">${escHtml(d.address)} · ${rssi}</div>
+        </div>
+        <button class="btn-action btn-action--primary"
+                data-use-mac="${escHtml(d.address)}"
+                data-use-name="${escHtml(d.name || '')}">
+          Use this
+        </button>
+      </div>`;
+  }).join("");
+  list.querySelectorAll("[data-use-mac]").forEach(b => {
+    b.addEventListener("click", () => wizAddTransportFromMac(b.dataset.useMac, b.dataset.useName));
+  });
+}
+
+async function wizAddTransportFromMac(mac, name) {
+  const stat = document.getElementById("wiz-find-status");
+  stat.textContent = `Adding ${mac}…`;
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address: mac,
+        label: name || null,
+        type: "ble_modbus",
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    stat.textContent = "";
+    alert("Couldn't add transport: " + (e.message || String(e)));
+    return;
+  }
+  stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
+  // Refresh the transports list so the new one shows up — but the
+  // running daemon hasn't loaded it yet, so its open-state will be
+  // false until restart. The "restart required" message above is the
+  // honest signal.
+  await wizLoadTransports();
 }
 
 // Surface BLE adapter status at the top of the wizard. Cheap diagnostic
