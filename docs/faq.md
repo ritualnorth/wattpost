@@ -22,7 +22,11 @@ Email [support@wattpost.io](mailto:support@wattpost.io) with the gear name + pro
 
 ## How do I get updates?
 
-The appliance has an **Update now** button in Settings → About. It pulls the latest source tarball from `releases.wattpost.io`, SHA256-verifies, atomic-swaps into place, restarts the daemon. No SSH needed. See [Updates](/docs/updates).
+Depends on your install path. SD-card install: **Settings → About → Update now** pulls the latest source tarball, SHA256-verifies, swaps into place, restarts. Docker install: `docker compose pull && docker compose up -d` from the host. See [Updates](/docs/updates).
+
+## Can I run WattPost in Docker instead of on a Pi?
+
+Yes. On a Linux host with BLE (laptop, mini PC, Synology, Unraid, etc), `docker compose up -d` is the install — full instructions at [Run in Docker](/docs/docker-install). Same daemon, same dashboard, same scanner; only differences are how you install and how you take updates. macOS / Windows / WSL2 can't pass host BLE through Docker so they're SD-card only.
 
 ## Is the code open source?
 

@@ -7,11 +7,11 @@ survive even when the hardware doesn't.
 
 | Path | What | Replaceable? |
 |---|---|---|
-| `/opt/wattpost/venv` | Python venv | Yes — re-install fetches it. |
+| `/opt/wattpost/venv` (Pi) / image (Docker) | Python runtime | Yes — re-install / re-pull fetches it. |
 | `/etc/wattpost/config.yaml` | Your devices + alerts + transports | **Back this up.** |
 | `/var/lib/wattpost/solar-monitor.db` | All historical telemetry | Back this up if it matters. |
 
-## Manual backup (today)
+## Manual backup — SD-card install
 
 SSH into the Pi:
 
@@ -23,6 +23,20 @@ sudo tar czf wattpost-backup-$(date +%F).tar.gz \
 
 Copy that file off the Pi. Restore is the reverse — `tar xzf` into
 the new SD card after installing WattPost, then restart the daemon.
+
+## Manual backup — Docker install
+
+Both the config and database live in the volumes you bind-mounted
+into the container (`./wattpost-config/` and `./wattpost-data/` if
+you used the example compose). To back up:
+
+```bash
+cd ~/wattpost
+tar czf wattpost-backup-$(date +%F).tar.gz wattpost-config/ wattpost-data/
+```
+
+Restore: copy that file to the new host, untar in place, `docker
+compose up -d`.
 
 ## Cloud backup (coming with the cloud tier)
 
@@ -42,5 +56,5 @@ No more re-pairing four batteries by hand.
 
 Every mutation through Settings (devices, alerts, transports) takes
 a `.bak` copy of `config.yaml` before writing. If something goes
-wrong you'll find `/etc/wattpost/config.yaml.bak` next to the live
-config — copy back to restore.
+wrong you'll find `config.yaml.bak` next to the live config — copy
+back to restore.

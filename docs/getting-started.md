@@ -1,34 +1,77 @@
 # Quick start
 
-WattPost is a Raspberry Pi appliance that polls your off-grid solar gear over Bluetooth and serves a live dashboard. Five minutes from flash to first SoC reading.
+WattPost polls off-grid solar gear over Bluetooth and serves a local
+dashboard. Two install paths — pick whichever fits.
 
-## What you need
+| | SD-card image (Pi) | Docker container (Linux box) |
+|---|---|---|
+| Hardware | Raspberry Pi 4 / 5 | Any Linux host with BLE |
+| Install | Flash + boot | `docker compose up -d` |
+| Updates | "Update now" in Settings | `docker compose pull` |
+| Best for | dedicated appliance | homelab / existing Linux box |
 
-- A Raspberry Pi 4 or 5 (any RAM size — even the 1 GB Pi 4 is plenty).
+The dashboard, scanner, vendor drivers, alerts, cloud-pairing — all
+identical between the two. The only differences are how you install
+and how you update.
+
+## Path A — SD card on a Raspberry Pi
+
+What you need:
+
+- A Raspberry Pi 4 or 5 (any RAM size — the 1 GB Pi 4 works fine).
 - An 8 GB+ microSD card.
-- A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) (Victron and JK BMS are on the roadmap, not in this release).
-- A USB-C power supply (Pi 4 / 5 official is ideal).
+- A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) plugged
+  into your charge controller / battery.
+- A USB-C power supply.
 
-## Flash the SD card
+Then:
 
 1. Install **Raspberry Pi Imager** from [raspberrypi.com/software](https://www.raspberrypi.com/software/).
 2. [Download the WattPost image](/download) — about 600 MB.
-3. In Imager: **Choose OS → Use custom** → select the `.img.xz` you just downloaded.
+3. In Imager: **Choose OS → Use custom** → select the `.img.xz`.
 4. **Choose Storage** → pick the SD card.
-5. Hit **Write**. Takes 3–5 minutes depending on card speed.
+5. Hit **Write**. ~3–5 minutes.
+6. Slot the SD card into the Pi, plug in your BT dongle, power on.
+7. After ~60 seconds, open `http://wattpost.local` from any browser
+   on the same network. If `.local` doesn't resolve, look up the
+   Pi's IP and use that.
 
-## First boot
+## Path B — Docker on an existing Linux host
 
-1. Slot the SD card into the Pi, plug in your BT dongle, power on.
-2. Wait ~60 seconds for first boot.
-3. Open `http://wattpost.local` from any browser on the same network.
-4. If your router doesn't resolve `wattpost.local`, look up the Pi's IP and use that.
+What you need:
 
-You should see the **WattPost dashboard** with a state-of-charge donut, power flow visualisation, and an empty Devices list waiting for you to pair gear.
+- A Linux box with Docker + `docker compose` and a working Bluetooth
+  adapter or USB BLE dongle (the host's `bluetoothctl list` should
+  show at least one controller).
+- A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) plugged
+  into your charge controller / battery.
+
+Then follow [Run in Docker](/docs/docker-install) — one compose file,
+two volumes, one `docker compose up -d`. Open
+`http://<this-host-ip>:8000` once it's up.
+
+Both paths land in the same place: the WattPost dashboard, ready to
+pair gear.
 
 ## Pair your first device
 
-Settings → **Devices & setup** → **Pair a new device** scans for Renogy gear in range. Tap the one you want and confirm. The dashboard starts filling in within ~10 seconds of the first poll.
+In the dashboard:
+
+1. **Settings → Setup**
+2. Confirm the **Bluetooth ready** banner at the top is green —
+   that's the daemon seeing your BLE adapter.
+3. Click **Find my dongle** in step 1. The wizard scans for
+   advertising BLE devices for ~8 seconds and lists them. Your
+   Renogy BT-2 advertises as `BT-TH-XXXXXXXX`.
+4. Click **Use this** on your dongle's row. The wizard writes the
+   transport entry and asks you to restart the daemon (or container).
+5. After restart, step 2 (**Scan for devices**) is unlocked. Hit
+   **Scan**; the wizard probes the standard Renogy slave IDs over
+   the BT-2 link. Identified devices appear with **Add** buttons.
+6. Add each one. Restart the daemon once more — live data starts
+   flowing on the dashboard within ~10 s of the first poll.
+
+No config files to hand-edit.
 
 ## What's next?
 
