@@ -95,6 +95,10 @@ const KIND_ICON = {
   inverter: "bolt",
   dcdc_charger: "alternator",
   shunt: "battery",
+  // Synthetic aggregate — re-uses the battery glyph but the label
+  // (and a CSS hook in styles.css, .dev-card.kind-bank) sets it
+  // apart so users read it as "the whole bank" not "another pack".
+  bank: "battery",
 };
 
 // Status pill icons by state
@@ -1478,10 +1482,16 @@ function efficiencyHeadline(data) {
 function renderDeviceCards() {
   const host = $("#device-cards");
   host.innerHTML = "";
-  // Don't show the synthetic "bank" pseudo-device on the Devices tab —
-  // it's an aggregate, not real hardware. It still appears in the History
-  // dropdown so users can chart bank.soc_pct / .power_w / etc.
-  const visible = devices.filter(d => d.kind !== "bank");
+  // Bank pinned to the top — it's the headline "what's actually in
+  // my battery bank right now" reading, so users expect to see it
+  // alongside the per-pack cards even though it's a synthetic
+  // aggregate, not real hardware. Sort: bank first, then everything
+  // else in the order the API returned (which matches config.yaml).
+  const visible = [...devices].sort((a, b) => {
+    if (a.kind === "bank") return -1;
+    if (b.kind === "bank") return 1;
+    return 0;
+  });
   for (const dev of visible) {
     const l = dev.latest || {};
     const card = document.createElement("a");
