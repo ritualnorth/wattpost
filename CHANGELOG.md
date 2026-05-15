@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.7] — 2026-05-15
+
+### Fixed
+- **Settings → About uptime now reports the daemon's uptime**,
+  not the host's. The previous `/proc/uptime` read leaked the
+  host machine's uptime through Docker — a freshly-restarted
+  container could show "3d 23h" if that's how long the laptop
+  had been booted.
+- **"Updates: docker compose pull..." row only shows when
+  there's actually an update pending.** Used to render
+  permanently on every Docker install, even with nothing to
+  apply — read as a nag.
+- **Fresh installs land in the setup wizard automatically.**
+  First-time users opening the dashboard with zero transports
+  configured used to see an empty dashboard with a "Setup
+  needed" pill top-right and no signpost. They now get
+  redirected straight to `#/setup` on first paint.
+
 ## [0.0.6] — 2026-05-15
 
 ### Added
