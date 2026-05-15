@@ -20,7 +20,7 @@ from typing import Any
 
 import msgspec
 import yaml
-from litestar import get, post
+from litestar import delete, get, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException, NotFoundException
 
@@ -367,6 +367,93 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
             "open": bool(client and getattr(client, "is_connected", False)),
         })
     return {"transports": out}
+
+
+@delete("/api/setup/devices/{slave_id:int}", status_code=200)
+async def delete_device(
+    slave_id: int, state: State, transport: str = "",
+) -> dict[str, Any]:
+    """Remove a device from config.yaml + hot-reload so polling stops
+    immediately. `transport` query param is required because the same
+    slave_id can exist on different transports."""
+    if not transport:
+        raise HTTPException(
+            status_code=400,
+            detail="transport= query param required (slave_id alone isn't unique)",
+        )
+    config_path: str = state.get("config_path", "config.yaml")
+    path = Path(config_path)
+    raw = yaml.safe_load(path.read_text()) or {}
+    devices = raw.get("devices") or []
+    new_devices = [d for d in devices
+                   if not (d.get("transport") == transport and int(d.get("slave_id", -1)) == slave_id)]
+    if len(new_devices) == len(devices):
+        raise NotFoundException(
+            f"no device with slave_id={slave_id} on transport {transport!r}"
+        )
+    raw["devices"] = new_devices
+
+    backup = path.with_suffix(path.suffix + ".bak")
+    shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    log.info("setup wizard: removed device slave_id=%d on transport=%s",
+             slave_id, transport)
+
+    reload_result = await _hot_reload(state)
+    return {
+        "ok": True,
+        "removed":          1,
+        "restart_required": not reload_result.get("reloaded", False),
+        "reloaded":         reload_result.get("reloaded", False),
+        "reload_error":     reload_result.get("error"),
+        "backup_path":      str(backup),
+    }
+
+
+@delete("/api/setup/transports/{transport_id:str}", status_code=200)
+async def delete_setup_transport(
+    transport_id: str, state: State,
+) -> dict[str, Any]:
+    """Remove a transport AND every device that referenced it, then
+    hot-reload so the BLE connection closes immediately. Cascade is
+    deliberate — a transport with orphan devices wouldn't poll
+    anyway, and leaving them in the yaml is confusing."""
+    config_path: str = state.get("config_path", "config.yaml")
+    path = Path(config_path)
+    raw = yaml.safe_load(path.read_text()) or {}
+
+    transports = raw.get("transports") or []
+    keep_t = [t for t in transports if t.get("id") != transport_id]
+    if len(keep_t) == len(transports):
+        raise NotFoundException(f"no transport with id {transport_id!r}")
+
+    devices = raw.get("devices") or []
+    keep_d  = [d for d in devices if d.get("transport") != transport_id]
+    dropped = len(devices) - len(keep_d)
+
+    raw["transports"] = keep_t
+    raw["devices"]    = keep_d
+
+    backup = path.with_suffix(path.suffix + ".bak")
+    shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    log.info("setup wizard: removed transport %s (also dropped %d child devices)",
+             transport_id, dropped)
+
+    reload_result = await _hot_reload(state)
+    return {
+        "ok": True,
+        "transport_id":     transport_id,
+        "devices_removed":  dropped,
+        "restart_required": not reload_result.get("reloaded", False),
+        "reloaded":         reload_result.get("reloaded", False),
+        "reload_error":     reload_result.get("error"),
+        "backup_path":      str(backup),
+    }
 
 
 @get("/api/setup/known_devices")
