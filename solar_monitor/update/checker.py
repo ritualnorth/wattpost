@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS = 24 * 3600   # 1 day
 DEFAULT_MANIFEST_URL   = "https://app.wattpost.io/api/releases/latest"
+DEFAULT_CHANGELOG_URL  = "https://releases.wattpost.io/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 
 
@@ -38,6 +39,13 @@ class UpdateState:
     release_url:        str | None = None
     last_checked_at:    int | None = None     # unix seconds
     last_error:         str | None = None     # last fetch failure if any
+    # Cached upstream CHANGELOG.md text — refreshed each successful
+    # manifest poll. Lets the dashboard show "what's in 0.0.3" while
+    # the appliance is still on 0.0.2 (bundled docs only know the
+    # versions <= the running release). Not included in as_dict() —
+    # served separately via /api/releases/changelog because it can be
+    # several KB and the update-state endpoint is polled frequently.
+    release_notes_md:   str | None = None
 
     @property
     def has_update(self) -> bool:
@@ -73,8 +81,13 @@ def _semver_tuple(v: str) -> tuple:
 
 
 class UpdateChecker:
-    def __init__(self, manifest_url: str | None = None) -> None:
-        self.manifest_url = manifest_url or DEFAULT_MANIFEST_URL
+    def __init__(
+        self,
+        manifest_url: str | None = None,
+        changelog_url: str | None = None,
+    ) -> None:
+        self.manifest_url  = manifest_url  or DEFAULT_MANIFEST_URL
+        self.changelog_url = changelog_url or DEFAULT_CHANGELOG_URL
         self.state = UpdateState()
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -96,22 +109,35 @@ class UpdateChecker:
             self._task = None
 
     async def check_once(self) -> None:
-        """Fetch the manifest + update state. Exposed for the
-        "check now" button in Settings UI so the user doesn't have
-        to wait 24h."""
+        """Fetch the manifest + cache the upstream CHANGELOG. Exposed
+        for the "check now" button in Settings UI so the user doesn't
+        have to wait 24h."""
         try:
             async with httpx.AsyncClient(
                 timeout=15.0, follow_redirects=True,
                 headers={"User-Agent": USER_AGENT},
             ) as client:
                 r = await client.get(self.manifest_url)
-            r.raise_for_status()
-            body = r.json()
-            self.state.latest_version     = body.get("version")
-            self.state.latest_released_at = body.get("released_at")
-            self.state.release_url        = body.get("release_url")
-            self.state.last_checked_at    = int(time.time())
-            self.state.last_error         = None
+                r.raise_for_status()
+                body = r.json()
+                self.state.latest_version     = body.get("version")
+                self.state.latest_released_at = body.get("released_at")
+                self.state.release_url        = body.get("release_url")
+                self.state.last_checked_at    = int(time.time())
+                self.state.last_error         = None
+
+                # Refresh cached release notes so the dashboard can
+                # preview a not-yet-installed version's changelog
+                # entry. Independent failure path — the manifest poll
+                # is the source of truth for has_update, the
+                # changelog is best-effort decoration.
+                try:
+                    cl = await client.get(self.changelog_url)
+                    cl.raise_for_status()
+                    self.state.release_notes_md = cl.text
+                except Exception as e:
+                    log.info("changelog fetch failed (keeping prior "
+                             "cache + local fallback): %s", e)
         except Exception as e:
             self.state.last_checked_at = int(time.time())
             self.state.last_error      = str(e)[:200]

@@ -207,6 +207,11 @@ jobs:
           JSON
           retry scp "${SSH_COMMON[@]}" /tmp/manifest.json \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/manifest.json"
+          # Also publish CHANGELOG.md at the releases root — the
+          # appliance update checker fetches it so the dashboard can
+          # preview release notes before the user installs.
+          retry scp "${SSH_COMMON[@]}" CHANGELOG.md \
+              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/CHANGELOG.md"
           # Repoint latest.img.xz → newest dated file, by mtime.
           retry ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" "
             set -euo pipefail

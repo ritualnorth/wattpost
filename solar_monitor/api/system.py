@@ -21,6 +21,7 @@ from typing import Any
 from litestar import get, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
+from litestar.response import Response
 
 log = logging.getLogger(__name__)
 
@@ -115,6 +116,23 @@ async def update_check_now(state: State) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="update checker not running")
     await updater.check_once()
     return updater.state.as_dict()
+
+
+@get("/api/releases/changelog")
+async def release_changelog(state: State) -> Response:
+    """Cached upstream CHANGELOG.md, refreshed by the update checker
+    on every manifest poll. Lets the dashboard preview release notes
+    for a not-yet-installed version — bundled docs only know about
+    versions <= the running release. Returns 204 if the cache is
+    empty (e.g. first-boot before the initial manifest poll); JS
+    falls back to the bundled /web/docs/release-notes.md."""
+    scheduler = state["scheduler"]
+    updater = getattr(scheduler, "_updater", None)
+    if updater is None or not updater.state.release_notes_md:
+        return Response(content="", media_type="text/markdown",
+                        status_code=204)
+    return Response(content=updater.state.release_notes_md,
+                    media_type="text/markdown")
 
 
 @post("/api/system/update/apply", status_code=202)

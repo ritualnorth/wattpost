@@ -61,6 +61,7 @@ from .exporters_admin import (
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
+    release_changelog,
 )
 
 
@@ -680,6 +681,7 @@ def build_app(
             update_check_now,
             update_apply,
             update_log,
+            release_changelog,
             tailscale_status,
             tailscale_up,
             tailscale_down,
