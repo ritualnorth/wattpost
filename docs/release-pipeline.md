@@ -100,6 +100,52 @@ The pi-gen workflow takes the longest, so the rule of thumb is:
 tag → take a 90 min break → check it landed. The CI emails on
 failure.
 
+### Recovering when pi-gen's publish step fails
+
+Pi-gen successfully BUILDS the image then SCPs it to
+`releases.wattpost.io` as the final step. The Azure→Contabo SSH
+path occasionally route-flaps for several minutes; the workflow
+retries with exponential backoff (~25 min total), but a long
+outage can still bail. When that happens the image lives **only**
+on the GH run as an artefact + attached to a GH Release —
+customers still see the OLD image on the /download page.
+
+Recovery from a developer laptop with VPS SSH access:
+
+```bash
+# 1. Find the failing run id (most recent pi-gen)
+gh -R ritualnorth/offgrid-monitor run list --workflow=build-image.yml --limit 3
+
+# 2. Download the artefact + verify
+cd /tmp && rm -rf wp-img-tmp && mkdir wp-img-tmp && cd wp-img-tmp
+gh -R ritualnorth/offgrid-monitor run download <RUN_ID>
+cd wattpost-image
+sha256sum -c image_*.img.xz.sha256
+
+# 3. scp it to the VPS + repoint the symlink + rewrite manifest
+IMG="image_YYYY-MM-DD-wattpost-lite.img.xz"
+SHA=$(awk '{print $1}' "${IMG}.sha256")
+SIZE=$(stat -c %s "${IMG}")
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+scp "${IMG}" "${IMG}.sha256" root@<vps>:/srv/wattpost-releases/img/
+ssh root@<vps> "cd /srv/wattpost-releases/img; \
+  ln -sfn '${IMG}' latest.img.xz; \
+  ln -sfn '${IMG}.sha256' latest.img.xz.sha256; \
+  jq -n --arg v 'X.Y.Z' --arg fn '${IMG}' --arg sha '${SHA}' \
+    --arg ts '${NOW}' --argjson sz ${SIZE} \
+    '{version:\$v, released_at:\$ts, image_filename:\$fn, \
+      image_url:\"https://releases.wattpost.io/img/latest.img.xz\", \
+      sha256:\$sha, sha256_url:\"https://releases.wattpost.io/img/latest.img.xz.sha256\", \
+      size_bytes:\$sz, release_url:\"/docs/release-notes\", \
+      source_url:\"https://releases.wattpost.io/source/latest.tar.gz\", \
+      source_sha256_url:\"https://releases.wattpost.io/source/latest.tar.gz.sha256\"}' \
+    > manifest.json"
+```
+
+After this, `curl -sI https://releases.wattpost.io/img/latest.img.xz`
+should 200 and the /download page reflects the new build within a
+minute or two.
+
 ### Customer-side update paths
 
 | Install type | Channel | Command / action | Notes |
