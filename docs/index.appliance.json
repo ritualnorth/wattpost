@@ -11,6 +11,7 @@
     { "slug": "history",         "title": "History & CSV export",     "section": "Features" },
     { "slug": "kiosk",           "title": "Kiosk mode",               "section": "Features" },
     { "slug": "updates",         "title": "Updates",                  "section": "Features" },
+    { "slug": "release-notes",   "title": "What's new",               "section": "Features" },
 
     { "slug": "forecast",        "title": "PV forecast (Solcast)",          "section": "Integrations" },
     { "slug": "weather",         "title": "Current weather (Open-Meteo)",   "section": "Integrations" },

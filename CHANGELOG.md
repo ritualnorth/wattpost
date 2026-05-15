@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.3] — 2026-05-15
+
+### Added
+- BLE transport auto-detects the notify characteristic per Renogy
+  BT-1 / BT-2 firmware revision (`ffd2` on newer modules, `fff1`
+  on older ones). Setup wizard's Scan step now works against both
+  generations without manual config.
+- About → Update surfaces the new version number and a "Release
+  notes ↗" link to `/docs/release-notes` whenever an update is
+  available, so users can see what changed before deciding to
+  apply.
+
+### Changed
+- Settings → About: Docker installs no longer show an in-app
+  "Update now" button — they get a persistent hint to run
+  `docker compose pull && docker compose up -d` on the host
+  (matches Immich / Pi-hole / Vaultwarden conventions). Pi
+  installs are unchanged.
+
+## [0.0.2] — 2026-05-15
+
 ### Added
 - WattPost cloud (wattpost.io) — opt-in. Pair the appliance to a
   cloud account from Settings → Integrations → WattPost cloud,
