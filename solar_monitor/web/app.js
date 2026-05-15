@@ -407,16 +407,24 @@ function stopPollingFallback() {
 }
 
 function renderStatus(run) {
+  // Daemon-side issues first — if the scheduler's not running or the
+  // last_run is stale, nothing else matters.
+  if (!run.scheduler_running) { setStatus("err", "Offline"); return; }
+  const t = run.transports || {};
+  // Setup-state checks. Order matters: "set up the wizard" wins over
+  // "no devices yet" so a first-boot user is pointed at the right
+  // next action.
+  if ((t.configured || 0) === 0) { setStatus("warn", "Setup needed"); return; }
+  if ((t.open || 0) === 0)       { setStatus("warn", "BLE not connected"); return; }
+  // Now the polling-health view. last_run might be null on a fresh
+  // daemon that hasn't completed its first poll yet.
   if (!run.last_run) { setStatus("warn", "Connecting…"); return; }
   const lr = run.last_run;
   const ageS = Math.floor(Date.now() / 1000) - lr.ts;
-  // Detailed metrics live in Settings. Header pill is just the answer
-  // to "am I OK?" — one word + (optional) error count.
-  if (!run.scheduler_running)        setStatus("err",  "Offline");
-  else if (ageS > 300)                setStatus("err",  "Stale");
-  else if (lr.errors_count > 0)       setStatus("warn", `${lr.errors_count} error${lr.errors_count===1?"":"s"}`);
-  else if (ageS > 120)                setStatus("warn", "Comms slow");
-  else                                 setStatus("ok",   "Healthy");
+  if      (ageS > 300)            setStatus("err",  "Stale");
+  else if (lr.errors_count > 0)   setStatus("warn", `${lr.errors_count} error${lr.errors_count===1?"":"s"}`);
+  else if (ageS > 120)            setStatus("warn", "Comms slow");
+  else                            setStatus("ok",   "Healthy");
 }
 
 // ---------- BANK AGGREGATE ----------

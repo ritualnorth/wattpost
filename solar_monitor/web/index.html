@@ -86,6 +86,8 @@
       </div>
       <ul class="status-legend-list">
         <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No BLE transport configured yet — visit Settings → Setup and click "Find my dongle".</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Transport is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
         <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes — usually a brief BLE wobble; clears on the next cycle.</li>
         <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
         <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes — check Bluetooth power / range to the dongle.</li>
@@ -673,6 +675,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=87"></script>
+  <script src="/web/app.js?v=88"></script>
 </body>
 </html>
