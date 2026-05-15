@@ -93,9 +93,34 @@ class CloudService:
                 # scheduled heartbeat. The dispatcher does its own
                 # serialization within a single command type.
                 asyncio.create_task(self._dispatch_command(cmd))
+            # Cache the owner's white-label branding (Installer tier)
+            # so the local dashboard can render the custom brand
+            # without a separate round-trip per page load. Stored in
+            # the kv table (the same one the forecast service uses)
+            # under key `cloud.branding`. Hobby/Pro accounts → empty
+            # dict, which clears any previously-cached brand.
+            self._cache_branding(body.get("branding") or {})
         except Exception as e:
-            log.warning("cloud heartbeat: failed to parse command list: %s", e)
+            log.warning("cloud heartbeat: failed to parse response body: %s", e)
         return True
+
+    def _cache_branding(self, branding: dict[str, Any]) -> None:
+        """Persist the {brand_name, brand_support_email, brand_logo_url}
+        triple in the appliance's kv table. The /api/branding endpoint
+        reads it back for the dashboard. Schema-less / additive so a
+        future white-label field doesn't need a migration."""
+        try:
+            store = self.scheduler.store
+            import json
+            payload = json.dumps({
+                k: branding.get(k) or None
+                for k in ("brand_name", "brand_support_email", "brand_logo_url")
+            })
+            # The store has a kv_set helper that the forecast service
+            # already uses; same write path.
+            asyncio.create_task(store.kv_set("cloud.branding", payload))
+        except Exception as e:
+            log.debug("cloud heartbeat: failed to cache branding: %s", e)
 
     async def _dispatch_command(self, cmd: dict[str, Any]) -> None:
         """Apply a single cloud-queued command. Reports status
