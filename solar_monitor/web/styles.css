@@ -1411,6 +1411,27 @@ main {
   color: var(--text-3);
 }
 .dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
+.dev-card-del {
+  /* Tiny trash icon button on each device row's head. The card
+   * itself is an <a> so clicks navigate to /#/device/<label>; this
+   * button stops propagation in JS to keep destructive clicks
+   * separate from the "open detail" tap. */
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.dev-card-del svg { width: 14px; height: 14px; }
+.dev-card-del:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: rgba(248,81,73,0.10);
+}
 .dev-card-chevron {
   width: 16px; height: 16px;
   color: var(--text-3);

@@ -1479,6 +1479,37 @@ function efficiencyHeadline(data) {
 }
 
 // ---------- device cards ----------
+// Delete a device from the Devices tab. Hits /api/setup/devices/
+// which writes config.yaml + schedules a background hot-reload so
+// polling stops without the user having to restart the daemon.
+async function deleteDeviceFromList(label, slaveId, transport) {
+  if (!transport) {
+    alert(`Can't delete "${label}" — couldn't find its transport. ` +
+          `Try Setup → Find my dongle to re-confirm the link.`);
+    return;
+  }
+  if (!confirm(`Remove "${label}" (slave ${slaveId})? Polling stops immediately; the BMS keeps running, this just disconnects the dashboard. You can re-add it via Setup → Scan.`)) {
+    return;
+  }
+  try {
+    const r = await fetch(
+      `/api/setup/devices/${slaveId}?transport=${encodeURIComponent(transport)}`,
+      { method: "DELETE" },
+    );
+    if (!r.ok) {
+      const d = await r.text();
+      alert(`Couldn't remove device (HTTP ${r.status}). ${d.slice(0, 200)}`);
+      return;
+    }
+    // Pull a fresh snapshot so the card vanishes without waiting
+    // for the next SSE tick. refresh() repopulates the global
+    // `devices` array; renderDeviceCards runs off that.
+    await refresh();
+  } catch (e) {
+    alert(`Delete failed: ${e.message || e}`);
+  }
+}
+
 function renderDeviceCards() {
   const host = $("#device-cards");
   host.innerHTML = "";
@@ -1512,11 +1543,41 @@ function renderDeviceCards() {
     left.append(iconSpan, name);
     const right = document.createElement("div");
     right.className = "dev-card-head-right";
+    // Bank is a synthetic aggregate — there's nothing on disk to
+    // delete. Real devices get a trash icon next to the slave label
+    // that hits /api/setup/devices/<slave>?transport=… and refreshes
+    // the list. Stop-propagation so a tap doesn't also navigate
+    // into the device detail page.
+    const slaveLabel = dev.kind === "bank"
+      ? `<span class="dev-card-slave">aggregate</span>`
+      : `<span class="dev-card-slave">slave ${dev.slave_id}</span>`;
+    const delBtnHtml = dev.kind === "bank" ? "" : `
+      <button class="dev-card-del" type="button"
+              data-del-label="${escHtml(dev.label)}"
+              data-del-slave="${dev.slave_id}"
+              data-del-transport="${escHtml(dev.transport || '')}"
+              title="Remove this device from polling">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>`;
     right.innerHTML = `
-      <span class="dev-card-slave">slave ${dev.slave_id}</span>
+      ${slaveLabel}
+      ${delBtnHtml}
       <svg class="dev-card-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
     head.append(left, right);
     card.appendChild(head);
+
+    const delBtn = right.querySelector(".dev-card-del");
+    if (delBtn) {
+      delBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await deleteDeviceFromList(
+          delBtn.dataset.delLabel,
+          +delBtn.dataset.delSlave,
+          delBtn.dataset.delTransport,
+        );
+      });
+    }
 
     const sub = document.createElement("div");
     sub.className = "dev-card-sub";
