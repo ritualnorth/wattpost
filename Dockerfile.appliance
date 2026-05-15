@@ -48,7 +48,11 @@ RUN mkdir -p /app/solar_monitor \
 
 COPY solar_monitor /app/solar_monitor
 COPY packaging    /app/packaging
-COPY docs         /docs
+# Docs live at /app/docs because solar_monitor/web/docs is a
+# repo-root symlink (../../docs). With solar_monitor at /app/...,
+# the symlink resolves to /app/docs — putting docs anywhere else
+# leaves a dangling symlink and /web/docs/<slug>.md 404s in-app.
+COPY docs         /app/docs
 
 # Belt+braces: expose /app on PYTHONPATH so both the installed entry
 # point and `python -m solar_monitor` resolve.
