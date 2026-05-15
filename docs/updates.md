@@ -1,15 +1,25 @@
 # Updates
 
-WattPost updates land on your Pi as **source tarballs** pulled from `releases.wattpost.io`. No package manager, no apt repo, no manual SSH steps. One click in the dashboard.
+How you take updates depends on which install path you're on.
 
-## How it works
+## On the SD-card install (Pi)
 
-1. The cloud manifest at [`releases.wattpost.io/img/manifest.json`](https://releases.wattpost.io/img/manifest.json) names the current published version
-2. Your appliance polls that manifest every 24 hours
-3. If a newer version is available, **Settings → About** shows "v0.0.X available"
-4. Click **Update now** → the daemon downloads the source tarball from `releases.wattpost.io/source/latest.tar.gz`, verifies its SHA256, swaps it into `/opt/wattpost-src`, runs `install.sh`, and restarts itself
+1. The cloud manifest at [`releases.wattpost.io/img/manifest.json`](https://releases.wattpost.io/img/manifest.json) names the current published version.
+2. Your appliance polls that manifest every 24 hours.
+3. If a newer version is available, **Settings → About** shows "v0.0.X available".
+4. Click **Update now** → the daemon downloads the source tarball from `releases.wattpost.io/source/latest.tar.gz`, verifies SHA256, swaps into `/opt/wattpost-src`, runs `install.sh`, and restarts.
 
-The dashboard polls the update log and reconnects to the new daemon when it comes back up. Total time: ~30 seconds.
+Dashboard polls the update log and reconnects when the new daemon comes back up. ~30 seconds total.
+
+## On the Docker install
+
+```
+cd ~/wattpost
+docker compose pull   # fetch newest image
+docker compose up -d  # roll the container
+```
+
+That's the update. The `latest` tag follows main; for traceability, pin to a `sha-<short>` tag in your compose file. Your config + history persist via the bind-mounted volumes.
 
 ## What changes between updates
 
