@@ -2273,6 +2273,41 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 .wiz-transport-del svg { width: 16px; height: 16px; }
 
+/* "Recently visible but missing" panel on the dongle-scan results.
+ * Calls out devices we KNEW were broadcasting but aren't now,
+ * because the #1 BLE debug surprise is "my Renogy BT-2 was here
+ * a minute ago — where is it?". Amber tint = informational, not
+ * an error. */
+.wiz-missing {
+  border: 1px solid rgba(210, 153, 34, 0.35);
+  background: rgba(210, 153, 34, 0.08);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+  margin: 0 0 .65rem;
+}
+.wiz-missing-head {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: .35rem;
+  color: var(--text);
+  font-size: .88rem;
+}
+.wiz-missing-row {
+  display: flex; gap: .75rem;
+  align-items: flex-start; justify-content: space-between;
+  padding: .35rem 0;
+  border-top: 1px dashed rgba(210, 153, 34, 0.20);
+  font-size: .85rem;
+}
+.wiz-missing-row:first-of-type { border-top: none; }
+.wiz-missing-cause {
+  color: var(--text-2);
+  font-size: .78rem;
+  text-align: right;
+  max-width: 55%;
+  line-height: 1.4;
+}
+
 .wiz-vendor-hint {
   display: inline-block;
   margin-left: .4rem;

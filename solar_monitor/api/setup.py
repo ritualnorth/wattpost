@@ -236,6 +236,20 @@ class BleScanRequest(msgspec.Struct):
     seconds: int = 8
 
 
+# In-memory MAC last-seen cache. Keyed by uppercase MAC, value is
+# {last_seen_ts, last_rssi, name}. Used to populate the
+# `seen_recently_missing` field — MACs we saw in a prior scan but
+# aren't in the current one. Big quality-of-life signal for "my
+# dongle was here a minute ago, now it isn't" debug.
+#
+# Module-level, in-memory only. Resets on daemon restart, which is
+# fine: the cache is a hint, not a source of truth.
+_BLE_SEEN_CACHE: dict[str, dict[str, Any]] = {}
+_BLE_SEEN_TTL_S = 15 * 60   # 15 min — long enough to catch most
+                            # "happened a minute ago" cases without
+                            # holding onto stale entries forever.
+
+
 @post("/api/setup/ble_scan")
 async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
     """Scan BLE advertisements for `seconds`. Returns a list of every
@@ -243,6 +257,13 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
     RSSI. The UI dedupes and shows them so the user can pick their
     Renogy BT-2 dongle by name pattern (`BT-TH-…`) or by MAC printed
     on the dongle itself.
+
+    Also returns `seen_recently_missing` — MACs we saw in a previous
+    scan within the last 15 minutes that AREN'T in the current scan.
+    A Renogy BT-2 that suddenly disappears between scans is almost
+    always being held by the Renogy mobile app (the BT-2 only allows
+    one BLE master at a time). Surfacing that to the user saves a
+    long debug session.
 
     Clamped to 2..30 seconds. Eight is the default — long enough that
     a slow-advertising dongle shows up, short enough that the user
@@ -266,13 +287,54 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
             detail=f"BLE scan failed: {e}. Check the BLE adapter "
                    f"status in step 0 of the wizard.",
         )
+    import time as _time
+    now = int(_time.time())
     out = []
+    current_macs: set[str] = set()
     for d in devices:
-        out.append({
-            "address": (d.address or "").upper(),
+        mac = (d.address or "").upper()
+        if not mac:
+            continue
+        current_macs.add(mac)
+        rec = {
+            "address": mac,
             "name":    d.name or None,
             "rssi":    getattr(d, "rssi", None),
+        }
+        out.append(rec)
+        # Refresh the cache so re-appearing devices stay fresh.
+        _BLE_SEEN_CACHE[mac] = {
+            "last_seen_ts": now,
+            "last_rssi":    rec["rssi"],
+            "name":         rec["name"],
+        }
+
+    # Build the "was visible recently but isn't now" list. Cleans
+    # up stale entries past the TTL while we're walking the dict.
+    seen_recently_missing: list[dict[str, Any]] = []
+    stale_macs: list[str] = []
+    for mac, meta in _BLE_SEEN_CACHE.items():
+        age = now - int(meta.get("last_seen_ts") or 0)
+        if age > _BLE_SEEN_TTL_S:
+            stale_macs.append(mac)
+            continue
+        if mac in current_macs:
+            continue
+        seen_recently_missing.append({
+            "address":      mac,
+            "name":         meta.get("name"),
+            "last_rssi":    meta.get("last_rssi"),
+            "seconds_ago":  age,
+            # Renogy-specific hint: the BT-2 advertises as BT-TH-…
+            # and is single-master, so a disappearance is almost
+            # always the Renogy mobile app holding it. We surface
+            # this as a likely_cause string the UI can render
+            # without needing its own classification logic.
+            "likely_cause": _classify_disappearance(meta.get("name")),
         })
+    for mac in stale_macs:
+        _BLE_SEEN_CACHE.pop(mac, None)
+
     # Sort: known-vendor names first (BT-TH = Renogy BT-2), then
     # by signal strength desc, then by name.
     def _vendor_pri(name: str | None) -> int:
@@ -283,8 +345,32 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
         if "jk" in n or "bms" in n: return 2
         return 5
     out.sort(key=lambda d: (_vendor_pri(d.get("name")), -(d.get("rssi") or -200)))
-    log.info("ble_scan: %d devices", len(out))
-    return {"devices": out, "scanned_seconds": secs}
+    seen_recently_missing.sort(key=lambda d: d.get("seconds_ago", 99999))
+    log.info("ble_scan: %d devices, %d recently-missing",
+             len(out), len(seen_recently_missing))
+    return {
+        "devices": out,
+        "scanned_seconds": secs,
+        "seen_recently_missing": seen_recently_missing,
+    }
+
+
+def _classify_disappearance(name: str | None) -> str | None:
+    """Best-guess explanation for why a previously-seen MAC isn't
+    in this scan's results. Renogy BT-2 single-master behaviour is
+    the #1 cause we want to surface; other vendors get a generic
+    'recently disappeared' note."""
+    if not name:
+        return "recently disappeared"
+    n = name.lower()
+    if n.startswith("bt-th") or "renogy" in n:
+        return ("Renogy BT-2 only allows one connection at a time. "
+                "Force-quit the Renogy DC Home / DC Connect app on "
+                "any phone in range, or power-cycle the dongle.")
+    if n.startswith("victron") or "smart" in n:
+        return ("Victron dongles can be held by VictronConnect. "
+                "Close the app on any phone in range.")
+    return "recently disappeared"
 
 
 class AddTransportRequest(msgspec.Struct):

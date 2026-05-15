@@ -4981,13 +4981,19 @@ async function wizFindDongle() {
   stat.textContent = `Found ${data.devices?.length || 0} device(s) in ${data.scanned_seconds || 8} s`;
   btn.disabled = false;
 
+  // Build the "recently disappeared" panel first if any — this is
+  // the #1 debugging signal for "where did my Renogy BT-2 go?"
+  // shown ABOVE the live results so users notice it before they
+  // give up assuming nothing's there.
+  const missingHtml = renderMissingPanel(data.seen_recently_missing || []);
+
   if (!data.devices?.length) {
-    list.innerHTML = `<div class="wiz-empty">Nothing visible. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
+    list.innerHTML = missingHtml + `<div class="wiz-empty">Nothing visible right now. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
     return;
   }
   // Build a row per discovered device. Renogy hint stays on top
   // (sorted server-side); each row offers "Use this".
-  list.innerHTML = data.devices.map(d => {
+  list.innerHTML = missingHtml + data.devices.map(d => {
     const nameStr = d.name
       ? `<strong>${escHtml(d.name)}</strong>`
       : `<em class="settings-foot">(no name)</em>`;
@@ -5010,6 +5016,33 @@ async function wizFindDongle() {
   list.querySelectorAll("[data-use-mac]").forEach(b => {
     b.addEventListener("click", () => wizAddTransportFromMac(b.dataset.useMac, b.dataset.useName));
   });
+}
+
+function renderMissingPanel(missing) {
+  if (!missing || !missing.length) return "";
+  // Format "30 seconds ago" / "3 min ago" — a generic relative
+  // string is more useful than "37 seconds ago" precision.
+  const ago = (s) => {
+    if (s == null) return "recently";
+    if (s < 60)   return `${s}s ago`;
+    if (s < 3600) return `${Math.round(s/60)} min ago`;
+    return `${Math.round(s/3600)} h ago`;
+  };
+  return `<div class="wiz-missing">
+    <div class="wiz-missing-head">
+      <strong>Recently visible, not broadcasting right now</strong>
+      <span class="settings-foot">${missing.length} device(s)</span>
+    </div>
+    ${missing.map(m => `
+      <div class="wiz-missing-row">
+        <div>
+          ${m.name ? `<strong>${escHtml(m.name)}</strong>` : `<em class="settings-foot">(no name)</em>`}
+          <div class="settings-foot">${escHtml(m.address)} · last RSSI ${m.last_rssi ?? "—"} dBm · ${ago(m.seconds_ago)}</div>
+        </div>
+        <div class="wiz-missing-cause">${escHtml(m.likely_cause || "")}</div>
+      </div>
+    `).join("")}
+  </div>`;
 }
 
 async function wizAddTransportFromMac(mac, name) {
