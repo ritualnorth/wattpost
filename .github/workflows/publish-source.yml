@@ -116,6 +116,13 @@ jobs:
             m["version"]     = version
             m["released_at"] = now
             m["source_sha256"] = src_sha
+            # Relative URL — the appliance dashboard resolves it
+            # against its own origin so it works on Pi (LAN IP),
+            # Docker (LAN IP), or via cloudflared tunnel without
+            # the manifest needing to know the host. Same content
+            # is also at wattpost.io/docs/release-notes for users
+            # who land on the marketing site.
+            m["release_url"] = "/docs/release-notes"
             p.write_text(json.dumps(m, indent=2) + "\n")
             print(f"manifest: version={version} released_at={now}")
             PY

@@ -200,7 +200,7 @@ jobs:
             "sha256":       "${SHA}",
             "sha256_url":   "https://releases.wattpost.io/img/latest.img.xz.sha256",
             "size_bytes":   ${SIZE},
-            "release_url":  "https://wattpost.io/download",
+            "release_url":  "/docs/release-notes",
             "source_url":   "https://releases.wattpost.io/source/latest.tar.gz",
             "source_sha256_url": "https://releases.wattpost.io/source/latest.tar.gz.sha256"
           }

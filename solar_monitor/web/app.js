@@ -2317,16 +2317,22 @@ async function refreshUpdateState() {
   const isDocker = u.deployment === "docker";
 
   // "Latest available" row appears only when there's a real update
-  // to surface. On Pi installs this is the only update touchpoint;
-  // on Docker we also show a persistent hint row below.
+  // to surface AND we know what version it is. The version check
+  // guards a transient state right after first boot — the daemon
+  // may have computed has_update=true from a stale local value
+  // before the manifest poll completes, in which case
+  // latest_version is still null and we'd render "v—".
   const row = $("#settings-update-row");
-  if (row) row.hidden = !u.has_update;
-  if (u.has_update) {
+  const showRow = u.has_update && !!u.latest_version;
+  if (row) row.hidden = !showRow;
+  if (showRow) {
     set("#settings-update-latest", "v" + u.latest_version);
     const a = $("#settings-update-link");
     if (a && u.release_url) {
       a.href = u.release_url;
       a.hidden = false;
+    } else if (a) {
+      a.hidden = true;
     }
     row?.classList.add("settings-row--update");
   } else {
@@ -2336,9 +2342,10 @@ async function refreshUpdateState() {
   // Apply button: only on Pi installs with an actual pending update.
   // Docker users update via `docker compose pull` on the host — no
   // in-app button, by design (matches Immich, Pi-hole, Vaultwarden
-  // conventions).
+  // conventions). Gated on showRow so we don't render "Apply" while
+  // the row itself is hidden waiting for a version.
   const applyBtn = $("#settings-update-apply");
-  if (applyBtn) applyBtn.hidden = isDocker || !u.has_update;
+  if (applyBtn) applyBtn.hidden = isDocker || !showRow;
 
   // Persistent "Updates: docker compose pull..." row, always on for
   // Docker so users discover the right command before they ever look
