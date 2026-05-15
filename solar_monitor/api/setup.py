@@ -18,11 +18,14 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import json
+
 import msgspec
 import yaml
 from litestar import delete, get, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException, NotFoundException
+from litestar.response import Stream
 
 from ..config import Config
 from ..modbus import build_read_holding, expected_read_response_len, verify_response
@@ -473,10 +476,53 @@ class ProbeRequest(msgspec.Struct):
     slave_ids: list[int] | None = None
 
 
+async def _probe_one(t, sid: int) -> dict[str, Any]:
+    """Probe a single slave ID. Tries each model-register guess in
+    order — first one that returns plausible ASCII wins."""
+    if not (1 <= sid <= 247):
+        return {"slave_id": sid, "alive": False, "vendor": None,
+                "kind": None, "model": None, "error": "id out of range"}
+    err: str | None = None
+    for v, suggested_kind, register, count in _MODEL_PROBES:
+        try:
+            frame = build_read_holding(sid, register, count)
+            # 2.5 s timeout — first probe after a fresh BLE connect
+            # often hits ~1.5 s on its first round-trip before settling.
+            # 1.2 s was clipping legit responses on cold links.
+            resp = await t.request(
+                frame, expected_read_response_len(count), timeout=2.5,
+            )
+            verify_response(resp, sid)
+        except Exception as e:
+            err = type(e).__name__
+            log.debug("probe slave=%d vendor=%s reg=%d failed: %s",
+                      sid, v, register, e)
+            continue
+        payload = resp[3:3 + count * 2]
+        if not _likely_ascii(payload):
+            err = "non-ascii response"
+            continue
+        text = _clean_ascii(payload)
+        kind = _classify_renogy(text) or suggested_kind if v == "renogy" \
+                else suggested_kind
+        return {"slave_id": sid, "alive": True, "vendor": v, "kind": kind,
+                "model": text, "error": None}
+    return {"slave_id": sid, "alive": False, "vendor": None, "kind": None,
+            "model": None, "error": err}
+
+
 @post("/api/setup/probe")
-async def probe(data: ProbeRequest, state: State) -> dict[str, Any]:
-    """Sweep slave IDs on a live transport. For each ID, read a model-name
-    register; if it answers with plausible ASCII, record vendor/kind/model.
+async def probe(data: ProbeRequest, state: State) -> Stream:
+    """Sweep slave IDs on a transport. Streams one NDJSON record per
+    probe — so the wizard UI can show "Probing #16 → found Rover
+    RVR40" live instead of staring at a spinner for 60s while the
+    full sweep finishes. Last record is a `{"done": true, ...}`
+    summary.
+
+    Reopens the transport at scan start so an idle-dropped BLE link
+    gets reconnected automatically — the user shouldn't have to
+    restart the daemon to scan a second time.
+
     The transport's own lock serialises against the scheduler's polls."""
     scheduler: PollScheduler = state["scheduler"]
     t = scheduler.get_transport(data.transport)
@@ -484,62 +530,46 @@ async def probe(data: ProbeRequest, state: State) -> dict[str, Any]:
         raise NotFoundException(f"transport {data.transport!r} not open")
 
     ids = tuple(data.slave_ids) if data.slave_ids else DEFAULT_PROBE_IDS
-    results: list[dict[str, Any]] = []
-    for sid in ids:
-        if not (1 <= sid <= 247):
-            results.append({"slave_id": sid, "alive": False, "error": "id out of range"})
-            continue
-        alive = False
-        vendor: str | None = None
-        kind: str | None = None
-        model: str | None = None
-        err: str | None = None
 
-        for v, suggested_kind, register, count in _MODEL_PROBES:
-            try:
-                frame = build_read_holding(sid, register, count)
-                # 2.5 s timeout — first probe after a fresh BLE
-                # connect often hits ~1.5 s on its first round-trip
-                # before settling. 1.2 s was clipping legit responses
-                # on cold links.
-                resp = await t.request(
-                    frame, expected_read_response_len(count), timeout=2.5,
-                )
-                verify_response(resp, sid)
-            except Exception as e:
-                err = type(e).__name__
-                log.debug("probe slave=%d vendor=%s reg=%d failed: %s",
-                          sid, v, register, e)
-                continue
+    async def gen():
+        # Reopen the link if it's dropped — idle BLE connections can
+        # die after a few minutes of no traffic.
+        reopened = False
+        try:
+            if hasattr(t, "_client") and (t._client is None or not t._client.is_connected):
+                yield json.dumps({"event": "reopening",
+                                  "transport": data.transport}).encode() + b"\n"
+                await t.open()
+                reopened = True
+        except Exception as e:
+            yield json.dumps({
+                "event": "open_failed",
+                "error": f"{type(e).__name__}: {e}",
+            }).encode() + b"\n"
+            yield json.dumps({"done": True, "alive_count": 0,
+                              "total": 0}).encode() + b"\n"
+            return
 
-            payload = resp[3:3 + count * 2]
-            if not _likely_ascii(payload):
-                err = "non-ascii response"
-                continue
+        yield json.dumps({"event": "start", "total": len(ids),
+                          "reopened": reopened}).encode() + b"\n"
 
-            text = _clean_ascii(payload)
-            alive = True
-            vendor = v
-            model = text
-            if v == "renogy":
-                kind = _classify_renogy(text) or suggested_kind
-            else:
-                kind = suggested_kind
-            err = None
-            break
+        alive_count = 0
+        for idx, sid in enumerate(ids, start=1):
+            yield json.dumps({"event": "probing", "slave_id": sid,
+                              "index": idx, "total": len(ids)}).encode() + b"\n"
+            result = await _probe_one(t, sid)
+            if result.get("alive"):
+                alive_count += 1
+            yield (json.dumps({"event": "result", **result}).encode()
+                   + b"\n")
+            # Small breather between probes so we don't starve the
+            # live poll.
+            await asyncio.sleep(0.05)
 
-        results.append({
-            "slave_id": sid,
-            "alive": alive,
-            "vendor": vendor,
-            "kind": kind,
-            "model": model,
-            "error": err,
-        })
-        # Small breather between probes so we don't starve the live poll.
-        await asyncio.sleep(0.05)
+        yield json.dumps({"done": True, "alive_count": alive_count,
+                          "total": len(ids)}).encode() + b"\n"
 
-    return {"transport": data.transport, "results": results}
+    return Stream(gen(), media_type="application/x-ndjson")
 
 
 class AddDeviceRequest(msgspec.Struct):
