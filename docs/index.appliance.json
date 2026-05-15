@@ -3,6 +3,7 @@
     { "slug": "getting-started", "title": "Getting started",          "section": "Setup" },
     { "slug": "supported-hardware","title": "Supported hardware",     "section": "Setup" },
     { "slug": "first-boot",      "title": "First boot",               "section": "Setup" },
+    { "slug": "docker-install",  "title": "Run in Docker",            "section": "Setup" },
     { "slug": "devices",         "title": "Adding devices",           "section": "Setup" },
     { "slug": "pairing",         "title": "Pair with the cloud",      "section": "Setup" },
 

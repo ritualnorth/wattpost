@@ -1,0 +1,49 @@
+# WattPost appliance — example docker-compose for Linux hosts.
+#
+# Copy this to docker-compose.yml in a working directory, then:
+#   docker compose up -d
+#   open http://localhost:8000   (or http://<this-host-ip>:8000)
+#
+# Updates:
+#   docker compose pull && docker compose up -d
+#
+# Linux host only — macOS / Windows / WSL2 can't pass host Bluetooth
+# through to a container. For those, use the SD-card image (Pi) or
+# any Linux host with BLE (cheap Mini PC, NUC, recycled laptop, etc).
+
+services:
+  wattpost:
+    image: ghcr.io/ritualnorth/wattpost-appliance:latest
+    container_name: wattpost
+
+    # Host networking is the simplest path to BLE on Linux. The
+    # alternative (cap_add + dbus bind-mount) works on most distros
+    # but bluez integration varies by version — host mode is the path
+    # we test. Trade-off: the container shares the host's network
+    # namespace, so :8000 binds the host directly.
+    network_mode: host
+
+    # Bluetooth on Linux Docker requires the container to talk to the
+    # host's bluetoothd over DBus. Sharing /var/run/dbus is the
+    # least-privilege approach. If your distro's bluez is patchy with
+    # this, fall back to `privileged: true` instead (heavier hammer).
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      # Persist config + history across `docker compose pull`.
+      - ./wattpost-config:/etc/wattpost
+      - ./wattpost-data:/var/lib/wattpost
+
+    # NET_ADMIN lets bleak listen for BLE advertisements without going
+    # full privileged. SYS_ADMIN is needed for some bluez ops.
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+
+    # On startup the entrypoint drops a default /etc/wattpost/config.yaml
+    # the first time the volume is empty, then runs `solar-monitor serve`.
+    restart: unless-stopped
+
+    # Pull image updates daily — equivalent of the "Update now" button.
+    # Comment this out if you'd rather control upgrades manually.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
