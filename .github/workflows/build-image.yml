@@ -159,18 +159,31 @@ jobs:
                       -o ServerAliveInterval=15
                       -o ServerAliveCountMax=4)
 
-          # Retry helper: any ssh/scp call gets 3 attempts with backoff.
-          # Most failures are transient route-flap, so retry > log-and-die.
+          # Retry helper. Pi-gen takes ~90 minutes, then we try to
+          # publish; by then the runner is on a relatively old Azure
+          # NAT and Contabo route flaps can knock SSH out for 5-10
+          # minutes at a stretch. Old config (3 retries, ~60s total
+          # wait) bailed before routes recovered.
+          #
+          # New: 8 attempts, exponential backoff capped at 5 min, so
+          # total wait is ~25 minutes before giving up. Pi-gen images
+          # are valuable (~90 min of compute), worth waiting on a
+          # transient route. The artefact is also attached to a GH
+          # Release in the previous step, so a failed publish here
+          # doesn't lose the image — operator can scp it manually
+          # from the artefact (see docs/release-pipeline.md).
           retry() {
             local n=0
+            local delays=(10 30 60 120 240 300 300 300)
             until "$@"; do
               n=$((n+1))
-              if [ "$n" -ge 3 ]; then
+              if [ "$n" -ge "${#delays[@]}" ]; then
                 echo "FAIL after $n attempts: $*" >&2
                 return 1
               fi
-              echo "retry $n: $*" >&2
-              sleep $((10 * n))
+              local d="${delays[$((n-1))]}"
+              echo "retry $n in ${d}s: $*" >&2
+              sleep "$d"
             done
           }
 
