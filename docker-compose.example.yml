@@ -23,21 +23,28 @@ services:
     # namespace, so :8000 binds the host directly.
     network_mode: host
 
-    # Bluetooth on Linux Docker requires the container to talk to the
-    # host's bluetoothd over DBus. Sharing /var/run/dbus is the
-    # least-privilege approach. If your distro's bluez is patchy with
-    # this, fall back to `privileged: true` instead (heavier hammer).
+    # Bluetooth on Linux Docker requires:
+    #   1. The host's system DBus socket. /var/run/dbus is a symlink
+    #      to /run/dbus on most modern distros — mount the source
+    #      explicitly so Docker doesn't get confused.
+    #   2. NET_ADMIN + SYS_ADMIN caps for BLE scan + bluez ops.
+    #   3. AppArmor unconfined — the default docker profile blocks
+    #      the container from talking through the system bus socket
+    #      on Ubuntu / Debian hosts. Without this, bluetoothctl in
+    #      the container fails with "connection != NULL" assertion.
+    #   If your distro's bluez is patchy with this combo, replace
+    #   the three options below with `privileged: true` (bigger
+    #   hammer, equivalent result).
     volumes:
-      - /var/run/dbus:/var/run/dbus
+      - /run/dbus:/var/run/dbus
       # Persist config + history across `docker compose pull`.
       - ./wattpost-config:/etc/wattpost
       - ./wattpost-data:/var/lib/wattpost
-
-    # NET_ADMIN lets bleak listen for BLE advertisements without going
-    # full privileged. SYS_ADMIN is needed for some bluez ops.
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
 
     # On startup the entrypoint drops a default /etc/wattpost/config.yaml
     # the first time the volume is empty, then runs `solar-monitor serve`.
