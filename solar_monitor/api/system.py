@@ -16,6 +16,7 @@ import platform
 import shutil
 import sys
 import time
+import time
 from typing import Any
 
 from litestar import get, post
@@ -42,13 +43,19 @@ def _disk_usage(path: str = "/") -> dict[str, Any]:
     }
 
 
+_DAEMON_STARTED_AT = time.time()
+
+
 def _proc_uptime_seconds() -> float | None:
-    """Read /proc/uptime — works on Linux, returns None elsewhere."""
-    try:
-        with open("/proc/uptime") as f:
-            return float(f.read().split()[0])
-    except Exception:
-        return None
+    """Return how long the WattPost daemon has been running.
+
+    Used to be a /proc/uptime read — which on bare metal gave the
+    box's uptime (fine) but in a Docker container with host /proc
+    leakage gave the host's uptime (e.g. '3d 23h' on a laptop
+    that's just had the container restarted ten minutes ago). The
+    daemon process start time is what users actually want to see.
+    """
+    return time.time() - _DAEMON_STARTED_AT
 
 
 @get("/api/system/info")

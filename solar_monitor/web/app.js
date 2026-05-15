@@ -2473,11 +2473,13 @@ async function refreshUpdateState() {
   const applyBtn = $("#settings-update-apply");
   if (applyBtn) applyBtn.hidden = isDocker || !showRow;
 
-  // Persistent "Updates: docker compose pull..." row, always on for
-  // Docker so users discover the right command before they ever look
-  // for an in-app updater.
+  // "Updates: docker compose pull..." row — only when there's
+  // actually an update pending on a Docker install. Used to be
+  // shown all the time on Docker, which read as "you need to do
+  // something" even when up to date. The Docker-update path is
+  // documented anyway; only surface the hint when actionable.
   const dockerRow = $("#settings-update-docker-row");
-  if (dockerRow) dockerRow.hidden = !isDocker;
+  if (dockerRow) dockerRow.hidden = !(isDocker && showRow);
 
   // Hide the in-flight progress row whenever there's no update to
   // apply. Without this it stuck around after a Pi user finished an
