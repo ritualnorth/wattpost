@@ -279,6 +279,66 @@ class CloudService:
             log.warning("cloud heartbeat: today_aggregate read failed",
                         exc_info=True)
 
+        # Weather snapshot + PV forecast totals. Both live in the
+        # local SQLite kv table (the same cache the dashboard reads
+        # from), so this is a cheap read — no third-party calls per
+        # heartbeat. Keep the field set tight (~5 fields, ~100 bytes)
+        # so the 2 KiB extras cap isn't a concern.
+        try:
+            store = getattr(self.scheduler, "store", None)
+            if store is not None:
+                wx = await store.kv_get("weather:current")
+                if wx is not None:
+                    import json as _json
+                    w = _json.loads(wx[0])
+                    if w.get("temperature_c") is not None:
+                        extras["weather_temp_c"] = round(float(w["temperature_c"]), 1)
+                    if w.get("weather_code") is not None:
+                        # Raw WMO code; cloud renders the label so we
+                        # don't need to ship a 30-entry lookup table
+                        # in every heartbeat.
+                        extras["weather_code"] = int(w["weather_code"])
+                    if w.get("sunset_ts") is not None:
+                        extras["sunset_unix"] = int(w["sunset_ts"])
+        except Exception:
+            log.warning("cloud heartbeat: weather snapshot read failed",
+                        exc_info=True)
+        try:
+            store = getattr(self.scheduler, "store", None)
+            if store is not None:
+                fc = await store.kv_get("forecast:pv")
+                if fc is not None:
+                    import json as _json
+                    f = _json.loads(fc[0])
+                    pts = f.get("points") or []
+                    # Sum Wh expected for today (local) + tomorrow.
+                    # Solcast points are 30-min periods in W; Wh =
+                    # W × 0.5h per point. Round to whole Wh.
+                    now_ts = int(time.time())
+                    local_now = time.localtime(now_ts)
+                    tom = int(time.mktime((
+                        local_now.tm_year, local_now.tm_mon, local_now.tm_mday + 1,
+                        0, 0, 0, 0, 0, -1,
+                    )))
+                    day_after = tom + 86400
+                    today_wh = 0.0
+                    tomorrow_wh = 0.0
+                    for p in pts:
+                        ts = int(p.get("ts") or 0)
+                        w_val = float(p.get("pv_w") or 0)
+                        wh = w_val * 0.5
+                        if now_ts <= ts < tom:
+                            today_wh += wh
+                        elif tom <= ts < day_after:
+                            tomorrow_wh += wh
+                    if today_wh > 0:
+                        extras["forecast_today_wh"] = int(today_wh)
+                    if tomorrow_wh > 0:
+                        extras["forecast_tomorrow_wh"] = int(tomorrow_wh)
+        except Exception:
+            log.warning("cloud heartbeat: forecast snapshot read failed",
+                        exc_info=True)
+
         return {
             "soc_pct": soc_pct,
             "net_w":   net_w,
