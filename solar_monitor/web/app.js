@@ -4442,21 +4442,23 @@ async function wizLoadTransports() {
     }
     host.innerHTML = transports.map(t => `
       <div class="wiz-transport-row">
-        <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${escHtml(t.id)}" ${t.open ? '' : 'disabled'}>
+        <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${escHtml(t.id)}">
           <div class="wiz-transport-main">
             <span class="wiz-transport-id">${escHtml(t.id)}</span>
             <span class="wiz-transport-addr">${escHtml(t.address || '')}</span>
           </div>
-          <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline'}</span>
+          <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline · will reconnect on scan'}</span>
         </button>
         <button class="wiz-transport-del" data-del-transport="${escHtml(t.id)}" title="Disconnect + remove this transport">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
       </div>
     `).join("");
+    // No `disabled` on offline rows — the scan endpoint auto-reopens
+    // a dropped BLE link, so users should always be able to select
+    // and try. The pill text tells them what to expect.
     host.querySelectorAll(".wiz-transport").forEach(btn => {
       btn.addEventListener("click", () => {
-        if (btn.disabled) return;
         wizState.transport = btn.dataset.id;
         host.querySelectorAll(".wiz-transport").forEach(b => b.classList.toggle("active", b === btn));
         $("#wiz-step-scan").hidden = false;
@@ -4473,10 +4475,18 @@ async function wizLoadTransports() {
 }
 
 async function wizScan() {
-  if (!wizState.transport) return;
   const btn = $("#wiz-scan-btn");
   const status = $("#wiz-scan-status");
   const host = $("#wiz-scan-results");
+  if (!wizState.transport) {
+    // Don't silently no-op — the previous version did, which left
+    // a user clicking with no feedback when their transport
+    // selection was lost (e.g. after a page refresh).
+    if (status) {
+      status.textContent = "Pick a transport above first.";
+    }
+    return;
+  }
   btn.disabled = true;
   host.innerHTML = "";
   status.innerHTML = `<span class="wiz-spinner" aria-hidden="true"></span> Starting scan…`;
