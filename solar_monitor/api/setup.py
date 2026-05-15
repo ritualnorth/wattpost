@@ -143,6 +143,144 @@ async def ble_status() -> dict[str, Any]:
     }
 
 
+class BleScanRequest(msgspec.Struct):
+    seconds: int = 8
+
+
+@post("/api/setup/ble_scan")
+async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
+    """Scan BLE advertisements for `seconds`. Returns a list of every
+    advertising device the host can see — MAC, name (if advertised),
+    RSSI. The UI dedupes and shows them so the user can pick their
+    Renogy BT-2 dongle by name pattern (`BT-TH-…`) or by MAC printed
+    on the dongle itself.
+
+    Clamped to 2..30 seconds. Eight is the default — long enough that
+    a slow-advertising dongle shows up, short enough that the user
+    doesn't think the page froze.
+    """
+    secs = max(2, min(30, int(data.seconds or 8)))
+    try:
+        from bleak import BleakScanner
+    except ImportError:
+        raise HTTPException(status_code=500, detail="bleak not available")
+
+    log.info("ble_scan: discover for %ds", secs)
+    try:
+        devices = await BleakScanner.discover(timeout=secs)
+    except Exception as e:
+        # Most failures here are bluez transport problems: adapter
+        # powered off, DBus passthrough broken in Docker, etc.
+        # Surface the message — it's the most useful debugging hint.
+        raise HTTPException(
+            status_code=500,
+            detail=f"BLE scan failed: {e}. Check the BLE adapter "
+                   f"status in step 0 of the wizard.",
+        )
+    out = []
+    for d in devices:
+        out.append({
+            "address": (d.address or "").upper(),
+            "name":    d.name or None,
+            "rssi":    getattr(d, "rssi", None),
+        })
+    # Sort: known-vendor names first (BT-TH = Renogy BT-2), then
+    # by signal strength desc, then by name.
+    def _vendor_pri(name: str | None) -> int:
+        if not name: return 9
+        n = name.lower()
+        if n.startswith("bt-th") or "renogy" in n: return 0
+        if n.startswith("victron") or "smart" in n: return 1
+        if "jk" in n or "bms" in n: return 2
+        return 5
+    out.sort(key=lambda d: (_vendor_pri(d.get("name")), -(d.get("rssi") or -200)))
+    log.info("ble_scan: %d devices", len(out))
+    return {"devices": out, "scanned_seconds": secs}
+
+
+class AddTransportRequest(msgspec.Struct):
+    address: str           # BT MAC of the dongle
+    label: str | None = None
+    type: str = "ble_modbus"   # Renogy BT-2 default; only kind today
+
+
+@post("/api/setup/transports/add")
+async def add_transport(data: AddTransportRequest, state: State) -> dict[str, Any]:
+    """Append a new BLE transport to config.yaml. UI-driven replacement
+    for editing yaml by hand. Daemon restart required for the new
+    transport to start polling — the response carries that flag so
+    the SPA shows the "restart daemon" banner."""
+    config_path: str = state.get("config_path", "config.yaml")
+    path = Path(config_path)
+
+    # ---- validation ----
+    mac = (data.address or "").strip().upper()
+    if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
+        raise HTTPException(
+            status_code=400,
+            detail="address must be a Bluetooth MAC (e.g. CC:45:A5:83:B7:42)",
+        )
+    if data.type != "ble_modbus":
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported transport type {data.type!r} — only "
+                   f"'ble_modbus' is supported in the UI today",
+        )
+
+    # Read current yaml from disk (not the boot-time `state["config"]`)
+    # so duplicate detection sees any transports added since boot via
+    # this same endpoint. Yaml is the source of truth.
+    raw = yaml.safe_load(path.read_text()) or {}
+    current_transports = raw.get("transports") or []
+
+    # Reject duplicates so we don't end up with two transports racing
+    # for the same BT-2 dongle.
+    for t in current_transports:
+        if (t.get("address") or "").upper() == mac:
+            raise HTTPException(
+                status_code=409,
+                detail=f"address {mac} is already configured as transport "
+                       f"{t.get('id')!r}",
+            )
+
+    # Generate a stable id from the MAC suffix. ble_b7_42 is human-
+    # readable when there's more than one dongle on the same site.
+    suffix = mac.replace(":", "").lower()[-4:]
+    new_id = f"ble_{suffix[:2]}_{suffix[2:]}"
+    # Bump if there's a collision (different MAC, same suffix).
+    existing_ids = {t.get("id") for t in current_transports}
+    base = new_id; n = 2
+    while new_id in existing_ids:
+        new_id = f"{base}_{n}"
+        n += 1
+
+    label = (data.label or "").strip() or f"BLE dongle {mac[-5:]}"
+
+    # ---- write ----
+    raw.setdefault("transports", []).append({
+        "id":      new_id,
+        "type":    data.type,
+        "address": mac,
+        "label":   label,
+    })
+
+    backup = path.with_suffix(path.suffix + ".bak")
+    shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    log.info("setup wizard: added transport %s type=%s address=%s label=%s",
+             new_id, data.type, mac, label)
+
+    return {
+        "ok": True,
+        "id": new_id,
+        "label": label,
+        "restart_required": True,
+        "backup_path": str(backup),
+    }
+
+
 @get("/api/setup/transports")
 async def list_setup_transports(state: State) -> dict[str, Any]:
     """Return configured transports with their live open/closed state."""

@@ -29,6 +29,8 @@ from ..scheduler import PollScheduler
 from ..storage import Store
 from .setup import (
     ble_status,
+    ble_scan,
+    add_transport,
     list_setup_transports,
     known_devices,
     probe,
@@ -688,6 +690,8 @@ def build_app(
             update_mqtt_config,
             test_mqtt,
             ble_status,
+            ble_scan,
+            add_transport,
             list_setup_transports,
             known_devices,
             probe,
