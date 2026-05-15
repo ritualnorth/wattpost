@@ -2517,6 +2517,24 @@ document.getElementById("settings-update-apply")?.addEventListener("click", asyn
 
 // ---------- Tailscale (Network block) ----------
 async function refreshTailscale() {
+  // Docker installs don't support in-app Tailscale management —
+  // Tailscale-in-container is fiddly (needs /dev/net/tun + caps +
+  // a sidecar pattern) and the homelab crowd who pick Docker can
+  // install Tailscale on the host directly. Cloud pairing covers
+  // the "remote access from my phone" case for everyone else.
+  // Hide the whole Network settings block on Docker; on Pi it
+  // stays as-is.
+  let deployment = "pi";
+  try {
+    const u = await api("/api/system/update");
+    deployment = u.deployment || "pi";
+  } catch (_) { /* assume Pi if probe fails */ }
+  const block = document.getElementById("settings-network-block");
+  if (deployment === "docker") {
+    if (block) block.hidden = true;
+    return;
+  }
+  if (block) block.hidden = false;
   const host = $("#settings-tailscale");
   if (!host) return;
   let s;
