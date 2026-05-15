@@ -66,13 +66,21 @@ class Poller:
             raise ValueError("duplicate transport ids in config")
         for tcfg in self.config.transports:
             t = _build_transport(tcfg)
+            # Always register the transport, even if the initial open
+            # fails (e.g. BT-2 dongle not advertising at boot). The
+            # object knows how to reconnect — the setup wizard probe
+            # and the scheduler's per-poll request can call .open()
+            # again. Discarding it stranded users who had to restart
+            # the daemon every time the dongle bounced.
+            self._transports[t.id] = t
             try:
                 await t.open()
-                self._transports[t.id] = t
             except Exception:
-                log.exception("transport %s failed to open at startup", tcfg.get("id"))
-                # Don't keep a half-open transport in the dict.
-                self._transports.pop(t.id, None)
+                log.exception(
+                    "transport %s failed to open at startup — kept "
+                    "registered so callers can retry .open()",
+                    tcfg.get("id"),
+                )
 
     async def close(self) -> None:
         for t in self._transports.values():

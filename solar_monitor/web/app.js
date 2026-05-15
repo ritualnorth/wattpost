@@ -4478,8 +4478,23 @@ async function wizScan() {
   const status = $("#wiz-scan-status");
   const host = $("#wiz-scan-results");
   btn.disabled = true;
-  status.textContent = "Probing slave IDs…";
   host.innerHTML = "";
+  status.innerHTML = `<span class="wiz-spinner" aria-hidden="true"></span> Starting scan…`;
+
+  // Live state — devices found so far, used both to render
+  // progressively and to feed renderScanResults at the end.
+  const alive = [];
+  let total = 0;
+  let probedCount = 0;
+  let aborted = false;
+
+  const repaint = () => {
+    status.innerHTML = total > 0
+      ? `<span class="wiz-spinner" aria-hidden="true"></span> Probed ${probedCount} of ${total} · ${alive.length} responded`
+      : `<span class="wiz-spinner" aria-hidden="true"></span> Probing…`;
+    renderScanResults(alive, /*partial*/ true);
+  };
+
   try {
     const r = await fetch("/api/setup/probe", {
       method: "POST",
@@ -4487,21 +4502,70 @@ async function wizScan() {
       body: JSON.stringify({ transport: wizState.transport }),
     });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    const data = await r.json();
-    wizState.scanResults = data.results;
-    const alive = data.results.filter(x => x.alive);
-    status.textContent = `${alive.length} device(s) responded out of ${data.results.length} probed`;
-    renderScanResults(alive);
+    if (!r.body) throw new Error("no response body");
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      // NDJSON: split on newlines, keep the trailing partial line in buf.
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim();
+        buf = buf.slice(nl + 1);
+        if (!line) continue;
+        let ev;
+        try { ev = JSON.parse(line); } catch (_) { continue; }
+        if (ev.event === "reopening") {
+          status.innerHTML = `<span class="wiz-spinner" aria-hidden="true"></span> Reconnecting BLE link…`;
+        } else if (ev.event === "open_failed") {
+          aborted = true;
+          status.textContent = `Couldn't open BLE link: ${ev.error}`;
+        } else if (ev.event === "start") {
+          total = ev.total;
+          repaint();
+        } else if (ev.event === "probing") {
+          probedCount = ev.index - 1;
+          repaint();
+        } else if (ev.event === "result") {
+          probedCount += 1;
+          if (ev.alive) alive.push(ev);
+          repaint();
+        } else if (ev.done) {
+          // Final summary — fall through to the "finished" block.
+        }
+      }
+    }
+
+    if (!aborted) {
+      status.textContent = alive.length
+        ? `${alive.length} device(s) found · ${total} probed`
+        : `No devices responded · ${total} probed`;
+      renderScanResults(alive, /*partial*/ false);
+    }
   } catch (e) {
     status.textContent = `Scan failed: ${e.message}`;
   } finally {
     btn.disabled = false;
+    wizState.scanResults = alive;
   }
 }
 
-function renderScanResults(alive) {
+function renderScanResults(alive, partial = false) {
   const host = $("#wiz-scan-results");
   if (!alive.length) {
+    // While the scan is still running, don't drop the long help
+    // text in — it'd flash on screen for milliseconds before the
+    // first device arrives and feel jumpy. Show a simple
+    // placeholder; the full troubleshooter appears only if the
+    // scan finishes with zero hits.
+    if (partial) {
+      host.innerHTML = `<div class="wiz-empty wiz-empty--quiet">Waiting for the first device to respond…</div>`;
+      return;
+    }
     host.innerHTML = `<div class="wiz-empty">
       <p><strong>No Renogy devices responded.</strong></p>
       <p>The BT-2 is connected to the daemon, but nothing on its RS-485 side answered Modbus. Most common causes, in order:</p>

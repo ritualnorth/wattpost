@@ -2306,6 +2306,28 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border: 1px dashed var(--border);
   border-radius: var(--r);
 }
+.wiz-empty--quiet {
+  /* Mid-scan placeholder. Borderless, very low contrast — doesn't
+   * compete for attention while live results stream in below it. */
+  background: transparent;
+  border: 0;
+  padding: 0.5rem 0;
+  color: var(--text-3);
+  font-style: italic;
+}
+.wiz-spinner {
+  display: inline-block;
+  width: 0.85em; height: 0.85em;
+  margin-right: 0.35em;
+  border: 2px solid var(--text-3);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: wiz-spin 0.9s linear infinite;
+}
+@keyframes wiz-spin {
+  to { transform: rotate(360deg); }
+}
 .wiz-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: 0.75rem;
