@@ -376,6 +376,10 @@ async function refresh() {
 // new one after every poll. Polling stays around as a fallback.
 let eventStream = null;
 let pollingFallbackTimer = null;
+// One-shot guard for the first-boot auto-redirect into the setup
+// wizard. Without it, removing the last transport mid-session would
+// kick the user back to #/setup unexpectedly.
+let _firstBootRedirected = false;
 function openStream() {
   if (eventStream) return;
   try {
@@ -418,7 +422,25 @@ function renderStatus(run) {
   // Setup-state checks. Order matters: "set up the wizard" wins over
   // "no devices yet" so a first-boot user is pointed at the right
   // next action.
-  if ((t.configured || 0) === 0) { setStatus("warn", "Setup needed"); return; }
+  if ((t.configured || 0) === 0) {
+    setStatus("warn", "Setup needed");
+    // First-boot redirect: nothing's configured, nothing's worth
+    // showing on the dashboard, so drop the user straight into the
+    // wizard rather than making them hunt for Settings → Setup.
+    // Only on the home/dashboard routes; respects kiosk, docs, and
+    // anyone who's already in the wizard. One-shot via a module
+    // flag so a slow-clicker mid-wizard isn't yanked back if the
+    // first transport gets added then removed.
+    if (!_firstBootRedirected) {
+      const h = (window.location.hash || "").replace(/^#\/?/, "").trim();
+      const onLandable = (h === "" || h === "dashboard");
+      if (onLandable) {
+        _firstBootRedirected = true;
+        window.location.hash = "#/setup";
+      }
+    }
+    return;
+  }
   if ((t.open || 0) === 0)       { setStatus("warn", "BLE not connected"); return; }
   // Now the polling-health view. last_run might be null on a fresh
   // daemon that hasn't completed its first poll yet.
