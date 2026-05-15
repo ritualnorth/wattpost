@@ -2759,6 +2759,24 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   padding: 1.25rem 1.5rem;
   max-width: 800px;
   line-height: 1.55;
+  /* CRITICAL on mobile: grid items default to `min-width: auto`
+   * which equals the intrinsic content width — so any long
+   * unbreakable token (a URL, an inline code chip, a wide table)
+   * silently pushes the column past the viewport, with text
+   * running off the right edge. `min-width: 0` lets the grid
+   * track shrink as expected; `overflow-wrap: anywhere` makes
+   * long English compounds ("Stripe-managed") and code identifiers
+   * break at character level if there's no natural break. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* Inline code in body text — wrap at character boundaries on
+ * mobile so a long path / package id doesn't push the column wide. */
+.docs-content p code,
+.docs-content li code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .docs-content h1 {
   font-size: 1.55rem; margin: 0 0 .9rem;
