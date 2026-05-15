@@ -444,6 +444,14 @@
         </div>
 
         <div class="wizard">
+          <!-- BLE adapter status — diagnostic at the top so users
+               can tell if their dongle / docker passthrough is even
+               reaching the daemon before fiddling with anything else. -->
+          <div id="wiz-ble-status" class="wiz-ble-status">
+            <span class="wiz-ble-dot"></span>
+            <span class="wiz-ble-label">Checking Bluetooth…</span>
+          </div>
+
           <!-- Step 1 — transport -->
           <div class="wiz-step">
             <div class="wiz-step-head"><span class="wiz-num">1</span><span>Pick a BLE transport</span></div>
@@ -665,6 +673,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=84"></script>
+  <script src="/web/app.js?v=85"></script>
 </body>
 </html>

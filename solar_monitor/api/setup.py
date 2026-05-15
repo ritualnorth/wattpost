@@ -77,6 +77,72 @@ def _clean_ascii(b: bytes) -> str:
     return re.sub(r"\s+", " ", text)
 
 
+@get("/api/setup/ble_status")
+async def ble_status() -> dict[str, Any]:
+    """List BLE adapters visible to the daemon. Used by the Setup
+    wizard to surface "Bluetooth is reaching the container / Pi"
+    vs "no radio detected — check the dongle".
+
+    Parses `bluetoothctl list` (and falls back to nothing if the
+    command isn't installed). Each adapter shows its name (hci0,
+    hci1, …), MAC, and powered-state from `bluetoothctl show`.
+    """
+    bctl = shutil.which("bluetoothctl")
+    if bctl is None:
+        return {
+            "available": False,
+            "reason": "bluetoothctl not installed in this environment",
+            "adapters": [],
+        }
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            bctl, "list",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+    except (FileNotFoundError, asyncio.TimeoutError) as e:
+        return {"available": False, "reason": str(e), "adapters": []}
+
+    adapters: list[dict[str, Any]] = []
+    # `bluetoothctl list` output: `Controller XX:XX:XX:XX:XX:XX hci0 [default]`
+    for line in out.decode("utf-8", errors="replace").splitlines():
+        m = re.match(r"^Controller\s+([0-9A-Fa-f:]{17})\s+(\S+)(.*)$", line.strip())
+        if not m:
+            continue
+        mac, name, rest = m.group(1), m.group(2), m.group(3)
+        # Default-controller flag.
+        default = "[default]" in rest
+        # Probe powered-state. Best-effort, separate call per adapter
+        # so a stuck adapter doesn't kill the whole listing.
+        powered = None
+        try:
+            sp = await asyncio.create_subprocess_exec(
+                bctl, "show", mac,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            sout, _ = await asyncio.wait_for(sp.communicate(), timeout=3)
+            for ln in sout.decode("utf-8", errors="replace").splitlines():
+                if "Powered:" in ln:
+                    powered = "yes" in ln.lower()
+                    break
+        except Exception:
+            pass
+        adapters.append({
+            "name":    name,
+            "address": mac,
+            "default": default,
+            "powered": powered,
+        })
+
+    return {
+        "available": bool(adapters),
+        "reason":    None if adapters else "no Bluetooth controllers found",
+        "adapters":  adapters,
+    }
+
+
 @get("/api/setup/transports")
 async def list_setup_transports(state: State) -> dict[str, Any]:
     """Return configured transports with their live open/closed state."""

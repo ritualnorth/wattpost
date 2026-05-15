@@ -4391,7 +4391,11 @@ async function wizLoadTransports() {
     ]);
     wizState.knownKeys = new Set(devices.map(d => wizKnownKey(d.transport, d.slave_id)));
     if (!transports.length) {
-      host.innerHTML = `<div class="wiz-empty">No transports configured yet. Add one to <code>config.yaml</code> and restart the daemon.</div>`;
+      host.innerHTML = `<div class="wiz-empty">
+        <p><strong>No BLE transport configured.</strong></p>
+        <p>A "transport" is one BT-2 dongle (or similar) the daemon connects to. Until that's set up, scanning for devices can't run.</p>
+        <p class="settings-foot">A one-click "Find my dongle" wizard is coming. For now, add a transport entry to <code>config.yaml</code> and restart the daemon — see <a href="/web/docs/devices.md" target="_blank" rel="noopener">Adding devices</a> for the exact YAML.</p>
+      </div>`;
       return;
     }
     host.innerHTML = transports.map(t => `
@@ -4546,7 +4550,40 @@ $("#wiz-scan-btn").addEventListener("click", wizScan);
 
 // Lazy-load when user navigates to Setup so we don't waste a request on
 // every page load. setRoute() fires this hook.
-function onEnterSetup() { wizLoadTransports(); }
+function onEnterSetup() {
+  wizLoadTransports();
+  wizCheckBleStatus();
+}
+
+// Surface BLE adapter status at the top of the wizard. Cheap diagnostic
+// that answers "is my dongle / docker passthrough even reaching the
+// daemon?" before the user starts wondering why scan does nothing.
+async function wizCheckBleStatus() {
+  const host = $("#wiz-ble-status");
+  if (!host) return;
+  let data;
+  try {
+    data = await api("/api/setup/ble_status");
+  } catch (e) {
+    host.className = "wiz-ble-status wiz-ble-warn";
+    host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label">Bluetooth status check failed: ${escHtml(String(e.message || e))}</span>`;
+    return;
+  }
+  if (!data.available || !data.adapters?.length) {
+    host.className = "wiz-ble-status wiz-ble-bad";
+    const reason = data.reason || "no Bluetooth controllers found";
+    host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth not reachable</strong> — ${escHtml(reason)}. Check your USB BLE dongle is plugged in${" "}${navigator.userAgent.includes("Docker") ? "" : "(if running in Docker, confirm network_mode: host + /var/run/dbus is bind-mounted)"}.</span>`;
+    return;
+  }
+  const list = data.adapters.map(a => {
+    const power = a.powered === false ? " · <span class='wiz-ble-warn-text'>powered off</span>" :
+                  a.powered === true ? "" : "";
+    const def = a.default ? " <em>(default)</em>" : "";
+    return `<code>${escHtml(a.name)}</code> ${escHtml(a.address)}${def}${power}`;
+  }).join(" · ");
+  host.className = "wiz-ble-status wiz-ble-ok";
+  host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth ready</strong> — ${list}</span>`;
+}
 
 // ---------- diagnostics (log tail) ----------
 let diagTimer = null;
