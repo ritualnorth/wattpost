@@ -248,7 +248,7 @@ function applyTheme(pref) {
   // visible renderer.
   const route = currentRouteName?.();
   if (route === "history") { refreshChart?.(); refreshHeatmap?.(); }
-  else if (route === "dashboard") { refreshDriftSparkline?.(); refreshBatteryHealth?.(); }
+  else if (route === "dashboard") { refreshDriftSparkline?.(); refreshBatteryHealth?.(); refreshRuntimeForecast?.(); }
 }
 function chartPalette() {
   const s = getComputedStyle(document.documentElement);
@@ -683,6 +683,8 @@ function renderHero() {
   const rem = computeRemaining(bank);
   $("#bank-time").textContent = rem.primary;
   $("#bank-time-sub").textContent = rem.secondary;
+  // The forecast-aware line is populated by refreshRuntimeForecast()
+  // on its own cadence — render here just keeps the existing values.
 
   // Source-disagreement hint (#121). Only rendered when both a
   // shunt and one or more BMSes are present AND their SoC readings
@@ -2466,6 +2468,76 @@ async function refreshDriftSparkline() {
       ],
     }, [data.ts, data.values], root);
   } catch (e) { console.error("drift sparkline:", e); }
+}
+
+// ---------- runtime prediction (#99) ----------
+// The Hero tile's "Remaining" line is naive — current power × current SoC.
+// This fetcher overlays a forecast-aware line below it: "Forecast: lasts
+// 4.5 days" (sunny) or "depleted Wed 02:00" (cloudy). Driven from a
+// rolling 1-hour avg load and the cached Open-Meteo / Solcast forecast.
+async function refreshRuntimeForecast() {
+  const fcEl = document.getElementById("bank-time-forecast");
+  if (!fcEl) return;
+  let data;
+  try { data = await api("/api/runtime-forecast"); }
+  catch (e) { fcEl.hidden = true; return; }
+  if (!data || !data.ok) {
+    fcEl.hidden = true;
+    return;
+  }
+
+  const naive = data.naive || {};
+  const fc    = data.forecast || {};
+  let text = "";
+  let title = "";
+
+  if (fc.available) {
+    if (fc.reserves_indefinite) {
+      // Forecast says you stay above 10% across the horizon — express
+      // as "reserve days" using the naive rate.
+      if (naive.hours_to_empty != null) {
+        const days = naive.hours_to_empty / 24;
+        text = `Forecast: holds for the ${fc.horizon_hours.toFixed(0)}h window`;
+      } else {
+        text = `Forecast: stable across ${fc.horizon_hours.toFixed(0)}h`;
+      }
+      title = "PV input covers your average draw across the forecast horizon.";
+    } else if (fc.depletion_ts) {
+      const when = new Date(fc.depletion_ts * 1000);
+      const hours = fc.hours_to_empty;
+      if (hours != null) {
+        // Choose phrasing by horizon
+        if (hours < 24) {
+          text = `Forecast: ~${hours.toFixed(1)}h until 10% (${when.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})})`;
+        } else {
+          const days = hours / 24;
+          text = `Forecast: ~${days.toFixed(1)} days until 10% (${when.toLocaleDateString([], {weekday:"short", month:"short", day:"numeric"})})`;
+        }
+      }
+      title = "Hourly walk of avg load minus forecast PV until SoC hits 10 % reserve.";
+    }
+  } else if (naive.hours_to_empty != null) {
+    // No forecast — show the naive rolling-average view as a secondary line.
+    const hours = naive.hours_to_empty;
+    if (hours < 24) {
+      text = `1h-avg load: ~${hours.toFixed(1)}h to 10%`;
+    } else {
+      text = `1h-avg load: ~${(hours / 24).toFixed(1)} days to 10%`;
+    }
+    title = "Average draw over the last hour, no PV factored in.";
+  } else if (naive.status === "charging") {
+    text = "1h-avg: charging";
+  } else if (naive.status === "idle") {
+    text = "1h-avg: idle";
+  }
+
+  if (text) {
+    fcEl.textContent = text;
+    fcEl.title = title;
+    fcEl.hidden = false;
+  } else {
+    fcEl.hidden = true;
+  }
 }
 
 // ---------- battery health tile (#109) ----------
@@ -6589,7 +6661,7 @@ setRoute(currentRouteName());
 // connection is established (and as a backstop on browsers that fail to
 // open EventSource). The stream takes over once the first event lands.
 refresh().then(() => {
-  if (currentRouteName() === "dashboard") { refreshDriftSparkline(); refreshBatteryHealth(); }
+  if (currentRouteName() === "dashboard") { refreshDriftSparkline(); refreshBatteryHealth(); refreshRuntimeForecast(); }
   if (currentRouteName() === "history") { refreshChart(); refreshHeatmap(); }
 });
 openStream();

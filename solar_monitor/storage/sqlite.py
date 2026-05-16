@@ -1329,6 +1329,34 @@ class Store:
             "bank_capacity_ah": round(cap_ah, 1) if cap_ah else None,
         }
 
+    async def rolling_load_avg(self, window_seconds: int = 3600) -> float | None:
+        """Mean bank power (W) over the last `window_seconds`. Negative
+        when discharging.
+
+        Used by the runtime-forecast endpoint (#99) to make "hours to
+        empty" stable. The instant V×I number is volatile — a kettle
+        on for 30 seconds drags it down to a worrying value. A rolling
+        1-hour average tracks the actual draw pattern."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        now = int(time.time())
+        since = now - window_seconds
+        async with self._db.execute(
+            "SELECT AVG(v.value * i.value) "
+            "FROM samples v "
+            "JOIN samples i "
+            "  ON v.ts = i.ts AND v.device = i.device "
+            "WHERE v.metric = 'voltage_v' "
+            "  AND i.metric = 'current_a' "
+            "  AND v.device LIKE 'battery_%' "
+            "  AND v.ts >= ?",
+            (since,),
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0] is not None:
+                return float(row[0])
+        return None
+
     async def load_heatmap(self, since_ts: int, until_ts: int) -> dict[str, Any]:
         """Aggregate bank power (V×I summed across packs) by hour-of-day
         × day-of-week. Returns a 7×24 grid of mean load (positive = the

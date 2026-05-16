@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.35] — 2026-05-16
+
+### Added — Forecast-aware runtime prediction (#99)
+- **New sub-line on the Hero's Remaining tile.** The existing
+  "until empty" was always naive: current instant power × current
+  SoC. A 2 kW kettle on for 30 seconds would drag it down to a
+  scary number, then bounce back. Two replacements ride below it:
+  - **Forecast-aware** (when an Open-Meteo or Solcast forecast is
+    cached): walks hourly through the next 48h, subtracts forecast
+    PV from a rolling 1-hour avg load, and reports either an
+    absolute depletion time ("~14h until 10% — 02:30 Tue") or
+    "holds for the 48h window" when PV input covers the draw.
+  - **Naive rolling fallback** (no forecast configured): same
+    1-hour avg load but no PV — "1h-avg: ~3.2 days to 10%".
+- **Why the 10 % floor**: LFP wants headroom; predicting to 0 % is
+  both alarming and academic since loads cut out before then.
+- **Hidden gracefully** when there's no bank capacity to predict
+  from (fresh install) or no historical load to average from.
+
+### API
+- New `GET /api/runtime-forecast` returning `now`, `naive`, and
+  `forecast` blocks. The forecast walk is best-effort — failures
+  return `forecast.available=false` and the UI falls back to the
+  naive line.
+
+### Storage
+- New `Store.rolling_load_avg(window_seconds=3600)` returning mean
+  bank power over the trailing window. Negative when discharging.
+  Single-query AVG across the V×I join — cheap on the rollup
+  tables.
+
 ## [0.0.34] — 2026-05-16
 
 ### Added — Battery health tile (#109)

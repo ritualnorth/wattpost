@@ -97,6 +97,117 @@ async def today(state: State) -> dict[str, Any]:
     return await store.today_aggregate(midnight, now)
 
 
+@get("/api/runtime-forecast")
+async def runtime_forecast(state: State) -> dict[str, Any]:
+    """Battery runtime prediction (#99).
+
+    Two layers:
+
+      * **Naive**: rolling 1-hour avg load → hours to SoC 10% at
+        present rate. Stable; survives a transient kettle.
+      * **Forecast-aware**: integrate next 48h of forecast PV
+        against the avg load and walk the bank's SoC down each
+        hour. Reports either an absolute depletion timestamp OR a
+        "reserve days" number if the forecast says you stay above
+        10% indefinitely.
+
+    The frontend renders both lines under the Hero tile's "until
+    empty" so customers see both the worst-case (naive) and the
+    expected (forecast)."""
+    store: Store = state["store"]
+
+    # Pull current bank state from the latest table.
+    latest = await store.get_latest()
+    bank = latest.get("bank") or {}
+    soc_pct = bank.get("soc_pct")
+    cap_ah = bank.get("capacity_ah")
+    voltage = bank.get("voltage_v") or 12.8
+    if not isinstance(soc_pct, (int, float)) or not isinstance(cap_ah, (int, float)) or cap_ah <= 0:
+        return {"ok": False, "reason": "no_bank"}
+
+    bank_wh = float(cap_ah) * float(voltage)
+    reserve_pct = 10.0  # don't predict past 10% SoC — LFP wants headroom
+    usable_wh = bank_wh * max(0.0, float(soc_pct) - reserve_pct) / 100.0
+
+    # Rolling 1-hour average load (negative when discharging).
+    avg_w = await store.rolling_load_avg(3600)
+    naive: dict[str, Any] = {"avg_load_w": None, "hours_to_empty": None}
+    if avg_w is not None:
+        naive["avg_load_w"] = round(avg_w, 1)
+        if avg_w < -5:  # discharging at >5 W
+            naive["hours_to_empty"] = round(usable_wh / abs(avg_w), 2)
+        elif avg_w > 5:
+            # Charging — would never empty at this rate
+            naive["status"] = "charging"
+        else:
+            naive["status"] = "idle"
+
+    # Forecast-aware: try to load the cached forecast and walk hourly.
+    forecast_result: dict[str, Any] = {"available": False}
+    try:
+        cached = await store.kv_get("forecast:pv")
+        if cached is not None:
+            body, _ = cached
+            payload = json.loads(body)
+            points = payload.get("points") or []
+            # points: [{"ts": unix, "watts": float}, ...] hourly
+            # We only care about future points.
+            now_ts = int(time.time())
+            future = [(int(p["ts"]), float(p.get("pv_w") or 0))
+                      for p in points if int(p.get("ts", 0)) > now_ts]
+            future.sort()
+            if future and avg_w is not None and avg_w < -5:
+                # Walk hourly: net = pv_w - |load_w|.
+                # Stop when SoC hits reserve_pct.
+                soc_wh = usable_wh
+                load_w = abs(avg_w)
+                depletion_ts = None
+                survived_horizon = True
+                prev_ts = now_ts
+                for ts, pv_w in future:
+                    dt_h = (ts - prev_ts) / 3600.0
+                    net_w = float(pv_w) - load_w
+                    soc_wh += net_w * dt_h
+                    if soc_wh <= 0:
+                        # Linear interpolate within this hour.
+                        # frac = (current_soc_before_step) / (net_w * dt_h * -1)
+                        prev_soc = soc_wh - net_w * dt_h
+                        if net_w * dt_h < 0:
+                            frac = prev_soc / (-net_w * dt_h)
+                            depletion_ts = int(prev_ts + frac * (ts - prev_ts))
+                        else:
+                            depletion_ts = ts
+                        survived_horizon = False
+                        break
+                    prev_ts = ts
+                forecast_result = {
+                    "available": True,
+                    "horizon_hours": round((future[-1][0] - now_ts) / 3600.0, 1),
+                    "depletion_ts":  depletion_ts,
+                    "hours_to_empty": (
+                        round((depletion_ts - now_ts) / 3600.0, 1)
+                        if depletion_ts else None
+                    ),
+                    "reserves_indefinite": survived_horizon,
+                }
+    except Exception:
+        # Forecast lookup is best-effort; never fail the endpoint.
+        # Forecast walk failures are non-fatal; swallow.
+        pass
+
+    return {
+        "ok": True,
+        "now": {
+            "soc_pct":   round(float(soc_pct), 1),
+            "capacity_ah": round(float(cap_ah), 1),
+            "voltage_v": round(float(voltage), 2),
+            "usable_wh": round(usable_wh, 1),
+        },
+        "naive": naive,
+        "forecast": forecast_result,
+    }
+
+
 @get("/api/battery-health")
 async def battery_health(state: State, days: int = 30) -> dict[str, Any]:
     """SoC residency histogram + cycle/lifetime numbers for the Battery
