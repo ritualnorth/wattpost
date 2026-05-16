@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.9] — 2026-05-16
+
+### Fixed
+- **Bumped the `/web/app.js?v=` cache-buster** in index.html.
+  Several recent appliance fixes (Settings → About row visibility,
+  history chart forecast bound, Check-now button focus state)
+  were sitting unread in the container because the script-tag's
+  version query hadn't moved since v0.0.5 — Cloudflare's edge
+  was serving the same URL out of its 4h cache regardless of
+  what the container actually held. From now on the index.html
+  `?v=` must move in lockstep with `sw.js` CACHE_VERSION so
+  every JS update gets a fresh URL that bypasses any CDN cache.
+
 ## [0.0.8] — 2026-05-16
 
 ### Fixed
