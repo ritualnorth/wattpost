@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from .base import CurrentWeather, WeatherProvider
+from .base import CurrentWeather, HourlyForecast, WeatherProvider
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +26,12 @@ _CURRENT_FIELDS = ",".join([
     "is_day", "precipitation", "weather_code", "cloud_cover",
     "pressure_msl", "wind_speed_10m", "wind_direction_10m",
 ])
+_HOURLY_FIELDS = ",".join([
+    "temperature_2m", "weather_code", "is_day",
+])
+# How many forward hours to keep in the cached payload. 12 hours is
+# Apple-Weather-ish density while staying small (≈ 1 kB extra JSON).
+_HOURLY_KEEP = 12
 
 
 class OpenMeteoProvider(WeatherProvider):
@@ -40,6 +46,7 @@ class OpenMeteoProvider(WeatherProvider):
             "latitude":  self.lat,
             "longitude": self.lon,
             "current":   _CURRENT_FIELDS,
+            "hourly":    _HOURLY_FIELDS,
             "daily":     "sunrise,sunset",
             "timezone":  "auto",
             "wind_speed_unit": "ms",
@@ -82,6 +89,7 @@ class OpenMeteoProvider(WeatherProvider):
             is_day=bool(cur.get("is_day")) if cur.get("is_day") is not None else None,
             sunrise_ts=sunrise,
             sunset_ts=sunset,
+            hourly=_extract_hourly(body.get("hourly") or {}, observed),
         )
 
 
@@ -91,6 +99,37 @@ def _num(v):
 
 def _int(v):
     return None if v is None else int(v)
+
+
+def _extract_hourly(hourly: dict, observed_ts: int | None) -> list[HourlyForecast]:
+    """Slice the Open-Meteo `hourly` block down to the next ~12 hours
+    starting at or after `observed_ts`. The API returns parallel
+    arrays (`time`, `temperature_2m`, `weather_code`, `is_day`) all
+    of the same length; we zip them and drop anything before the
+    current observation hour so the dashboard never shows a slice
+    that's already in the past. Returns [] if the payload is missing
+    or shorter than expected."""
+    times = hourly.get("time") or []
+    if not times:
+        return []
+    temps    = hourly.get("temperature_2m") or []
+    codes    = hourly.get("weather_code")  or []
+    is_days  = hourly.get("is_day")        or []
+    out: list[HourlyForecast] = []
+    cutoff = observed_ts or 0
+    for i, t in enumerate(times):
+        ts = _parse_iso(t)
+        if ts is None or ts < cutoff:
+            continue
+        out.append(HourlyForecast(
+            ts=ts,
+            temperature_c=_num(temps[i]) if i < len(temps) else None,
+            weather_code=_int(codes[i])  if i < len(codes) else None,
+            is_day=bool(is_days[i]) if i < len(is_days) and is_days[i] is not None else None,
+        ))
+        if len(out) >= _HOURLY_KEEP:
+            break
+    return out
 
 
 def _parse_iso(s):

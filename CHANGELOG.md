@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.11] — 2026-05-16
+
+### Added
+- **Right-now tile now shows the next 8 hours.** Apple-Weather-
+  style hourly strip at the bottom of the panel: HH:00 label,
+  a tiny WMO icon (sun / partly cloudy / cloud / rain / snow /
+  thunder, switched to a moon for night-time clear skies), and
+  the predicted °C for each cell. Pulled from the same
+  Open-Meteo fetch as the current conditions — one extra HTTP
+  param, no new provider — so refresh cadence + auth-free
+  setup is unchanged. The strip is hidden if the provider
+  doesn't return hourly data, and scrolls horizontally on
+  narrow viewports rather than wrapping.
+
 ## [0.0.10] — 2026-05-16
 
 ### Changed

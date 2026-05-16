@@ -1555,6 +1555,53 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   color: var(--text);
 }
 
+/* Hourly forecast strip (next ~8 hours). Sits under the meta row; on
+ * narrow viewports the cells scroll horizontally rather than wrap so
+ * the row keeps reading as a continuous timeline. */
+.weather-hourly {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: .35rem;
+  padding-top: .6rem;
+  margin-top: .25rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-hourly {
+    grid-auto-flow: column;
+    grid-auto-columns: 56px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: .15rem;
+  }
+}
+.weather-hour {
+  display: flex; flex-direction: column;
+  align-items: center; gap: .15rem;
+  padding: .35rem .15rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.weather-hour-t {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--text-3);
+}
+.weather-hour-i {
+  width: 24px; height: 24px;
+  color: var(--accent);
+  display: block;
+}
+.weather-hour-i svg { width: 100%; height: 100%; display: block; }
+.weather-hour-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .85rem;
+  color: var(--text);
+}
+
 /* Today panel — two-column layout: hero numbers on the left, the
  * forecast sparkline on the right. The hero's big kWh-so-far reading
  * sits above three compact sub-cells (charged Ah, peak, load). The

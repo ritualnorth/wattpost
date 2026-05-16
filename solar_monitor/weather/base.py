@@ -5,6 +5,15 @@ import abc
 import msgspec
 
 
+class HourlyForecast(msgspec.Struct):
+    """One hour-ahead slice. Used to draw the "next few hours" strip
+    in the Right-now tile (a-la Apple Weather's hourly preview)."""
+    ts: int                           # unix seconds at the start of the hour
+    temperature_c: float | None = None
+    weather_code: int | None = None
+    is_day: bool | None = None
+
+
 class CurrentWeather(msgspec.Struct):
     """Snapshot of current conditions. Optional fields are None when
     the provider doesn't report them — keeps the schema additive as
@@ -35,6 +44,11 @@ class CurrentWeather(msgspec.Struct):
     # Sun events for today, as unix seconds in the user's local tz.
     sunrise_ts: int | None = None
     sunset_ts: int | None = None
+
+    # Next ~8 hours, starting from the upcoming hour. None when the
+    # provider doesn't surface hourly data or we're between fetches
+    # and the cache still holds an older schema.
+    hourly: list[HourlyForecast] | None = None
 
 
 class WeatherProvider(abc.ABC):
