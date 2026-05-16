@@ -100,9 +100,38 @@ class CloudService:
             # under key `cloud.branding`. Hobby/Pro accounts → empty
             # dict, which clears any previously-cached brand.
             self._cache_branding(body.get("branding") or {})
+            # SSO secret distribution (#137). Cloud always echoes this
+            # back; if our local copy is empty (legacy pair, or first
+            # heartbeat post-update), persist it to config.yaml so the
+            # /sso endpoint can verify cloud-signed redirect tokens.
+            self._maybe_persist_sso_secret(body.get("sso_secret"))
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         return True
+
+    def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
+        """Save the cloud-issued SSO HMAC key if we don't already have
+        one. Idempotent — if our copy matches, no-op. If it differs
+        (cloud rotated), trust the cloud and update. Persistence goes
+        through the same config.yaml write path the pair flow uses,
+        so the appliance survives restarts."""
+        if not sso_secret or not isinstance(sso_secret, str):
+            return
+        if self.cfg.sso_secret == sso_secret:
+            return
+        log.info("cloud heartbeat: caching SSO secret (was empty=%s)",
+                 not self.cfg.sso_secret)
+        try:
+            # Mutate the live config struct in place AND persist to
+            # config.yaml so the new secret survives daemon restart.
+            self.cfg.sso_secret = sso_secret
+            # Delegate the file write to the cloud_admin helper so the
+            # YAML round-trip stays consistent across all writers.
+            from ..api import cloud_admin as _ca
+            cfg_path = getattr(self.scheduler, "config_path", None)
+            _ca.persist_cloud_cfg(self.cfg, config_path=cfg_path)
+        except Exception:
+            log.exception("cloud heartbeat: failed to persist sso_secret")
 
     def _cache_branding(self, branding: dict[str, Any]) -> None:
         """Persist the {brand_name, brand_support_email, brand_logo_url}

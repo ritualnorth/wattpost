@@ -8,6 +8,59 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.38] — 2026-05-16
+
+### Added — Cloud→appliance SSO (#137)
+- **Cloud-signed redirect tokens replace the "give everyone the
+  tunnel URL" model.** When a logged-in cloud user clicks "Open"
+  on the dashboard, the cloud now mints a short-lived
+  HMAC-SHA256 token bound to (`user_id`, `appliance_id`,
+  `exp=now+60s`, random `jti`), and redirects the user to
+  `https://{slug}.appliances.wattpost.io/sso?token=…`. The
+  appliance verifies the signature against a per-appliance
+  `sso_secret` exchanged at pair time, issues a session cookie
+  tagged `origin=sso`, and bounces to `/`. Transparent to the
+  user: cloud login is the front door, no local-password prompt.
+
+- **Tunnel-origin requests now require an SSO-issued session.**
+  The middleware separates `is_session_valid()` (any local
+  session OK) from `is_session_valid_for_tunnel()` (SSO origin
+  required). Local password is still usable for LAN / kiosks /
+  break-glass; it just can't grant tunnel access on its own.
+  Closes the threat: a leaked tunnel URL is now harmless — the
+  recipient has to log into your cloud account first to mint
+  a valid token.
+
+- **Replay protection**: the appliance caches `jti` claims of
+  recently-consumed tokens until exp+10s; a second use within
+  that window is rejected even with a valid signature. Tokens
+  are effectively single-use.
+
+### Storage / schema
+- **Cloud**: new `appliances.sso_secret` column (32-byte hex).
+  Migration 0021 backfills all existing rows with a fresh
+  secret; new rows get one from a `default=` on the model.
+- **Appliance**: new `cloud.sso_secret` field on `CloudCfg`,
+  persisted to `config.yaml`. The cloud heartbeat response
+  always includes the current cloud-side value; the appliance
+  picks it up on first heartbeat post-update so legacy pairs
+  don't need to re-pair.
+
+### Endpoints
+- Cloud: new `GET /api/sites/{id}/sso` (cookie-auth, owner-only)
+  returning `{redirect_url, expires_in}`.
+- Appliance: new `GET /sso?token=…` (anonymous) verifying the
+  token + issuing the session cookie.
+
+### Threat model notes
+- The tunnel itself stays always-on (cloudflared maintains a
+  permanent connection); we don't try to gate the tunnel
+  lifecycle. Auth lives at the appliance — anyone with the URL
+  reaches the auth wall, doesn't sneak past it.
+- Local password becomes the LAN fallback / break-glass route;
+  no more single-token-grants-everything. See [[docker-pi-parity]]
+  in agent memory.
+
 ## [0.0.37] — 2026-05-16
 
 ### Security — Docker installs were also wide open (urgent follow-up to 0.0.36)

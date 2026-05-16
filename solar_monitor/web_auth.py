@@ -63,13 +63,22 @@ ANONYMOUS_PATH_PREFIXES = (
     "/manifest.webmanifest",
     "/service-worker.js",
     "/api/login",
+    "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
     # /api/heartbeat is bearer-token authed elsewhere; the middleware
     # leaves the auth header path alone.
 )
 
-# In-memory session store. Token → (issued_at_epoch,) tuple so a
-# future expiry policy can add fields without breaking unpacks.
-_SESSIONS: dict[str, float] = {}
+# In-memory session store. Token → {"issued_at": epoch, "origin": "local"|"sso"}.
+# Origin matters because tunnel-origin requests must be backed by an
+# "sso" session — a local-password session shouldn't grant tunnel
+# access (the password is a fallback for LAN, not the perimeter for
+# internet exposure).
+_SESSIONS: dict[str, dict[str, float | str]] = {}
+# Recently-used SSO nonces (jti claims). HMAC tokens are otherwise
+# replayable within their 60 s window if intercepted. Keys are the
+# nonce strings; values are the unix-second they expire. Cleaned on
+# every issue.
+_SSO_NONCES_SEEN: dict[str, int] = {}
 
 
 def _argon2_hasher():
@@ -112,12 +121,17 @@ def verify_password(plaintext: str) -> bool:
         return False
 
 
-def issue_session() -> str:
+def issue_session(origin: str = "local") -> str:
     """Generate a fresh session token and remember it. Returns the
-    token; caller drops it in the response Set-Cookie."""
+    token; caller drops it in the response Set-Cookie.
+
+    `origin` tags the session for the tunnel-origin check in the
+    middleware — "local" for local-password logins, "sso" for
+    cloud-redirect SSO logins. Tunnel-origin requests require an
+    "sso" session (see is_session_valid_for_tunnel)."""
     _gc_sessions()
     token = secrets.token_urlsafe(32)
-    _SESSIONS[token] = time.time()
+    _SESSIONS[token] = {"issued_at": time.time(), "origin": origin}
     return token
 
 
@@ -125,16 +139,32 @@ def revoke_session(token: str) -> None:
     _SESSIONS.pop(token, None)
 
 
-def is_session_valid(token: str | None) -> bool:
+def _session_record(token: str | None) -> dict[str, float | str] | None:
     if not token:
-        return False
-    issued = _SESSIONS.get(token)
-    if issued is None:
-        return False
-    if time.time() - issued > SESSION_TTL_SECONDS:
+        return None
+    rec = _SESSIONS.get(token)
+    if rec is None:
+        return None
+    if time.time() - float(rec["issued_at"]) > SESSION_TTL_SECONDS:
         _SESSIONS.pop(token, None)
+        return None
+    return rec
+
+
+def is_session_valid(token: str | None) -> bool:
+    return _session_record(token) is not None
+
+
+def is_session_valid_for_tunnel(token: str | None) -> bool:
+    """Tunnel-origin requests need a session whose origin is "sso" —
+    i.e. one issued by the /sso endpoint after verifying a cloud-
+    signed redirect token. Local-password sessions don't qualify
+    (you can still use the password on the LAN, but it can't grant
+    you internet-facing access on its own)."""
+    rec = _session_record(token)
+    if rec is None:
         return False
-    return True
+    return rec.get("origin") == "sso"
 
 
 def _gc_sessions() -> None:
@@ -142,9 +172,63 @@ def _gc_sessions() -> None:
     (a couple of admin browsers, in practice). Runs only on issue —
     don't pay the cost on every request."""
     now = time.time()
-    expired = [t for t, issued in _SESSIONS.items() if now - issued > SESSION_TTL_SECONDS]
+    expired = [t for t, rec in _SESSIONS.items()
+               if now - float(rec["issued_at"]) > SESSION_TTL_SECONDS]
     for t in expired:
         _SESSIONS.pop(t, None)
+    # Also GC the SSO nonce cache.
+    expired_n = [n for n, exp in _SSO_NONCES_SEEN.items() if exp < int(now)]
+    for n in expired_n:
+        _SSO_NONCES_SEEN.pop(n, None)
+
+
+def consume_sso_token(token: str, sso_secret_hex: str) -> dict | None:
+    """Verify a cloud-signed SSO redirect token. Returns the decoded
+    payload dict on success, None on any failure (bad signature,
+    expired, replayed, malformed).
+
+    Token format: `urlsafe_b64(payload_json)` + `.` + `urlsafe_b64(sig)`.
+    Sig is HMAC-SHA256(sso_secret_bytes, payload_json_bytes).
+
+    Replay protection: the `jti` claim is recorded in _SSO_NONCES_SEEN
+    until exp + 10s. A second use within that window is rejected even
+    if the signature is otherwise valid."""
+    import base64
+    import hashlib
+    import hmac
+    import json as _json
+
+    if not token or "." not in token or not sso_secret_hex:
+        return None
+    try:
+        body_b64, sig_b64 = token.split(".", 1)
+        # Pad for urlsafe_b64decode (we stripped = on the mint side).
+        pad = lambda s: s + "=" * (-len(s) % 4)
+        body = base64.urlsafe_b64decode(pad(body_b64))
+        sig  = base64.urlsafe_b64decode(pad(sig_b64))
+    except Exception:
+        return None
+    try:
+        key = bytes.fromhex(sso_secret_hex)
+    except ValueError:
+        return None
+    expected = hmac.new(key, body, hashlib.sha256).digest()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    try:
+        payload = _json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, _json.JSONDecodeError):
+        return None
+    exp = payload.get("exp")
+    if not isinstance(exp, int) or exp < int(time.time()):
+        return None
+    jti = payload.get("jti")
+    if not isinstance(jti, str) or not jti:
+        return None
+    if jti in _SSO_NONCES_SEEN:
+        return None  # replay
+    _SSO_NONCES_SEEN[jti] = exp + 10
+    return payload
 
 
 def is_loopback_source(scope: dict) -> bool:

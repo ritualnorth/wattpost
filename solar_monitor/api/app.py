@@ -595,6 +595,50 @@ def login_page() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
+@get("/sso", sync_to_thread=False)
+def sso_redirect(request: Request, state: State, token: str = "") -> Response:
+    """Cloud→appliance SSO landing (#137). The cloud's dashboard
+    mints a short-lived HMAC-signed token bound to (user, appliance,
+    exp=60s) and redirects the user here. We verify the signature
+    against the per-appliance `sso_secret` exchanged at pair time,
+    issue a session cookie tagged origin=sso, and bounce to /.
+
+    Failures fall through to /login so a stale link doesn't dead-end
+    the user."""
+    from .. import web_auth as _wa
+    config: Config = state["config"]
+    sso_secret = (config.cloud.sso_secret if config.cloud else "") or ""
+    if not sso_secret:
+        # Appliance hasn't heartbeated post-update yet; no key to
+        # verify against. Send the user to /login as a fallback.
+        return Response(
+            content="",
+            status_code=302,
+            headers={"Location": "/login?next=/&sso_unavail=1"},
+        )
+    payload = _wa.consume_sso_token(token, sso_secret)
+    if payload is None:
+        return Response(
+            content="",
+            status_code=302,
+            headers={"Location": "/login?next=/&sso_failed=1"},
+        )
+    session = _wa.issue_session(origin="sso")
+    resp = Response(content="", status_code=302, headers={"Location": "/"})
+    resp.set_cookie(
+        key=_wa.SESSION_COOKIE_NAME,
+        value=session,
+        max_age=_wa.SESSION_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+        # Tunnel is HTTPS-only at the CF edge; secure cookies survive
+        # the round-trip back through cloudflared to the appliance.
+        secure=True,
+    )
+    return resp
+
+
 @post("/api/login", status_code=200)
 async def do_login(data: dict, request: Request) -> Response:
     """Verify the supplied password, drop a session cookie. Returns
@@ -669,6 +713,10 @@ def build_app(
 ) -> Litestar:
     store = Store(db_path)
     scheduler = PollScheduler(config, store, interval_seconds=interval_seconds)
+    # Stash config_path on the scheduler too so the CloudService it
+    # owns can persist mutations (sso_secret from heartbeat) without
+    # needing access to app.state.
+    scheduler.config_path = config_path
 
     async def on_startup(app: Litestar) -> None:
         # uvicorn finishes its own logging dictConfig before this hook
@@ -809,8 +857,9 @@ def build_app(
             # NOT apply to tunnel-origin requests — a leaked tunnel
             # URL would otherwise leak every metric on the appliance
             # to anonymous viewers.
+            tunnel = _web_auth.is_tunnel_origin(scope)
             if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS") \
-                    and not _web_auth.is_tunnel_origin(scope):
+                    and not tunnel:
                 await self.app(scope, receive, send)
                 return
             # Look up the session cookie.
@@ -825,7 +874,15 @@ def build_app(
                 if part.startswith(_web_auth.SESSION_COOKIE_NAME + "="):
                     token = part.split("=", 1)[1]
                     break
-            if _web_auth.is_session_valid(token):
+            # Tunnel-origin requests require an SSO-issued session;
+            # local-password sessions only grant LAN access. Keeps the
+            # local password as a fallback while making cloud-login
+            # the actual perimeter for internet-facing traffic.
+            if tunnel:
+                ok = _web_auth.is_session_valid_for_tunnel(token)
+            else:
+                ok = _web_auth.is_session_valid(token)
+            if ok:
                 await self.app(scope, receive, send)
                 return
             # Reject.
@@ -927,6 +984,7 @@ def build_app(
             login_page,
             do_login,
             do_logout,
+            sso_redirect,
             static_router,
         ],
         on_startup=[on_startup],
