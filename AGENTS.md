@@ -27,6 +27,7 @@ Read in this order if you're new:
 | **Cut a real release** (see below)    | Bump `__version__` + CHANGELOG, commit, `git tag vX.Y.Z`, push tag.   |
 | Ship a feature to bleeding-edge testers | Just push to `main`. Builds `:edge` Docker tag, no manifest bump.    |
 | Debug a failed pi-gen run             | `gh run view <id> --log-failed`. Common failure modes documented in release-pipeline.md operator runbook |
+| Cloud incident / something on fire    | [docs/runbook.md](docs/runbook.md) — indexed by symptom (5xx, no heartbeats, tunnel down, etc) |
 | Edit production Caddy                 | Edit `vps-infra/caddy/Caddyfile`, push to vps-infra main, SSH in + `docker compose up -d shared-caddy` |
 | Smoke-test the cloud locally          | `cd cloud && docker compose up -d`; visit `http://localhost:8080`     |
 
