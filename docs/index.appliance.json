@@ -5,6 +5,7 @@
     { "slug": "first-boot",      "title": "First boot",               "section": "Setup" },
     { "slug": "docker-install",  "title": "Run in Docker",            "section": "Setup" },
     { "slug": "devices",         "title": "Adding devices",           "section": "Setup" },
+    { "slug": "wired-setup",     "title": "Wired setup (Cat5 / USB-RS485)", "section": "Setup" },
     { "slug": "pairing",         "title": "Pair with the cloud",      "section": "Setup" },
 
     { "slug": "alerts",          "title": "Alerts & notifications",   "section": "Features" },
