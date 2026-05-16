@@ -337,6 +337,10 @@ class PollScheduler:
                         await self.outputs.discover_all()
                         self._outputs_last_device_count = devices_now
                     await self.outputs.apply_snapshot()
+                    # Schedule engine (#117) — fires any rule whose
+                    # trigger landed since the last tick. Tolerant of
+                    # crash; no schedules configured = cheap no-op.
+                    await self.outputs.fire_schedules_if_due()
                 except Exception:
                     log.exception("outputs service hook failed")
                 # Fan out to exporters. Each exporter is non-blocking; if it
