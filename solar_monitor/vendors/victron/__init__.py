@@ -21,23 +21,43 @@ from ..base import VendorInfo
 from ..registry import register_vendor
 from .smart_shunt import VictronSmartShunt
 from .dcdc import VictronDcDc
+from .smart_solar import VictronSmartSolar
+from .orion_xs import VictronOrionXS
+from .smart_battery_protect import VictronSmartBatteryProtect
+from .ac_charger import VictronAcCharger
+from .smart_lithium import VictronSmartLithium
+from .lynx_smart_bms import VictronLynxSmartBMS
 
 INFO = VendorInfo(
     id="victron",
     display_name="Victron Energy",
     description=(
-        "Read-only via BLE Instant Readout. Currently supports the "
-        "SmartShunt battery monitor and Orion-Tr Smart DC-DC chargers; "
-        "SmartSolar and others to follow."
+        "Read-only via BLE Instant Readout. Covers SmartShunt + BMV "
+        "battery monitors, Orion-Tr Smart + Orion XS DC-DC chargers, "
+        "SmartSolar MPPTs (every model), Smart BatteryProtect load "
+        "disconnects, Blue Smart AC Chargers, Smart Lithium batteries, "
+        "and the Lynx Smart BMS. MultiPlus / Phoenix inverters use "
+        "VE.Bus and need a different transport — deferred."
     ),
 )
 
 register_vendor(
     info=INFO,
     drivers={
-        "shunt": VictronSmartShunt,
-        "dcdc":  VictronDcDc,
+        "shunt":            VictronSmartShunt,
+        "dcdc":             VictronDcDc,
+        "dcdc_xs":          VictronOrionXS,
+        "charge_controller": VictronSmartSolar,
+        "load_disconnect":  VictronSmartBatteryProtect,
+        "ac_charger":       VictronAcCharger,
+        "smart_battery":    VictronSmartLithium,
+        "bms":              VictronLynxSmartBMS,
     },
 )
 
-__all__ = ["INFO", "VictronSmartShunt", "VictronDcDc"]
+__all__ = [
+    "INFO",
+    "VictronSmartShunt", "VictronDcDc", "VictronSmartSolar",
+    "VictronOrionXS", "VictronSmartBatteryProtect", "VictronAcCharger",
+    "VictronSmartLithium", "VictronLynxSmartBMS",
+]

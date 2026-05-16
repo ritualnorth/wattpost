@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.20] — 2026-05-16
+
+### Added — Victron coverage sweep
+- **Victron SmartSolar MPPT driver (#131).** Every model from
+  75/15 through 250/100 — they all share one `SolarCharger` BLE
+  Instant Readout decoder, so one driver covers the whole family.
+  Registered as `(vendor=victron, kind=charge_controller)` so the
+  existing dashboard tiles render unchanged. Validated end-to-end
+  against the upstream BlueSolar 75/15 fixture.
+- **Victron Orion XS DC-DC driver.** Newer DC-DC line replacing
+  the Orion-Tr Smart family. Adds proper output-current
+  measurement. Registered as `kind=dcdc_xs` to coexist with the
+  existing Orion-Tr driver (`kind=dcdc`).
+- **Victron Smart BatteryProtect driver.** Load-disconnect device
+  (cuts the load circuit at low SoC). `kind=load_disconnect`.
+  Validated end-to-end against the 12/24V-65A fixture.
+- **Victron Blue Smart AC Charger driver.** Mains-input battery
+  charger; 3-output models surface each channel separately.
+  `kind=ac_charger`. Validated end-to-end against the IP22 12/30
+  fixture.
+- **Victron Smart Lithium driver.** Victron's own LFP battery
+  range. Surfaces per-cell voltages so the existing cell-balance
+  panel works unchanged. `kind=smart_battery`.
+- **Victron Lynx Smart BMS driver.** Distribution + BMS combo.
+  Reports V/A/SoC/consumed Ah/time-to-go/temps/contactor state.
+  `kind=bms`.
+
+WattPost now covers every consumer Victron BLE Instant Readout
+device. The only remaining Victron gap is VE.Bus (MultiPlus /
+Phoenix / Quattro inverters) — needs a separate transport,
+deferred until first customer asks.
+
 ## [0.0.19] — 2026-05-16
 
 ### Added
