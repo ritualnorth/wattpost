@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.19] — 2026-05-16
+
+### Added
+- **Renogy DCC50S / DCC30S driver (#123).** The DC-DC + MPPT combo
+  charger that dominates mid-tier van builds — single device with
+  both an alternator input and a solar input. Speaks Modbus RTU
+  over the existing BT-2 / USB-RS485 transports; just a new
+  register map. Configure with `vendor: renogy, kind: dcdc`.
+- Exposes alternator side (V / A / W), solar/PV side (V / A / W),
+  battery side (V / A / SoC / temp), daily extremes (min/max V,
+  max A, max charging W, today's Ah + Wh), lifetime totals, and
+  per-bit alarm decoding. Charging state includes the
+  `alternator_direct` value the DCC50S exposes (engine running,
+  pure alternator feed) that the Rover doesn't have.
+- Register map sourced from cyril/renogy-bt's `DCChargerClient.py`
+  — well-validated against real DCC50S hardware in production at
+  multiple van builders.
+
+### Notes for the user
+- Two vendors now register `device_kind: dcdc`: Victron (Orion-Tr)
+  and Renogy (DCC50S/DCC30S). The orchestrator resolves by
+  `(vendor, kind)` tuple, so both can coexist on the same Pi.
+
 ## [0.0.18] — 2026-05-16
 
 ### Added
