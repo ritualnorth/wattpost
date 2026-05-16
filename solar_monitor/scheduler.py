@@ -21,6 +21,7 @@ from .update import UpdateChecker
 from .config import Config
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
+from .outputs.service import OutputsService
 from .storage import Store
 
 log = logging.getLogger(__name__)
@@ -113,6 +114,15 @@ class PollScheduler:
             self._updater = UpdateChecker()
         except Exception:
             log.exception("update checker failed to initialise")
+
+        # Controllable outputs (#104). Discovery happens after the
+        # first poll lands (otherwise device_meta is empty and no
+        # adapter has anything to match against). The service then
+        # refreshes state from every subsequent poll snapshot.
+        self.outputs = OutputsService(config=config, store=store, scheduler=self)
+        # Tracks whether we've performed the post-first-poll discovery.
+        # Re-discover whenever new devices appear (count change).
+        self._outputs_last_device_count = -1
 
     @property
     def last_result(self) -> dict[str, Any] | None:
@@ -318,6 +328,17 @@ class PollScheduler:
                 result = await self._poller.poll()
                 self._last_result = result
                 await self.store.record_poll(result)
+                # Output adapters (#104) — discover-on-first-poll and
+                # refresh state from every snapshot. Tolerant of crash:
+                # any failure logs but doesn't stall polling.
+                try:
+                    devices_now = len(result.get("devices") or [])
+                    if devices_now != self._outputs_last_device_count:
+                        await self.outputs.discover_all()
+                        self._outputs_last_device_count = devices_now
+                    await self.outputs.apply_snapshot()
+                except Exception:
+                    log.exception("outputs service hook failed")
                 # Fan out to exporters. Each exporter is non-blocking; if it
                 # has its own queue it'll buffer. A misbehaving exporter does
                 # not stall the scheduler.

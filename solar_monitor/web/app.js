@@ -4369,10 +4369,135 @@ function renderDeviceDetail(label) {
         ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${next.label} →</a>` : ""}
       </div>
     </div>
-    ${inner}`;
+    ${inner}
+    <div id="outputs-host"></div>`;
 
   // Wire up the per-device chart after DOM is in place.
   wireDeviceDetailChart(dev);
+  // Async-fetch controllable outputs registered against this device.
+  // Renders nothing if the device has none — Rovers get a Load panel,
+  // smart batteries / shunts get nothing today (until #114 adds JK BMS
+  // charge/discharge MOS outputs).
+  renderDeviceOutputs(dev.label);
+}
+
+// ---------- CONTROLLABLE OUTPUTS (#104) ----------
+//
+// Per-device panel: toggle + state + last-command + safety-confirm.
+// State is sourced from /api/outputs which the daemon refreshes on
+// each poll cycle. A toggle round-trips through /api/outputs/<id>/
+// toggle and surfaces the WriteResult; success updates state from
+// the response's `confirmed_state` immediately, so the UI doesn't
+// have to wait for the next 60s poll to reflect truth.
+
+async function renderDeviceOutputs(label) {
+  const host = $("#outputs-host");
+  if (!host) return;
+  let outs = [];
+  try {
+    const r = await api(`/api/outputs?device=${encodeURIComponent(label)}`);
+    outs = r?.outputs || [];
+  } catch (e) { outs = []; }
+  if (!outs.length) { host.innerHTML = ""; return; }
+  host.innerHTML = outs.map(renderOutputPanelHtml).join("");
+  outs.forEach(wireOutputPanel);
+}
+
+function renderOutputPanelHtml(o) {
+  const stateLabel =
+    o.state === 1 ? `<span class="output-state-pill output-on">●  ON</span>` :
+    o.state === 0 ? `<span class="output-state-pill output-off">○  OFF</span>` :
+    `<span class="output-state-pill output-unknown">— unknown</span>`;
+  const lastCmd = o.last_command;
+  const lastLine = lastCmd
+    ? `Last command: <strong>${lastCmd.action}</strong> · ${fmt.ago(lastCmd.at)} · by ${lastCmd.by} · ${lastCmd.result}`
+    : `No command issued yet.`;
+  const safetyBanner = o.safety_confirmed ? "" : `
+    <div class="output-safety">
+      <strong>Advanced control.</strong> This sends a write command to your
+      charger that switches the load terminal. If anything is wired to it,
+      that thing will turn off or on. Continue?
+      <button class="btn-action btn-action--primary" data-output-confirm="${o.id}">
+        I understand — enable controls
+      </button>
+    </div>`;
+  const controls = o.safety_confirmed ? `
+    <div class="output-controls">
+      <button class="output-toggle ${o.state === 1 ? 'is-on' : 'is-off'}"
+              data-output-toggle="${o.id}"
+              aria-pressed="${o.state === 1 ? 'true' : 'false'}">
+        <span class="output-toggle-thumb"></span>
+        <span class="output-toggle-label">${o.state === 1 ? 'On' : 'Off'}</span>
+      </button>
+      <span class="output-busy" data-output-busy="${o.id}" hidden>Writing…</span>
+    </div>` : "";
+  return `
+    <section class="panel output-panel" data-output-id="${o.id}">
+      <div class="panel-header">
+        <h2>
+          <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18h6"/><path d="M10 22h4"/>
+            <path d="M2 12a10 10 0 0 1 20 0c0 3-1.5 5.5-4 7h-12c-2.5-1.5-4-4-4-7z"/>
+          </svg>
+          ${o.name}
+        </h2>
+        <div class="panel-sub">${stateLabel}</div>
+      </div>
+      ${safetyBanner}
+      ${controls}
+      <div class="output-foot meta-k">${lastLine}</div>
+    </section>`;
+}
+
+function wireOutputPanel(o) {
+  document.querySelector(`[data-output-confirm="${o.id}"]`)?.addEventListener("click", async () => {
+    try {
+      await fetch(`/api/outputs/${encodeURIComponent(o.id)}/confirm`, {method: "POST"});
+      // Re-render this device's outputs so the controls appear.
+      renderDeviceOutputs(o.device_label);
+    } catch (e) {
+      alert(`Couldn't enable: ${e}`);
+    }
+  });
+  document.querySelector(`[data-output-toggle="${o.id}"]`)?.addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    const busy = document.querySelector(`[data-output-busy="${o.id}"]`);
+    btn.disabled = true; if (busy) busy.hidden = false;
+    const want = !(o.state === 1);
+    try {
+      const r = await fetch(`/api/outputs/${encodeURIComponent(o.id)}/toggle`, {
+        method: "POST",
+        headers: {"content-type": "application/json"},
+        body: JSON.stringify({on: want}),
+      });
+      if (!r.ok) {
+        // Body may be JSON with detail{} or a plain string. Either
+        // way we want a one-line user-readable message.
+        let msg = `HTTP ${r.status}`;
+        try {
+          const j = await r.json();
+          msg = j?.detail?.detail || j?.detail || msg;
+        } catch (_) {}
+        throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+      }
+      const data = await r.json();
+      // Re-render with the new state from the server (which includes
+      // confirmed_state from the post-write FC03 read-back).
+      const fresh = data?.output;
+      if (fresh) {
+        // Swap one panel's worth of HTML in-place so we don't lose the
+        // scroll position on long device pages.
+        const host = document.querySelector(`[data-output-id="${o.id}"]`);
+        if (host) {
+          host.outerHTML = renderOutputPanelHtml(fresh);
+          wireOutputPanel(fresh);
+        }
+      }
+    } catch (e) {
+      alert(`Couldn't change state: ${e.message || e}`);
+      btn.disabled = false; if (busy) busy.hidden = true;
+    }
+  });
 }
 
 function buildSmartBatteryDetail(dev) {

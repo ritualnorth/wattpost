@@ -22,6 +22,7 @@ have a customer hitting the limit, not before.
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -149,6 +150,43 @@ CREATE TABLE IF NOT EXISTS forecast_history (
 );
 CREATE INDEX IF NOT EXISTS idx_fc_hist_period
     ON forecast_history (period_end);
+
+-- Controllable outputs (#104).
+-- A ControllableOutput is anything a vendor adapter can flip: Renogy
+-- Rover load terminal, JK BMS charge MOS, future MQTT relay etc.
+-- Discovery is driven by vendor adapters seeing a known device and
+-- registering its outputs here. State is updated from the next poll's
+-- read-back after a write — we don't trust FC06 acks (BT-2 swallows
+-- them on Rover firmware 3.x).
+CREATE TABLE IF NOT EXISTS controllable_outputs (
+    id                TEXT PRIMARY KEY,             -- "charge_controller.load"
+    device_label      TEXT NOT NULL,
+    name              TEXT NOT NULL,                -- "Load output"
+    kind              TEXT NOT NULL,                -- "load"|"charge_mos"|"discharge_mos"
+    state             INTEGER,                      -- 0/1, NULL = unknown
+    state_at          INTEGER,                      -- unix ts of last confirmed read-back
+    last_command_json TEXT,                         -- {"action","at","by","result"} or NULL
+    safety_confirmed  INTEGER NOT NULL DEFAULT 0,   -- first-toggle confirm gate
+    capabilities_json TEXT NOT NULL DEFAULT '["toggle"]'
+);
+CREATE INDEX IF NOT EXISTS idx_outputs_device ON controllable_outputs (device_label);
+
+-- Schedules for controllable outputs (#104 phase B). Stored ahead of
+-- the scheduler implementation so the schema lands in one shot. The
+-- scheduler tick is wired in a follow-up commit.
+CREATE TABLE IF NOT EXISTS output_schedules (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    output_id       TEXT NOT NULL,
+    action          TEXT NOT NULL,                  -- "on"|"off"
+    trigger_kind    TEXT NOT NULL,                  -- "time"|"sunrise"|"sunset"
+    trigger_time    TEXT,                           -- "HH:MM" when kind=time
+    offset_min      INTEGER NOT NULL DEFAULT 0,     -- +/- minutes for sunrise/sunset
+    days_mask       INTEGER NOT NULL DEFAULT 127,   -- bitmask MTWTFSS, 127=every day
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    last_run_at     INTEGER,
+    last_run_result TEXT                            -- "ok"|"skip:..."|"fail:..."
+);
+CREATE INDEX IF NOT EXISTS idx_schedules_output ON output_schedules (output_id);
 """
 
 # Retention windows (seconds). Each lower-resolution table keeps data for
@@ -1358,3 +1396,117 @@ class Store:
             "devices_ok": int(devices_ok),
             "errors_count": int(errors_count),
         }
+
+    # ---------- controllable outputs (#104) ----------
+
+    async def upsert_output(
+        self, *, id: str, device_label: str, name: str, kind: str,
+        capabilities: list[str],
+    ) -> None:
+        """Register or update an output definition. Idempotent on (id) —
+        re-discovery on daemon restart preserves state + safety_confirmed.
+        Capabilities are overwritten because the adapter is the source
+        of truth for what an output can do."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        caps_json = json.dumps(sorted(set(capabilities)))
+        await self._db.execute(
+            "INSERT INTO controllable_outputs (id, device_label, name, kind, capabilities_json) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(id) DO UPDATE SET "
+            "  device_label = excluded.device_label, "
+            "  name = excluded.name, "
+            "  kind = excluded.kind, "
+            "  capabilities_json = excluded.capabilities_json",
+            (id, device_label, name, kind, caps_json),
+        )
+        await self._db.commit()
+
+    async def list_outputs(self, device_label: str | None = None) -> list[dict[str, Any]]:
+        """List controllable outputs, optionally filtered to one device."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        sql = (
+            "SELECT id, device_label, name, kind, state, state_at, "
+            "       last_command_json, safety_confirmed, capabilities_json "
+            "FROM controllable_outputs"
+        )
+        args: tuple = ()
+        if device_label is not None:
+            sql += " WHERE device_label = ?"
+            args = (device_label,)
+        sql += " ORDER BY device_label, name"
+        out: list[dict[str, Any]] = []
+        async with self._db.execute(sql, args) as cur:
+            async for row in cur:
+                out.append(_row_to_output(row))
+        return out
+
+    async def get_output(self, output_id: str) -> dict[str, Any] | None:
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        async with self._db.execute(
+            "SELECT id, device_label, name, kind, state, state_at, "
+            "       last_command_json, safety_confirmed, capabilities_json "
+            "FROM controllable_outputs WHERE id = ?",
+            (output_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        return _row_to_output(row) if row else None
+
+    async def update_output_state(
+        self, output_id: str, state: int | None, state_at: int,
+    ) -> None:
+        """Write the latest read-back state. Called by the poller after
+        each device snapshot reflects the output's truth value."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        await self._db.execute(
+            "UPDATE controllable_outputs SET state = ?, state_at = ? WHERE id = ?",
+            (state, state_at, output_id),
+        )
+        await self._db.commit()
+
+    async def record_output_command(
+        self, output_id: str, *, action: str, at: int, by: str, result: str,
+    ) -> None:
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        payload = json.dumps({"action": action, "at": at, "by": by, "result": result})
+        await self._db.execute(
+            "UPDATE controllable_outputs SET last_command_json = ? WHERE id = ?",
+            (payload, output_id),
+        )
+        await self._db.commit()
+
+    async def confirm_output_safety(self, output_id: str) -> None:
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        await self._db.execute(
+            "UPDATE controllable_outputs SET safety_confirmed = 1 WHERE id = ?",
+            (output_id,),
+        )
+        await self._db.commit()
+
+
+def _row_to_output(row: tuple) -> dict[str, Any]:
+    id_, dev, name, kind, state, state_at, cmd_json, safety, caps_json = row
+    try:
+        caps = json.loads(caps_json) if caps_json else []
+    except json.JSONDecodeError:
+        caps = []
+    try:
+        last_cmd = json.loads(cmd_json) if cmd_json else None
+    except json.JSONDecodeError:
+        last_cmd = None
+    return {
+        "id": id_,
+        "device_label": dev,
+        "name": name,
+        "kind": kind,
+        "state": int(state) if state is not None else None,
+        "state_at": int(state_at) if state_at is not None else None,
+        "last_command": last_cmd,
+        "safety_confirmed": bool(safety),
+        "capabilities": caps,
+    }
