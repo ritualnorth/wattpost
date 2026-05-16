@@ -169,6 +169,7 @@ async def pair_appliance(
         heartbeat_minutes=(config.cloud.heartbeat_minutes if config.cloud else 5),
         tunnel_token=body.get("tunnel_token") or "",
         tunnel_hostname=body.get("tunnel_hostname") or "",
+        sso_secret=body.get("sso_secret") or "",
     )
     config.cloud = new_c
 
@@ -292,6 +293,23 @@ async def trigger_heartbeat(state: State) -> dict[str, Any]:
     return {"ok": ok}
 
 
+def persist_cloud_cfg(cfg: CloudCfg, config_path: str | None = None) -> None:
+    """Background-write helper. Looks up the active config.yaml path
+    (the daemon's --config arg) and rewrites it with the serialised
+    `cfg`. Used by the cloud heartbeat service when the cloud pushes
+    a new sso_secret to a not-yet-migrated appliance.
+
+    `config_path` overrides the path lookup; defaults to the
+    environment variable WATTPOST_CONFIG which the systemd unit /
+    Docker entrypoint set."""
+    import os
+    path = config_path or os.environ.get("WATTPOST_CONFIG") or "config.yaml"
+    def _mutate(raw):
+        raw["cloud"] = _serialize_cloud(cfg)
+        return raw
+    _save_config(path, _mutate)
+
+
 def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
     out: dict[str, Any] = {
         "endpoint":          c.endpoint,
@@ -306,4 +324,6 @@ def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
         out["tunnel_token"]    = c.tunnel_token
     if c.tunnel_hostname:
         out["tunnel_hostname"] = c.tunnel_hostname
+    if c.sso_secret:
+        out["sso_secret"]      = c.sso_secret
     return out

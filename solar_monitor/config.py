@@ -122,6 +122,13 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     # over the tunnel.
     tunnel_token:      str  = ""
     tunnel_hostname:   str  = ""
+    # Per-appliance HMAC key for cloud→appliance SSO (#137). Cloud
+    # pushes this via the pair response + every heartbeat response;
+    # the daemon persists it here and verifies inbound /sso?token=…
+    # requests against it. Empty until the appliance has heartbeat-ed
+    # at least once post-v0.0.38; while empty, tunnel access falls
+    # back to the local-password login page.
+    sso_secret:        str  = ""
 
 
 class WeatherCfg(msgspec.Struct, kw_only=True):
