@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.17] — 2026-05-16
+
+### Added
+- **Open-Meteo PV forecast provider** — free, unlimited, lat/lon-
+  based PV forecast that doesn't require a Solcast account. Solar
+  irradiance from Open-Meteo is combined with the user's array
+  geometry (capacity_kW, tilt, azimuth, system_efficiency) via a
+  simple solar-position + tilt-cosine model to estimate PV output
+  hourly for 7 days. Validated end-to-end against a real UK
+  location — physically sensible peak watts + day totals.
+- **Settings → Integrations → PV forecast** form now has a
+  provider dropdown: pick "Solcast (site-trained ML)" for fixed-
+  roof installs with a registered account, or "Open-Meteo
+  (irradiance estimate)" for moving vans / no-account installs.
+  Each provider shows only its own field set; the picker
+  swaps them. Lat/lon left blank inherits from the weather
+  integration's location.
+- **Why this matters**: Solcast is fundamentally site-based
+  (free tier = 10 calls/day, max 2 sites, no API to register
+  sites) — a non-starter for moving vans + a real barrier-to-
+  entry for casual users. Open-Meteo doesn't have any of those
+  limits. We're already calling Open-Meteo for current weather;
+  the irradiance endpoint is one more parameter.
+
+### Notes
+- Forecast accuracy hierarchy: Solcast best for fixed roofs (site-
+  trained ML), Open-Meteo good enough for "should I drive south
+  tomorrow" + as a no-config default. Future ticket #125 (USB
+  GPS) auto-switches to Open-Meteo when location drift is
+  detected.
+- Today / Tomorrow tile sub-line now credits whichever provider
+  is configured rather than hard-coding "Solcast".
+
 ## [0.0.16] — 2026-05-16
 
 ### Added

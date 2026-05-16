@@ -55,17 +55,42 @@ class AlertRuleCfg(msgspec.Struct, kw_only=True):
 
 class ForecastCfg(msgspec.Struct, kw_only=True):
     """Third-party PV forecast integration. Each user supplies their
-    own credentials — we don't proxy. Currently only `solcast` is
-    implemented; structured this way so adding tomorrow.io / forecast.solar
-    is a new provider class, not a config-schema change."""
+    own credentials — we don't proxy. Each provider uses the subset
+    of fields it cares about:
+      * `solcast`   — api_key + resource_id
+      * `openmeteo` — lat + lon + array_kw + tilt_deg + azimuth_deg
+                      (free, no key; physical PV estimate from
+                      irradiance + array geometry)
+      * `synthetic` — none (demo container only)
+    """
     provider: str = "solcast"
-    # Solcast needs both; the synthetic demo provider ignores them.
-    # Defaulting to empty strings lets the demo's config.yaml configure
-    # `provider: synthetic` without dummy values cluttering the schema.
+    # Solcast credentials. Empty when using openmeteo or synthetic.
     api_key: str = ""
     resource_id: str = ""
+    # Open-Meteo PV estimator inputs. Lat/lon default to None so the
+    # provider can fall back to the WeatherCfg location if both blocks
+    # are configured at the same site.
+    lat: float | None = None
+    lon: float | None = None
+    # Array nameplate capacity in kilowatts. Required for openmeteo;
+    # ignored by solcast (Solcast learns capacity from the user's
+    # site definition in their web app).
+    array_kw: float = 1.0
+    # Panel tilt above horizontal (0 = flat, 90 = vertical). Used by
+    # the openmeteo estimator's POA transposition. Default 30° is a
+    # reasonable mid-latitude compromise.
+    tilt_deg: float = 30.0
+    # Panel azimuth: 0 = south (northern hemisphere optimal), 90 = west,
+    # 180 = north, 270 = east. We don't currently switch convention by
+    # hemisphere — southern-hemisphere users should configure 180.
+    azimuth_deg: float = 0.0
+    # System efficiency multiplier — covers inverter losses, wiring,
+    # soiling, temperature derating. 0.80 is the commonly-cited
+    # all-in figure for a healthy system.
+    system_efficiency: float = 0.80
     # Cadence of the poll loop. Solcast hobbyist tier is 10 calls/day,
-    # so 3 hours (8/day) leaves a comfortable buffer.
+    # so 3 hours (8/day) leaves a comfortable buffer. Open-Meteo has
+    # no quota and can poll more often if desired.
     poll_hours: int = 3
 
 

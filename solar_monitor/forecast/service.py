@@ -20,6 +20,7 @@ from ..config import ForecastCfg
 from ..storage.sqlite import Store
 from .base import PvForecast
 from . import solcast as _solcast_mod
+from . import openmeteo as _openmeteo_mod
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +31,14 @@ CACHE_KEY = "forecast:pv"
 from . import synthetic as _synth_mod
 
 PROVIDERS = {
+    # Site-trained ML forecast — best quality for fixed installs that
+    # have registered a rooftop in Solcast's web app. Needs an account
+    # + API key; free tier capped at 10 calls/day per site.
     "solcast":   _solcast_mod.build,
+    # Physical PV estimate from Open-Meteo irradiance + array geometry.
+    # Free, unlimited, lat/lon-based — the right pick for moving vans
+    # and for users who don't want to register a Solcast account.
+    "openmeteo": _openmeteo_mod.build,
     # Demo-only fake forecast; never makes a network call. Selected by
     # the demo.wattpost.io container's config.yaml.
     "synthetic": _synth_mod.build,

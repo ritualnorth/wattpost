@@ -1304,13 +1304,20 @@ function renderToday() {
     const sleep = s.todayRemainingWh < 50 && s.tomorrowWh > 0;
     panel?.classList.toggle("today-panel--sleep", sleep);
 
+    // Provider name for the sub-line credit. Backend returns the
+    // active provider in the forecast blob ("solcast" / "openmeteo").
+    // Map to user-friendly text rather than echoing the raw key.
+    const provLabel = f.provider === "openmeteo"
+      ? "Open-Meteo"
+      : f.provider === "solcast" ? "Solcast" : "Forecast";
+
     if (sleep) {
       if (headline) headline.textContent = "Tomorrow";
       $("#today-pv").textContent = `${(s.tomorrowWh / 1000).toFixed(1)} kWh`;
       if (sub) {
         sub.textContent = s.tomorrowPeak
-          ? `Expected · peak ${(s.tomorrowPeak.w / 1000).toFixed(2)} kW at ${_fmtHm(s.tomorrowPeak.ts)} · Solcast`
-          : "Expected · Solcast";
+          ? `Expected · peak ${(s.tomorrowPeak.w / 1000).toFixed(2)} kW at ${_fmtHm(s.tomorrowPeak.ts)} · ${provLabel}`
+          : `Expected · ${provLabel}`;
       }
       // Footer becomes the final tally for today.
       if (foot) {
@@ -1324,13 +1331,13 @@ function renderToday() {
         if (s.todayWh > 0) {
           const expected  = (s.todayWh / 1000).toFixed(1);
           const remaining = (s.todayRemainingWh / 1000).toFixed(1);
-          sub.textContent = `Of ${expected} kWh expected · ${remaining} kWh still to come · Solcast`;
+          sub.textContent = `Of ${expected} kWh expected · ${remaining} kWh still to come · ${provLabel}`;
         } else {
-          sub.textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
+          sub.textContent = `${provLabel} · refreshed ${fmt.ago(f.fetched_at)}`;
         }
       }
-      // Tomorrow preview footer — only shown if Solcast actually has
-      // tomorrow's window populated.
+      // Tomorrow preview footer — only shown when the forecast
+      // window has tomorrow's data populated.
       if (s.tomorrowWh > 0 && foot) {
         foot.hidden = false;
         const peakStr = s.tomorrowPeak
@@ -3464,30 +3471,82 @@ async function clearWeather() {
 
 function renderForecastForm(fc) {
   const apiKeyMasked = fc.api_key === "****";
+  const provider = fc.provider || "solcast";
+  // Two distinct field sets — Solcast wants API creds, Open-Meteo
+  // wants array geometry. We render both and JS shows/hides based on
+  // the picker. Easier to maintain than two separate render funcs.
   return `
     <form class="alerts-form" data-form="forecast">
       <div class="alerts-form-grid">
+        <label>Provider
+          <select name="provider">
+            <option value="solcast"   ${provider === "solcast"   ? "selected" : ""}>Solcast (site-trained ML)</option>
+            <option value="openmeteo" ${provider === "openmeteo" ? "selected" : ""}>Open-Meteo (irradiance estimate)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="alerts-form-grid" data-provider-fields="solcast" ${provider === "solcast" ? "" : "hidden"}>
         <label>API key
           <input type="password" name="api_key"
-                 value="${apiKeyMasked ? "" : ""}"
                  placeholder="${apiKeyMasked ? "(unchanged)" : "your Solcast API key"}"
-                 ${apiKeyMasked ? "" : "required"} autocomplete="off"/>
+                 autocomplete="off"/>
         </label>
         <label>Resource ID
           <input type="text" name="resource_id"
                  value="${fc.resource_id || ""}"
-                 placeholder="e.g. abcd-1234-…" required/>
+                 placeholder="e.g. abcd-1234-…"/>
         </label>
+      </div>
+
+      <div class="alerts-form-grid" data-provider-fields="openmeteo" ${provider === "openmeteo" ? "" : "hidden"}>
+        <label>Latitude
+          <input type="number" step="any" name="lat"
+                 value="${fc.lat ?? ""}" placeholder="leave blank to inherit from weather"/>
+        </label>
+        <label>Longitude
+          <input type="number" step="any" name="lon"
+                 value="${fc.lon ?? ""}" placeholder="leave blank to inherit from weather"/>
+        </label>
+        <label>Array capacity (kW)
+          <input type="number" step="0.1" min="0.1" name="array_kw"
+                 value="${fc.array_kw ?? 1.0}" required/>
+        </label>
+        <label>Tilt (°, 0=flat 90=vertical)
+          <input type="number" step="1" min="0" max="90" name="tilt_deg"
+                 value="${fc.tilt_deg ?? 30}" required/>
+        </label>
+        <label>Azimuth (°, 0=south +west)
+          <input type="number" step="1" min="-180" max="360" name="azimuth_deg"
+                 value="${fc.azimuth_deg ?? 0}" required/>
+        </label>
+        <label>System efficiency (0-1)
+          <input type="number" step="0.05" min="0.1" max="1.0" name="system_efficiency"
+                 value="${fc.system_efficiency ?? 0.80}" required/>
+        </label>
+      </div>
+
+      <div class="alerts-form-grid">
         <label>Poll every (hours)
           <input type="number" name="poll_hours"
                  value="${fc.poll_hours ?? 3}" min="1" max="24" required/>
         </label>
       </div>
-      <p class="settings-foot">
-        Hobbyist tier allows 10 API calls/day. 3 hours = 8/day, which leaves
+
+      <p class="settings-foot" data-provider-help="solcast" ${provider === "solcast" ? "" : "hidden"}>
+        Hobbyist tier allows 10 API calls/day per site. 3 hours = 8/day, leaves
         room for retries. Find your resource ID at
         <a href="https://toolkit.solcast.com.au/rooftop-sites" target="_blank" rel="noopener">solcast.com → My Sites</a>.
+        Best quality for fixed-roof installs.
       </p>
+      <p class="settings-foot" data-provider-help="openmeteo" ${provider === "openmeteo" ? "" : "hidden"}>
+        Free, unlimited, lat/lon-based — no account needed. PV estimate is
+        derived from solar irradiance + your array geometry. Less accurate
+        than Solcast for fixed roofs (no site-specific calibration) but works
+        for moving installs (vans/RVs) and as a no-setup default.
+        Lat/lon left blank inherits from the weather integration's location.
+      </p>
+
       <div class="alerts-form-actions">
         <button type="submit" class="btn-action btn-action--primary">Save</button>
         <button type="button" class="btn-action" data-test-forecast>Test</button>
@@ -3510,15 +3569,51 @@ function wireForecastForm() {
   });
   form.querySelector("[data-test-forecast]")?.addEventListener("click", () => testForecast(form));
   form.querySelector("[data-clear-forecast]")?.addEventListener("click", () => clearForecast(form));
+  // Provider picker toggles which field-set is visible. Implemented
+  // as a generic show/hide by data-attribute so adding a third
+  // provider later doesn't need new switch logic here.
+  const select = form.elements["provider"];
+  if (select) {
+    select.addEventListener("change", () => {
+      const p = select.value;
+      form.querySelectorAll("[data-provider-fields]").forEach(el => {
+        el.hidden = el.dataset.providerFields !== p;
+      });
+      form.querySelectorAll("[data-provider-help]").forEach(el => {
+        el.hidden = el.dataset.providerHelp !== p;
+      });
+    });
+  }
 }
 
 function _forecastPayload(form) {
-  const ak = form.elements["api_key"].value;
+  const provider = form.elements["provider"].value;
+  const base = {
+    provider,
+    poll_hours: parseInt(form.elements["poll_hours"].value, 10),
+  };
+  if (provider === "solcast") {
+    const ak = form.elements["api_key"].value;
+    return {
+      ...base,
+      api_key:     ak === "" ? "****" : ak,     // sentinel for "keep existing"
+      resource_id: form.elements["resource_id"].value.trim(),
+    };
+  }
+  // openmeteo — empty lat/lon means "inherit from weather block";
+  // send null so backend can apply that fallback.
+  const _f = (k) => {
+    const v = form.elements[k].value.trim();
+    return v === "" ? null : parseFloat(v);
+  };
   return {
-    provider:    "solcast",
-    api_key:     ak === "" ? "****" : ak,    // sentinel for "keep existing"
-    resource_id: form.elements["resource_id"].value.trim(),
-    poll_hours:  parseInt(form.elements["poll_hours"].value, 10),
+    ...base,
+    lat:               _f("lat"),
+    lon:               _f("lon"),
+    array_kw:          parseFloat(form.elements["array_kw"].value),
+    tilt_deg:          parseFloat(form.elements["tilt_deg"].value),
+    azimuth_deg:       parseFloat(form.elements["azimuth_deg"].value),
+    system_efficiency: parseFloat(form.elements["system_efficiency"].value),
   };
 }
 
@@ -3564,7 +3659,7 @@ async function testForecast(form) {
 }
 
 async function clearForecast(form) {
-  if (!confirm("Disable Solcast forecast? Existing cached data is dropped.")) return;
+  if (!confirm("Disable the PV forecast? Existing cached data is dropped.")) return;
   const status = form.querySelector(".alerts-form-status");
   status.textContent = "Disabling…";
   try {
