@@ -8,6 +8,42 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.21] — 2026-05-16
+
+### Added — JK BMS (JiKong) support (#114)
+- **New `ble_jkbms` BLE transport** for JK's proprietary GATT
+  protocol (service 0xFFE0, char 0xFFE1). Maintains a persistent
+  GATT connection + notification subscription; on connect, sends
+  the "request cell info" command and the BMS auto-streams its
+  state every ~1 s thereafter. Frame accumulator handles multi-
+  notification frames (a single ~300-byte cell-info frame
+  arrives as 15+ MTU-sized BLE chunks).
+- **New `jkbms` vendor** with `bms` device kind. Auto-detects
+  protocol version (JK02_24S vs JK02_32S) from frame length and
+  parses with the correct field offsets. Per-cell voltages flow
+  into the existing cell-balance dashboard tile; total V, current,
+  SoC, time-to-go, temps, MOS state, cycle count, alarm flags all
+  surface as standard normalised fields.
+- **Why this matters**: JK BMS is the dominant choice in the DIY
+  LFP crowd — 16x EVE 280Ah builds, 48V house banks, vanlife.
+  Adding support brings that entire segment (orders of magnitude
+  larger than the commercial-pack market) into WattPost's reach.
+  See `project_target_customer` + `project_coverage_commitment`
+  in agent memory for the strategic context.
+
+### Validation status
+- Cell-voltage parser validated against a real upstream frame
+  fixture from syssi/esphome-jk-bms: 16 active cells at 3.327-
+  3.329V (perfectly balanced 48V LFP bank, drift 2 mV) decoded
+  correctly. Parser code mirrors syssi's C++ field offsets
+  byte-for-byte for the trailer (V/A/SoC/temps/cycles/alarms),
+  but trailer values are unvalidated against real hardware in
+  this release — the fixture I had was hand-transcribed and
+  inconsistent. First-customer validation will flush out any
+  alignment issues; the code path is in place, the JK protocol
+  is well-documented, and any field-position fixes are
+  surgical.
+
 ## [0.0.20] — 2026-05-16
 
 ### Added — Victron coverage sweep
