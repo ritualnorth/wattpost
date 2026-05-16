@@ -757,9 +757,11 @@ def build_app(
             if scope.get("type") != "http":
                 await self.app(scope, receive, send)
                 return
-            # Bypass: demo mode (public read-only by design),
-            # password not yet set (install.sh hasn't run / new dev
-            # box without a config'd password), tunnel-loopback source.
+            # Bypass: demo mode (public read-only by design), or
+            # password not yet set (install.sh hasn't run / fresh dev
+            # box). is_loopback_source returns False for tunnel-origin
+            # requests even though their TCP peer is 127.0.0.1 — see
+            # web_auth.is_loopback_source for the CF-header sniff.
             if _DEMO or not _web_auth.password_is_set() \
                     or _web_auth.is_loopback_source(scope):
                 await self.app(scope, receive, send)
@@ -769,7 +771,13 @@ def build_app(
                 await self.app(scope, receive, send)
                 return
             method = scope.get("method", "GET").upper()
-            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS"):
+            # READONLY_PUBLIC bypass: allow GET reads on LAN without a
+            # session, so kiosks-on-wifi keep working unchanged. Does
+            # NOT apply to tunnel-origin requests — a leaked tunnel
+            # URL would otherwise leak every metric on the appliance
+            # to anonymous viewers.
+            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS") \
+                    and not _web_auth.is_tunnel_origin(scope):
                 await self.app(scope, receive, send)
                 return
             # Look up the session cookie.

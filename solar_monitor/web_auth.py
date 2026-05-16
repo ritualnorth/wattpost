@@ -142,15 +142,49 @@ def _gc_sessions() -> None:
 
 
 def is_loopback_source(scope: dict) -> bool:
-    """ASGI scope's `client` field is `(host, port)` or None. The
-    kernel sets this for us — a LAN client can't fake `127.0.0.1`."""
+    """Returns True only for a *real* loopback request — i.e. local
+    curl, SSH port-forward, the appliance talking to itself.
+
+    Returns False when the request came through the Cloudflare Tunnel,
+    even though the TCP peer is 127.0.0.1. cloudflared on the appliance
+    proxies tunnel traffic to localhost, so the kernel-level client
+    address always looks loopback. Without distinguishing tunnel vs.
+    real-loopback, anyone with the public tunnel URL would inherit
+    "tunnel-loopback trust" and bypass auth entirely — a complete
+    security hole.
+
+    Detection: cloudflared always injects `CF-Ray` and
+    `CF-Connecting-IP` headers when forwarding from the public
+    hostname. A direct loopback request has neither.
+    """
     client = scope.get("client")
     if not client:
         return False
     host = client[0] if isinstance(client, (list, tuple)) and client else None
     if not host:
         return False
-    return host in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+    if host not in ("127.0.0.1", "::1", "::ffff:127.0.0.1"):
+        return False
+    # Tunnel-origin sniff. cloudflared sets these headers; a real
+    # loopback request (curl from the Pi, SSH -L tunnel) won't.
+    for k, _v in scope.get("headers", []):
+        if k in (b"cf-ray", b"cf-connecting-ip", b"cf-ipcountry"):
+            return False
+    return True
+
+
+def is_tunnel_origin(scope: dict) -> bool:
+    """True iff this request arrived via the Cloudflare Tunnel — i.e.
+    the appliance's cloudflared proxied it from the public hostname.
+
+    Used by the auth middleware to also disable the "readonly public"
+    GET bypass for tunnel traffic. Without this, a leaked tunnel URL
+    grants anonymous read access to every device + metric on the
+    appliance even though writes require login."""
+    for k, _v in scope.get("headers", []):
+        if k in (b"cf-ray", b"cf-connecting-ip", b"cf-ipcountry"):
+            return True
+    return False
 
 
 def is_anonymous_path(path: str) -> bool:
