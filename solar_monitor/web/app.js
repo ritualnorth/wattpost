@@ -4838,35 +4838,47 @@ async function wizLoadTransports() {
     wizState.knownKeys = new Set(devices.map(d => wizKnownKey(d.transport, d.slave_id)));
     if (!transports.length) {
       host.innerHTML = `<div class="wiz-empty">
-        <p><strong>No BLE transport configured.</strong></p>
-        <p>A "transport" is one BT-2 dongle (or similar) the daemon connects to. Click below to scan for nearby Bluetooth devices and pick yours — no config files.</p>
-        <div class="wiz-controls">
+        <p><strong>No transport configured.</strong></p>
+        <p>A "transport" is one dongle / adapter the daemon talks Modbus through. Pick how yours is connected:</p>
+        <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
           <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <span>Find my dongle</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M7 17L17 7M12 2v20M7 7l5-5 5 5M7 17l5 5 5-5"/></svg>
+            <span>Bluetooth (e.g. Renogy BT-2)</span>
+          </button>
+          <button id="wiz-find-usb-btn" class="btn-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="2.5" r="1.5"/><path d="M12 4v18"/><path d="M8 9h8"/><path d="M8 9l-2 4 2 4h8l2-4-2-4"/></svg>
+            <span>Wired (USB-RS485 adapter)</span>
           </button>
           <span id="wiz-find-status" class="wiz-status"></span>
         </div>
+        <p class="settings-foot" style="margin:.4rem 0 0">
+          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port — that port is RS-485, NOT Ethernet, so it does not plug into the Pi's network jack.
+        </p>
         <div id="wiz-find-results" class="wiz-results"></div>
       </div>`;
-      // Click handler — scan, list results, attach per-row use-this binds.
       document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
+      document.getElementById("wiz-find-usb-btn")?.addEventListener("click", wizFindUsb);
       return;
     }
-    host.innerHTML = transports.map(t => `
+    host.innerHTML = transports.map(t => {
+      // Serial transports carry `port` (/dev/ttyUSB0); BLE carry
+      // `address` (MAC). Either reads as the transport's identity.
+      const addr = t.address || t.port || '';
+      const kind = t.type === 'serial_modbus' ? 'USB-RS485' : 'Bluetooth';
+      return `
       <div class="wiz-transport-row">
         <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${escHtml(t.id)}">
           <div class="wiz-transport-main">
             <span class="wiz-transport-id">${escHtml(t.id)}</span>
-            <span class="wiz-transport-addr">${escHtml(t.address || '')}</span>
+            <span class="wiz-transport-addr">${escHtml(kind)} · ${escHtml(addr)}</span>
           </div>
           <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline · will reconnect on scan'}</span>
         </button>
         <button class="wiz-transport-del" data-del-transport="${escHtml(t.id)}" title="Disconnect + remove this transport">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
     // No `disabled` on offline rows — the scan endpoint auto-reopens
     // a dropped BLE link, so users should always be able to select
     // and try. The pill text tells them what to expect.
@@ -5319,6 +5331,104 @@ function renderMissingPanel(missing) {
       </div>
     `).join("")}
   </div>`;
+}
+
+// USB-RS485 path — same shape as wizFindDongle/wizAddTransportFromMac
+// but driven by /api/setup/usb_scan + the serial_modbus transport type.
+// Customers who skip the BT-2 (or replace it with a wired dongle for
+// reliability — sub-ms round-trips, no BLE timeouts, proper FC06 acks)
+// pair through here.
+async function wizFindUsb() {
+  const btn  = document.getElementById("wiz-find-usb-btn");
+  const stat = document.getElementById("wiz-find-status");
+  const list = document.getElementById("wiz-find-results");
+  if (!btn) return;
+  btn.disabled = true;
+  stat.textContent = "Looking for USB adapters…";
+  list.innerHTML = "";
+  let data;
+  try {
+    const r = await fetch("/api/setup/usb_scan");
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    data = await r.json();
+  } catch (e) {
+    stat.textContent = "";
+    list.innerHTML = `<div class="wiz-empty">${escHtml(e.message || String(e))}</div>`;
+    btn.disabled = false;
+    return;
+  }
+  btn.disabled = false;
+  const adapters = data.adapters || [];
+  stat.textContent = `Found ${adapters.length} USB serial adapter(s)`;
+  if (!adapters.length) {
+    list.innerHTML = `<div class="wiz-empty">
+      <strong>No USB serial adapters detected.</strong>
+      Plug a USB-RS485 dongle into the Pi (FTDI or CH340 chip — ~£10 from any electronics supplier). The Pi should see it as <code>/dev/ttyUSB0</code> within a few seconds. Reload this page and try again. If nothing shows up, run <code>lsusb</code> on the Pi to confirm it's enumerating.
+    </div>`;
+    return;
+  }
+  list.innerHTML = adapters.map(a => {
+    const chip = a.chip ? `<span class="wiz-vendor-hint">${escHtml(a.chip)}</span>` : "";
+    const product = a.product ? `<strong>${escHtml(a.product)}</strong>` : `<strong>${escHtml(a.port)}</strong>`;
+    const ids = (a.vendor_id && a.product_id)
+      ? ` · VID ${escHtml(a.vendor_id)} PID ${escHtml(a.product_id)}`
+      : "";
+    const serial = a.serial ? ` · S/N ${escHtml(a.serial)}` : "";
+    return `
+      <div class="wiz-result-row">
+        <div class="wiz-result-info">
+          ${product} ${chip}
+          <div class="settings-foot">${escHtml(a.port)}${ids}${serial}</div>
+        </div>
+        <button class="btn-action btn-action--primary"
+                data-use-port="${escHtml(a.port)}"
+                data-use-label="${escHtml(a.product || a.port)}">
+          Use this
+        </button>
+      </div>`;
+  }).join("");
+  list.querySelectorAll("[data-use-port]").forEach(b => {
+    b.addEventListener("click", () => wizAddTransportFromPort(b.dataset.usePort, b.dataset.useLabel));
+  });
+}
+
+async function wizAddTransportFromPort(port, label) {
+  const stat = document.getElementById("wiz-find-status");
+  stat.textContent = `Adding ${port}…`;
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "serial_modbus",
+        port: port,
+        label: label || null,
+        baudrate: 9600,   // Renogy/Epever default; future: ask in a form
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    stat.textContent = "";
+    alert("Couldn't add transport: " + (e.message || String(e)));
+    return;
+  }
+  if (res.reloaded) {
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now — give it ~5 s.`;
+  } else if (res.reload_error) {
+    stat.textContent = `Added ${res.label}, but hot-reload failed: ${res.reload_error}. Restart the daemon to apply.`;
+  } else {
+    stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
+  }
+  await new Promise(r => setTimeout(r, 1500));
+  await wizLoadTransports();
 }
 
 async function wizAddTransportFromMac(mac, name) {
