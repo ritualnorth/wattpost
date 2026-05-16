@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.50] — 2026-05-16
+
+### Added — Audit logging for security-relevant events (#144)
+Common SaaS feature (Stripe, Linear, GitHub all show this). Two
+purposes: customer-facing visibility into account activity +
+ops-facing forensics for incident review.
+
+- **Schema**: new `audit_events` table via migration 0023.
+  Composite index on `(user_id, created_at DESC)` for the
+  per-user-timeline query.
+- **Helper**: `cloud/wattpost_cloud/audit.py::log_event()` —
+  swallows failures (audit writes never break the operation
+  they're auditing).
+- **Wired into** (this release):
+  - `login.success` (with `twofa_used` flag)
+  - `login.failure` (records attempted email)
+  - `password.change` (records sessions_revoked count)
+  - `logout.others` (sessions_revoked count)
+- **More wire-ups to follow** (twofa enrol/disable, account
+  delete, email change, appliance pair/delete, billing changes):
+  trivial follow-up since the helper is in place.
+- **New endpoint** `GET /api/account/security/events` returns
+  the last 50 events for the signed-in user. UI page can render
+  this; backend ready.
+
 ## [0.0.49] — 2026-05-16
 
 ### Fixed — middleware actually fires now (was silently no-op'd)
