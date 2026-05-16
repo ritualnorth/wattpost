@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=100" />
+  <link rel="stylesheet" href="/web/styles.css?v=101" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -87,6 +87,14 @@
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
     </button>
+    <!-- "Sign in" affordance — only shown when the user has no
+         local session AND a password is set on the appliance. Goes
+         to /login?next=<current-hash>. Driven by JS that probes
+         /api/system/info + checks for the session cookie. -->
+    <a id="header-signin" class="header-signin" href="/login" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+      <span>Sign in</span>
+    </a>
 
     <!-- Status legend popover — opens when the pill is tapped. -->
     <div id="status-legend" class="status-legend" hidden>
@@ -659,6 +667,20 @@
               <span>Restart daemon</span>
             </button>
           </div>
+          <div class="settings-block">
+            <h3>Web password</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              The local password protects writes from the LAN. Rotate it
+              if you've forgotten yours, or if you suspect it's been
+              shared. The new password is shown to you once — save it
+              right then.
+            </p>
+            <button id="rotate-pw-btn" class="btn-action">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Rotate web password</span>
+            </button>
+            <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
+          </div>
           <div class="settings-block settings-block--diagnostics">
             <h3>Diagnostics</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
@@ -732,6 +754,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=122"></script>
+  <script src="/web/app.js?v=123"></script>
 </body>
 </html>

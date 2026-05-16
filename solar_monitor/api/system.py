@@ -113,6 +113,42 @@ async def update_state(state: State) -> dict[str, Any]:
     return state_dict
 
 
+@post("/api/system/web-password/rotate")
+async def rotate_web_password() -> dict[str, Any]:
+    """Generate a new local web password and persist it. Returns the
+    new plaintext exactly once — caller must show it to the user
+    immediately, we don't store it anywhere readable post-rotation
+    apart from the on-disk mirror file (which is mode 0640 root only).
+
+    Reachable from Settings → System on the dashboard. Already
+    requires a session (the middleware enforces it for POSTs), so
+    rotation is gated to logged-in users only. Stale sessions are
+    NOT invalidated — the user who's rotating is logged in on this
+    browser, and we don't want to log them out of their own tab.
+    Other browser sessions stay valid until they natural-expire (30d)
+    OR until the user clicks "Sign out all sessions" elsewhere."""
+    from .. import web_auth as _wa
+    import secrets as _secrets
+    new_pw = _secrets.token_urlsafe(12)
+    try:
+        _wa.write_password_hash(new_pw)
+    except OSError as e:
+        log.exception("web-password rotate: hash write failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"couldn't write the new password hash: {e}",
+        )
+    # Mirror plaintext for the "I forgot it" case — same path the
+    # first-boot helper uses, same 0640 root-only perms. Best-effort;
+    # rotation isn't a hard failure if the mirror write throws.
+    try:
+        _wa.PASSWORD_PLAINTEXT_PATH.write_text(new_pw + "\n", encoding="utf-8")
+    except OSError:
+        log.warning("web-password rotate: plaintext mirror write failed (non-fatal)")
+    log.info("web-password rotated via Settings UI")
+    return {"ok": True, "password": new_pw}
+
+
 @post("/api/system/update/check", status_code=202)
 async def update_check_now(state: State) -> dict[str, Any]:
     """Force a one-off manifest fetch — Settings UI's "Check now"
