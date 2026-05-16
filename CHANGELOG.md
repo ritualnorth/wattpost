@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.16] — 2026-05-16
+
+### Added
+- **USB-scan now classifies each device by protocol.** The wizard's
+  wired-adapter list opens each `/dev/ttyUSB*` / `/dev/ttyACM*`,
+  reads briefly, and tags it as:
+  - `Modbus` — silent serial (the typical case) — "Use as Modbus" button
+  - `NMEA GPS` — emitted `$GP…` / `$GN…` sentences (preparation for
+    #125 USB GPS support; button disabled with "coming soon" hint)
+  - `unknown output` — bytes seen but no recognised pattern
+  - `port busy` — already held by another process
+- Stops users accidentally adding a GPS receiver as a Modbus
+  transport — a £8 VK-162 G-Mouse GPS would otherwise show up
+  alongside legitimate RS-485 adapters and silently fail every poll
+  after pairing.
+
+### Notes
+- Detection is read-only (no Modbus probe write at scan time). The
+  existing `/api/setup/probe` endpoint does an active slave-ID
+  sweep once a Modbus transport is selected — that's where real
+  device confirmation happens.
+
 ## [0.0.15] — 2026-05-16
 
 ### Added

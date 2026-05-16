@@ -5412,17 +5412,43 @@ async function wizFindUsb() {
       ? ` · VID ${escHtml(a.vendor_id)} PID ${escHtml(a.product_id)}`
       : "";
     const serial = a.serial ? ` · S/N ${escHtml(a.serial)}` : "";
+
+    // Brief read-back classification from the backend:
+    //   modbus_rtu — silent serial, hint Modbus (the dominant case).
+    //   nmea_gps   — emitted GPS sentences during the sniff window.
+    //   unknown    — port opens but bytes don't match anything we know.
+    //   busy       — port held by another process (probably us).
+    const proto = a.protocol || "unknown";
+    let badge = "";
+    let action = `<button class="btn-action btn-action--primary"
+                data-use-port="${escHtml(a.port)}"
+                data-use-label="${escHtml(a.product || a.port)}">Use as Modbus</button>`;
+    if (proto === "nmea_gps") {
+      badge = `<span class="wiz-vendor-hint wiz-vendor-hint--gps">NMEA GPS</span>`;
+      // GPS receiver path lands with #125. Until then we surface the
+      // detection but block the wrong action — adding a GPS as a
+      // Modbus transport would just sit there failing every poll.
+      action = `<button class="btn-action" disabled
+                  title="GPS support is on the roadmap (#125) — coming soon">
+                  GPS support coming soon
+                </button>`;
+    } else if (proto === "busy") {
+      badge = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">port busy</span>`;
+      action = `<button class="btn-action" disabled
+                  title="Port couldn't be opened — already in use by another process (often the daemon itself if you've already added this transport)">
+                  port busy
+                </button>`;
+    } else if (proto === "unknown") {
+      badge = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">unknown output</span>`;
+      // Still offer Modbus — user may know what it is even if we don't.
+    }
     return `
       <div class="wiz-result-row">
         <div class="wiz-result-info">
-          ${product} ${chip}
+          ${product} ${chip} ${badge}
           <div class="settings-foot">${escHtml(a.port)}${ids}${serial}</div>
         </div>
-        <button class="btn-action btn-action--primary"
-                data-use-port="${escHtml(a.port)}"
-                data-use-label="${escHtml(a.product || a.port)}">
-          Use this
-        </button>
+        ${action}
       </div>`;
   }).join("");
   list.querySelectorAll("[data-use-port]").forEach(b => {

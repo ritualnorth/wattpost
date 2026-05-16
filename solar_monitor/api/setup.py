@@ -357,20 +357,31 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
 
 @get("/api/setup/usb_scan")
 async def usb_scan() -> dict[str, Any]:
-    """Enumerate USB serial adapters that could carry Modbus RTU.
+    """Enumerate USB serial devices and classify what protocol each is
+    emitting.
 
     Returns every `/dev/ttyUSB*` and `/dev/ttyACM*` the host can see,
-    along with the chip-level identifiers we can pull from sysfs
-    (vendor + product IDs, chip name) so the unified wizard can show
-    "USB-RS485 adapter · CH340 chip · /dev/ttyUSB0" instead of just
-    a path. The CH340/FT232 chip name is what most customers will
-    recognise from their adapter's product page.
+    along with chip-level identifiers from sysfs (vendor + product IDs,
+    chip name) AND a brief protocol sniff per device so the wizard
+    can route the user correctly:
 
-    We don't actively probe Modbus here — that would risk colliding
-    with other software on the bus. The existing `/api/setup/probe`
-    endpoint (slave-ID sweep) does that once the user picks a
-    transport to confirm it talks to real gear.
+      * `nmea_gps`         — emitted NMEA sentences (`$GP…` / `$GN…`).
+                             Routed to GPS setup (when #125 lands).
+      * `modbus_rtu`       — silent at 1s of read, plausible Modbus
+                             host — routed through the existing
+                             "Use as Modbus" flow.
+      * `unknown`          — port opens, no recognisable output —
+                             user can still pick it manually.
+      * `busy`             — port couldn't be opened (held by the
+                             daemon or another process).
+
+    Protocol sniff is read-only: open at 9600 baud, read for ~700 ms,
+    classify by what landed. We don't write a Modbus probe here — the
+    existing `/api/setup/probe` endpoint does that once the user has
+    selected a transport, and writing blindly could clobber something
+    else on the bus.
     """
+    import asyncio as _asyncio
     import glob
     import os
 
@@ -417,10 +428,82 @@ async def usb_scan() -> dict[str, Any]:
         if chip:
             rec["chip"] = chip
 
+        # Protocol sniff. Best-effort — any failure tags the device
+        # as `unknown` rather than blocking the scan.
+        rec["protocol"] = await _asyncio.get_event_loop().run_in_executor(
+            None, _sniff_serial_protocol, path,
+        )
         out.append(rec)
 
-    log.info("usb_scan: %d adapter(s) found", len(out))
+    log.info("usb_scan: %d device(s) found", len(out))
     return {"adapters": out}
+
+
+def _sniff_serial_protocol(port: str) -> str:
+    """Open a serial port, read briefly, classify what came out.
+
+    Runs in a thread-pool executor — pyserial is synchronous and we
+    don't want a long-read to block the event loop while scanning a
+    handful of devices.
+
+    Classifications:
+      * 'nmea_gps' — at least one `$GP…` / `$GN…` / `$GL…` / `$GA…`
+        sentence within the read window. Reliable signal: NMEA
+        receivers emit ~10 sentences per second at 9600 baud.
+      * 'modbus_rtu' — zero bytes received. Silent serial ports are
+        the Modbus default: the device only speaks when polled. NOT a
+        guarantee (could be an unplugged adapter), but the right
+        default for routing in the wizard.
+      * 'unknown' — bytes received but no recognised pattern.
+      * 'busy' — port couldn't be opened (already in use).
+    """
+    try:
+        import serial as _serial
+    except ImportError:
+        return "unknown"
+    try:
+        ser = _serial.Serial(
+            port=port, baudrate=9600,
+            bytesize=8, parity="N", stopbits=1,
+            timeout=0.7,
+        )
+    except Exception:
+        return "busy"
+    try:
+        buf = bytearray()
+        # ~700 ms total budget: NMEA at 9600 baud emits well over
+        # one sentence in this window. Modbus devices are silent.
+        # We read in small chunks so a really chatty source doesn't
+        # let us miss the deadline waiting for a buffer fill.
+        import time as _time
+        deadline = _time.monotonic() + 0.7
+        while _time.monotonic() < deadline and len(buf) < 256:
+            chunk = ser.read(64)
+            if not chunk:
+                break
+            buf.extend(chunk)
+    finally:
+        try:
+            ser.close()
+        except Exception:
+            pass
+
+    if not buf:
+        # Silent serial = either Modbus (typical) or unplugged.
+        # We hint Modbus because that's the dominant case in our
+        # customer base; the wizard's slave-ID probe will tell the
+        # truth once the user picks the device.
+        return "modbus_rtu"
+
+    # NMEA: starts with `$` and one of the standard talker IDs.
+    # We scan the buffer rather than just looking at byte 0 because
+    # some receivers boot with a few bytes of junk before the first
+    # full sentence.
+    text = bytes(buf).decode("ascii", errors="ignore")
+    for line in text.splitlines():
+        if line.startswith(("$GP", "$GN", "$GL", "$GA", "$GB", "$BD")):
+            return "nmea_gps"
+    return "unknown"
 
 
 def _classify_disappearance(name: str | None) -> str | None:

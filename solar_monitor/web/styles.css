@@ -3118,6 +3118,21 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   color: var(--accent);
 }
 
+/* Vendor-hint variants for the USB-scan classification: NMEA GPS
+ * receivers get an accent-coloured tag so they're visually distinct
+ * from the default Modbus-hint adapter; unknown / busy ports get an
+ * amber warning tone. */
+.wiz-vendor-hint--gps {
+  background: rgba(63,185,80,0.12);
+  border-color: rgba(63,185,80,0.4);
+  color: var(--green, #3fb950);
+}
+.wiz-vendor-hint--warn {
+  background: rgba(210,153,34,0.10);
+  border-color: rgba(210,153,34,0.4);
+  color: var(--amber);
+}
+
 /* "Add another transport" — collapsible block in the wizard's
  * transport-list view. Lets a customer wire up BLE + USB side by
  * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
