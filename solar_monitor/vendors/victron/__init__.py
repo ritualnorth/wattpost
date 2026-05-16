@@ -20,13 +20,15 @@ transport — same code path, just a different driver per device kind:
 from ..base import VendorInfo
 from ..registry import register_vendor
 from .smart_shunt import VictronSmartShunt
+from .dcdc import VictronDcDc
 
 INFO = VendorInfo(
     id="victron",
     display_name="Victron Energy",
     description=(
         "Read-only via BLE Instant Readout. Currently supports the "
-        "SmartShunt battery monitor; SmartSolar and others to follow."
+        "SmartShunt battery monitor and Orion-Tr Smart DC-DC chargers; "
+        "SmartSolar and others to follow."
     ),
 )
 
@@ -34,7 +36,8 @@ register_vendor(
     info=INFO,
     drivers={
         "shunt": VictronSmartShunt,
+        "dcdc":  VictronDcDc,
     },
 )
 
-__all__ = ["INFO", "VictronSmartShunt"]
+__all__ = ["INFO", "VictronSmartShunt", "VictronDcDc"]
