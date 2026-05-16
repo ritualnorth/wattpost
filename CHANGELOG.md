@@ -8,6 +8,45 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.13] — 2026-05-16
+
+### Added
+- **Victron SmartShunt support (read-only).** The BMV-style
+  battery monitor — voltage, current, SoC, time-to-go, consumed
+  Ah, aux input (starter/midpoint/temperature), model + alarm
+  state — now lights up the same dashboard tiles as our other
+  vendors. New BLE transport `ble_victron_advertise` runs a
+  passive BleakScanner that decrypts Victron's Instant Readout
+  advertisements via the per-device key (find it in
+  VictronConnect → Product info → Show device key). New vendor
+  `victron` with driver `shunt`. Validated end-to-end against
+  the `victron-ble` library's upstream test fixtures — every
+  field decodes correctly.
+- Adds `victron-ble>=0.10` as a dependency.
+
+### Notes for early adopters
+- v0.0.13 ships the engine — a wizard flow for adding a Victron
+  device is coming in #118. Until then, drop a transport block
+  and matching device block into `config.yaml` manually:
+
+      transports:
+        - id: shunt1
+          type: ble_victron_advertise
+          address: CC:CC:CC:CC:CC:CC
+          encryption_key: aff4d0...  # 32-char hex from VictronConnect
+
+      devices:
+        - transport: shunt1
+          vendor: victron
+          kind: shunt
+          slave_id: 0
+          label: shunt
+
+- **Write capability is permanently out of scope for Victron.**
+  Heavy-Victron customers live on VRM/Cerbo — chasing them is a
+  rabbit hole we won't go down. See `project_victron_scope` in
+  the AI's memory for the strategic call.
+
 ## [0.0.12] — 2026-05-16
 
 ### Added
