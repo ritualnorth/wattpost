@@ -134,19 +134,47 @@ DEFAULT_PROBE_IDS: tuple[int, ...] = (
 
 # Register slots that hold a model-name ASCII string for each vendor we
 # probe. The wizard tries each entry in order until one comes back with
-# usable ASCII.
+# usable ASCII. Order matters — DCC + inverter blocks come first because
+# they're more specific; the generic Rover block at register 12 is the
+# fallback catch-all for any other Renogy device that happens to keep
+# the model string there.
 _MODEL_PROBES: list[tuple[str, str, int, int]] = [
     # (vendor, suggested_kind, register, word_count)
-    ("renogy", "smart_battery",    5122, 8),
-    ("renogy", "charge_controller",  12, 8),
+    ("renogy", "smart_battery",    5122, 8),    # LFP smart batteries
+    ("renogy", "inverter",         4311, 8),    # 1000W/2000W/3000W inverters
+    ("renogy", "charge_controller",  12, 8),    # Rover/Wanderer/Adv/Voyager
+                                                # + DCC50S/DCC30S (driver
+                                                # picks via _classify_renogy)
 ]
 
 # Per-vendor heuristics that map a model string → recommended device kind.
+# Order matters — more specific patterns first (DCC, inverter) so the
+# generic Rover catch-all doesn't claim them by mistake.
 def _classify_renogy(model: str) -> str | None:
     m = (model or "").upper()
+    # Smart batteries: most LFP packs start with "RBT" (Renogy Battery
+    # Type) or include "LFP" in the model.
     if m.startswith("RBT") or "LFP" in m:
         return "smart_battery"
-    if any(s in m for s in ("ROVER", "WANDER", "ADVENTUR", "RNG-CTRL", "RNG-")):
+    # DC-DC + MPPT combo (DCC50S, DCC30S, DCC25S, DCC15S). Sometimes
+    # the model string is just "DCC50S"; sometimes "RNG-DCC50S". Match
+    # both. These MUST be checked before the generic charge_controller
+    # patterns — they'd otherwise match "RNG-" and end up routed to
+    # the wrong driver.
+    if "DCC" in m and any(c.isdigit() for c in m):
+        return "dcdc"
+    # Inverters: Renogy uses "RIV" (Renogy Inverter), or sometimes
+    # "RNG-INVT-". Both have INV in them so we just match on that.
+    if "INV" in m or m.startswith("RIV"):
+        return "inverter"
+    # Charge controllers — the catch-all bucket. Covers Rover, Rover
+    # Elite, Rover Boost, Wanderer (all current/Li/PG variants),
+    # Adventurer, Voyager, plus the generic "RNG-CTRL-" prefix used
+    # on newer model SKUs.
+    if any(s in m for s in (
+        "ROVER", "WANDER", "ADVENTUR", "VOYAGER",
+        "RNG-CTRL", "RNG-",
+    )):
         return "charge_controller"
     return None
 

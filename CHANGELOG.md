@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.22] — 2026-05-16
+
+### Added — Renogy coverage finished
+- **Renogy 1000W/2000W/3000W pure-sine inverter driver (#135).**
+  Covers RIV/RNG-INVT inverter-charger family. Exposes AC input +
+  AC output (V/A/Hz), battery side, integrated MPPT side (some
+  models include solar), and AC load percentage. Modbus FC03
+  over the existing BT-2 / USB-RS485 transports. Register map
+  from cyril/renogy-bt's `InverterClient.py`. Registered as
+  `(vendor=renogy, kind=inverter)`.
+
+### Changed — Model classifier sweep (#134)
+- **Model-string classifier now recognises the full Renogy line.**
+  Probe + setup-wizard now routes:
+  - `RVR/WND/ADV/VNG` (any model code) → `charge_controller`
+    — covers Rover (40A/60A/100A), Rover Elite, Rover Boost,
+    Wanderer (10A/30A/Li/PG), Adventurer (30A), Voyager (20A
+    waterproof) and any newer SKU using the same prefix.
+  - `DCC*` with a digit anywhere → `dcdc` — covers DCC50S,
+    DCC30S, DCC25S, DCC15S (plus `RNG-DCC*` variants).
+  - `RBT*` or `*LFP*` → `smart_battery`.
+  - `RIV*` or `*INV*` → `inverter`.
+- **Load-output discovery** in `outputs/renogy_rover.py` now
+  matches bare prefixes (`RVR`, `WND`, etc.) too, so older
+  firmware that drops the `RNG-CTRL-` vendor tag still gets a
+  load toggle on the dashboard.
+
+### Renogy coverage status
+Effectively complete. The only gap is the Smart Shunt 300
+(#113) — blocked on the lack of a community-documented register
+map, will be unblocked via the discovery telemetry pipeline
+(#129) or a customer-contributed Modbus capture.
+
 ## [0.0.21] — 2026-05-16
 
 ### Added — JK BMS (JiKong) support (#114)
