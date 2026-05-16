@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.44] — 2026-05-16
+
+### Changed — Phase 2 of cloud rebrand: app.wattpost.io → wattpost.cloud (#139)
+Following v0.0.43 (which stood up wattpost.cloud + the Caddy broker
+in parallel), this commit completes the URL migration:
+
+- **Cloud code sweep** — 22 hardcoded `https://app.wattpost.io/...`
+  references across 13 files (verification emails, password-reset
+  links, billing return URLs, marketing copy, referral URLs)
+  flipped to `https://wattpost.cloud/...`. Future emails / new
+  bookmarks all use the new domain.
+- **Caddy app.wattpost.io block** — replaced with a single
+  `redir https://wattpost.cloud{uri} 308`. 308 preserves method +
+  body, so existing paired appliances heartbeating to
+  `app.wattpost.io/api/heartbeat` keep working without any
+  appliance-side change. Heartbeat POST → 308 → POST to wattpost.cloud.
+
+### Verified
+- `https://app.wattpost.io/login` → 308 → loads at wattpost.cloud/login
+- `POST https://app.wattpost.io/api/heartbeat` (fake auth) → 308 →
+  POST lands at wattpost.cloud, returns 401 (auth checked, method
+  preserved)
+- `https://wattpost.cloud/app` serves the dashboard
+
+### Next
+- Phase 3: update appliance default cloud endpoint to
+  `https://wattpost.cloud` in `solar_monitor/config.py`. New pairings
+  use the new endpoint directly; existing pairings stay on
+  `app.wattpost.io` (heartbeat 308 keeps them working).
+- Phase 4: README + docs sweep.
+- Phase 5: remove the app.wattpost.io block entirely once heartbeat
+  logs confirm every paired appliance has hit wattpost.cloud at
+  least once.
+
 ## [0.0.43] — 2026-05-16
 
 ### Changed — Cloud broker rebuilt with Caddy on wattpost.cloud (#139)
