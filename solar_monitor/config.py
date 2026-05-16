@@ -138,6 +138,22 @@ class WeatherCfg(msgspec.Struct, kw_only=True):
     poll_minutes: int = 15
 
 
+class GpsCfg(msgspec.Struct, kw_only=True):
+    """USB GPS receiver (#125). Off by default — opt in by adding a
+    `gps:` block to config.yaml. The daemon reads NMEA at `baudrate`
+    from `port` (typically `/dev/ttyACM0` for a USB-CDC receiver like
+    the VK-162 G-Mouse) and, on significant movement (>5 km from
+    the last applied fix, or >30 min idle), updates the weather +
+    forecast services' lat/lon so a moving van/cabin gets correct
+    forecasts."""
+    port: str                                # e.g. /dev/ttyACM0
+    baudrate: int = 9600
+    # Tunables for the move-detection threshold. Defaults match #125;
+    # power users in a tightly-mapped area can tighten these.
+    min_move_km: float = 5.0
+    refresh_after_s: int = 1800
+
+
 class QuietHoursCfg(msgspec.Struct, kw_only=True):
     """Window during which `warn`-severity alerts are buffered instead of
     dispatched immediately. `alarm` always pages through. Hours are
@@ -160,6 +176,7 @@ class Config(msgspec.Struct, kw_only=True):
     forecast: ForecastCfg | None = None  # optional
     weather: WeatherCfg | None = None    # optional
     cloud: CloudCfg | None = None        # optional
+    gps: GpsCfg | None = None            # optional (USB GPS — #125)
 
 
 def load_config(path: str | Path) -> Config:

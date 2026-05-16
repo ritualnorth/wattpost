@@ -16,6 +16,7 @@ from .alerts import AlertEngine, AlertRule
 from .forecast import ForecastService
 from .weather import WeatherService
 from .cloud import CloudService
+from .gps import GpsService
 from .tunnel import TunnelService
 from .update import UpdateChecker
 from .config import Config
@@ -124,6 +125,23 @@ class PollScheduler:
         # Re-discover whenever new devices appear (count change).
         self._outputs_last_device_count = -1
 
+        # USB GPS (#125). Optional; off entirely when config.gps is
+        # absent. On significant movement we mutate the weather +
+        # forecast cfg in-memory and trigger one-shot re-fetches so
+        # a moving van's dashboard tracks its location automatically.
+        self._gps: GpsService | None = None
+        if config.gps is not None:
+            try:
+                self._gps = GpsService(
+                    port=config.gps.port,
+                    baudrate=config.gps.baudrate,
+                    min_move_km=config.gps.min_move_km,
+                    refresh_after_s=config.gps.refresh_after_s,
+                    on_significant_move=self._on_gps_move,
+                )
+            except Exception:
+                log.exception("gps service failed to initialise")
+
     @property
     def last_result(self) -> dict[str, Any] | None:
         return self._last_result
@@ -134,6 +152,50 @@ class PollScheduler:
         if self._poller is None:
             return None
         return self._poller._transports.get(transport_id)
+
+    @property
+    def gps(self) -> GpsService | None:
+        """Expose the GPS service for the /api/gps status endpoint
+        (returns None when not configured)."""
+        return self._gps
+
+    async def _on_gps_move(self, lat: float, lon: float) -> None:
+        """Called by GpsService when a fresh fix moves the daemon's
+        effective location enough to warrant a refresh. Mutates the
+        weather + forecast cfg in memory and triggers one-shot
+        re-fetches; weather/forecast then refresh their kv caches
+        which the dashboard reads from on next poll.
+
+        We DO NOT persist the new lat/lon to YAML — that would write
+        hundreds of files a day in a moving van. The original config-
+        file values stay as the cold-start fallback."""
+        if self.config.weather is not None:
+            self.config.weather.lat = lat
+            self.config.weather.lon = lon
+        if self.config.forecast is not None and self.config.forecast.provider == "openmeteo":
+            # Solcast is site-based and can't follow a moving van
+            # (see project_target_customer + #130). Only Open-Meteo
+            # gets its forecast lat/lon updated.
+            self.config.forecast.lat = lat
+            self.config.forecast.lon = lon
+        # Trigger one-shot re-fetches so the kv caches refresh
+        # without waiting for the next poll-cadence tick.
+        if self._weather is not None:
+            try:
+                await self._weather.fetch_once()
+            except Exception:
+                log.exception("gps move: weather refetch failed")
+        if self._forecast is not None and self.config.forecast and self.config.forecast.provider == "openmeteo":
+            try:
+                # Rebuild the provider so it picks up the new lat/lon —
+                # ForecastService caches the provider built at start.
+                from .forecast.service import PROVIDERS as _FC
+                self._forecast.provider = _FC[self.config.forecast.provider](
+                    self.config.forecast,
+                )
+                await self._forecast.fetch_once()
+            except Exception:
+                log.exception("gps move: forecast refetch failed")
 
     # ---------- SSE broadcast ----------
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -244,6 +306,8 @@ class PollScheduler:
         # Background forecast poller (only if configured).
         if self._forecast is not None:
             await self._forecast.start()
+        if self._gps is not None:
+            await self._gps.start()
         if self._weather is not None:
             await self._weather.start()
         if self._cloud is not None:
@@ -299,6 +363,8 @@ class PollScheduler:
         await self._alerts.stop()
         if self._forecast is not None:
             await self._forecast.stop()
+        if self._gps is not None:
+            await self._gps.stop()
         if self._weather is not None:
             await self._weather.stop()
         if self._cloud is not None:
