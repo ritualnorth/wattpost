@@ -8,6 +8,34 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.10] — 2026-05-16
+
+### Changed
+- **Dashboard tile redesign — Today is now the headline.**
+  The standalone "Tomorrow" tile is gone; its content folds
+  into the Today panel as a sub-line. The Today panel now
+  shows kWh-so-far as a big hero number, with a forecast
+  sparkline running across the day (solid for the past,
+  dashed for "still to come") and a faint "now" marker. The
+  sub-line tells you what was expected and what's still to
+  come ("Of 3.8 kWh expected · 1.4 kWh still to come"). The
+  Tomorrow preview drops to a one-line footer at the bottom
+  of the tile.
+- **Sunset flip.** After dusk — when no PV is forecast for
+  the rest of today and tomorrow's window has data — the
+  Today tile auto-flips: Tomorrow's expected kWh becomes the
+  headline, today's tally demotes to "Today (final): PV …
+  Load …" in the footer. The dashboard's "operational
+  moment" stays unambiguous all day.
+- **5-day outlook highlights Today**, not Tomorrow. Matches
+  the headline tile so the "you are here" anchor reads
+  consistently top-to-bottom.
+
+### Fixed
+- **"Right now" weather tile gets its background tint back.**
+  Was the only dashboard tile without a panel tint, which
+  made it visually inert next to the others.
+
 ## [0.0.9] — 2026-05-16
 
 ### Fixed

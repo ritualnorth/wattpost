@@ -1503,12 +1503,15 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 
 /* "Right now" panel — current weather conditions from Open-Meteo.
- * Sits between Today (energy state) and Tomorrow (PV forecast). The
- * big temperature reading + icon dominates so the panel reads at a
- * glance; supporting cells (cloud, wind, humidity, sunrise/sunset)
- * sit below in a row. Tint stays neutral so it feels like ambient
- * context rather than another metric. */
-.weather-panel { border-color: rgba(88, 166, 255, 0.18); }
+ * Sits between Today (energy state) and the daily outlook. The big
+ * temperature reading + icon dominates so the panel reads at a glance;
+ * supporting cells (cloud, wind, humidity, sunrise/sunset) sit below
+ * in a row. Soft blue tint matches the border so the tile reads as
+ * part of the dashboard's tinted-panel family, not a flat one-off. */
+.weather-panel {
+  border-color: rgba(88, 166, 255, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
+}
 .weather-strip {
   display: flex; flex-direction: column; gap: .65rem;
 }
@@ -1552,20 +1555,67 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   color: var(--text);
 }
 
-/* Tomorrow panel (dashboard PV forecast) — sits between Today and
- * the cell balance panel. Reuses .today-strip / .today-cell since
- * the layout is identical; the sparkline is the only new piece.
- * Tint is amber rather than the today-panel's blue so the forecast
- * reads as a distinct concept, not "more of today". */
-.tomorrow-panel { border-color: rgba(210,153,34,0.30); }
-.tomorrow-panel .panel-header h2 .h-icon { color: var(--amber); }
-.tomorrow-spark {
-  margin-top: .65rem;
-  border-top: 1px dashed var(--border);
-  padding-top: .5rem;
-  min-height: 56px;
+/* Today panel — two-column layout: hero numbers on the left, the
+ * forecast sparkline on the right. The hero's big kWh-so-far reading
+ * sits above three compact sub-cells (charged Ah, peak, load). The
+ * sparkline shows the day's predicted PV curve with the past portion
+ * solid and the "still to come" portion dashed; a faint vertical line
+ * marks "now". On narrow screens we stack vertically so neither half
+ * gets squeezed. */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  align-items: center;
 }
-.tomorrow-spark svg { display: block; width: 100%; }
+@media (max-width: 720px) {
+  .today-grid { grid-template-columns: 1fr; gap: .75rem; }
+}
+.today-hero {
+  display: flex; flex-direction: column; gap: .8rem;
+  min-width: 0;
+}
+.today-hero-val {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.6rem; line-height: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+.today-hero-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.today-hero-cells .today-cell {
+  border-left: none;
+  padding-left: 0;
+}
+.today-hero-cells .today-v {
+  font-size: .95rem;
+  margin-top: .15rem;
+}
+.today-spark { min-height: 64px; }
+.today-spark svg { display: block; width: 100%; }
+
+/* One-line Tomorrow preview at the bottom of the Today tile. Reads
+ * as a footnote — not another headline. */
+.today-tomorrow {
+  margin-top: .65rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .82rem; color: var(--text-2);
+}
+.today-tomorrow svg {
+  width: 16px; height: 16px; flex: none; color: var(--amber);
+}
+
+/* Sleep mode — after sunset (no PV remaining today + tomorrow forecast
+ * known) the panel flips: the hero shows tomorrow's expected kWh, and
+ * today's tally demotes to the footer. Sub-stats stay live so the user
+ * can still see the day's totals at a glance. */
+.today-panel--sleep .panel-header h2 .h-icon { color: var(--text-3); }
 
 /* Settings → About: "Latest available" row gains a soft amber tint
  * when a newer version is published, so the user notices on the
@@ -1580,8 +1630,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 
 /* "Yesterday: predicted X kWh · actual Y kWh · Z% of forecast" line.
- * Lives under the Tomorrow sparkline so the user can see how well
- * the previous day's forecast held up — drift here is the early
+ * Lives at the bottom of the Today panel so the user can see how
+ * well the previous day's forecast held up — drift here is the early
  * signal that Solcast's array model needs re-tuning (capacity, tilt,
  * azimuth, shading). */
 .forecast-accuracy {
@@ -1595,12 +1645,12 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .acc-warn { color: var(--amber); }
 .acc-off  { color: var(--red,   #f85149); }
 
-/* 7-day outlook strip: horizontal row of day-cards under the
- * Tomorrow tile. Tomorrow's card is highlighted with a slightly
- * brighter border so it reads as the "you are here" of the week.
- * Cards scroll horizontally on narrow screens rather than wrapping —
- * a 7-card row that wraps to 2 rows of 3+4 looks worse than one row
- * the user can swipe. */
+/* 5-day outlook strip: horizontal row of day-cards under the Today
+ * tile. Today's card is highlighted with a slightly brighter border
+ * so it reads as the "you are here" of the week — matching the Today
+ * headline above. Cards scroll horizontally on narrow screens rather
+ * than wrapping; a 5-card row that wraps to 2 rows looks worse than
+ * one row the user can swipe. */
 .week-panel { border-color: rgba(210,153,34,0.18); }
 .week-panel .panel-header h2 .h-icon { color: var(--amber); }
 .week-strip {

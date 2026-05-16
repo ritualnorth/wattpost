@@ -341,7 +341,6 @@ function applySnapshot(frame) {
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
   renderWeather();
-  renderTomorrow();
   renderWeek();
   renderCells();
   renderDeviceCards();
@@ -968,12 +967,14 @@ function bucketByDay(points) {
 function summariseForecast(points) {
   const out = {
     todayWh: 0, tomorrowWh: 0, dayAfterWh: 0,
+    todayPoints: [], todayPeak: null, todayRemainingWh: 0,
     tomorrowPeak: null, tomorrowPoints: [], dayAfterPoints: [],
   };
   if (!points?.length) return out;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const todayMid = today.getTime() / 1000;
   const dayS = 86400;
+  const nowS = Math.floor(Date.now() / 1000);
   // Solcast's `period_end` is the END of a 30-min slice, so the
   // slice that ends at exactly 00:00 tomorrow is actually 23:30 of
   // *today*. Bucket by the slice mid-point (ts - 900s) to keep the
@@ -985,6 +986,9 @@ function summariseForecast(points) {
     const bucketTs = ts - 900;
     if (bucketTs >= todayMid && bucketTs < todayMid + dayS) {
       out.todayWh += wh;
+      out.todayPoints.push({ ts, w });
+      if (!out.todayPeak || w > out.todayPeak.w) out.todayPeak = { ts, w };
+      if (ts >= nowS) out.todayRemainingWh += wh;
     } else if (bucketTs >= todayMid + dayS && bucketTs < todayMid + 2*dayS) {
       out.tomorrowWh += wh;
       out.tomorrowPoints.push({ ts, w });
@@ -1130,48 +1134,9 @@ async function refreshAccuracyLine() {
   } catch (e) { row.hidden = true; }
 }
 
-function renderTomorrow() {
-  const panel = $("#tomorrow-panel");
-  if (!panel) return;
-  // Accuracy line refreshes on a slower cadence than the dashboard
-  // poll — it only changes once per day. We just kick it off here
-  // alongside the regular Tomorrow render; the API returns quickly
-  // and the result is hidden when there's no archive yet.
-  refreshAccuracyLine();
-  ensureForecast().then(f => {
-    if (!f) {
-      panel.hidden = true;
-      // No forecast configured (or no successful fetch yet) — surface
-      // the gentle "set this up" tile unless the user has dismissed it.
-      renderTomorrowEmpty(true);
-      return;
-    }
-    const s = summariseForecast(f.points);
-    // If neither tomorrow nor the day after has any data, the forecast
-    // window is probably just historic — don't show an empty tile.
-    if (s.tomorrowWh <= 0 && s.dayAfterWh <= 0) {
-      panel.hidden = true;
-      renderTomorrowEmpty(true);
-      return;
-    }
-    panel.hidden = false;
-    renderTomorrowEmpty(false);
-    // Tile is now forecast-Tomorrow-only — today's forecast lives as
-    // the first card in the daily-outlook strip below, where it's
-    // unambiguous against the actual "Today" panel further up.
-    $("#tomorrow-kwh").textContent = `${(s.tomorrowWh / 1000).toFixed(2)} kWh`;
-    if (s.tomorrowPeak) {
-      $("#tomorrow-peak").textContent = `${(s.tomorrowPeak.w / 1000).toFixed(2)} kW`;
-      const t = new Date(s.tomorrowPeak.ts * 1000);
-      $("#tomorrow-peak-at").textContent = t.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
-    } else {
-      $("#tomorrow-peak").textContent = "—";
-      $("#tomorrow-peak-at").textContent = "—";
-    }
-    $("#tomorrow-sub").textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
-    drawTomorrowSpark(s.tomorrowPoints);
-  });
-}
+// Tomorrow tile was folded into Today (see renderToday) — the standalone
+// renderTomorrow() / drawTomorrowSpark() entry points are gone. Anything
+// the dashboard used to do for tomorrow lives inside renderToday now.
 
 // ---------- 7-DAY OUTLOOK STRIP ----------
 function renderWeek() {
@@ -1212,9 +1177,10 @@ function drawWeekStrip(days) {
     const kwh = (d.wh / 1000).toFixed(1);
     const peakKw = d.peak ? (d.peak.w / 1000).toFixed(2) : "—";
     const peakAt = d.peak ? new Date(d.peak.ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "";
-    const isTomorrow = d.dayMid === todayMid + 86400;
+    // Today is the "you are here" anchor — matches the Today tile above.
+    const isToday = d.dayMid === todayMid;
     return `
-      <div class="week-card ${isTomorrow ? "week-card--featured" : ""}">
+      <div class="week-card ${isToday ? "week-card--featured" : ""}">
         <div class="week-card-head">
           <span class="week-card-day">${label}</span>
           <span class="week-card-date">${dateLabel}</span>
@@ -1244,47 +1210,155 @@ function weekSparkSvg(points, peakWAcrossWeek) {
     </svg>`;
 }
 
-function drawTomorrowSpark(points) {
-  const host = $("#tomorrow-spark");
-  if (!host || !points.length) { if (host) host.innerHTML = ""; return; }
-  // Plain SVG sparkline — simpler than spinning up another uPlot
-  // instance for a tile this small.
+// ---------- TODAY PANEL ----------
+//
+// Headline tile: today's PV-so-far + a forecast curve for the rest of
+// the day + sub-stats + one-line Tomorrow preview. After sunset (no PV
+// expected today + tomorrow forecast available), the tile flips so
+// Tomorrow becomes the headline and today demotes to a "final" line —
+// the dashboard's "operational moment" stays unambiguous.
+function renderToday() {
+  const rover = devices.find(d => d.kind === "charge_controller");
+  const l = rover?.latest || {};
+
+  const pvActualWh   = l.energy_today_wh || 0;
+  const pvActualStr  = fmt.wh(pvActualWh);
+  const chargedStr   = (l.charging_ah_today ?? 0) + " Ah";
+  const peakSoFarStr = fmt.num(l.max_charging_power_today_w, 0) + " W";
+  const loadWh = (todayAggregate && typeof todayAggregate.load_today_wh === "number")
+    ? todayAggregate.load_today_wh
+    : l.consumption_today_wh;
+  const loadStr = fmt.wh(loadWh);
+
+  // Default to live actuals; sleep-mode block below may overwrite the
+  // hero number with tomorrow's expected kWh.
+  $("#today-pv").textContent      = pvActualStr;
+  $("#today-charged").textContent = chargedStr;
+  $("#today-peak").textContent    = peakSoFarStr;
+  $("#today-load").textContent    = loadStr;
+
+  // Yesterday-accuracy line lives under this tile now — refresh on the
+  // same cadence as the dashboard poll; the API call is cheap and the
+  // result hides itself if no archive exists yet.
+  refreshAccuracyLine();
+
+  const panel    = $("#today-panel");
+  const headline = $("#today-headline");
+  const sub      = $("#today-sub");
+  const foot     = $("#today-tomorrow");
+  const footText = $("#today-tomorrow-text");
+  const spark    = $("#today-spark");
+
+  ensureForecast().then(f => {
+    if (!f) {
+      // No forecast configured. Show only live actuals and surface the
+      // gentle "hook up Solcast" CTA card unless the user dismissed it.
+      if (headline) headline.textContent = "Today";
+      if (sub)  sub.textContent = "";
+      if (foot) foot.hidden = true;
+      if (spark) spark.innerHTML = "";
+      panel?.classList.remove("today-panel--sleep");
+      renderTomorrowEmpty(true);
+      return;
+    }
+    renderTomorrowEmpty(false);
+
+    const s = summariseForecast(f.points);
+    // Sleep mode: today has no meaningful PV left to come and the
+    // forecast knows about tomorrow. < 50 Wh covers noisy zero-ish
+    // slices around dusk so we don't oscillate.
+    const sleep = s.todayRemainingWh < 50 && s.tomorrowWh > 0;
+    panel?.classList.toggle("today-panel--sleep", sleep);
+
+    if (sleep) {
+      if (headline) headline.textContent = "Tomorrow";
+      $("#today-pv").textContent = `${(s.tomorrowWh / 1000).toFixed(1)} kWh`;
+      if (sub) {
+        sub.textContent = s.tomorrowPeak
+          ? `Expected · peak ${(s.tomorrowPeak.w / 1000).toFixed(2)} kW at ${_fmtHm(s.tomorrowPeak.ts)} · Solcast`
+          : "Expected · Solcast";
+      }
+      // Footer becomes the final tally for today.
+      if (foot) {
+        foot.hidden = false;
+        footText.textContent = `Today (final): PV ${pvActualStr} · Load ${loadStr}`;
+      }
+      drawTodaySpark(s.tomorrowPoints, null, spark);
+    } else {
+      if (headline) headline.textContent = "Today";
+      if (sub) {
+        if (s.todayWh > 0) {
+          const expected  = (s.todayWh / 1000).toFixed(1);
+          const remaining = (s.todayRemainingWh / 1000).toFixed(1);
+          sub.textContent = `Of ${expected} kWh expected · ${remaining} kWh still to come · Solcast`;
+        } else {
+          sub.textContent = `Solcast · refreshed ${fmt.ago(f.fetched_at)}`;
+        }
+      }
+      // Tomorrow preview footer — only shown if Solcast actually has
+      // tomorrow's window populated.
+      if (s.tomorrowWh > 0 && foot) {
+        foot.hidden = false;
+        const peakStr = s.tomorrowPeak
+          ? ` · peak ${(s.tomorrowPeak.w / 1000).toFixed(2)} kW at ${_fmtHm(s.tomorrowPeak.ts)}`
+          : "";
+        footText.textContent = `Tomorrow: ${(s.tomorrowWh / 1000).toFixed(1)} kWh expected${peakStr}`;
+      } else if (foot) {
+        foot.hidden = true;
+      }
+      drawTodaySpark(s.todayPoints, Math.floor(Date.now() / 1000), spark);
+    }
+  });
+}
+
+function _fmtHm(ts) {
+  return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// Today's sparkline: pre-now points draw solid (the curve as Solcast
+// originally forecast it), post-now points draw dashed + faded so the
+// "still to come" portion is visually distinct from history. A faint
+// vertical line marks "now". When nowTs is null the curve is rendered
+// uniformly bright — used by sleep mode for tomorrow.
+function drawTodaySpark(points, nowTs, host) {
+  host = host || $("#today-spark");
+  if (!host || !points || !points.length) { if (host) host.innerHTML = ""; return; }
   const W = host.clientWidth || 600;
-  const H = 56;
+  const H = 64;
   const padX = 8, padY = 6;
   const maxW = Math.max(...points.map(p => p.w), 1);
   const t0 = points[0].ts, tN = points[points.length - 1].ts;
   const span = Math.max(1, tN - t0);
-  const pts = points.map(p => {
-    const x = padX + (p.w === 0 ? 0 : ((p.ts - t0) / span) * (W - 2*padX));
-    const y = H - padY - (p.w / maxW) * (H - 2*padY);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  // Area under the curve so the silhouette reads more than a line.
-  const area = `M${padX},${H - padY} L ${pts} L ${W - padX},${H - padY} Z`;
+  const xOf = (ts) => padX + ((ts - t0) / span) * (W - 2*padX);
+  const yOf = (w)  => H - padY - (w / maxW) * (H - 2*padY);
+
+  if (nowTs == null) {
+    const pts = points.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
+    const area = `M${padX},${H - padY} L ${pts} L ${W - padX},${H - padY} Z`;
+    host.innerHTML = `
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
+        <path d="${area}" fill="rgba(210,153,34,0.18)"/>
+        <polyline points="${pts}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>
+      </svg>`;
+    return;
+  }
+
+  const past   = points.filter(p => p.ts <= nowTs);
+  const future = points.filter(p => p.ts >= nowTs);
+  const pastStr   = past.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
+  const futureStr = future.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
+  const nowX = Math.min(Math.max(xOf(nowTs), padX), W - padX);
+  // Area only under the past — emphasises what has actually happened.
+  const pastArea = past.length
+    ? `<path d="M${xOf(past[0].ts).toFixed(1)},${H - padY} L ${pastStr} L ${nowX.toFixed(1)},${H - padY} Z" fill="rgba(210,153,34,0.18)"/>`
+    : "";
   host.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
-      <path d="${area}" fill="rgba(210,153,34,0.15)"/>
-      <polyline points="${pts}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>
+      ${pastArea}
+      ${past.length   ? `<polyline points="${pastStr}"   fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>` : ""}
+      ${future.length ? `<polyline points="${futureStr}" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linejoin="round" stroke-dasharray="3 3" opacity="0.55"/>` : ""}
+      <line x1="${nowX.toFixed(1)}" y1="${padY}" x2="${nowX.toFixed(1)}" y2="${H - padY}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
     </svg>`;
-}
-
-// ---------- TODAY STRIP ----------
-function renderToday() {
-  const rover = devices.find(d => d.kind === "charge_controller");
-  const l = rover?.latest || {};
-  $("#today-pv").textContent       = fmt.wh(l.energy_today_wh);
-  $("#today-charged").textContent  = (l.charging_ah_today ?? 0) + " Ah";
-  $("#today-peak").textContent     = fmt.num(l.max_charging_power_today_w, 0) + " W";
-  // Load today comes from /api/today (computed from energy balance across
-  // all polls). The Rover's `consumption_today_wh` only counts its load
-  // output terminals — useless for the typical busbar wiring.
-  if (todayAggregate && typeof todayAggregate.load_today_wh === "number") {
-    $("#today-load").textContent = fmt.wh(todayAggregate.load_today_wh);
-  } else {
-    $("#today-load").textContent = fmt.wh(l.consumption_today_wh);
-  }
-  $("#today-lifetime").textContent = fmt.wh(l.energy_total_wh);
 }
 
 // ---------- ALERTS ----------
