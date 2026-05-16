@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.49] — 2026-05-16
+
+### Fixed — middleware actually fires now (was silently no-op'd)
+v0.0.48 added `DefineMiddleware(...)` wrappers thinking that
+fixed the v0.0.46/v0.0.47 issue of plain ASGI middleware classes
+being silently ignored. It didn't. Litestar's `middleware=[…]`
+expects `litestar.middleware.ASGIMiddleware` subclasses with a
+`handle(scope, receive, send, next_app)` method — NOT
+`__call__(scope, receive, send)`.
+
+All three security middlewares converted:
+- `rate_limit.RateLimitMiddleware` → ASGIMiddleware
+- `csrf.CSRFMiddleware` → ASGIMiddleware
+- `twofa_enforce.TwoFactorEnforcementMiddleware` → ASGIMiddleware
+
+Registered as INSTANCES not classes:
+`middleware=[RateLimitMiddleware(), CSRFMiddleware(), TwoFactorEnforcementMiddleware()]`.
+
+Saved as memory [[litestar-middleware-shape]] so future me / future
+contributors don't burn time on the same trap.
+
+### What this means in practice
+After this deploys, all three gates fire on every request for real:
+- 5 bad logins/minute → 429 on the 6th
+- POST to cookie-auth state-changing endpoint without
+  `X-Requested-With: WattPost` → 403
+- Staff session without 2FA enrolled hits any non-allowlisted
+  endpoint → 403 + `must_enroll_2fa: true` payload → frontend
+  redirects to enrolment
+
 ## [0.0.48] — 2026-05-16
 
 ### Fixed — middleware registration (rate-limit was silently ignored)
