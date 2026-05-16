@@ -1,15 +1,27 @@
 name: Build SD image
 
 # Triggers:
-#   - Pushing a tag matching v* (e.g. v0.0.2) → builds + attaches the
-#     .img.xz to a real GitHub Release.
-#   - workflow_dispatch → builds + uploads as a workflow artefact (no
-#     release). Useful for smoke-testing the pipeline without cutting
-#     a tag, or for one-off images for demos.
+#   - Pushing a MINOR/MAJOR tag (v0.1.0, v0.2.0, v1.0.0, …) → builds
+#     + attaches the .img.xz to a real GitHub Release. Patch tags
+#     (v0.0.x) are deliberately skipped — pi-gen builds eat ~90 min
+#     of GitHub Actions minutes each, and we ship patch releases
+#     close to daily during active development. Docker (:latest)
+#     customers still get every patch immediately; SD-image users
+#     get a rollup image cut on the next minor bump (or via the
+#     manual workflow_dispatch below if a fresh image is needed
+#     mid-cycle).
+#   - workflow_dispatch → builds + uploads as a workflow artefact
+#     (no release). Useful for one-off images on demand, smoke-
+#     testing the pipeline, or cutting an out-of-band SD image
+#     during a long patch-tag streak.
 on:
   push:
     tags:
-      - 'v*'
+      # v<major>.<minor>.0 only. Patch tags like v0.0.25 are
+      # intentionally excluded; cut a minor bump (v0.1.0) when you
+      # want an SD image, or trigger workflow_dispatch from the
+      # Actions UI for an ad-hoc build off any ref.
+      - 'v[0-9]+.[0-9]+.0'
   workflow_dispatch:
 
 permissions:
