@@ -25,6 +25,7 @@ from litestar.exceptions import HTTPException, NotFoundException
 from ..config import Config, ForecastCfg
 from ..forecast.service import CACHE_KEY
 from ..forecast.solcast import SolcastProvider
+from ..forecast.openmeteo import OpenMeteoForecastProvider
 from ..scheduler import PollScheduler
 from ..storage.sqlite import Store
 from .setup import _hot_reload_bg
@@ -35,9 +36,20 @@ log = logging.getLogger(__name__)
 # ---------- payloads ----------
 
 class ForecastConfigPayload(msgspec.Struct, kw_only=True):
+    """Each provider uses a subset of these — Solcast needs api_key +
+    resource_id, Open-Meteo needs lat/lon + array geometry, synthetic
+    ignores everything. Routing happens in the PUT/POST handlers."""
     provider: str = "solcast"
-    api_key: str | None = None      # null = clear / disable
+    # Solcast credentials. Null = clear / disable.
+    api_key: str | None = None
     resource_id: str | None = None
+    # Open-Meteo PV estimator inputs.
+    lat: float | None = None
+    lon: float | None = None
+    array_kw: float = 1.0
+    tilt_deg: float = 30.0
+    azimuth_deg: float = 0.0
+    system_efficiency: float = 0.80
     poll_hours: int = 3
 
 
@@ -128,21 +140,39 @@ async def get_pv_forecast(state: State) -> dict[str, Any]:
 
 @get("/api/forecast/config")
 async def get_forecast_config(state: State) -> dict[str, Any]:
-    """Masked view of the credentials for the Settings UI. Never
-    returns the raw api_key — the field comes back as `****` when
-    set, "" when unset, and the UI handles "leave blank to keep
-    existing" the same way the alert transport editor does."""
+    """Masked view of the config for the Settings UI. Never returns
+    the raw api_key — the field comes back as `****` when set, "" when
+    unset, and the UI handles "leave blank to keep existing" the same
+    way the alert transport editor does. Open-Meteo fields ride along
+    so the form can show the array geometry without a second fetch."""
     config: Config = state["config"]
     fc = config.forecast
     if fc is None:
-        return {"configured": False, "provider": "solcast",
-                "api_key": "", "resource_id": "", "poll_hours": 3}
+        return {
+            "configured":        False,
+            "provider":          "solcast",
+            "api_key":           "",
+            "resource_id":       "",
+            "lat":               None,
+            "lon":               None,
+            "array_kw":          1.0,
+            "tilt_deg":          30.0,
+            "azimuth_deg":       0.0,
+            "system_efficiency": 0.80,
+            "poll_hours":        3,
+        }
     return {
-        "configured":  True,
-        "provider":    fc.provider,
-        "api_key":     "****" if fc.api_key else "",
-        "resource_id": fc.resource_id,
-        "poll_hours":  fc.poll_hours,
+        "configured":        True,
+        "provider":          fc.provider,
+        "api_key":           "****" if fc.api_key else "",
+        "resource_id":       fc.resource_id,
+        "lat":               fc.lat,
+        "lon":               fc.lon,
+        "array_kw":          fc.array_kw,
+        "tilt_deg":          fc.tilt_deg,
+        "azimuth_deg":       fc.azimuth_deg,
+        "system_efficiency": fc.system_efficiency,
+        "poll_hours":        fc.poll_hours,
     }
 
 
@@ -150,33 +180,13 @@ async def get_forecast_config(state: State) -> dict[str, Any]:
 async def update_forecast_config(
     data: ForecastConfigPayload, state: State,
 ) -> dict[str, Any]:
-    """Write or clear the `forecast:` block. Null/empty api_key clears
-    the integration. Engine reads config at boot so this returns
-    `restart_required: true`."""
+    """Write or clear the `forecast:` block. Each provider has its
+    own "required fields are present" check; if anything's missing
+    the block gets cleared rather than half-configured.
+
+    Engine hot-reloads via the same path as the wizard."""
     config: Config = state["config"]
     config_path: str = state.get("config_path", "config.yaml")
-
-    clearing = not (data.api_key and data.resource_id)
-    if clearing:
-        config.forecast = None
-
-        def _mutate(raw):
-            raw.pop("forecast", None)
-            return raw
-        _save_config(config_path, _mutate)
-        log.info("forecast integration cleared")
-        # Background hot-reload — picks up the cleared config within
-        # a few seconds without a user-visible restart.
-        asyncio.create_task(_hot_reload_bg(state))
-        return {"ok": True, "configured": False, "restart_required": False}
-
-    # Preserve existing api_key when the UI sends "****" sentinel
-    # (Settings form leaves the password input blank to keep the
-    # current value).
-    existing = config.forecast
-    api_key = data.api_key
-    if api_key == "****" and existing is not None:
-        api_key = existing.api_key
 
     if data.poll_hours < 1 or data.poll_hours > 24:
         raise HTTPException(
@@ -185,21 +195,87 @@ async def update_forecast_config(
                    "limits make 3-6 the practical range.",
         )
 
-    new_fc = ForecastCfg(
-        provider=data.provider,
-        api_key=api_key,
-        resource_id=data.resource_id,
-        poll_hours=data.poll_hours,
-    )
+    # Branch per provider — each has different required fields, so
+    # "clearing" semantics differ too. Solcast clears when api_key or
+    # resource_id is missing; Open-Meteo clears when lat/lon is missing.
+    existing = config.forecast
+    new_fc: ForecastCfg | None = None
+
+    if data.provider == "solcast":
+        api_key = data.api_key
+        # Preserve existing api_key when the UI sends "****" sentinel
+        # (Settings form leaves the password input blank to keep the
+        # current value).
+        if api_key == "****" and existing is not None:
+            api_key = existing.api_key
+        if api_key and data.resource_id:
+            new_fc = ForecastCfg(
+                provider="solcast",
+                api_key=api_key,
+                resource_id=data.resource_id,
+                poll_hours=data.poll_hours,
+            )
+    elif data.provider == "openmeteo":
+        # Lat/lon falls back to WeatherCfg if the user hasn't given the
+        # forecast block its own — typical case: van builder with a
+        # single static lat/lon for both current weather + PV forecast.
+        lat = data.lat
+        lon = data.lon
+        if lat is None and config.weather is not None:
+            lat = config.weather.lat
+        if lon is None and config.weather is not None:
+            lon = config.weather.lon
+        if lat is not None and lon is not None and data.array_kw > 0:
+            new_fc = ForecastCfg(
+                provider="openmeteo",
+                lat=lat,
+                lon=lon,
+                array_kw=data.array_kw,
+                tilt_deg=data.tilt_deg,
+                azimuth_deg=data.azimuth_deg,
+                system_efficiency=data.system_efficiency,
+                poll_hours=data.poll_hours,
+            )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown forecast provider {data.provider!r}; "
+                   f"expected 'solcast' or 'openmeteo'",
+        )
+
+    if new_fc is None:
+        # Required fields missing → clear the integration.
+        config.forecast = None
+
+        def _mutate(raw):
+            raw.pop("forecast", None)
+            return raw
+        _save_config(config_path, _mutate)
+        log.info("forecast integration cleared")
+        asyncio.create_task(_hot_reload_bg(state))
+        return {"ok": True, "configured": False, "restart_required": False}
+
     config.forecast = new_fc
 
     def _mutate(raw):
-        raw["forecast"] = {
-            "provider":    new_fc.provider,
-            "api_key":     new_fc.api_key,
-            "resource_id": new_fc.resource_id,
-            "poll_hours":  new_fc.poll_hours,
+        # Write only the fields relevant to the chosen provider — keeps
+        # the yaml clean for the inspecting user. Common fields always
+        # written; provider-specific fields conditioned on provider.
+        block: dict[str, Any] = {
+            "provider":   new_fc.provider,
+            "poll_hours": new_fc.poll_hours,
         }
+        if new_fc.provider == "solcast":
+            block["api_key"]     = new_fc.api_key
+            block["resource_id"] = new_fc.resource_id
+        else:  # openmeteo
+            block["lat"]               = new_fc.lat
+            block["lon"]               = new_fc.lon
+            block["array_kw"]          = new_fc.array_kw
+            block["tilt_deg"]          = new_fc.tilt_deg
+            block["azimuth_deg"]       = new_fc.azimuth_deg
+            block["system_efficiency"] = new_fc.system_efficiency
+        raw["forecast"] = block
         return raw
     _save_config(config_path, _mutate)
     log.info("forecast integration configured (%s, every %dh)",
@@ -212,35 +288,56 @@ async def update_forecast_config(
 async def test_forecast_fetch(
     data: ForecastConfigPayload, state: State,
 ) -> dict[str, Any]:
-    """One-shot fetch with the supplied credentials. Used by the
-    Settings UI's "Test" button so the user can validate keys before
-    saving them to config.yaml. Doesn't touch the live service or the
-    cache — purely a credential check."""
-    if data.provider != "solcast":
+    """One-shot fetch with the supplied creds/config. Used by the
+    Settings UI's "Test" button so the user can validate before
+    saving to config.yaml. Doesn't touch the live service or cache."""
+    config: Config = state["config"]
+
+    if data.provider == "solcast":
+        api_key = data.api_key
+        # Same "****" → keep-existing semantic as the PUT.
+        if api_key == "****" and config.forecast is not None:
+            api_key = config.forecast.api_key
+        if not api_key or not data.resource_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Both api_key and resource_id are required.",
+            )
+        provider = SolcastProvider(api_key=api_key, resource_id=data.resource_id)
+    elif data.provider == "openmeteo":
+        lat = data.lat if data.lat is not None else (config.weather.lat if config.weather else None)
+        lon = data.lon if data.lon is not None else (config.weather.lon if config.weather else None)
+        if lat is None or lon is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Lat/lon required (either on the forecast form or "
+                       "via the weather integration).",
+            )
+        if data.array_kw <= 0:
+            raise HTTPException(
+                status_code=400, detail="Array capacity must be > 0 kW.",
+            )
+        provider = OpenMeteoForecastProvider(
+            lat=lat, lon=lon,
+            array_kw=data.array_kw,
+            tilt_deg=data.tilt_deg,
+            azimuth_deg=data.azimuth_deg,
+            system_efficiency=data.system_efficiency,
+        )
+    else:
         raise HTTPException(
             status_code=400, detail=f"unknown provider {data.provider!r}",
         )
 
-    config: Config = state["config"]
-    api_key = data.api_key
-    # Same "****" → keep-existing semantic as the PUT.
-    if api_key == "****" and config.forecast is not None:
-        api_key = config.forecast.api_key
-    if not api_key or not data.resource_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Both api_key and resource_id are required.",
-        )
-
-    provider = SolcastProvider(api_key=api_key, resource_id=data.resource_id)
     try:
         fc = await provider.fetch()
     except RuntimeError as e:
-        # Provider raises RuntimeError with a friendly message on the
-        # well-known failure modes (401, 404, 429). Surface those as-is.
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Solcast unreachable: {e}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"{data.provider} unreachable: {e}",
+        )
 
     # Headline: time + power of the next forecast peak, so the UI can
     # show "✓ next peak 4.2 kW at 14:00 tomorrow".
@@ -257,6 +354,7 @@ async def test_forecast_fetch(
 
     return {
         "ok":       True,
+        "provider": data.provider,
         "points":   len(fc.points),
         "peak_ts":  peak_ts,
         "peak_w":   round(peak_w, 1) if peak_ts is not None else None,
