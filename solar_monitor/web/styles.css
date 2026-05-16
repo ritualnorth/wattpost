@@ -3117,3 +3117,86 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ---------------- controllable outputs (#104) ---------------- */
+/* Per-device output panel: lives on the device detail page under the
+ * vendor-specific data panels. Toggle + state pill + audit footer. */
+.output-panel {
+  --panel-tint: linear-gradient(135deg, rgba(63,185,80,0.05), transparent 65%);
+}
+.output-state-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .15rem .55rem; border-radius: 999px;
+  font-family: var(--mono);
+  font-size: .82rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.output-on  { color: var(--green, #3fb950); border-color: rgba(63,185,80,0.45); }
+.output-off { color: var(--text-3); }
+.output-unknown { color: var(--text-3); font-style: italic; }
+
+.output-safety {
+  margin: .25rem 0 .75rem;
+  padding: .75rem .85rem;
+  background: rgba(210,153,34,0.08);
+  border: 1px solid rgba(210,153,34,0.35);
+  border-radius: var(--r);
+  font-size: .9rem; color: var(--text-2); line-height: 1.45;
+}
+.output-safety strong { color: var(--text); }
+.output-safety .btn-action { margin-top: .65rem; }
+
+.output-controls {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .5rem 0 .25rem;
+}
+/* The toggle is a chunky on/off switch with a sliding thumb — same
+ * pattern as Settings → Kiosk view, just wider so it reads as the
+ * primary control on the panel rather than a checkbox. */
+.output-toggle {
+  position: relative;
+  display: inline-flex; align-items: center;
+  width: 96px; height: 34px;
+  padding: 0 .6rem; gap: .5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.output-toggle:hover { background: var(--surface-3); }
+.output-toggle:disabled { opacity: .55; cursor: wait; }
+.output-toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 26px; height: 26px;
+  background: var(--text-3);
+  border-radius: 999px;
+  transition: left .18s, background .18s;
+}
+.output-toggle.is-on {
+  background: rgba(63,185,80,0.18);
+  border-color: rgba(63,185,80,0.55);
+}
+.output-toggle.is-on .output-toggle-thumb {
+  left: 67px;
+  background: var(--green, #3fb950);
+}
+.output-toggle-label {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--text-2);
+}
+.output-toggle.is-on .output-toggle-label { color: var(--green, #3fb950); }
+.output-busy {
+  font-size: .8rem; color: var(--text-3);
+  font-family: var(--mono);
+}
+.output-foot {
+  margin-top: .65rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+  font-size: .78rem;
+}
+.output-foot strong { color: var(--text-2); font-weight: 600; }

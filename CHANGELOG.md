@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.12] — 2026-05-16
+
+### Added
+- **Renogy MPPT load-output toggle.** Rover-family chargers (Rover
+  / Wanderer / Adventurer / Voyager) now expose their 12 V load
+  terminal as a controllable output on the device-detail page.
+  Toggle button writes register 0x010A via FC06 and confirms the
+  new state via an explicit FC03 read-back inside the same BLE
+  session — works around the BT-2 dongle quirk where Rover
+  firmware 3.x silently swallows FC06 ack frames. Confirmed
+  end-to-end against a real RNG-CTRL-RVR40 FW 3.1.0.
+- **One-shot safety gate** before the first toggle on any output:
+  the panel explains what's about to happen ("write command to
+  your charger, the load terminal will switch") and the user has
+  to acknowledge before any control surface appears. Persisted
+  per-output — won't nag on every visit.
+- **Audit line** under each control: "Last command: on · 6 sec
+  ago · by user · ok". So you can see whether a command actually
+  landed, especially handy when BLE was wobbly.
+- **Generic `ControllableOutput` schema + adapter protocol** under
+  `solar_monitor/outputs/`. JK BMS charge/discharge MOS toggles
+  drop into the same UI + (forthcoming) schedule engine without
+  per-vendor UI work. Today's adapter is `renogy_rover`; more
+  arrive with #114 (JK BMS).
+
+### Foundations (no user-visible change yet)
+- **FC06 `build_write_single` helper** in `modbus.py`, plus
+  `verify_response(expected_fc=...)` so future write functions
+  share the same exception-code plumbing as FC03.
+- **SQLite tables `controllable_outputs` + `output_schedules`.**
+  The schedules table lands ahead of the scheduler tick that
+  uses it (Phase B of #104) — the schema's lighter to evolve
+  if it ships in one shot.
+
 ## [0.0.11] — 2026-05-16
 
 ### Added

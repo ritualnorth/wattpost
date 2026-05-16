@@ -58,6 +58,11 @@ from .cloud_admin import (
 from .exporters_admin import (
     get_mqtt_config, update_mqtt_config, test_mqtt,
 )
+from .outputs import (
+    list_outputs,
+    toggle_output,
+    confirm_output_safety,
+)
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
@@ -736,6 +741,9 @@ def build_app(
             probe,
             add_device,
             delete_device,
+            list_outputs,
+            toggle_output,
+            confirm_output_safety,
             index,
             kiosk_index,
             login_page,
