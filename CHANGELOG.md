@@ -8,6 +8,44 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.34] — 2026-05-16
+
+### Added — Battery health tile (#109)
+- **New dashboard panel** above Cell balance: four headline stats
+  + a 10-bar SoC residency histogram showing where the bank lives
+  over the last 30 days.
+- **Cycles (BMS)**: cycle count reported by the BMS. Worst-pack-
+  wins (max across packs in a multi-pack bank). Empty when no BMS
+  is paired.
+- **Lifetime energy**: cumulative kWh that's flowed through the
+  bank since the BMS started counting. Computed from the BMS-
+  reported total_charge_ah × current mean pack voltage. Renders
+  as "kWh" up to 1 MWh, then "MWh" above.
+- **Window cycles**: equivalent full cycles over the last 30
+  days, computed by integrating discharged kWh ÷ bank capacity.
+  Works *without* a BMS — every shunt + battery setup gets this.
+- **Days online**: time since the earliest bank sample. Useful
+  for "is the BMS cycle counter saying 247 cycles in only 30
+  days?" sanity checks.
+- **SoC residency histogram**: 10 vertical bars, one per 10 %
+  band. Red at the low end → green at the high end. A healthy
+  LFP bank lives in the 50-95 % bands; visible weight at 0-30 %
+  means the customer's draining too deep and shortening lifespan.
+  Stat header surfaces the peak band: "mostly 70-80% (32 % of
+  the time)".
+
+### Strategic context
+Renogy Smart Shunt 300 surfaces cycle count on its tiny screen
+but nowhere else. Victron VRM has a "battery life" widget but
+it's locked to BMV/SmartShunt installs and lives behind their
+SaaS. WattPost surfaces it free, BMS-or-shunt-driven, with the
+residency histogram added on top. Aligns with the moat per
+[[project-coverage-commitment]] in agent memory.
+
+### API
+- New `GET /api/battery-health?days=N` (default 30, clamp 1-365)
+  returning the aggregate. Read-only; no auth changes.
+
 ## [0.0.33] — 2026-05-16
 
 ### Fixed — demo.wattpost.io broken since 0.0.31

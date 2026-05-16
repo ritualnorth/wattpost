@@ -248,7 +248,7 @@ function applyTheme(pref) {
   // visible renderer.
   const route = currentRouteName?.();
   if (route === "history") { refreshChart?.(); refreshHeatmap?.(); }
-  else if (route === "dashboard") { refreshDriftSparkline?.(); }
+  else if (route === "dashboard") { refreshDriftSparkline?.(); refreshBatteryHealth?.(); }
 }
 function chartPalette() {
   const s = getComputedStyle(document.documentElement);
@@ -2466,6 +2466,95 @@ async function refreshDriftSparkline() {
       ],
     }, [data.ts, data.values], root);
   } catch (e) { console.error("drift sparkline:", e); }
+}
+
+// ---------- battery health tile (#109) ----------
+// SoC residency histogram + cycle/lifetime numbers. Refreshed on
+// route-enter and on every dashboard tick alongside the drift
+// sparkline. Cheap query — single rollup-table scan plus a couple
+// of latest-table lookups.
+async function refreshBatteryHealth() {
+  const root = document.querySelector("#panel-battery-health");
+  if (!root) return;
+  let data;
+  try { data = await api("/api/battery-health?days=30"); }
+  catch (e) { return; }
+  if (!data) return;
+
+  const cy = document.getElementById("bhealth-cycles");
+  const lf = document.getElementById("bhealth-lifetime");
+  const wc = document.getElementById("bhealth-window-cycles");
+  const dy = document.getElementById("bhealth-days");
+  const rs = document.getElementById("bhealth-residency-stat");
+  const bars = document.getElementById("bhealth-bars");
+
+  // BMS-direct numbers: only show when a BMS reports them. Otherwise
+  // a dash + a quiet hint so customers don't think the tile is broken.
+  const bms = data.bms || {};
+  if (cy) {
+    if (bms.cycle_count != null) {
+      cy.textContent = Math.round(bms.cycle_count).toLocaleString();
+      cy.title = "Reported by the BMS — typically increments per full discharge-then-charge.";
+    } else {
+      cy.textContent = "—";
+      cy.title = "Add a BMS to track cycles. (Equivalent cycles from current integration shown below.)";
+    }
+  }
+  if (lf) {
+    if (bms.lifetime_throughput_kwh != null) {
+      const v = bms.lifetime_throughput_kwh;
+      lf.textContent = v >= 1000 ? `${(v / 1000).toFixed(2)} MWh`
+                                  : `${v.toFixed(1)} kWh`;
+      lf.title = "Lifetime energy moved through the bank (BMS-reported).";
+    } else {
+      lf.textContent = "—";
+      lf.title = "BMS-required. Connect a JK / Lynx BMS to track lifetime throughput.";
+    }
+  }
+  if (wc) {
+    const ec = data.window_equivalent_cycles;
+    if (ec != null) {
+      wc.textContent = ec.toFixed(1);
+      wc.title = `Computed: discharged kWh in window ÷ bank capacity. Works without a BMS.`;
+    } else {
+      wc.textContent = "—";
+    }
+  }
+  if (dy) {
+    dy.textContent = data.days_online != null ? `${data.days_online}` : "—";
+  }
+
+  // Residency histogram — 10 bars, % time in each 10% SoC band. A
+  // healthy LFP bank lives in 50-95%; visible weight at the low end
+  // means the user's draining too deep and shortening lifespan.
+  const resid = data.soc_residency || [];
+  const total = resid.reduce((a, b) => a + (b.pct || 0), 0);
+  if (rs) {
+    if (total > 0) {
+      // Highlight the band where the bank spends most time.
+      const peak = resid.reduce((p, c) => (c.pct > p.pct ? c : p), { pct: -1 });
+      rs.textContent = peak.pct > 0
+        ? `mostly ${peak.range} (${peak.pct.toFixed(0)}% of the time)`
+        : "—";
+    } else {
+      rs.textContent = "collecting…";
+    }
+  }
+  if (bars) {
+    if (total === 0) {
+      bars.innerHTML = '<div class="empty-spark">collecting…</div>';
+    } else {
+      // Bars coloured by SoC band — red for low, amber mid, green high.
+      const palette = ["#dc4d4d", "#dc7a4d", "#e0a04a", "#e0c04a", "#c6c04a",
+                       "#8fc04a", "#5fc06a", "#4fbf7f", "#43b88f", "#3aa080"];
+      const maxPct = Math.max(...resid.map(r => r.pct || 0), 1);
+      bars.innerHTML = resid.map((r, i) => {
+        const h = Math.max(2, (r.pct / maxPct) * 100);
+        const colour = palette[i] || "#888";
+        return `<div class="bhealth-bar" style="height:${h}%;background:${colour}" title="${r.range}: ${r.pct.toFixed(1)}%"></div>`;
+      }).join("");
+    }
+  }
 }
 
 // ---------- load heatmap ----------
@@ -6500,7 +6589,7 @@ setRoute(currentRouteName());
 // connection is established (and as a backstop on browsers that fail to
 // open EventSource). The stream takes over once the first event lands.
 refresh().then(() => {
-  if (currentRouteName() === "dashboard") refreshDriftSparkline();
+  if (currentRouteName() === "dashboard") { refreshDriftSparkline(); refreshBatteryHealth(); }
   if (currentRouteName() === "history") { refreshChart(); refreshHeatmap(); }
 });
 openStream();
