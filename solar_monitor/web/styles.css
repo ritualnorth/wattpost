@@ -3118,6 +3118,27 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   color: var(--accent);
 }
 
+/* "Add another transport" — collapsible block in the wizard's
+ * transport-list view. Lets a customer wire up BLE + USB side by
+ * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
+ * without faking-out the wizard by deleting and re-adding. */
+.wiz-add-another {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px dashed var(--border);
+}
+.wiz-add-another-btn {
+  width: auto;
+  font-size: .9rem;
+}
+.wiz-add-another-panel {
+  margin-top: .65rem;
+  padding: .65rem .85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
 /* ---------------- controllable outputs (#104) ---------------- */
 /* Per-device output panel: lives on the device detail page under the
  * vendor-specific data panels. Toggle + state pill + audit footer. */

@@ -4878,7 +4878,42 @@ async function wizLoadTransports() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
       </div>`;
-    }).join("");
+    }).join("") + `
+      <div class="wiz-add-another">
+        <button class="btn-action wiz-add-another-btn" id="wiz-add-another-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Add another transport</span>
+        </button>
+        <div class="wiz-add-another-panel" id="wiz-add-another-panel" hidden>
+          <p class="settings-foot" style="margin:.5rem 0">
+            BLE + USB-RS485 can run side by side on the same Pi —
+            e.g. a Renogy BT-2 for the MPPT and a USB dongle for a
+            JK BMS. Pick the connection type for the next adapter:
+          </p>
+          <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
+            <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M7 17L17 7M12 2v20M7 7l5-5 5 5M7 17l5 5 5-5"/></svg>
+              <span>Bluetooth</span>
+            </button>
+            <button id="wiz-find-usb-btn" class="btn-action">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="2.5" r="1.5"/><path d="M12 4v18"/><path d="M8 9h8"/><path d="M8 9l-2 4 2 4h8l2-4-2-4"/></svg>
+              <span>Wired (USB-RS485)</span>
+            </button>
+            <span id="wiz-find-status" class="wiz-status"></span>
+          </div>
+          <div id="wiz-find-results" class="wiz-results"></div>
+        </div>
+      </div>`;
+    // Wire the collapsible "Add another" panel — same two scan
+    // buttons reuse wizFindDongle / wizFindUsb so the BLE+USB
+    // mixed-install path is identical regardless of whether the
+    // user is adding their first or fifth transport.
+    document.getElementById("wiz-add-another-btn")?.addEventListener("click", () => {
+      const panel = document.getElementById("wiz-add-another-panel");
+      if (panel) panel.hidden = !panel.hidden;
+    });
+    document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
+    document.getElementById("wiz-find-usb-btn")?.addEventListener("click", wizFindUsb);
     // No `disabled` on offline rows — the scan endpoint auto-reopens
     // a dropped BLE link, so users should always be able to select
     // and try. The pill text tells them what to expect.
