@@ -8,6 +8,75 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.43] — 2026-05-16
+
+### Changed — Cloud broker rebuilt with Caddy on wattpost.cloud (#139)
+Field-scan + Ritual North's pushback on the v0.0.42 Python broker
+("I don't like that the tunnel is hitting the appliance directly")
+led to a proper architectural redo. Nabu Casa, Tesla, Sonos and
+Cloudflare Access all converge on the same pattern: cloud-relay
+through the vendor SaaS, with the data-plane proxy in a battle-
+tested HTTP layer (not custom Python).
+
+**Domain rebrand**: `wattpost.io` keeps marketing/landing/download;
+**`wattpost.cloud` is now the SaaS dashboard + broker hostname**.
+- Apex `wattpost.cloud` = the SaaS (was `app.wattpost.io`).
+- `<slug>.wattpost.cloud` = brokered appliance dashboards.
+- Cloudflare Universal SSL covers `wattpost.cloud` + `*.wattpost.cloud`
+  for free (single-level wildcards) — no paid Advanced Cert needed.
+- Single eTLD+1 means session cookies set on the apex are sent to
+  every subdomain (including the broker) automatically — no cross-
+  domain auth dance.
+
+**Data path** (replaces v0.0.42's Python httpx proxy):
+1. Browser → `<slug>.wattpost.cloud` with the `.wattpost.cloud`
+   session cookie.
+2. Caddy `forward_auth` calls cloud's new
+   `/api/internal/can-access` endpoint.
+3. Cloud verifies session + ownership, returns 200 with
+   `X-WP-Broker-Auth = <ts>.<hmac>` signed using the per-appliance
+   `sso_secret`.
+4. Caddy copies the header into the upstream request and
+   reverse-proxies to `<slug>.wattpost.io` (the existing CF tunnel).
+5. Appliance's auth middleware verifies the broker header and
+   bypasses normal session checks (unchanged from v0.0.42).
+
+**Native SSE/WebSocket** pass-through, **no HTML rewriting shim
+needed** (subdomain pattern means the appliance's absolute `/api/*`
+and `/web/*` paths resolve correctly).
+
+**Deleted**:
+- `cloud/wattpost_cloud/api/broker.py` — the Python proxy.
+- HTML shim injection logic — moot under subdomain pattern.
+
+**Cookie domain change**: `.wattpost.io` → `.wattpost.cloud`. Existing
+sessions on app.wattpost.io get invalidated; one re-login per
+browser. Acceptable: only the founder has an account today.
+
+**`app.wattpost.io`** stays serving the same backend for back-compat
+(heartbeats from paired appliances etc) until a future release
+turns it into a 308 redirect to `wattpost.cloud`.
+
+### Infrastructure
+- Caddyfile (vps-infra) adds `wattpost.cloud` and `*.wattpost.cloud`
+  site blocks alongside the existing `app.wattpost.io` block.
+- DNS (CF wattpost.cloud zone): A record apex → `REDACTED-ORIGIN-IP`
+  (proxied), CNAME `*` → `wattpost.cloud` (proxied).
+
+### Strategy lock-in (memory)
+- [[project-cloud-tier]] updated: local dashboard stays canonical
+  (it's the marketing budget we don't pay for); cloud-exclusive
+  features are the moat. Broker is convenience-layer not moat.
+- [[project-target-customer]] updated: paying personas vs marketing
+  personas distinction. Cabin guy is marketing, not P&L.
+- [[feedback-dont-optimize-for-non-payers]] new: don't bend
+  architecture for non-paying personas.
+
+### Next
+- Phase 2: turn `app.wattpost.io` → 308 redirect to `wattpost.cloud`.
+- Phase 3: update appliance default endpoint + email templates.
+- Phase 4: remove `app.wattpost.io` after grace period.
+
 ## [0.0.42] — 2026-05-16
 
 ### Added — Cloud broker (#139)
