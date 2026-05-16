@@ -8,6 +8,44 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.47] — 2026-05-16
+
+### Security — 2FA enrolment enforcement for staff accounts
+Admin password leak shouldn't = WattPost cloud compromise. Staff
+users now must enrol TOTP-based 2FA before they can access anything
+beyond the enrolment page itself.
+
+- **Schema**: `users.require_2fa BOOLEAN DEFAULT FALSE`
+  (migration `0022_user_require_2fa.py`). Backfill sets True for
+  every existing `is_staff = TRUE` user.
+- **Stateless enforcement** in
+  `cloud/wattpost_cloud/twofa_enforce.py`. ASGI middleware checks
+  every request:
+  - If session resolves to a user with `require_2fa=True` AND
+    `totp_enabled_at IS NULL` AND the path isn't on the enrolment
+    allowlist → return 403 + `{must_enroll_2fa: true,
+    enrol_url: /app/account#enroll-2fa}`.
+  - Allowlist: `/api/twofa/*`, `/api/logout`, `/api/me`,
+    `/api/account/sessions`, `/app/account`, `/static/*`,
+    `/healthz`, `/login`, `/logout`.
+- **Frontend handler** in `_base.html.jinja` wraps `fetch()`. Any
+  403 with `must_enroll_2fa` triggers `window.location.href =
+  enrol_url`. Smooth UX: user logs in, dashboard tries first fetch,
+  gets redirected straight to the enrolment flow.
+
+### What this means for the founder account (`is_staff=True`)
+After deploy + alembic upgrade, your next visit to `wattpost.cloud`
+will:
+1. Let you log in normally.
+2. Redirect you straight to `/app/account#enroll-2fa`.
+3. You scan the QR with your authenticator app, enter a code, save
+   the backup codes.
+4. From then on, login requires password + 6-digit TOTP code on
+   every signin.
+
+Non-staff users keep 2FA optional. Push for the recommendation
+later when there's enough mass to bother.
+
 ## [0.0.46] — 2026-05-16
 
 ### Security — hardening sprint
