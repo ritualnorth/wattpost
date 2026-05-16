@@ -200,17 +200,24 @@ let todayAggregate = null;  // /api/today result, refreshed alongside devices
 // the banner, but Settings isn't visited on most page loads — pull the
 // check up to boot so the banner appears immediately on every page,
 // kiosk mode included.
-(async () => {
+//
+// Exposed as a top-level promise so renderStatus() can await it before
+// triggering the "Setup needed" wizard redirect — without this gate,
+// the SSE snapshot can arrive first and demo visitors get yanked into
+// the wizard before the banner classifies them as a demo session.
+window._demoReady = (async () => {
   try {
     const r = await fetch("/api/system/info");
-    if (!r.ok) return;
+    if (!r.ok) return false;
     const info = await r.json();
     if (info.demo) {
       const b = document.getElementById("demo-banner");
       if (b) b.hidden = false;
       document.body.classList.add("is-demo");
+      return true;
     }
   } catch (_) { /* no banner on fetch failure */ }
+  return false;
 })();
 
 // ---------- theme ----------
@@ -413,15 +420,34 @@ function stopPollingFallback() {
   pollingFallbackTimer = null;
 }
 
+async function _maybeFirstBootRedirect() {
+  // Wait for /api/system/info to resolve before deciding — without
+  // this gate, the SSE snapshot can arrive first and demo visitors
+  // get yanked into the wizard before the demo flag classifies them.
+  try { await window._demoReady; } catch (_) {}
+  if (document.body.classList.contains("is-demo")) return;
+  if (_firstBootRedirected) return;
+  const h = (window.location.hash || "").replace(/^#\/?/, "").trim();
+  const onLandable = (h === "" || h === "dashboard");
+  if (!onLandable) return;
+  _firstBootRedirected = true;
+  window.location.hash = "#/setup";
+}
+
 function renderStatus(run) {
   // Daemon-side issues first — if the scheduler's not running or the
   // last_run is stale, nothing else matters.
   if (!run.scheduler_running) { setStatus("err", "Offline"); return; }
   const t = run.transports || {};
+  // Demo mode (demo.wattpost.io) has a synthetic poller and no real
+  // transports — the wizard redirect and "Setup needed" / "BLE not
+  // connected" warnings are nonsense there. Body class is set by the
+  // /api/system/info bootstrap at the top of this file.
+  const isDemo = document.body.classList.contains("is-demo");
   // Setup-state checks. Order matters: "set up the wizard" wins over
   // "no devices yet" so a first-boot user is pointed at the right
   // next action.
-  if ((t.configured || 0) === 0) {
+  if (!isDemo && (t.configured || 0) === 0) {
     setStatus("warn", "Setup needed");
     // First-boot redirect: nothing's configured, nothing's worth
     // showing on the dashboard, so drop the user straight into the
@@ -429,18 +455,12 @@ function renderStatus(run) {
     // Only on the home/dashboard routes; respects kiosk, docs, and
     // anyone who's already in the wizard. One-shot via a module
     // flag so a slow-clicker mid-wizard isn't yanked back if the
-    // first transport gets added then removed.
-    if (!_firstBootRedirected) {
-      const h = (window.location.hash || "").replace(/^#\/?/, "").trim();
-      const onLandable = (h === "" || h === "dashboard");
-      if (onLandable) {
-        _firstBootRedirected = true;
-        window.location.hash = "#/setup";
-      }
-    }
+    // first transport gets added then removed. Async because we
+    // must wait for the demo check before firing.
+    _maybeFirstBootRedirect();
     return;
   }
-  if ((t.open || 0) === 0)       { setStatus("warn", "BLE not connected"); return; }
+  if (!isDemo && (t.open || 0) === 0) { setStatus("warn", "BLE not connected"); return; }
   // Now the polling-health view. last_run might be null on a fresh
   // daemon that hasn't completed its first poll yet.
   if (!run.last_run) { setStatus("warn", "Connecting…"); return; }

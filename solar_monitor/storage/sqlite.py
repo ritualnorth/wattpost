@@ -597,8 +597,26 @@ class Store:
             for k, val in bank.items():
                 if val is None:
                     continue
-                num_rows.append((ts, "bank", k, float(val)))
-                latest_num.append(("bank", k, ts, float(val)))
+                # The bank aggregate carries numeric metrics (V, A, SoC,
+                # cycle_count, …) AND a couple of non-numeric diagnostics
+                # ("source": "shunt"|"bms", "source_disagreement": dict).
+                # Route each to its right table; without this, a single
+                # string field crashes record_poll and the dashboard
+                # silently stops persisting anything.
+                if isinstance(val, (int, float)) and not isinstance(val, bool):
+                    num_rows.append((ts, "bank", k, float(val)))
+                    latest_num.append(("bank", k, ts, float(val)))
+                elif isinstance(val, str):
+                    str_rows.append((ts, "bank", k, val))
+                    latest_str.append(("bank", k, ts, val))
+                elif isinstance(val, dict):
+                    # JSON-encode dicts (e.g. source_disagreement) so the
+                    # SSE/snapshot pipeline can still expose them via the
+                    # latest table.
+                    import json
+                    encoded = json.dumps(val)
+                    str_rows.append((ts, "bank", k, encoded))
+                    latest_str.append(("bank", k, ts, encoded))
             device_meta_rows.append(("bank", "internal", "bank", None, ts))
 
         db = self._db
@@ -756,6 +774,7 @@ class Store:
         # --- System-level layer (policy-driven choice) ---
         # Build candidate "system view" dicts from each available source.
         bms_view: dict[str, float] | None = None
+        bms_health: dict[str, float] = {}
         if batts:
             sum_v = sum(float(b.get("voltage_v") or 0) for b in batts)
             sum_i = sum(float(b.get("current_a") or 0) for b in batts)
@@ -771,6 +790,25 @@ class Store:
                 "remaining_ah": total_rem,
                 "capacity_ah":  total_cap,
             }
+            # Lifetime + cycle fields. Cycle count: take the MAX
+            # across packs (worst pack defines bank health). Total
+            # throughput: SUM (a 4S2P bank that's done 100 cycles has
+            # genuinely moved 2× the energy of a single pack).
+            cycles = [int(b.get("cycle_count")) for b in batts
+                      if isinstance(b.get("cycle_count"), (int, float))]
+            throughput = [float(b.get("total_charge_ah")) for b in batts
+                          if isinstance(b.get("total_charge_ah"), (int, float))]
+            if cycles:
+                bms_health["cycle_count"] = float(max(cycles))
+            if throughput:
+                bms_health["lifetime_throughput_ah"] = sum(throughput)
+                # kWh estimate uses current mean pack voltage as a
+                # rough proxy for the lifetime-average. Good enough
+                # for a "1.2 MWh lifetime" tile; would need per-cycle
+                # logging to be exact.
+                bms_health["lifetime_throughput_kwh"] = round(
+                    sum(throughput) * mean_v / 1000.0, 1
+                )
 
         shunt_view: dict[str, float] | None = None
         if shunt is not None:
@@ -831,6 +869,7 @@ class Store:
         out["pack_count"] = float(len(batts))
         out["source"]     = chosen_label  # "shunt" | "bms"
         out.update(cell_info)
+        out.update(bms_health)
         if disagreement is not None:
             # Stored under one key so it round-trips as JSON via the
             # existing SSE/snapshot pipeline. The dashboard checks
@@ -1160,6 +1199,134 @@ class Store:
             "bank_net_today_wh": round(charged_wh - discharged_wh, 1),
             "load_today_wh": round(load_today_wh, 1),
             "poll_count": len(rows),
+        }
+
+    async def battery_health_aggregate(
+        self, since_ts: int, until_ts: int,
+    ) -> dict[str, Any]:
+        """Bucket bank SoC residency into 10-percent bins, plus the
+        equivalent-full-cycle count over the window.
+
+        Two distinct numbers customers care about:
+
+          * **Where does the battery live?** A bank that spends 80 %
+            of its time at 30-50 % SoC will wear out faster than one
+            that lives at 70-90 %. The histogram makes that visible.
+
+          * **How many cycles HAVE you done since install?** The BMS
+            cycle counter only exists if you have a BMS. For everyone
+            else, we integrate discharged Ah and divide by capacity.
+            Doesn't match the BMS exactly (the BMS uses its own
+            definition of "cycle") but lands in the same ballpark.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        # SoC residency histogram. Sample bank.soc_pct hourly across
+        # the window and bucket. samples_1hour gives us pre-rolled
+        # averages, but we only have those if the window is long
+        # enough — otherwise sample raw.
+        table, ts_col, _ = self._pick_history_table(until_ts - since_ts)
+        soc_sql = (
+            f"SELECT {('avg_value' if table != 'samples' else 'value')} "
+            f"FROM {table} "
+            f"WHERE device = 'bank' AND metric = 'soc_pct' "
+            f"  AND {ts_col} BETWEEN ? AND ? "
+            f"  AND {('avg_value' if table != 'samples' else 'value')} IS NOT NULL"
+        )
+        soc_buckets = [0] * 10  # 0-10, 10-20, …, 90-100
+        async with self._db.execute(soc_sql, (since_ts, until_ts)) as cur:
+            async for row in cur:
+                v = float(row[0] or 0)
+                # Clamp 0-100, pick bucket. 100 → bucket 9 (90-100).
+                idx = min(9, max(0, int(v // 10)))
+                soc_buckets[idx] += 1
+        total_samples = sum(soc_buckets) or 1
+        soc_residency = [
+            {
+                "range": f"{i*10}-{(i+1)*10}%",
+                "pct":   round(count / total_samples * 100, 1),
+            }
+            for i, count in enumerate(soc_buckets)
+        ]
+
+        # Discharged Ah across the window (sum of |negative current|
+        # integrated). Cycle equivalents = ÷ bank capacity.
+        ah_sql = (
+            "SELECT v.ts, SUM(v.value * i.value) AS bank_w "
+            "FROM samples v "
+            "JOIN samples i "
+            "  ON v.ts = i.ts AND v.device = i.device "
+            "WHERE v.metric = 'voltage_v' "
+            "  AND i.metric = 'current_a' "
+            "  AND v.device LIKE 'battery_%' "
+            "  AND v.ts BETWEEN ? AND ? "
+            "GROUP BY v.ts ORDER BY v.ts"
+        )
+        discharged_wh = 0.0
+        charged_wh = 0.0
+        prev_ts: int | None = None
+        prev_w = 0.0
+        async with self._db.execute(ah_sql, (since_ts, until_ts)) as cur:
+            async for ts, w in cur:
+                if prev_ts is not None:
+                    dt_h = (int(ts) - prev_ts) / 3600.0
+                    e = (prev_w + float(w)) / 2.0 * dt_h
+                    if e > 0: charged_wh += e
+                    else:     discharged_wh += -e
+                prev_ts, prev_w = int(ts), float(w)
+
+        # Pull bank capacity from latest table (BMS or shunt).
+        cap_ah = 0.0
+        nominal_v = 12.8  # LFP 4S, sensible default
+        async with self._db.execute(
+            "SELECT value_num FROM latest "
+            "WHERE device = 'bank' AND metric IN ('capacity_ah', 'voltage_v')"
+        ) as cur:
+            async for row in cur:
+                pass  # placeholder — re-query below for clarity
+        async with self._db.execute(
+            "SELECT metric, value_num FROM latest "
+            "WHERE device = 'bank' AND metric IN ('capacity_ah', 'voltage_v')"
+        ) as cur:
+            async for metric, val in cur:
+                if metric == "capacity_ah" and val: cap_ah = float(val)
+                if metric == "voltage_v"  and val: nominal_v = float(val)
+
+        discharged_ah = discharged_wh / nominal_v if nominal_v else 0
+        equivalent_cycles = round(discharged_ah / cap_ah, 1) if cap_ah else None
+
+        # Lifetime / time-on-system: earliest bank sample.
+        days_online: float | None = None
+        async with self._db.execute(
+            "SELECT MIN(ts) FROM samples WHERE device = 'bank' AND metric = 'soc_pct'"
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0]:
+                days_online = round((until_ts - int(row[0])) / 86400.0, 1)
+
+        # Pull lifetime fields from latest table (BMS-direct, may be None).
+        bms_lifetime: dict[str, float] = {}
+        async with self._db.execute(
+            "SELECT metric, value_num FROM latest "
+            "WHERE device = 'bank' "
+            "  AND metric IN ('cycle_count', 'lifetime_throughput_ah', "
+            "                 'lifetime_throughput_kwh')"
+        ) as cur:
+            async for metric, val in cur:
+                if val is not None:
+                    bms_lifetime[metric] = float(val)
+
+        return {
+            "since_ts": since_ts,
+            "until_ts": until_ts,
+            "soc_residency": soc_residency,
+            "window_charged_kwh":    round(charged_wh / 1000.0, 2),
+            "window_discharged_kwh": round(discharged_wh / 1000.0, 2),
+            "window_equivalent_cycles": equivalent_cycles,
+            "days_online": days_online,
+            "bms": bms_lifetime,  # cycle_count, lifetime_throughput_ah/kwh (or empty if no BMS)
+            "bank_capacity_ah": round(cap_ah, 1) if cap_ah else None,
         }
 
     async def load_heatmap(self, since_ts: int, until_ts: int) -> dict[str, Any]:

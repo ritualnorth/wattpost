@@ -8,6 +8,35 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.33] — 2026-05-16
+
+### Fixed — demo.wattpost.io broken since 0.0.31
+- **Synthetic poller crash loop.** `_compute_bank_aggregate` started
+  emitting non-numeric fields (`source: "shunt"|"bms"` and the
+  `source_disagreement` dict) in 0.0.31. record_poll's bank-persist
+  loop assumed every value was numeric and crashed with
+  `ValueError: could not convert string to float: 'shunt'` on every
+  poll. The store stayed empty; the dashboard saw zero devices and
+  fell through to "Setup needed" + the wizard redirect. Fix: route
+  bank fields by type — floats to `samples`, strings to
+  `samples_str`, dicts JSON-encoded into `samples_str`.
+- **Demo dashboard yanking visitors into the setup wizard.** Even
+  with the persist fix, the demo container has zero configured
+  transports (it uses a synthetic poller), so the dashboard fired
+  its first-boot redirect into `#/setup`. Now gated on the
+  `is-demo` body class via a new `_maybeFirstBootRedirect` helper
+  that awaits the `/api/system/info` promise before deciding.
+
+### Added — Battery health plumbing (groundwork for #109)
+- Bank aggregate now surfaces `cycle_count`, `lifetime_throughput_ah`,
+  and `lifetime_throughput_kwh` when one or more BMSes report them
+  (JK BMS, Lynx Smart BMS — anything with `cycle_count` +
+  `total_charge_ah`). Cycle count is the max across packs (worst-
+  pack-defines-bank); throughput is the sum. Empty when no BMS.
+- New `Store.battery_health_aggregate(since, until)` returns a 10-
+  bucket SoC residency histogram + window equivalent cycles +
+  days-online. No tile yet — that lands in 0.0.34.
+
 ## [0.0.32] — 2026-05-16
 
 ### Added — First-class alert rules audit (#107)
