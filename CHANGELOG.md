@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.36] — 2026-05-16
+
+### Security — tunnel URL no longer grants anonymous access (urgent)
+- **The bug:** the appliance's auth middleware treated source IP
+  `127.0.0.1` as fully trusted ("the request must have come through
+  the authenticated cloud session"). But cloudflared on the
+  appliance proxies tunnel traffic to localhost, so EVERY tunnel
+  request appeared as loopback. Net effect: anyone with the
+  `{slug}.appliances.wattpost.io` URL got full unauthenticated
+  read + write access to the appliance — including settings, alert
+  rules, and write-through endpoints. Reported by Ritual North after he
+  shared the URL with a friend who could read his appliance from
+  another house.
+- **The fix:** `is_loopback_source()` now sniffs for Cloudflare's
+  `CF-Ray` / `CF-Connecting-IP` / `CF-IPCountry` headers and returns
+  False when present. Real loopback (curl from the Pi, SSH
+  port-forward, the daemon talking to itself) has none of those, so
+  legitimate local-trust paths still work. New helper
+  `is_tunnel_origin()` is also used to disable the `READONLY_PUBLIC`
+  GET bypass for tunnel requests — a leaked URL would otherwise
+  still leak every metric anonymously.
+- **What customers will see after this update:** clicking "Open" on
+  the cloud dashboard now lands them on the appliance's local
+  login page. They'll need their local appliance password (printed
+  on the first-boot MOTD; also visible at Settings → System →
+  Reset web password). Session cookie persists 30 days.
+- **Coming next** (#137): transparent SSO via a short-lived cloud-
+  signed token, so the "Open" button works without re-prompting
+  for a password. Until that lands, the password prompt is the
+  correct, safe trade-off.
+
 ## [0.0.35] — 2026-05-16
 
 ### Added — Forecast-aware runtime prediction (#99)
