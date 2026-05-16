@@ -106,12 +106,23 @@ async def update_cloud_config(
             status_code=400, detail="endpoint must be http(s) URL",
         )
     existing = config.cloud
+    # IMPORTANT: preserve every existing field on edit. Earlier
+    # versions of this handler only carried bearer_token + appliance_id
+    # + label across, which silently wiped tunnel_token,
+    # tunnel_hostname, and sso_secret every time the user clicked
+    # Save in Settings → Cloud. Ritual North hit it after pulling v0.0.38:
+    # heartbeat populated sso_secret, then Settings-save reset it,
+    # then SSO redirects failed with 401 because the appliance had
+    # no key to verify against.
     new_c = CloudCfg(
         endpoint=data.endpoint,
         bearer_token=existing.bearer_token if existing else "",
         appliance_id=existing.appliance_id if existing else None,
         label=existing.label if existing else "",
         heartbeat_minutes=data.heartbeat_minutes,
+        tunnel_token=existing.tunnel_token if existing else "",
+        tunnel_hostname=existing.tunnel_hostname if existing else "",
+        sso_secret=existing.sso_secret if existing else "",
     )
     config.cloud = new_c
 
