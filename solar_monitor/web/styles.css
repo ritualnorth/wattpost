@@ -2689,6 +2689,16 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
    * push past its parent's right edge on narrow viewports. */
   min-width: 0;
 }
+/* The HTML5 `hidden` attribute defaults to `display:none` via the
+ * UA stylesheet, but ANY class rule with `display: grid|flex|etc`
+ * wins the specificity fight and leaves the element visible.
+ * Without this, the forecast form's provider-switched field groups
+ * stay visible when their provider isn't selected — every Solcast
+ * user sees the Open-Meteo lat/lon/array fields uselessly. */
+.alerts-form-grid[hidden],
+.alerts-form .settings-foot[hidden] {
+  display: none !important;
+}
 .alerts-form-grid--full { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .alerts-form label {
   display: flex; flex-direction: column; gap: .25rem;

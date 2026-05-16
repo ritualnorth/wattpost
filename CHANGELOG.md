@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.23] — 2026-05-16
+
+### Fixed
+- **Forecast form: Open-Meteo fields no longer leak in when
+  Solcast is selected.** The `hidden` attribute was being emitted
+  on the inactive provider's field group, but
+  `.alerts-form-grid { display: grid }` was overriding the
+  browser's default `[hidden]{display:none}` UA rule via
+  specificity. Now Solcast users see only `api_key` +
+  `resource_id`; Open-Meteo users see only `lat/lon/array_kw/
+  tilt/azimuth/efficiency`. Same fix for the per-provider help
+  paragraphs below the form.
+
 ## [0.0.22] — 2026-05-16
 
 ### Added — Renogy coverage finished
