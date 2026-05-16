@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sign in via app.wattpost.io</title>
+  <meta name="theme-color" content="#0a0d12"/>
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem("wp-theme") || "system";
+        var resolved = pref === "system"
+          ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+          : pref;
+        document.documentElement.setAttribute("data-theme", resolved);
+      } catch (_) { document.documentElement.setAttribute("data-theme", "dark"); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/web/styles.css?v=102"/>
+  <style>
+    body.tunnel-blocked {
+      display: flex; min-height: 100vh; align-items: center;
+      justify-content: center; padding: 2rem;
+    }
+    .tunnel-card {
+      width: 100%; max-width: 460px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2.25rem 2rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    [data-theme="light"] .tunnel-card { box-shadow: 0 8px 32px rgba(15,23,42,0.08); }
+    .tunnel-icon {
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(108,142,242,0.12);
+      color: var(--blue, #6c8ef2);
+      border-radius: 12px;
+      margin: 0 auto 1rem;
+    }
+    .tunnel-icon svg { width: 26px; height: 26px; }
+    .tunnel-card h1 { margin: 0 0 .35rem; font-size: 1.2rem; text-align: center; }
+    .tunnel-card .sub {
+      color: var(--text-2); font-size: .9rem;
+      text-align: center; margin: 0 0 1.5rem;
+      line-height: 1.45;
+    }
+    .tunnel-cta {
+      display: inline-block;
+      width: 100%;
+      padding: .75rem 1rem;
+      background: var(--blue, #6c8ef2);
+      color: white !important;
+      text-align: center;
+      border-radius: 10px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .95rem;
+      box-sizing: border-box;
+      transition: opacity .15s;
+    }
+    .tunnel-cta:hover { opacity: 0.9; }
+    .tunnel-foot {
+      margin-top: 1.25rem;
+      font-size: .78rem;
+      color: var(--text-3);
+      text-align: center;
+      line-height: 1.5;
+    }
+    .tunnel-foot code {
+      font-family: var(--mono);
+      font-size: .72rem;
+      padding: 0 .25rem;
+      background: var(--bg-2);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="tunnel-blocked">
+  <div class="tunnel-card">
+    <div class="tunnel-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <h1>Sign in via app.wattpost.io</h1>
+    <p class="sub">
+      Direct tunnel access isn't supported. Sign in to your
+      WattPost cloud account and click <b>Open</b> next to this
+      appliance — that's the only way to reach the dashboard
+      remotely.
+    </p>
+    <a class="tunnel-cta" href="https://app.wattpost.io/app">
+      Open app.wattpost.io
+    </a>
+    <p class="tunnel-foot">
+      The local web password works on your LAN
+      (<code>http://&lt;appliance-ip&gt;</code>) but not via the
+      Cloudflare tunnel. This is by design — closing it stops
+      a leaked tunnel URL from granting anyone access.
+    </p>
+  </div>
+</body>
+</html>
