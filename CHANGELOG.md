@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.15] — 2026-05-16
+
+### Added
+- **"Add another transport" in the setup wizard.** Once you've got
+  a transport configured, a collapsible tile under the list lets
+  you wire up a second one without deleting the first. Same two
+  buttons (Bluetooth / Wired USB-RS485) as the empty-state
+  picker. Pairs cleanly with the underlying architecture —
+  BLE and USB serial subsystems are completely independent on
+  the Pi, so a single host can run a Renogy BT-2 for the MPPT
+  *and* a USB-RS485 dongle for a JK BMS at the same time without
+  contention.
+
 ## [0.0.14] — 2026-05-16
 
 ### Added
