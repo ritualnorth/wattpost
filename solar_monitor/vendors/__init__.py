@@ -14,6 +14,7 @@ from .registry import VENDORS, register_vendor
 # Adding a new vendor = create a folder under this directory, then add a line
 # below. That's the entire "add a vendor" code change in the core.
 from . import renogy  # noqa: F401
+from . import victron  # noqa: F401
 
 __all__ = [
     "DeviceDriver",
