@@ -42,6 +42,14 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # here uvicorn's dictConfig wipes the handler before any of our
     # daemon code emits log lines.
     config = load_config(args.config)
+    # First-boot password generation. The Pi SD-card image's install.sh
+    # used to do this, but Docker installs never ran install.sh and so
+    # shipped with no password — combined with the auth middleware's
+    # "no password = bypass" rule that left the dashboard wide open to
+    # anyone who could reach it (incl. via the cloud tunnel). Idempotent:
+    # once the hash file exists this is a no-op.
+    from . import web_auth as _wa
+    _wa.ensure_first_boot_password()
     app = build_app(
         config=config,
         db_path=args.db,

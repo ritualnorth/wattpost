@@ -757,13 +757,46 @@ def build_app(
             if scope.get("type") != "http":
                 await self.app(scope, receive, send)
                 return
-            # Bypass: demo mode (public read-only by design), or
-            # password not yet set (install.sh hasn't run / fresh dev
-            # box). is_loopback_source returns False for tunnel-origin
-            # requests even though their TCP peer is 127.0.0.1 — see
-            # web_auth.is_loopback_source for the CF-header sniff.
-            if _DEMO or not _web_auth.password_is_set() \
-                    or _web_auth.is_loopback_source(scope):
+            # Bypass: demo mode (public read-only by design) OR real
+            # loopback (curl from the Pi, SSH port-forward, daemon
+            # talking to itself). is_loopback_source returns False
+            # for tunnel-origin requests — see the CF-header sniff
+            # in web_auth.is_loopback_source.
+            #
+            # "no password set" is NO LONGER a bypass condition. Until
+            # 0.0.37 it was, on the assumption install.sh always ran;
+            # Docker installs never ran install.sh and so were left
+            # wide open. ensure_first_boot_password() now generates
+            # one on every startup, so password_is_set() should always
+            # be True by the time we accept requests. If it ever
+            # isn't (permission error writing the hash file), we
+            # fail-closed below.
+            if _DEMO or _web_auth.is_loopback_source(scope):
+                await self.app(scope, receive, send)
+                return
+            # No password file = misconfigured install. Fail-closed
+            # to the login page (which itself surfaces a "password
+            # not configured" message), NEVER let the request through.
+            if not _web_auth.password_is_set():
+                # /login + /api/login + static assets are always
+                # allowed — the user needs SOMETHING to render.
+                _p = scope.get("path", "/")
+                if not _web_auth.is_anonymous_path(_p):
+                    if _p.startswith("/api/"):
+                        body = (b'{"detail":"local password not configured -- '
+                                b'check /etc/wattpost/web-password.hash"}')
+                        await send({
+                            "type": "http.response.start", "status": 503,
+                            "headers": [(b"content-type", b"application/json")],
+                        })
+                        await send({"type": "http.response.body", "body": body})
+                    else:
+                        await send({
+                            "type": "http.response.start", "status": 302,
+                            "headers": [(b"location", b"/login")],
+                        })
+                        await send({"type": "http.response.body", "body": b""})
+                    return
                 await self.app(scope, receive, send)
                 return
             path = scope.get("path", "/")
