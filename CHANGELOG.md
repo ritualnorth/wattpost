@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.31] — 2026-05-16
+
+### Added — Victron pairing in the setup wizard (#118 + #120 Phase 1B)
+- **BLE scan now identifies Victron, Renogy, and JK devices** by
+  manufacturer ID + name patterns. Each device row in the scan
+  results gets a colour-coded vendor badge:
+  - 🔵 Victron — additionally shows the decoded device class
+    (SmartShunt, SolarCharger, DcDcConverter, etc.) when the
+    advertisement payload makes that possible (no decryption
+    needed — model ID is in the public header).
+  - Renogy BT-2 / BT-1 — kept the existing badge.
+  - JK BMS — surfaced as a recognised device with a "manual
+    config needed" placeholder (driver shipped in v0.0.21;
+    GATT-handshake wizard support will land in a follow-up).
+- **One-tap Victron pairing.** Tap "Pair Victron" on a Victron
+  scan row → inline form expands → paste the encryption key from
+  VictronConnect's "Show device key" dialog → Save. Daemon
+  hot-reloads, transport appears in the list within ~2 seconds.
+  No more manual YAML editing.
+- **`add_transport` endpoint accepts `type=ble_victron_advertise`**
+  with a `encryption_key` field (32 hex chars, tolerant of the
+  spaces / colons VictronConnect sometimes shows). MAC dedupe
+  works across all transport types so a customer can't
+  accidentally double-pair the same device.
+
+### Closes the Persona B unlock
+Together with #112 (SmartShunt driver, v0.0.13) and the bank
+reconciliation in #121, the entire "budget upgrader who buys a
+shunt for visibility" workflow is now one-tap-installable from
+the wizard. No CLI, no YAML, no Python.
+
 ## [0.0.30] — 2026-05-16
 
 ### Added — "No-BMS" dashboard mode (#115)

@@ -305,7 +305,14 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
 
     log.info("ble_scan: discover for %ds", secs)
     try:
-        devices = await BleakScanner.discover(timeout=secs)
+        # `return_adv=True` makes BleakScanner give us each device's
+        # latest advertisement_data alongside the BLEDevice object.
+        # We need the manufacturer_data map to identify Victron Instant
+        # Readout broadcasts (#118) — their advertisements carry a
+        # payload under manufacturer ID 0x02E1.
+        devices_with_adv = await BleakScanner.discover(
+            timeout=secs, return_adv=True,
+        )
     except Exception as e:
         # Most failures here are bluez transport problems: adapter
         # powered off, DBus passthrough broken in Docker, etc.
@@ -319,16 +326,50 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
     now = int(_time.time())
     out = []
     current_macs: set[str] = set()
-    for d in devices:
-        mac = (d.address or "").upper()
+    # Victron's manufacturer ID. Any advertisement carrying a payload
+    # under this key in manufacturer_data is one of their Instant
+    # Readout devices (SmartShunt, SmartSolar, Orion-Tr/XS, etc.).
+    VICTRON_MFR_ID = 0x02E1
+    for mac, (d, ad) in devices_with_adv.items():
+        mac = (mac or "").upper()
         if not mac:
             continue
         current_macs.add(mac)
-        rec = {
+        rec: dict[str, Any] = {
             "address": mac,
             "name":    d.name or None,
-            "rssi":    getattr(d, "rssi", None),
+            "rssi":    getattr(ad, "rssi", None),
         }
+        # Vendor / protocol detection. The UI uses these to badge the
+        # device + route to the correct add-transport form.
+        mfr_data = getattr(ad, "manufacturer_data", None) or {}
+        if VICTRON_MFR_ID in mfr_data:
+            rec["protocol"] = "victron_instant_readout"
+            rec["vendor"]   = "victron"
+            # Attempt to identify the Victron device kind from the raw
+            # payload header. The victron-ble library has detect_device_type
+            # which classifies based on the first few bytes (model id).
+            # We can't decrypt without the user's key, but we CAN tell
+            # the user "this looks like a SmartShunt / SmartSolar / …".
+            try:
+                from victron_ble.devices import detect_device_type
+                payload = mfr_data[VICTRON_MFR_ID]
+                dc = detect_device_type(payload)
+                if dc is not None:
+                    rec["victron_device_class"] = dc.__name__
+            except Exception:
+                pass
+        # Name-based hints stay as before — covers Renogy BT-* and
+        # any other vendor identifiable by advertised name.
+        nm = (d.name or "").lower()
+        if not rec.get("vendor"):
+            if nm.startswith("bt-th") or "renogy" in nm:
+                rec["vendor"] = "renogy"
+                rec["protocol"] = "modbus_bt2"
+            elif "jk" in nm or "jbd" in nm:
+                rec["vendor"] = "jkbms"
+                rec["protocol"] = "jk_ble"
+
         out.append(rec)
         # Refresh the cache so re-appearing devices stay fresh.
         _BLE_SEEN_CACHE[mac] = {
@@ -557,11 +598,16 @@ class AddTransportRequest(msgspec.Struct):
     # serial_modbus (USB-RS485 dongle):  provide `port` (e.g. /dev/ttyUSB0)
     #                                    + optional `baudrate` (defaults to
     #                                    9600 — Renogy default).
+    # ble_victron_advertise (Victron Instant Readout):
+    #                                    provide `address` (MAC) + `encryption_key`
+    #                                    (32-char hex from VictronConnect →
+    #                                    Product info → Show device key).
     # Discriminated by `type` so a single endpoint handles every transport
-    # kind the unified wizard surfaces (#120).
+    # kind the unified wizard surfaces (#120 / #118).
     address: str | None = None
     port: str | None = None
     baudrate: int = 9600
+    encryption_key: str | None = None
     label: str | None = None
     type: str = "ble_modbus"
 
@@ -606,6 +652,48 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         }
         default_label = f"BLE dongle {mac[-5:]}"
 
+    elif data.type == "ble_victron_advertise":
+        # Victron Instant Readout — passive BLE advertisement decode.
+        # Needs the device's encryption key (revealed in VictronConnect
+        # under Product info → Show device key). 32-char hex, tolerant
+        # of common separator clutter.
+        mac = (data.address or "").strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
+            raise HTTPException(
+                status_code=400,
+                detail="address must be a Bluetooth MAC (e.g. CC:CC:CC:CC:CC:CC)",
+            )
+        key_raw = (data.encryption_key or "").strip()
+        # Strip the kinds of separators users typically paste from
+        # VictronConnect's "Show device key" dialog (sometimes the key
+        # is displayed with spaces or colons every 2 chars).
+        key_clean = key_raw.replace(" ", "").replace(":", "").replace("-", "").lower()
+        if not re.fullmatch(r"[0-9a-f]{32}", key_clean):
+            raise HTTPException(
+                status_code=400,
+                detail="encryption_key must be 32 hex chars (the value "
+                       "VictronConnect shows under Product info → Show "
+                       "device key)",
+            )
+        # Dedupe on MAC across both BLE transport types — a single
+        # physical device can't be polled by two different transports
+        # at once.
+        for t in current_transports:
+            if (t.get("address") or "").upper() == mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"address {mac} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        suffix = mac.replace(":", "").lower()[-4:]
+        new_id = f"victron_{suffix[:2]}_{suffix[2:]}"
+        block = {
+            "type":           "ble_victron_advertise",
+            "address":        mac,
+            "encryption_key": key_clean,
+        }
+        default_label = f"Victron {mac[-5:]}"
+
     elif data.type == "serial_modbus":
         port = (data.port or "").strip()
         # Tolerant validation: accept any /dev/* path; pyserial will
@@ -647,7 +735,8 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         raise HTTPException(
             status_code=400,
             detail=f"unsupported transport type {data.type!r} — wizard "
-                   f"currently supports 'ble_modbus' and 'serial_modbus'",
+                   f"currently supports 'ble_modbus', 'serial_modbus', "
+                   f"and 'ble_victron_advertise'",
         )
 
     # Bump id if collision (rare — different MAC, same tail).
