@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.8] — 2026-05-16
+
+### Fixed
+- **History chart: the forecast overlay no longer stretches the
+  x-axis past the selected range.** Picking "6h" used to render
+  a week-wide axis because Solcast's full 7-day forecast was
+  appended. The forecast horizon now mirrors the chosen history
+  window (1h history → 1h forecast, 24h → 24h, etc).
+- **"Check now" button on Settings → About stops looking
+  pressed** after the action completes — it was the iOS focus
+  ring sticking; we now blur the button when the work returns.
+- **iOS Safari picks up appliance updates faster.** Service
+  worker registration now uses `updateViaCache: 'none'`, so
+  Safari fetches the SW file fresh on every page load instead
+  of holding the previous version's cached copy for hours.
+
 ## [0.0.7] — 2026-05-15
 
 ### Fixed

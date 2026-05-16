@@ -2520,6 +2520,10 @@ document.getElementById("settings-update-now")?.addEventListener("click", async 
     await refreshUpdateState();
   } finally {
     btn.disabled = false; btn.textContent = "Check now";
+    // Drop focus so iOS Safari doesn't leave the button in its
+    // pressed/highlighted state after the action completes — users
+    // see the colour stuck and assume the button is still busy.
+    btn.blur();
   }
 });
 
