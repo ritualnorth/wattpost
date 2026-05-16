@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.32] — 2026-05-16
+
+### Added — First-class alert rules audit (#107)
+- **One-tap alert templates.** Settings → Alerts now has a "Quick
+  templates" pill row. Tap a chip → add-rule form opens with the
+  metric path, comparison operator, threshold, severity, and
+  cooldown all pre-filled with sensible defaults. Users don't
+  have to learn the metric-path schema or invent thresholds.
+  Shipped templates:
+  - Low SoC (< 30%) — warn, 1h cooldown
+  - Critical SoC (< 15%) — alarm, 15min cooldown
+  - Low voltage (< 11.5V for 12V) — alarm
+  - Bank over-temp (> 50°C) — alarm
+  - Cell drift warning (> 100 mV) — warn
+  - Cell drift alarm (> 200 mV) — alarm
+  - Shunt-vs-BMS disagreement (> 10 percentage pts) — warn,
+    catches battery monitoring drift before customers complain
+- **Expanded metric suggestions** in the dropdown. New entries:
+  bank.time_to_go_minutes, bank.cell_min_v, bank.cell_max_v,
+  bank.source_disagreement.delta_pct (all from #121),
+  devices.charge_controller.pv_power_w, battery_temperature_c,
+  controller_temperature_c, load_status.
+
+### Strategic context
+Renogy's Smart Shunt 300 has on-device alarms (low/high V, low SoC,
+temp, deep-discharge) with per-alarm enable/disable. WattPost now
+has parity at the rule-engine layer + crosses every device's metrics
+(not just the shunt's own readings) and routes through any number
+of notification transports (push, email, MQTT, Discord, ntfy,
+Pushover). That's the alarm wedge per
+[[project-renogy-competitive]] in agent memory.
+
 ## [0.0.31] — 2026-05-16
 
 ### Added — Victron pairing in the setup wizard (#118 + #120 Phase 1B)

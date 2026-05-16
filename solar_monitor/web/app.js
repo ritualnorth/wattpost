@@ -3782,13 +3782,67 @@ const ALERT_OP_LABEL = { lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=", neq:
 // Common metric paths the user can pick without typing. Anything else
 // works too — the field falls back to a free-text input.
 const METRIC_SUGGESTIONS = [
+  // Bank-level metrics — the everyday "is the battery OK" stuff.
   { value: "bank.soc_pct",              label: "Battery SoC (%)" },
   { value: "bank.netW",                 label: "Bank net power (W)" },
   { value: "bank.meanV",                label: "Bank voltage (V)" },
   { value: "bank.totalRem",             label: "Bank remaining (Ah)" },
   { value: "bank.totalCap",             label: "Bank capacity (Ah)" },
+  { value: "bank.time_to_go_minutes",   label: "Time to empty (minutes, shunt-only)" },
+  // Cell-balance metrics (BMS-sourced) — early-warning for pack health.
   { value: "bank.worst_pack_drift_v",   label: "Worst pack drift (V)" },
-  { value: "aggregate.max_cell_drift_v",label: "Max cell drift (V)" },
+  { value: "bank.cell_min_v",           label: "Lowest cell voltage (V)" },
+  { value: "bank.cell_max_v",           label: "Highest cell voltage (V)" },
+  // Disagreement diagnostic (#121).
+  { value: "bank.source_disagreement.delta_pct",
+                                        label: "Shunt-vs-BMS SoC delta (%)" },
+  // Common per-device metrics (use the device label your wizard set).
+  { value: "devices.charge_controller.pv_power_w",
+                                        label: "PV power in (W) — charge_controller" },
+  { value: "devices.charge_controller.battery_temperature_c",
+                                        label: "Battery temp (°C) — charge_controller" },
+  { value: "devices.charge_controller.controller_temperature_c",
+                                        label: "Controller temp (°C) — charge_controller" },
+  { value: "devices.charge_controller.load_status",
+                                        label: "Load output state (on/off) — charge_controller" },
+  // Legacy aggregate metric retained for upgraders who already used it.
+  { value: "aggregate.max_cell_drift_v",label: "Max cell drift (V) — legacy alias" },
+];
+
+// One-tap rule templates. Each entry pre-fills the add-rule form with
+// sensible defaults so users don't have to learn the metric-path
+// schema or thinks about op/threshold defaults. The "voltage" rules
+// assume a 12 V system; users on 24/48 V tweak the threshold once
+// the form opens.
+const ALERT_TEMPLATES = [
+  { id: "low_soc",
+    label: "Low SoC (< 30%)",
+    rule: { name: "Low battery", metric: "bank.soc_pct", op: "lt",
+            threshold: 30, severity: "warn", cooldown_seconds: 3600 } },
+  { id: "critical_soc",
+    label: "Critical SoC (< 15%)",
+    rule: { name: "Critical battery", metric: "bank.soc_pct", op: "lt",
+            threshold: 15, severity: "alarm", cooldown_seconds: 900 } },
+  { id: "low_v_12v",
+    label: "Low voltage (< 11.5 V, 12 V system)",
+    rule: { name: "Low voltage", metric: "bank.meanV", op: "lt",
+            threshold: 11.5, severity: "alarm", cooldown_seconds: 600 } },
+  { id: "high_temp",
+    label: "Bank over-temp (> 50 °C)",
+    rule: { name: "Battery over-temperature", metric: "devices.charge_controller.battery_temperature_c",
+            op: "gt", threshold: 50, severity: "alarm", cooldown_seconds: 600 } },
+  { id: "cell_drift_warn",
+    label: "Cell drift warning (> 100 mV)",
+    rule: { name: "Cell drift warning", metric: "bank.worst_pack_drift_v",
+            op: "gt", threshold: 0.10, severity: "warn", cooldown_seconds: 21600 } },
+  { id: "cell_drift_alarm",
+    label: "Cell drift alarm (> 200 mV)",
+    rule: { name: "Cell drift alarm", metric: "bank.worst_pack_drift_v",
+            op: "gt", threshold: 0.20, severity: "alarm", cooldown_seconds: 3600 } },
+  { id: "soc_disagreement",
+    label: "Shunt-vs-BMS disagree (>10 %)",
+    rule: { name: "Shunt/BMS SoC disagree", metric: "bank.source_disagreement.delta_pct",
+            op: "gt", threshold: 10, severity: "warn", cooldown_seconds: 21600 } },
 ];
 const TRANSPORT_TYPES = [
   { value: "ntfy",            label: "ntfy",        keyField: "topic", placeholder: "my-private-topic" },
@@ -3831,8 +3885,23 @@ function renderAlertsPanel() {
   html += `<div class="alerts-sub-head"><h4>Alert rules</h4>
     <button class="alerts-add-btn" data-add="rule">+ Add rule</button></div>`;
 
+  // One-tap templates row — pre-fills the add-rule form with sensible
+  // thresholds for the most common alarms. Hidden when the form is
+  // already open so we don't clutter the editing flow.
+  if (!(alertsState.editing?.type === "rule" && alertsState.editing.mode === "add")) {
+    html += `<div class="alerts-templates">
+      <span class="settings-foot">Quick templates:</span>
+      ${ALERT_TEMPLATES.map(t => `
+        <button class="alerts-template-chip" data-alert-template="${t.id}">${escHtml(t.label)}</button>
+      `).join("")}
+    </div>`;
+  }
+
   if (alertsState.editing?.type === "rule" && alertsState.editing.mode === "add") {
-    html += renderRuleForm(null, transportIds);
+    // A `prefill` on the editing state means the user clicked a
+    // quick-template chip — pass the template rule into the form
+    // so all the fields land pre-filled.
+    html += renderRuleForm(alertsState.editing.prefill || null, transportIds);
   }
   if (!alertsState.rules.length && !(alertsState.editing?.type === "rule" && alertsState.editing.mode === "add")) {
     html += `<div class="settings-empty">No rules yet. Click "+ Add rule" to create one.</div>`;
@@ -4118,6 +4187,19 @@ function wireAlertsHandlers() {
   host.querySelectorAll("[data-add]").forEach(btn => {
     btn.addEventListener("click", () => {
       alertsState.editing = { type: btn.dataset.add, mode: "add", id: null };
+      renderAlertsPanel();
+    });
+  });
+  // Quick-template chips — open the add-rule form pre-filled with the
+  // template's metric, op, threshold, severity, cooldown.
+  host.querySelectorAll("[data-alert-template]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tpl = ALERT_TEMPLATES.find(t => t.id === btn.dataset.alertTemplate);
+      if (!tpl) return;
+      alertsState.editing = {
+        type: "rule", mode: "add", id: null,
+        prefill: { ...tpl.rule },
+      };
       renderAlertsPanel();
     });
   });
