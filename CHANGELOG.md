@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.30] — 2026-05-16
+
+### Added — "No-BMS" dashboard mode (#115)
+- **Shunt-only installs (Persona B — see `project_target_customer`
+  in agent memory) now read cleanly.** The bank aggregator in
+  #121 already handled the data path; this finishes the UI:
+  - **Bank-meta tile** drops the "0× " prefix when no BMS is
+    declared. Renders just the shunt model name (e.g.
+    "SmartShunt 500A/50mV") instead of the confusing "0× …".
+  - Cell-balance panel auto-hides cleanly (already did, just
+    confirmed).
+  - Time-to-go reads from the shunt's Coulomb-counted estimate
+    (via #121).
+  - Per-device detail page already had a dedicated
+    `buildShuntDetail` renderer — verified it still works.
+- After this lands, a customer with a Victron SmartShunt + a
+  Renogy MPPT (no BMS) gets a complete coherent dashboard. The
+  budget-upgrader segment we're targeting per
+  `project_target_customer` finally has the full experience.
+
 ## [0.0.29] — 2026-05-16
 
 ### Added — BMS-vs-shunt reconciliation (#121)
