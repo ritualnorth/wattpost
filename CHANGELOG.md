@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.39] — 2026-05-16
+
+### Fixed — Settings → Cloud Save was wiping tunnel + SSO state
+- The cloud config edit handler (`PUT /api/cloud/config`) rebuilt
+  the in-memory `CloudCfg` from scratch using only the form fields
+  the user submitted (endpoint + heartbeat_minutes), preserving
+  `bearer_token`, `appliance_id`, and `label` but DROPPING
+  `tunnel_token`, `tunnel_hostname`, and (newly in 0.0.38)
+  `sso_secret`. Then `_serialize_cloud` wrote the slimmed-down
+  CloudCfg back to `config.yaml` — wiping all three on disk.
+- Symptom: tunnel + SSO worked right after pair / heartbeat,
+  then any "Save" click in Settings → Cloud silently broke
+  both. Caught by Ritual North after pulling v0.0.38: heartbeat
+  populated `sso_secret`, then Settings-save reset it, then
+  tunnel hits returned 401 because the appliance had no key to
+  verify cloud-signed redirects against.
+- Fix: handler now carries every existing field across, not just
+  the headline three. One-line addition per field.
+
+### Recovery for installs hit by this in 0.0.38
+The pre-Save backup at `/etc/wattpost/config.yaml.bak` (inside the
+container; bind-mount on Docker) still has the lost fields. Restore
+it + restart the container:
+
+```
+sudo cp /opt/wattpost/wattpost-config/config.yaml.bak \
+        /opt/wattpost/wattpost-config/config.yaml
+docker restart wattpost
+```
+
+Or: do nothing, re-pair from the cloud Sites page — fresh
+`bearer_token` + `sso_secret` arrive in the pair response.
+
 ## [0.0.38] — 2026-05-16
 
 ### Added — Cloud→appliance SSO (#137)
