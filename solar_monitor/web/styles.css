@@ -647,6 +647,13 @@ main {
   color: var(--text-3);
   margin-top: .2rem;
 }
+.hero-stat-forecast {
+  font-size: .72rem;
+  color: var(--blue, #6c8ef2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
 
 /* Net power color cues */
 #bank-power-tile.charging .hero-stat-val { color: var(--green); }
