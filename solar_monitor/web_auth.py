@@ -182,6 +182,46 @@ def _gc_sessions() -> None:
         _SSO_NONCES_SEEN.pop(n, None)
 
 
+def verify_broker_auth(header_value: str, sso_secret_hex: str) -> bool:
+    """Verify the cloud-broker auth header (#139).
+
+    Format: `<ts>.<hmac_b64url>` where hmac signs the unix-second `ts`
+    with the per-appliance `sso_secret`. The appliance trusts any
+    request bearing a valid broker header — the cloud is the
+    authenticated party (cloud session + ownership check happen
+    cloud-side before this signed request fires).
+
+    Freshness window: ±30s on the timestamp. The cloud signs
+    immediately before sending; clock skew on the appliance is
+    rarely worse than a few seconds.
+
+    Replay protection isn't strictly needed (the body of what
+    flows through is read-only telemetry or write-actions that
+    the cloud session already authorised), and a 30s window keeps
+    the surface tiny enough that practical replay isn't useful."""
+    import base64
+    import hashlib
+    import hmac
+    if not header_value or "." not in header_value:
+        return False
+    try:
+        ts_str, sig_b64 = header_value.split(".", 1)
+        ts = int(ts_str)
+        pad = lambda s: s + "=" * (-len(s) % 4)
+        sig = base64.urlsafe_b64decode(pad(sig_b64))
+    except (ValueError, TypeError):
+        return False
+    now = int(time.time())
+    if abs(now - ts) > 30:
+        return False
+    try:
+        key = bytes.fromhex(sso_secret_hex)
+    except ValueError:
+        return False
+    expected = hmac.new(key, ts_str.encode("ascii"), hashlib.sha256).digest()
+    return hmac.compare_digest(expected, sig)
+
+
 def consume_sso_token(token: str, sso_secret_hex: str) -> dict | None:
     """Verify a cloud-signed SSO redirect token. Returns the decoded
     payload dict on success, None on any failure (bad signature,

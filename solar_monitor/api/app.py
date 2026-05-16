@@ -862,6 +862,33 @@ def build_app(
             if _DEMO or _web_auth.is_loopback_source(scope):
                 await self.app(scope, receive, send)
                 return
+            # Cloud broker (#139). When the cloud proxies a logged-in
+            # user's request through to this appliance, it stamps the
+            # request with X-WP-Broker-Auth = <ts>.<hmac> signed with
+            # the per-appliance sso_secret. We verify against our
+            # local copy of sso_secret. Valid header = the cloud has
+            # already authenticated this user; we trust the request
+            # exactly as if it had a valid SSO session. No session
+            # cookie is issued — broker traffic is stateless per
+            # request.
+            broker_header: bytes | None = None
+            for k, v in scope.get("headers", []):
+                if k == b"x-wp-broker-auth":
+                    broker_header = v
+                    break
+            if broker_header is not None:
+                # `config` is captured by closure from build_app's
+                # arguments. Its `.cloud` is mutated in place by the
+                # heartbeat service when the cloud sends an sso_secret,
+                # so this lookup always reflects the current value.
+                _sso = (
+                    config.cloud.sso_secret if config.cloud else ""
+                ) or ""
+                if _sso and _web_auth.verify_broker_auth(
+                    broker_header.decode("latin-1", errors="ignore"), _sso,
+                ):
+                    await self.app(scope, receive, send)
+                    return
             # No password file = misconfigured install. Fail-closed
             # to the login page (which itself surfaces a "password
             # not configured" message), NEVER let the request through.

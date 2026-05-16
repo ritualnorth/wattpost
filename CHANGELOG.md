@@ -8,6 +8,55 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.42] — 2026-05-16
+
+### Added — Cloud broker (#139)
+- **Cloud now proxies appliance dashboards.** Previously the
+  cloud's "Open" button bounced the user to
+  `<slug>.wattpost.io/sso?token=…`; the browser then ran every
+  subsequent request directly against the appliance's tunnel
+  hostname. Ritual North didn't like that the tunnel was hitting the
+  appliance directly even with SSO in front: the appliance
+  hostname was still in the URL bar, and every byte of the
+  dashboard rode through Cloudflare's tunnel rather than the
+  cloud's perimeter.
+- **New design.** The cloud serves the appliance dashboard at
+  `app.wattpost.io/site/{appliance_id}/...`. Every request is
+  reverse-proxied via `httpx` from the cloud through to
+  `<slug>.wattpost.io` server-side. The user's browser only
+  ever talks to `app.wattpost.io`. Tunnel hostname is invisible.
+- **Authentication chain.** Cloud verifies the user's session
+  cookie + appliance ownership cloud-side, then stamps each
+  outbound request with `X-WP-Broker-Auth: <ts>.<hmac>` signed
+  by the per-appliance `sso_secret`. The appliance's auth
+  middleware verifies the header and bypasses session/SSO
+  checks. So the appliance auth wall is still up if anyone
+  tried to bypass the cloud by hitting the tunnel directly.
+- **SSE bridged.** httpx's `aiter_raw()` + Litestar's `Stream`
+  forwards chunks as they arrive, so the live `/api/stream`
+  endpoint works through the broker.
+- **HTML shim.** Proxied HTML responses get a tiny script
+  injected at `<head>` that monkey-patches `fetch()`,
+  `XMLHttpRequest`, and `EventSource` to prefix absolute paths
+  (`/api/devices` → `/site/{id}/api/devices`). Without this,
+  the appliance dashboard's hard-coded paths would hit the
+  cloud root and 404. Service-worker registration is no-op'd
+  under the broker (the SW caches stale appliance assets at
+  the wrong scope).
+- **Open button** in the cloud dashboard now points at the
+  broker URL directly; no JS click handler, native link with
+  `target="_blank"`.
+
+### Trade-offs
+- Direct tunnel access still works (`<slug>.wattpost.io/sso?token=…`)
+  for the time being. Once we're confident in the broker we'll
+  deprecate it.
+- WebSocket bridging isn't implemented — the appliance doesn't use
+  WS today (only SSE). Add when needed.
+- HTML rewriting + the JS shim are belt-and-braces; cleaner long-
+  term is to ship appliance HTML/JS with relative URLs and drop
+  the shim. Track as a polish item.
+
 ## [0.0.41] — 2026-05-16
 
 ### Fixed — Tunnel `/login` no longer pretends to work
