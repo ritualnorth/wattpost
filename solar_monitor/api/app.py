@@ -63,6 +63,10 @@ from .outputs import (
     list_outputs,
     toggle_output,
     confirm_output_safety,
+    list_output_schedules,
+    create_output_schedule,
+    update_output_schedule,
+    delete_output_schedule,
 )
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
@@ -746,6 +750,10 @@ def build_app(
             list_outputs,
             toggle_output,
             confirm_output_safety,
+            list_output_schedules,
+            create_output_schedule,
+            update_output_schedule,
+            delete_output_schedule,
             index,
             kiosk_index,
             login_page,

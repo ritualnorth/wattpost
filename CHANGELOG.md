@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.24] — 2026-05-16
+
+### Added — Output schedules (Phase B of #104)
+- **Cron-style local schedule engine** for any controllable output.
+  Three trigger kinds: `time` (fires at fixed HH:MM in the
+  appliance's local timezone), `sunrise`, `sunset` (both with a
+  ± minute offset, sourced from the cached Open-Meteo sunrise/
+  sunset timestamps — sun-relative triggers silently skip when
+  weather isn't configured). Day-of-week mask (MTWTFSS bitmask)
+  gates which days a rule fires.
+- **Ticks once per poll cycle** alongside the existing outputs
+  state refresh. Schedules dedupe within a day via `last_run_at`
+  — a daemon restart won't re-fire today's already-run rules.
+  Result of each fire is recorded ("ok" / "fail:reason") and
+  shown in the UI under each schedule row.
+- **API surface**: `GET/POST/PUT/DELETE
+  /api/outputs/<id>/schedules` for full CRUD. Validates trigger
+  shape + day-mask range. Backed by the `output_schedules` SQLite
+  table that's been ready since v0.0.12.
+- **Dashboard UI**: a collapsible "Schedules" section appears
+  under each output panel on the device-detail page. Renders
+  each rule with an enabled toggle + delete button + last-run
+  status. "+ Add schedule" form has action radio (On/Off),
+  trigger picker (Time/Sunrise/Sunset, with conditional
+  time-vs-offset input), and day chips (MTWTFSS, default all).
+  Lazy-loaded — the schedule list isn't fetched until the user
+  taps the section, so users who only want the instant toggle
+  pay no overhead.
+
+### Closes the #104 saga
+Phase A (instant toggle) shipped in v0.0.12. Phase B (schedules)
+ships now. Phase C (cloud-fire — Pro tier) is the only remaining
+piece, deferred until cloud-side roadmap pulls it in.
+
 ## [0.0.23] — 2026-05-16
 
 ### Fixed

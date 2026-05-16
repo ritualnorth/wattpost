@@ -25,6 +25,7 @@ from ..config import Config
 from ..storage import Store
 from .base import ControllableOutput, OutputAdapter, WriteResult
 from .registry import discover_outputs_for_device, get_adapter_for
+from . import schedules as _schedules
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +83,20 @@ class OutputsService:
             if state is None:
                 continue
             await self.store.update_output_state(output_id, state, now)
+
+    async def fire_schedules_if_due(self) -> int:
+        """Tick the schedule engine. Called by the scheduler on every
+        poll cycle; cheap when no schedules are configured (single
+        empty SELECT). Returns the number fired this tick."""
+        try:
+            weather = await _schedules.load_weather_cache(self.store)
+            return await _schedules.fire_due_schedules(
+                store=self.store, outputs_service=self,
+                weather_cache=weather, now_ts=int(time.time()),
+            )
+        except Exception:
+            log.exception("schedule tick failed")
+            return 0
 
     async def toggle(
         self, output_id: str, on: bool, *, by: str,

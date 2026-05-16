@@ -4526,6 +4526,17 @@ function renderOutputPanelHtml(o) {
       </button>
       <span class="output-busy" data-output-busy="${o.id}" hidden>Writing…</span>
     </div>` : "";
+  const schedulesSection = o.safety_confirmed ? `
+    <details class="output-schedules" data-output-schedules="${o.id}">
+      <summary>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/></svg>
+        <span>Schedules</span>
+        <span class="output-schedules-count meta-k" data-output-schedules-count="${o.id}"></span>
+      </summary>
+      <div class="output-schedules-list" data-output-schedules-list="${o.id}">
+        <div class="settings-empty">Loading…</div>
+      </div>
+    </details>` : "";
   return `
     <section class="panel output-panel" data-output-id="${o.id}">
       <div class="panel-header">
@@ -4541,10 +4552,24 @@ function renderOutputPanelHtml(o) {
       ${safetyBanner}
       ${controls}
       <div class="output-foot meta-k">${lastLine}</div>
+      ${schedulesSection}
     </section>`;
 }
 
 function wireOutputPanel(o) {
+  // Lazy-load schedules when the user opens the <details> for the
+  // first time. Keeps the initial output-panel render cheap and
+  // skips the network round-trip for users who never tap Schedules.
+  const details = document.querySelector(`[data-output-schedules="${o.id}"]`);
+  if (details && !details.dataset.loaded) {
+    details.addEventListener("toggle", () => {
+      if (details.open && !details.dataset.loaded) {
+        details.dataset.loaded = "1";
+        renderSchedulesList(o.id);
+      }
+    });
+  }
+
   document.querySelector(`[data-output-confirm="${o.id}"]`)?.addEventListener("click", async () => {
     try {
       await fetch(`/api/outputs/${encodeURIComponent(o.id)}/confirm`, {method: "POST"});
@@ -4593,6 +4618,220 @@ function wireOutputPanel(o) {
       btn.disabled = false; if (busy) busy.hidden = true;
     }
   });
+}
+
+// ---------- output schedules UI (#117) ----------
+//
+// One schedule row per cron-like rule; clicking "+ Add schedule"
+// reveals an inline form that posts to the API and re-renders the
+// list. Sunrise/sunset triggers carry a ± offset; time triggers
+// carry an HH:MM. Day-mask is rendered as 7 toggleable letter chips
+// (M T W T F S S, Monday is bit 0 — matches `datetime.weekday()`).
+
+const DAY_LABELS = ["M","T","W","T","F","S","S"];
+
+function _scheduleSummary(s) {
+  const action = s.action === "on" ? "Turn ON" : "Turn OFF";
+  let when;
+  if (s.trigger_kind === "time") {
+    when = `at ${s.trigger_time || "?"}`;
+  } else {
+    const off = s.offset_min || 0;
+    const sign = off > 0 ? "+" : "";
+    const ofs = off === 0 ? "" : ` (${sign}${off} min)`;
+    when = `at ${s.trigger_kind}${ofs}`;
+  }
+  // Day-mask pretty-print: full week = "every day", weekdays =
+  // "weekdays", weekend = "weekends", else explicit letters.
+  let days = "";
+  const m = s.days_mask ?? 127;
+  if (m === 127) days = "every day";
+  else if (m === 0b0011111) days = "weekdays";
+  else if (m === 0b1100000) days = "weekends";
+  else {
+    days = DAY_LABELS.map((d, i) => (m & (1 << i)) ? d : "").join("") || "(no days)";
+  }
+  return `${action} ${when} · ${days}`;
+}
+
+function _formatLastRun(s) {
+  if (!s.last_run_at) return "Never run yet.";
+  const ago = fmt.ago(s.last_run_at);
+  const res = s.last_run_result || "?";
+  const cls = res === "ok" ? "ok" : "err";
+  return `Last run: <span class="acc-${cls}">${escHtml(res)}</span> · ${ago}`;
+}
+
+async function renderSchedulesList(outputId) {
+  const host = document.querySelector(`[data-output-schedules-list="${outputId}"]`);
+  const counter = document.querySelector(`[data-output-schedules-count="${outputId}"]`);
+  if (!host) return;
+  let schedules = [];
+  try {
+    const r = await api(`/api/outputs/${encodeURIComponent(outputId)}/schedules`);
+    schedules = r?.schedules || [];
+  } catch (e) {
+    host.innerHTML = `<div class="settings-empty">Couldn't load schedules: ${escHtml(e.message || String(e))}</div>`;
+    return;
+  }
+  if (counter) counter.textContent = schedules.length ? `(${schedules.length})` : "";
+
+  const rows = schedules.map(s => `
+    <div class="schedule-row" data-schedule-id="${s.id}">
+      <label class="schedule-enabled" title="${s.enabled ? 'Enabled — uncheck to pause' : 'Disabled'}">
+        <input type="checkbox" data-schedule-toggle="${s.id}" ${s.enabled ? "checked" : ""}/>
+      </label>
+      <div class="schedule-info">
+        <div class="schedule-summary">${escHtml(_scheduleSummary(s))}</div>
+        <div class="schedule-last meta-k">${_formatLastRun(s)}</div>
+      </div>
+      <button class="alerts-icon-btn alerts-icon-btn--danger"
+              data-schedule-delete="${s.id}"
+              title="Delete this schedule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
+    </div>`).join("");
+
+  host.innerHTML = `
+    ${rows || '<div class="settings-empty">No schedules yet — add one below.</div>'}
+    <div class="schedule-add-host" data-schedule-add-host="${outputId}">
+      <button class="btn-action" data-schedule-add-show="${outputId}">+ Add schedule</button>
+    </div>`;
+
+  // Wire row controls + the add-button.
+  host.querySelectorAll("[data-schedule-toggle]").forEach(cb => {
+    cb.addEventListener("change", () => _scheduleToggle(outputId, +cb.dataset.scheduleToggle, cb.checked));
+  });
+  host.querySelectorAll("[data-schedule-delete]").forEach(btn => {
+    btn.addEventListener("click", () => _scheduleDelete(outputId, +btn.dataset.scheduleDelete));
+  });
+  host.querySelector(`[data-schedule-add-show="${outputId}"]`)?.addEventListener("click", () => {
+    _scheduleShowAddForm(outputId);
+  });
+}
+
+function _scheduleShowAddForm(outputId) {
+  const host = document.querySelector(`[data-schedule-add-host="${outputId}"]`);
+  if (!host) return;
+  // Sensible default for new schedules: turn ON at sunset (the
+  // archetypal van-light "shed lighting" use case).
+  host.innerHTML = `
+    <form class="schedule-form" data-schedule-form="${outputId}">
+      <div class="schedule-form-row">
+        <label class="schedule-form-label">Action</label>
+        <div class="schedule-form-group">
+          <label><input type="radio" name="action" value="on" checked/> Turn ON</label>
+          <label><input type="radio" name="action" value="off"/> Turn OFF</label>
+        </div>
+      </div>
+      <div class="schedule-form-row">
+        <label class="schedule-form-label">Trigger</label>
+        <div class="schedule-form-group">
+          <label><input type="radio" name="trigger_kind" value="time"/> at time</label>
+          <label><input type="radio" name="trigger_kind" value="sunrise"/> sunrise</label>
+          <label><input type="radio" name="trigger_kind" value="sunset" checked/> sunset</label>
+        </div>
+      </div>
+      <div class="schedule-form-row" data-show-when-kind="time" hidden>
+        <label class="schedule-form-label">Time (HH:MM)</label>
+        <input type="time" name="trigger_time" value="22:00"/>
+      </div>
+      <div class="schedule-form-row" data-show-when-kind="sunrise sunset">
+        <label class="schedule-form-label">Offset (minutes ± sunrise/sunset)</label>
+        <input type="number" name="offset_min" value="0" min="-720" max="720" step="5"/>
+      </div>
+      <div class="schedule-form-row">
+        <label class="schedule-form-label">Days</label>
+        <div class="schedule-form-group schedule-days">
+          ${DAY_LABELS.map((d, i) => `
+            <label class="schedule-day"><input type="checkbox" name="day_${i}" checked/> ${d}</label>
+          `).join("")}
+        </div>
+      </div>
+      <div class="schedule-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">Add</button>
+        <button type="button" class="btn-action" data-schedule-add-cancel="${outputId}">Cancel</button>
+        <span class="schedule-form-status"></span>
+      </div>
+    </form>`;
+  const form = host.querySelector("form");
+  // Toggle visibility of time-input / offset-input based on selected
+  // trigger_kind. data-show-when-kind is space-separated, listing
+  // which kinds the row should be visible for.
+  const refreshKindVisibility = () => {
+    const kind = form.querySelector('input[name="trigger_kind"]:checked').value;
+    form.querySelectorAll("[data-show-when-kind]").forEach(el => {
+      el.hidden = !el.dataset.showWhenKind.split(/\s+/).includes(kind);
+    });
+  };
+  form.querySelectorAll('input[name="trigger_kind"]').forEach(r => {
+    r.addEventListener("change", refreshKindVisibility);
+  });
+  refreshKindVisibility();
+  form.addEventListener("submit", (e) => { e.preventDefault(); _scheduleSubmit(outputId, form); });
+  form.querySelector(`[data-schedule-add-cancel="${outputId}"]`).addEventListener("click", () => {
+    renderSchedulesList(outputId);
+  });
+}
+
+async function _scheduleSubmit(outputId, form) {
+  const status = form.querySelector(".schedule-form-status");
+  status.textContent = "Saving…"; status.className = "schedule-form-status";
+  const kind = form.elements["trigger_kind"].value;
+  const action = form.elements["action"].value;
+  let days_mask = 0;
+  for (let i = 0; i < 7; i++) {
+    if (form.elements[`day_${i}`].checked) days_mask |= (1 << i);
+  }
+  const payload = {
+    action, trigger_kind: kind, days_mask, enabled: true,
+  };
+  if (kind === "time") {
+    payload.trigger_time = form.elements["trigger_time"].value;
+  } else {
+    payload.offset_min = parseInt(form.elements["offset_min"].value, 10) || 0;
+  }
+  try {
+    const r = await fetch(`/api/outputs/${encodeURIComponent(outputId)}/schedules`, {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    status.textContent = e.message || String(e); status.classList.add("err");
+    return;
+  }
+  renderSchedulesList(outputId);
+}
+
+async function _scheduleToggle(outputId, scheduleId, enabled) {
+  try {
+    await fetch(`/api/outputs/${encodeURIComponent(outputId)}/schedules/${scheduleId}`, {
+      method: "PUT",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({enabled}),
+    });
+  } catch (e) {
+    alert(`Couldn't update: ${e.message || e}`);
+    renderSchedulesList(outputId);
+  }
+}
+
+async function _scheduleDelete(outputId, scheduleId) {
+  if (!confirm("Delete this schedule?")) return;
+  try {
+    await fetch(`/api/outputs/${encodeURIComponent(outputId)}/schedules/${scheduleId}`, {
+      method: "DELETE",
+    });
+  } catch (e) {
+    alert(`Couldn't delete: ${e.message || e}`);
+    return;
+  }
+  renderSchedulesList(outputId);
 }
 
 function buildSmartBatteryDetail(dev) {
