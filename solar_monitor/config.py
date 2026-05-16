@@ -138,6 +138,32 @@ class WeatherCfg(msgspec.Struct, kw_only=True):
     poll_minutes: int = 15
 
 
+class BankCfg(msgspec.Struct, kw_only=True):
+    """Bank-level aggregation tuning (#121). Controls how the dashboard
+    reconciles a system that has both a shunt and one or more smart
+    BMSes reporting overlapping metrics (V, A, SoC, remaining Ah).
+
+    Default behaviour (`source: auto`):
+      * Cell-level data (per-cell V, drift, balance state) always
+        comes from BMSes — shunts don't have it.
+      * System-level data (V, A, SoC, time-to-go) prefers the shunt
+        when present (direct measurement at the busbar, Coulomb-
+        counted), falls back to summing BMSes when no shunt.
+
+    Overrides for users whose hardware lies / drifts:
+      * `source: shunt` — force system-level from shunt even when
+        BMSes are present. Doesn't affect cell data.
+      * `source: bms`   — force system-level from BMS pack sum
+        even when a shunt is present.
+
+    `disagreement_threshold_pct` controls when the dashboard surfaces
+    a quiet "shunt vs BMS disagree" warning — 5% by default. Set to
+    100 to suppress the warning entirely.
+    """
+    source: str = "auto"                      # auto | shunt | bms
+    disagreement_threshold_pct: float = 5.0
+
+
 class GpsCfg(msgspec.Struct, kw_only=True):
     """USB GPS receiver (#125). Off by default — opt in by adding a
     `gps:` block to config.yaml. The daemon reads NMEA at `baudrate`
@@ -177,6 +203,7 @@ class Config(msgspec.Struct, kw_only=True):
     weather: WeatherCfg | None = None    # optional
     cloud: CloudCfg | None = None        # optional
     gps: GpsCfg | None = None            # optional (USB GPS — #125)
+    bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
 
 
 def load_config(path: str | Path) -> Config:

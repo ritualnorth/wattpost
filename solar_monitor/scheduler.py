@@ -116,6 +116,18 @@ class PollScheduler:
         except Exception:
             log.exception("update checker failed to initialise")
 
+        # Bank aggregator policy (#121). The `bank:` block is optional
+        # in config.yaml; when present, it controls how shunt + BMS
+        # data is reconciled into the bank-level snapshot the
+        # dashboard renders. Defaults: source=auto (shunt wins for
+        # system metrics when present, BMS wins for cell data
+        # always), 5 % disagreement threshold for the diagnostic.
+        if config.bank is not None:
+            store.set_bank_policy(
+                source=config.bank.source,
+                disagreement_pct=config.bank.disagreement_threshold_pct,
+            )
+
         # Controllable outputs (#104). Discovery happens after the
         # first poll lands (otherwise device_meta is empty and no
         # adapter has anything to match against). The service then

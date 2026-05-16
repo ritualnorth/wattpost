@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.29] — 2026-05-16
+
+### Added — BMS-vs-shunt reconciliation (#121)
+- **Two-layer bank aggregator.** Cell-level metrics (per-cell V,
+  worst-pack drift, cell min/max) always come from BMSes — shunts
+  don't have per-cell data. System-level metrics (V, A, SoC,
+  remaining Ah, time-to-go) prefer the shunt when present,
+  fallback to BMS pack-sum otherwise. **Previously the shunt
+  branch returned early, dropping all cell-level data — fixed.**
+- **Source-disagreement hint.** When both shunt and BMS report SoC
+  and they differ by more than 5 percentage points, the hero tile
+  shows a quiet sub-line: *"BMS 72% · shunt 65% — showing shunt"*.
+  Renogy DC Home makes users pick manually; we pick the right
+  source automatically *and* tell them when we're unsure.
+- **Time-to-go from shunt.** When the shunt reports a Coulomb-
+  counted `time_to_go_minutes`, the Remaining tile uses that
+  instead of the V·I extrapolation — much better accuracy on
+  variable loads.
+- **Manual override** via new optional `bank:` config block:
+  ```yaml
+  bank:
+    source: auto      # auto | shunt | bms
+    disagreement_threshold_pct: 5.0
+  ```
+  Defaults to `auto` (recommended). Set `shunt` or `bms` to force
+  a side when your hardware is misconfigured.
+
+### Fixed
+- Previously, the bank aggregator's shunt branch returned early
+  and dropped `worst_pack_drift_v`, `cell_min_v`, `cell_max_v`
+  from the snapshot when both a shunt and BMSes were present —
+  meaning customers with a hybrid install lost the cell-balance
+  panel data. The aggregator now keeps both layers independent.
+
 ## [0.0.28] — 2026-05-16
 
 ### Fixed
