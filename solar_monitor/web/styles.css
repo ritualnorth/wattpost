@@ -1863,6 +1863,76 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .eff-cell--unreliable .eff-cell-foot,
 .eff-cell--unreliable .meta-k { opacity: .5; }
 
+/* Battery health tile (#109) — cycle/lifetime stats + SoC residency */
+#panel-battery-health { --panel-tint: linear-gradient(180deg, rgba(99,140,242,0.05), transparent 50%); }
+#panel-battery-health .h-icon { color: var(--blue, #6c8ef2); }
+.bhealth-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: .8rem;
+  margin-bottom: 1rem;
+}
+.bhealth-stat {
+  display: flex; flex-direction: column;
+  gap: .15rem;
+  padding: .55rem .65rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bhealth-k {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-3);
+}
+.bhealth-v {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+}
+.bhealth-residency {
+  margin-top: .25rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.bhealth-residency-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .5rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.bhealth-residency-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.bhealth-bars {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  height: 80px;
+  align-items: end;
+  padding: 0 2px;
+}
+.bhealth-bar {
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: opacity .15s ease;
+}
+.bhealth-bar:hover { opacity: .8; cursor: help; }
+.bhealth-bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: .25rem;
+  font-size: .68rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+
 /* Cell-drift trend sparkline */
 .cell-drift-trend {
   margin-top: .9rem;

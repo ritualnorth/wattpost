@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=98" />
+  <link rel="stylesheet" href="/web/styles.css?v=99" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -311,6 +311,47 @@
               Nothing leaves your network without it.
             </p>
             <a class="tomorrow-empty-cta" href="#/docs/forecast">How it works →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- BATTERY HEALTH -->
+      <section class="panel" id="panel-battery-health">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="14" height="10" rx="1.5"/><path d="M17 10v4"/><path d="M7 12h6"/>
+            </svg>
+            Battery health
+          </h2>
+          <div class="panel-sub" id="bhealth-window">last 30 days</div>
+        </div>
+        <div class="bhealth-stats">
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Cycles (BMS)</span>
+            <span class="bhealth-v" id="bhealth-cycles">—</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Lifetime energy</span>
+            <span class="bhealth-v" id="bhealth-lifetime">—</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Window cycles</span>
+            <span class="bhealth-v" id="bhealth-window-cycles">—</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Days online</span>
+            <span class="bhealth-v" id="bhealth-days">—</span>
+          </div>
+        </div>
+        <div class="bhealth-residency">
+          <div class="bhealth-residency-head">
+            <span class="meta-k">Where the battery lives — SoC residency</span>
+            <span class="bhealth-residency-stat" id="bhealth-residency-stat">—</span>
+          </div>
+          <div class="bhealth-bars" id="bhealth-bars"></div>
+          <div class="bhealth-bars-axis">
+            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
           </div>
         </div>
       </section>
@@ -690,6 +731,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=120"></script>
+  <script src="/web/app.js?v=121"></script>
 </body>
 </html>

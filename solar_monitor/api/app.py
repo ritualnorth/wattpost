@@ -97,6 +97,20 @@ async def today(state: State) -> dict[str, Any]:
     return await store.today_aggregate(midnight, now)
 
 
+@get("/api/battery-health")
+async def battery_health(state: State, days: int = 30) -> dict[str, Any]:
+    """SoC residency histogram + cycle/lifetime numbers for the Battery
+    Health tile (#109).
+
+    Default window is 30 days — long enough to surface a real residency
+    pattern, short enough to stay responsive on the 1-min/1-hour rollup
+    tables. Caller can override via ?days=N (clamped 1-365)."""
+    store: Store = state["store"]
+    days = max(1, min(365, int(days)))
+    now = int(time.time())
+    return await store.battery_health_aggregate(now - days * 86400, now)
+
+
 @get("/api/poll_run")
 async def last_poll_run(state: State) -> dict[str, Any]:
     """Header status pill data source. Includes BLE-side health so the
