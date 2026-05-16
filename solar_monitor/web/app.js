@@ -1964,15 +1964,30 @@ function drawChart(label, metric, data, forecast = null) {
   const hasBand = Array.isArray(data.min) && Array.isArray(data.max) &&
                   data.min.length === ts.length && data.min.length > 0;
 
-  // Filter forecast to future-only points so we don't visually overlap
-  // the observed line in the past (where the forecast is now a known
-  // bad prediction). We keep one point from the most recent historic
-  // value as the anchor so the dashed line joins up cleanly at the
-  // "now" boundary instead of starting in mid-air.
+  // Filter forecast to future-only points AND bound the horizon to
+  // roughly the same width as the user's selected history range. A
+  // 6-hour history with 7 days of forecast overlay (Solcast's full
+  // window) made the X-axis span a week and visually drowned the
+  // historic data. Mirroring the window keeps the chart balanced:
+  //   1h history  → 1h  forecast
+  //   6h          → 6h
+  //   24h         → 24h
+  //   7d/30d      → cap at Solcast's max (~7d)
   let forecastFuture = [];
   if (forecast?.points?.length) {
     const now = Math.floor(Date.now() / 1000);
-    forecastFuture = forecast.points.filter(p => p.ts >= now);
+    // Width of the historic window in seconds, derived from the
+    // server-stamped since/until so a custom range works too.
+    let historyWindow = 0;
+    if (typeof data.since === "number" && typeof data.until === "number") {
+      historyWindow = Math.max(0, data.until - data.since);
+    } else if (data.ts && data.ts.length > 1) {
+      historyWindow = Math.max(0, data.ts[data.ts.length - 1] - data.ts[0]);
+    }
+    // 1h floor so the line has somewhere to live even on the
+    // shortest range; cap to whatever Solcast returned (usually 7d).
+    const horizon = Math.max(3600, historyWindow);
+    forecastFuture = forecast.points.filter(p => p.ts >= now && p.ts <= now + horizon);
   }
 
   // Build series + data matrix in lockstep so indices always line up.
