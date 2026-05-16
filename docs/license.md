@@ -27,7 +27,7 @@ writing a custom licence is risky and reinventing the wheel.
 
 ## The cloud tier
 
-The code at `app.wattpost.io` (multi-site dashboard, heartbeat ingest,
+The code at `wattpost.cloud` (multi-site dashboard, heartbeat ingest,
 Cloudflare tunnel provisioning, REST API server, billing) is **not**
 distributed and **not** covered by the appliance licence. It's
 private to RitualNorth Ltd.

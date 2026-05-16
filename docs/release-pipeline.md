@@ -51,7 +51,7 @@ Both are anonymously fetchable. There's no auth on `releases.wattpost.io` becaus
 
 ## Serving infrastructure
 
-- **Container**: `shared-caddy` in `vps-infra/docker-compose.yml`. Same Alpine Caddy that serves `wattpost.io` + `app.wattpost.io`.
+- **Container**: `shared-caddy` in `vps-infra/docker-compose.yml`. Same Alpine Caddy that serves `wattpost.io` + `wattpost.cloud`.
 - **Host directory**: `/srv/wattpost-releases/{img,source}/` — bind-mounted read-only into the container. Created by `vps-infra/scripts/bootstrap.sh`.
 - **Caddy block**: `vps-infra/caddy/Caddyfile` → `releases.wattpost.io`. `file_server browse` so the directory listing is human-readable. 24h cache header — fine because filenames are versioned.
 - **DNS**: `releases.wattpost.io` A → `REDACTED-ORIGIN-IP` (Proxied through CF). Set in CF dashboard for the `wattpost.io` zone.

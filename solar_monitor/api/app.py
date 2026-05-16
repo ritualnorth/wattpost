@@ -592,7 +592,7 @@ def login_page(request: Request) -> File | Response:
     Tunnel (CF-Ray header present), the password form is a dead
     end — local-password sessions don't grant tunnel access by
     design (#137). Serve a different page that explains "sign in
-    via app.wattpost.io and click Open" rather than letting the
+    via wattpost.cloud and click Open" rather than letting the
     user fill in a password that issues a session their next click
     will 401 against."""
     from .. import web_auth as _wa
@@ -605,12 +605,12 @@ def login_page(request: Request) -> File | Response:
         return Response(
             content=(
                 "<!doctype html><meta charset=utf-8>"
-                "<title>Sign in via app.wattpost.io</title>"
+                "<title>Sign in via wattpost.cloud</title>"
                 "<body style=\"font:14px system-ui;max-width:420px;"
                 "margin:6rem auto;padding:0 1rem;color:#cdd6e0\">"
                 "<h1>Direct tunnel access isn't supported</h1>"
-                "<p>Sign in at <a href=\"https://app.wattpost.io\">"
-                "app.wattpost.io</a> and click <b>Open</b> on this "
+                "<p>Sign in at <a href=\"https://wattpost.cloud\">"
+                "wattpost.cloud</a> and click <b>Open</b> on this "
                 "appliance to access it remotely.</p>"
                 "</body>"
             ),
@@ -683,7 +683,7 @@ async def do_login(data: dict, request: Request) -> Response:
         return Response(
             {"ok": False,
              "detail": "direct tunnel sign-in not supported — "
-                       "use app.wattpost.io and click Open"},
+                       "use wattpost.cloud and click Open"},
             status_code=403,
         )
     pw = (data or {}).get("password") or ""

@@ -38,7 +38,7 @@ The cloud-tier code (multi-site dashboard, heartbeat ingest, tunnel provisioning
 
 The cloud receives **heartbeats only** — SoC + net power + a tiny extras blob (alert count, today's energy), every ~5 minutes. Per-poll detail, individual cell voltages, full history — all stay on your Pi. We never see your raw telemetry stream.
 
-Unpairing from `app.wattpost.io` deletes the appliance row + all stored heartbeats from our DB.
+Unpairing from `wattpost.cloud` deletes the appliance row + all stored heartbeats from our DB.
 
 ## Why local-first instead of cloud-only?
 
@@ -60,7 +60,7 @@ If you're 100% grid-tied with no batteries, dedicated solar-PV monitoring tools 
 
 ## How much does the cloud tier cost?
 
-The cloud is in beta and free during beta. Pricing TBD. Sign up at [app.wattpost.io/signup](https://app.wattpost.io/signup).
+The cloud is in beta and free during beta. Pricing TBD. Sign up at [wattpost.cloud/signup](https://wattpost.cloud/signup).
 
 ## What hardware do you recommend buying?
 
@@ -68,6 +68,6 @@ The cloud is in beta and free during beta. Pricing TBD. Sign up at [app.wattpost
 - **8 GB+ microSD card**
 - **Renogy BT-2 dongle** (£8 / $12) if you have Renogy gear
 
-Victron and JK BMS support are on the roadmap; if you have them, sign up at [app.wattpost.io](https://app.wattpost.io/signup) so we can ping you when those land.
+Victron and JK BMS support are on the roadmap; if you have them, sign up at [wattpost.cloud](https://wattpost.cloud/signup) so we can ping you when those land.
 
 Total kit for a Renogy setup: **~£70**. About 1/4 the cost of a comparable commercial monitor.

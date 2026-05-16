@@ -32,13 +32,13 @@ log = logging.getLogger(__name__)
 # ---------- payloads ----------
 
 class CloudConfigPayload(msgspec.Struct, kw_only=True):
-    endpoint:          str = "https://app.wattpost.io"
+    endpoint:          str = "https://wattpost.cloud"
     heartbeat_minutes: int = 5
 
 
 class PairPayload(msgspec.Struct, kw_only=True):
     code:     str
-    endpoint: str = "https://app.wattpost.io"
+    endpoint: str = "https://wattpost.cloud"
 
 
 # ---------- helpers ----------
@@ -65,7 +65,7 @@ async def get_cloud_config(state: State) -> dict[str, Any]:
     if c is None or not c.bearer_token:
         return {
             "configured":        False,
-            "endpoint":          c.endpoint if c else "https://app.wattpost.io",
+            "endpoint":          c.endpoint if c else "https://wattpost.cloud",
             "heartbeat_minutes": c.heartbeat_minutes if c else 5,
             "appliance_id":      None,
             "label":             "",
@@ -153,7 +153,7 @@ async def pair_appliance(
     try:
         # Same follow_redirects rationale as the heartbeat client —
         # a user typing https://wattpost.io into the pairing form
-        # still works because Caddy 308s /api/* to app.wattpost.io.
+        # still works because Caddy 308s /api/* to wattpost.cloud.
         async with httpx.AsyncClient(
             timeout=15.0, follow_redirects=True,
         ) as client:

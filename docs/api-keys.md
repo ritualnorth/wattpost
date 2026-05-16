@@ -1,10 +1,10 @@
 # API keys
 
-WattPost API tokens are minted at **[/app/account/api-keys](https://app.wattpost.io/app/account/api-keys)** while signed into the cloud dashboard.
+WattPost API tokens are minted at **[/app/account/api-keys](https://wattpost.cloud/app/account/api-keys)** while signed into the cloud dashboard.
 
 ## Creating a token
 
-1. Sign in at [app.wattpost.io](https://app.wattpost.io)
+1. Sign in at [wattpost.cloud](https://wattpost.cloud)
 2. **Account → Manage API keys → Create key**
 3. Give it a label so you can identify it later (e.g. "Home Assistant", "Grafana on rpi5", "personal scripts")
 4. The cleartext token is shown **once**. Copy it into your password manager / app config now — we store only an argon2 hash and cannot recover it.

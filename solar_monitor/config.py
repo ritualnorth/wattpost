@@ -106,10 +106,10 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     back into this struct.
     """
     # Canonical product subdomain. wattpost.io is the marketing site;
-    # the API + dashboard live on app.wattpost.io. Old pairings with
+    # the API + dashboard live on wattpost.cloud. Old pairings with
     # endpoint=https://wattpost.io keep working — Caddy reverse-proxies
     # /api/* on both hostnames.
-    endpoint:          str  = "https://app.wattpost.io"
+    endpoint:          str  = "https://wattpost.cloud"
     bearer_token:      str  = ""    # empty until paired
     appliance_id:      int | None = None
     label:             str  = ""

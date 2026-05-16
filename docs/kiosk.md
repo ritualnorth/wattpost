@@ -20,7 +20,7 @@ The `/kiosk` route is **always anonymous** — never gated by the local web pass
 
 ## Copying a kiosk link from the cloud
 
-On `app.wattpost.io`, every paired appliance card has a **Kiosk link** button. Click it → copies `https://<slug>.wattpost.io/kiosk` to your clipboard. Paste into the tablet's browser.
+On `wattpost.cloud`, every paired appliance card has a **Kiosk link** button. Click it → copies `https://<slug>.wattpost.io/kiosk` to your clipboard. Paste into the tablet's browser.
 
 ## What kiosk shows
 
