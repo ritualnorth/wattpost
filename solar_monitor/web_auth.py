@@ -42,8 +42,14 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 
-PASSWORD_HASH_PATH      = Path("/etc/wattpost/web-password.hash")
-PASSWORD_PLAINTEXT_PATH = Path("/etc/wattpost/web-password")
+# Default paths. Overridable via WATTPOST_PASSWORD_DIR for installs
+# (Docker, custom data layouts) that put state somewhere other than
+# /etc/wattpost. The Pi SD-card image keeps the default; Docker
+# users already volume-mount /etc/wattpost so the default is fine
+# there too.
+_PASSWORD_DIR = Path(os.environ.get("WATTPOST_PASSWORD_DIR", "/etc/wattpost"))
+PASSWORD_HASH_PATH      = _PASSWORD_DIR / "web-password.hash"
+PASSWORD_PLAINTEXT_PATH = _PASSWORD_DIR / "web-password"
 SESSION_COOKIE_NAME     = "wp_local_session"
 SESSION_TTL_SECONDS     = 60 * 60 * 24 * 30   # 30 days
 # Paths that don't need auth even on LAN. /kiosk is the wall-display
@@ -201,3 +207,52 @@ def write_password_hash(plaintext: str) -> None:
     file ownership / mode — this just writes the bytes."""
     PASSWORD_HASH_PATH.parent.mkdir(parents=True, exist_ok=True)
     PASSWORD_HASH_PATH.write_text(hash_password(plaintext) + "\n", encoding="utf-8")
+
+
+def ensure_first_boot_password() -> str | None:
+    """Generate + persist a random initial password if none is set.
+
+    Called once on daemon startup. Closes the "Docker installs ship
+    with no password, so the auth middleware bypasses everything"
+    hole — packaging/install.sh did this for the Pi SD image, but
+    Docker users never ran install.sh and were left wide open.
+
+    Returns the plaintext if a new password was just generated,
+    None if one already existed.
+
+    The plaintext is also logged at WARNING level so Docker users
+    can grab it from `docker compose logs wattpost`."""
+    if is_demo_mode():
+        return None
+    if password_is_set():
+        return None
+    plaintext = secrets.token_urlsafe(12)
+    try:
+        write_password_hash(plaintext)
+    except OSError as e:
+        log.error(
+            "first-boot password generation FAILED: %s. "
+            "Auth is currently bypassed because no password file exists. "
+            "Fix permissions on %s (or set WATTPOST_PASSWORD_DIR to a "
+            "writable path) and restart the daemon.",
+            e, PASSWORD_HASH_PATH.parent,
+        )
+        return None
+    # Mirror the plaintext to a sibling file so the MOTD on Pi
+    # installs and `docker exec cat /etc/wattpost/web-password` on
+    # Docker installs can both show it. Best-effort.
+    try:
+        PASSWORD_PLAINTEXT_PATH.write_text(plaintext + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    log.warning("=" * 64)
+    log.warning("FIRST-BOOT: generated initial web password")
+    log.warning("")
+    log.warning("    %s", plaintext)
+    log.warning("")
+    log.warning("Save it now — you'll need it to log into the dashboard.")
+    log.warning("Rotate via Settings → System → Reset web password (or")
+    log.warning("`wattpost-config` on the Pi). Stored at %s",
+                PASSWORD_HASH_PATH)
+    log.warning("=" * 64)
+    return plaintext

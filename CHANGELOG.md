@@ -8,6 +8,48 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.37] — 2026-05-16
+
+### Security — Docker installs were also wide open (urgent follow-up to 0.0.36)
+- **The bug:** v0.0.36 closed the tunnel-via-loopback bypass, but
+  Docker installs have a SECOND hole the SD image didn't have:
+  `packaging/install.sh` (Pi-only) is what generates the first-boot
+  password. Docker installs never ran install.sh, so
+  `password_is_set()` returned False — and the auth middleware
+  used to bypass entirely on "no password set." Net effect: every
+  Docker customer's appliance was open to anyone with the URL,
+  tunnel or LAN. Caught by Ritual North after he updated to 0.0.36 and
+  said "I don't have a local password, I'm pretty sure we don't
+  ship a password on Docker."
+- **The fix, two parts:**
+  1. New `ensure_first_boot_password()` runs at daemon startup
+     (cli.py `cmd_serve`). If no hash exists, it generates a random
+     ~16-char password, writes the hash, mirrors the plaintext to
+     `/etc/wattpost/web-password`, and logs the plaintext at
+     WARNING level so Docker users can find it via
+     `docker compose logs wattpost | grep -A2 FIRST-BOOT`.
+     Idempotent: existing hash → no-op.
+  2. Auth middleware no longer treats "no password set" as a
+     bypass. It now fail-closes: every non-anonymous path returns
+     503 (API) or redirects to /login (HTML) until a password is
+     configured. The startup hook guarantees one exists in normal
+     operation; if hash-write fails (permissions, read-only mount),
+     the operator gets a loud error log AND a 503 wall — no quiet
+     wide-open state.
+- **What customers need to do:**
+  - SD-card users: nothing — install.sh already set a password.
+  - Docker users: `docker compose pull && docker compose up -d`,
+    then `docker compose logs wattpost | grep -A2 FIRST-BOOT` to
+    find the generated password. Save it; bookmark Settings →
+    System → Reset web password to rotate later.
+- New `WATTPOST_PASSWORD_DIR` env var lets you point the hash +
+  plaintext files at a different directory than `/etc/wattpost`
+  if you've got an unusual data layout.
+
+### Docs
+- `docs/docker-install.md` now has a "First-boot password" section
+  with the exact `docker compose logs | grep FIRST-BOOT` command.
+
 ## [0.0.36] — 2026-05-16
 
 ### Security — tunnel URL no longer grants anonymous access (urgent)

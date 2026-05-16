@@ -61,6 +61,32 @@ First-boot drops a minimal `config.yaml` in `./wattpost-config/` —
 edit via **Settings → Devices & setup** in the dashboard, no SSH or
 file-editing needed.
 
+## First-boot password (find it in the logs)
+
+On first start the daemon generates a random web password and logs
+it once. Grab it from the container logs:
+
+```bash
+docker compose logs wattpost | grep -A2 "FIRST-BOOT"
+```
+
+Output looks like:
+
+```
+WARNING ... FIRST-BOOT: generated initial web password
+WARNING ...
+WARNING ...     fA9-XyT2_kpQ3rN0
+```
+
+Save it now — you'll need it to log into the dashboard. It also
+gets written to `./wattpost-config/web-password` on the host (and
+`/etc/wattpost/web-password` inside the container) so
+`docker exec wattpost cat /etc/wattpost/web-password` works if you
+miss it in the logs.
+
+Rotate any time via **Settings → System → Reset web password** in
+the dashboard.
+
 ## Bluetooth passthrough
 
 The example compose uses `network_mode: host` and bind-mounts
