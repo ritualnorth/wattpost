@@ -464,10 +464,47 @@ function renderStatus(run) {
 //
 //   3. With nothing addressable, we return null and the dashboard hides
 //      the bank hero.
+// Bank-level aggregator — mirrors the server-side reconciliation in
+// solar_monitor/storage/sqlite.py:_compute_bank_aggregate (#121).
+//
+// Two distinct layers:
+//   * System metrics (V, A, SoC, capacity, remaining) come from the
+//     shunt when present, otherwise the BMS pack-sum. "Source" tag
+//     in the output tells consumers which side fed the numbers.
+//   * Cell metrics (min/max V across packs, worst pack drift) ALWAYS
+//     come from BMSes — shunts don't have per-cell data. Surfaced
+//     alongside the system metrics even when the shunt is driving.
+//
+// When BOTH a shunt and one or more BMSes are present AND their SoC
+// readings disagree by >5 percentage points, attach a `disagreement`
+// object so the hero tile can render a quiet "shunt 65%, BMS 72%,
+// showing shunt — tap to investigate" hint.
 function aggregateBank() {
   const shunt = devices.find(d => d.kind === "shunt");
   const batts = devices.filter(d => d.kind === "smart_battery");
+  if (!shunt && batts.length === 0) return null;
 
+  // ---------- Cell layer (always BMS-sourced) ----------
+  let cellMin = null, cellMax = null, worstDrift = 0;
+  for (const b of batts) {
+    const l = b.latest || {};
+    const n = +l.cell_count || 0;
+    const cells = [];
+    for (let j = 0; j < n; j++) {
+      const cv = l[`cell_voltage_${j}_v`];
+      if (typeof cv === "number") cells.push(cv);
+    }
+    if (cells.length) {
+      const pmin = Math.min(...cells);
+      const pmax = Math.max(...cells);
+      worstDrift = Math.max(worstDrift, pmax - pmin);
+      cellMin = cellMin === null ? pmin : Math.min(cellMin, pmin);
+      cellMax = cellMax === null ? pmax : Math.max(cellMax, pmax);
+    }
+  }
+
+  // ---------- Candidate system views ----------
+  let shuntView = null;
   if (shunt) {
     const l = shunt.latest || {};
     const v = +l.voltage_v || 0;
@@ -476,37 +513,71 @@ function aggregateBank() {
     const totalCap = +l.bank_capacity_ah || +l.capacity_ah || 0;
     const totalRem = +l.remaining_ah || (totalCap * ((+l.soc_pct || 0) / 100));
     const soc = +l.soc_pct || (totalCap > 0 ? (totalRem / totalCap) * 100 : 0);
-    return {
+    shuntView = {
       source: "shunt",
-      packs: batts.length,                  // declared packs alongside the shunt
       model: l.model || shunt.label || "smart shunt",
-      soc, meanV: v, sumI: i, netW: power_w,
-      totalCap, totalRem,
+      soc, meanV: v, sumI: i, netW: power_w, totalCap, totalRem,
+      timeToGoMinutes: typeof l.time_to_go_minutes === "number" ? l.time_to_go_minutes : null,
+    };
+  }
+  let bmsView = null;
+  if (batts.length) {
+    let totalCap = 0, totalRem = 0, sumV = 0, sumI = 0;
+    for (const b of batts) {
+      const l = b.latest || {};
+      totalCap += +l.capacity_ah || 0;
+      totalRem += +l.remaining_charge_ah || 0;
+      sumV += +l.voltage_v || 0;
+      sumI += +l.current_a || 0;
+    }
+    const meanV = sumV / batts.length;
+    const soc = totalCap > 0 ? (totalRem / totalCap) * 100 : 0;
+    bmsView = {
+      source: "bms",
+      model: batts[0]?.latest?.model || "battery",
+      soc, meanV, sumI, netW: meanV * sumI, totalCap, totalRem,
+      timeToGoMinutes: null,
     };
   }
 
-  if (batts.length === 0) return null;
+  // ---------- Source pick (auto policy: shunt > BMS) ----------
+  const chosen = shuntView || bmsView;
 
-  let totalCap = 0, totalRem = 0, sumV = 0, sumI = 0;
-  for (const b of batts) {
-    const l = b.latest || {};
-    totalCap += +l.capacity_ah || 0;
-    totalRem += +l.remaining_charge_ah || 0;
-    sumV += +l.voltage_v || 0;
-    sumI += +l.current_a || 0;
+  // ---------- Disagreement diagnostic ----------
+  let disagreement = null;
+  if (shuntView && bmsView) {
+    const delta = Math.abs(shuntView.soc - bmsView.soc);
+    if (delta >= 5) {
+      disagreement = {
+        shuntSoc: shuntView.soc,
+        bmsSoc:   bmsView.soc,
+        deltaPct: delta,
+        showing:  chosen.source,
+      };
+    }
   }
-  const meanV = sumV / batts.length;
-  const soc = totalCap > 0 ? (totalRem / totalCap) * 100 : 0;
+
   return {
-    source: "batteries",
+    ...chosen,
     packs: batts.length,
-    model: batts[0]?.latest?.model || "battery",
-    soc, meanV, sumI, netW: meanV * sumI, totalCap, totalRem,
+    cellMinV: cellMin,
+    cellMaxV: cellMax,
+    worstDriftV: cellMin === null ? null : worstDrift,
+    disagreement,
   };
 }
 
 function computeRemaining(bank) {
   if (!bank) return { primary: "—", secondary: "" };
+  // Prefer the shunt's time_to_go_minutes when it's available — it's
+  // a Coulomb-counted estimate that knows about your actual recent
+  // discharge curve, much better than our V*I extrapolation.
+  if (typeof bank.timeToGoMinutes === "number" && bank.timeToGoMinutes > 0) {
+    return {
+      primary:   fmt.duration(bank.timeToGoMinutes / 60),
+      secondary: "until empty · shunt",
+    };
+  }
   const i = bank.sumI;
   if (Math.abs(i) < 0.5) return { primary: "Idle", secondary: "—" };
   if (i > 0) {
@@ -592,6 +663,26 @@ function renderHero() {
   const rem = computeRemaining(bank);
   $("#bank-time").textContent = rem.primary;
   $("#bank-time-sub").textContent = rem.secondary;
+
+  // Source-disagreement hint (#121). Only rendered when both a
+  // shunt and one or more BMSes are present AND their SoC readings
+  // differ by >5 pp. Single quiet line — not an alarm.
+  const dis = $("#donut-disagreement");
+  if (dis) {
+    if (bank.disagreement) {
+      const d = bank.disagreement;
+      const sourceLabel = d.showing === "shunt" ? "shunt" : "BMS";
+      dis.textContent = `BMS ${d.bmsSoc.toFixed(0)}% · shunt ${d.shuntSoc.toFixed(0)}% — showing ${sourceLabel}`;
+      dis.hidden = false;
+      dis.title = "Your BMS and shunt disagree by more than 5%. " +
+        "WattPost is showing the more reliable source for the " +
+        "metric (shunt for SoC by default). Pick a forced source " +
+        "in Settings → Power source if you trust one over the other.";
+    } else {
+      dis.hidden = true;
+      dis.textContent = "";
+    }
+  }
 
   // Other stats
   $("#bank-voltage").textContent = bank.meanV.toFixed(2);

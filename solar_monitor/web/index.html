@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=95" />
+  <link rel="stylesheet" href="/web/styles.css?v=96" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -159,6 +159,9 @@
             <div class="donut-pct"><span id="bank-soc">—</span><span class="donut-pct-unit">%</span></div>
             <div class="donut-label">State of charge</div>
             <div class="donut-flow" id="donut-flow"><span class="donut-flow-arrow"></span><span class="donut-flow-text">—</span></div>
+            <!-- #121: surfaced when shunt + BMS SoC disagree by >5pp.
+                 Empty / hidden in the common case. -->
+            <div class="donut-disagreement" id="donut-disagreement" hidden></div>
           </div>
         </div>
 
@@ -687,6 +690,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=115"></script>
+  <script src="/web/app.js?v=116"></script>
 </body>
 </html>

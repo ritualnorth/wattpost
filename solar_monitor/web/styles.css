@@ -3164,6 +3164,21 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-radius: var(--r);
 }
 
+/* Source-disagreement hint (#121). Tucked under the donut-flow pill
+ * inside the donut centre. Only shows when shunt + BMS SoC differ
+ * by >5pp. Deliberately quiet — small, low-contrast — because it's
+ * a "for your information" diagnostic, not an alarm. */
+.donut-disagreement {
+  margin-top: .35rem;
+  font-size: .65rem;
+  font-family: var(--mono);
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  max-width: 12rem;
+  line-height: 1.2;
+  text-align: center;
+}
+
 /* ---------------- controllable outputs (#104) ---------------- */
 /* Per-device output panel: lives on the device detail page under the
  * vendor-specific data panels. Toggle + state pill + audit footer. */

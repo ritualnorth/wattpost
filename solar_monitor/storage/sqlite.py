@@ -304,6 +304,24 @@ class Store:
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self._db: aiosqlite.Connection | None = None
+        # Bank-aggregator policy (#121). Defaults match BankCfg's
+        # defaults; the scheduler calls `set_bank_policy()` after
+        # boot to apply any user override from config.yaml.
+        self._bank_source: str = "auto"
+        self._bank_disagreement_pct: float = 5.0
+
+    def set_bank_policy(self, source: str, disagreement_pct: float) -> None:
+        """Hot-applied bank-aggregator policy. Called by the scheduler
+        after reading the optional `bank:` block from config.yaml.
+        Defaults stay in effect when no block is present."""
+        if source not in ("auto", "shunt", "bms"):
+            log.warning("invalid bank source %r — keeping current (%r)",
+                        source, self._bank_source)
+            return
+        self._bank_source = source
+        self._bank_disagreement_pct = float(disagreement_pct)
+        log.info("bank policy: source=%s, disagreement_threshold=%.1f%%",
+                 source, disagreement_pct)
 
     async def open(self) -> None:
         if self._db is not None:
@@ -680,14 +698,81 @@ class Store:
 
     def _compute_bank_aggregate(self, devices: dict[str, dict]) -> dict[str, float] | None:
         """Compute bank-level aggregate metrics from one poll's per-device
-        snapshot. Shunt wins for V/I/SoC if present; otherwise sum across
-        smart batteries. Returns None if there's nothing to aggregate.
+        snapshot.
+
+        Combines two independent layers:
+
+          * **Cell-level metrics** (per-cell V, drift, balance state)
+            always come from BMSes (smart_battery devices). Shunts
+            don't have cell-level data; if a shunt is the configured
+            "system source" we still surface the BMS's cell stats
+            alongside the shunt's system numbers.
+
+          * **System-level metrics** (V, A, SoC, remaining Ah, power,
+            time-to-go) come from the policy in `self._bank_source`:
+              - "auto" (default): shunt if present, BMS pack-sum
+                otherwise.
+              - "shunt": force shunt even when BMS present.
+              - "bms":   force BMS pack-sum even when shunt present.
+
+        When BOTH a shunt and BMS report SoC and they differ by more
+        than `self._bank_disagreement_pct`, we surface a diagnostic
+        line (`source_disagreement`) so the dashboard can render a
+        quiet "shunt 65 %, BMS 72 %, showing shunt — tap to
+        investigate" hint. Renogy DC Home makes users pick manually;
+        we pick + tell them when we're unsure.
+
+        Returns None when there's no shunt and no BMS to aggregate.
         """
         shunt = next((d for d in devices.values()
                       if d and d.get("_kind") == "shunt"), None)
         batts = [d for d in devices.values()
                  if d and d.get("_kind") == "smart_battery"]
+        if shunt is None and not batts:
+            return None
 
+        # --- Cell-level layer (always BMS-sourced when BMSes present) ---
+        cell_info: dict[str, float] = {}
+        if batts:
+            worst_drift = 0.0
+            all_cell_min: float | None = None
+            all_cell_max: float | None = None
+            for b in batts:
+                n = int(b.get("cell_count") or 0)
+                cells = []
+                for j in range(n):
+                    cv = b.get(f"cell_voltage_{j}_v")
+                    if isinstance(cv, (int, float)):
+                        cells.append(float(cv))
+                if cells:
+                    pmin, pmax = min(cells), max(cells)
+                    worst_drift = max(worst_drift, pmax - pmin)
+                    all_cell_min = pmin if all_cell_min is None else min(all_cell_min, pmin)
+                    all_cell_max = pmax if all_cell_max is None else max(all_cell_max, pmax)
+            if all_cell_min is not None: cell_info["cell_min_v"] = all_cell_min
+            if all_cell_max is not None: cell_info["cell_max_v"] = all_cell_max
+            cell_info["worst_pack_drift_v"] = worst_drift
+
+        # --- System-level layer (policy-driven choice) ---
+        # Build candidate "system view" dicts from each available source.
+        bms_view: dict[str, float] | None = None
+        if batts:
+            sum_v = sum(float(b.get("voltage_v") or 0) for b in batts)
+            sum_i = sum(float(b.get("current_a") or 0) for b in batts)
+            total_cap = sum(float(b.get("capacity_ah") or 0) for b in batts)
+            total_rem = sum(float(b.get("remaining_charge_ah") or 0) for b in batts)
+            mean_v = sum_v / len(batts) if batts else 0
+            soc = (total_rem / total_cap * 100) if total_cap else 0
+            bms_view = {
+                "voltage_v":    mean_v,
+                "current_a":    sum_i,
+                "power_w":      mean_v * sum_i,
+                "soc_pct":      soc,
+                "remaining_ah": total_rem,
+                "capacity_ah":  total_cap,
+            }
+
+        shunt_view: dict[str, float] | None = None
         if shunt is not None:
             l = shunt
             v = float(l.get("voltage_v") or 0)
@@ -696,57 +781,61 @@ class Store:
             rem = float(l.get("remaining_ah") or (cap * (float(l.get("soc_pct") or 0) / 100)))
             soc = float(l.get("soc_pct") or (rem / cap * 100 if cap else 0))
             power_w = float(l.get("power_w") if l.get("power_w") is not None else v * i)
-            return {
-                "voltage_v": v,
-                "current_a": i,
-                "power_w": power_w,
-                "soc_pct": soc,
+            shunt_view = {
+                "voltage_v":    v,
+                "current_a":    i,
+                "power_w":      power_w,
+                "soc_pct":      soc,
                 "remaining_ah": rem,
-                "capacity_ah": cap,
-                "pack_count": float(len(batts)),
+                "capacity_ah":  cap,
             }
+            # Time-to-go is shunt-only — neither BMS pack-sums nor
+            # voltage estimates produce a real time estimate.
+            ttg = l.get("time_to_go_minutes")
+            if isinstance(ttg, (int, float)) and ttg > 0:
+                shunt_view["time_to_go_minutes"] = float(ttg)
 
-        if not batts:
+        # Pick the chosen source per policy.
+        policy = getattr(self, "_bank_source", "auto")
+        chosen: dict[str, float] | None
+        chosen_label: str
+        if policy == "shunt":
+            chosen = shunt_view or bms_view
+            chosen_label = "shunt" if shunt_view else "bms"
+        elif policy == "bms":
+            chosen = bms_view or shunt_view
+            chosen_label = "bms" if bms_view else "shunt"
+        else:  # auto
+            chosen = shunt_view if shunt_view else bms_view
+            chosen_label = "shunt" if shunt_view else "bms"
+        if chosen is None:
             return None
 
-        sum_v = sum(float(b.get("voltage_v") or 0) for b in batts)
-        sum_i = sum(float(b.get("current_a") or 0) for b in batts)
-        total_cap = sum(float(b.get("capacity_ah") or 0) for b in batts)
-        total_rem = sum(float(b.get("remaining_charge_ah") or 0) for b in batts)
-        mean_v = sum_v / len(batts) if batts else 0
-        soc = (total_rem / total_cap * 100) if total_cap else 0
-        power_w = mean_v * sum_i
+        # Detect disagreement between shunt + BMS SoC. Surfaced as a
+        # diagnostic field the dashboard can render quietly under the
+        # SoC hero ("BMS 72 %, shunt 65 %, showing shunt").
+        disagreement: dict[str, float | str] | None = None
+        if shunt_view and bms_view:
+            threshold = getattr(self, "_bank_disagreement_pct", 5.0)
+            shunt_soc = shunt_view.get("soc_pct") or 0
+            bms_soc   = bms_view.get("soc_pct")   or 0
+            if abs(shunt_soc - bms_soc) >= threshold:
+                disagreement = {
+                    "shunt_soc_pct": round(shunt_soc, 1),
+                    "bms_soc_pct":   round(bms_soc, 1),
+                    "delta_pct":     round(abs(shunt_soc - bms_soc), 1),
+                    "showing":       chosen_label,
+                }
 
-        # Worst-pack drift across the bank — a single number that signals
-        # "any pack imbalance worth investigating" when charted over time.
-        worst_drift = 0.0
-        all_cell_min = None
-        all_cell_max = None
-        for b in batts:
-            n = int(b.get("cell_count") or 0)
-            cells = []
-            for j in range(n):
-                cv = b.get(f"cell_voltage_{j}_v")
-                if isinstance(cv, (int, float)):
-                    cells.append(float(cv))
-            if cells:
-                pmin, pmax = min(cells), max(cells)
-                worst_drift = max(worst_drift, pmax - pmin)
-                all_cell_min = pmin if all_cell_min is None else min(all_cell_min, pmin)
-                all_cell_max = pmax if all_cell_max is None else max(all_cell_max, pmax)
-
-        out: dict[str, float] = {
-            "voltage_v": mean_v,
-            "current_a": sum_i,
-            "power_w": power_w,
-            "soc_pct": soc,
-            "remaining_ah": total_rem,
-            "capacity_ah": total_cap,
-            "pack_count": float(len(batts)),
-            "worst_pack_drift_v": worst_drift,
-        }
-        if all_cell_min is not None: out["cell_min_v"] = all_cell_min
-        if all_cell_max is not None: out["cell_max_v"] = all_cell_max
+        out: dict[str, float] = dict(chosen)
+        out["pack_count"] = float(len(batts))
+        out["source"]     = chosen_label  # "shunt" | "bms"
+        out.update(cell_info)
+        if disagreement is not None:
+            # Stored under one key so it round-trips as JSON via the
+            # existing SSE/snapshot pipeline. The dashboard checks
+            # for its presence to decide whether to render the hint.
+            out["source_disagreement"] = disagreement   # type: ignore[assignment]
         return out
 
     # ---------- reads ----------
