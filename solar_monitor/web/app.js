@@ -3260,7 +3260,7 @@ function renderIntegrationsPanel() {
                   ? ` · remote: <a href="https://${integrationsState.cloud.tunnel_hostname}/" target="_blank" rel="noopener">${integrationsState.cloud.tunnel_hostname}</a>`
                   : (integrationsState.cloud.tunnel_enabled === false ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel — re-pair to enable remote access</span>` : "")
               }`
-            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://app.wattpost.io")}" target="_blank" rel="noopener">app.wattpost.io</a> account for the multi-site dashboard + offline alerts.`
+            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`
           }
         </div>
       </div>
@@ -3456,12 +3456,12 @@ async function disableMqtt() {
 
 function renderCloudForm(cc) {
   const paired = !!cc.configured;
-  const endpoint = cc.endpoint || "https://app.wattpost.io";
+  const endpoint = cc.endpoint || "https://wattpost.cloud";
   return `
     <form class="alerts-form" data-form="cloud">
       <div class="alerts-form-grid">
         <label class="alerts-field-wide">Cloud endpoint
-          <input type="url" name="endpoint" value="${endpoint}" required placeholder="https://app.wattpost.io"/>
+          <input type="url" name="endpoint" value="${endpoint}" required placeholder="https://wattpost.cloud"/>
         </label>
         <label>Heartbeat (minutes)
           <input type="number" name="heartbeat_minutes" value="${cc.heartbeat_minutes ?? 5}" min="1" max="60" required/>
@@ -3483,7 +3483,7 @@ function renderCloudForm(cc) {
         <details class="alerts-repair">
           <summary>Pair with a different account…</summary>
           <p class="settings-foot">
-            Paste a pairing code from the (new) app.wattpost.io account. Submitting will
+            Paste a pairing code from the (new) wattpost.cloud account. Submitting will
             replace the existing pairing — this appliance's old row stays on the
             previous account until that user removes it.
           </p>
@@ -3625,7 +3625,7 @@ async function testCloudHeartbeat(form) {
 }
 
 async function unpairCloud() {
-  if (!confirm("Unpair from app.wattpost.io? Cloud heartbeats stop and the local dashboard is unaffected.")) return;
+  if (!confirm("Unpair from wattpost.cloud? Cloud heartbeats stop and the local dashboard is unaffected.")) return;
   try {
     const r = await fetch("/api/cloud/unpair", { method: "POST" });
     if (!r.ok) {

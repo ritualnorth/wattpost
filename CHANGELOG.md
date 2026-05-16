@@ -8,6 +8,41 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.45] — 2026-05-16
+
+### Changed — Phase 3 of cloud rebrand: appliance side (#139)
+Final code/doc sweep of `app.wattpost.io` references in the appliance.
+
+- `solar_monitor/config.py` — `CloudCfg.endpoint` default flips from
+  `https://app.wattpost.io` → `https://wattpost.cloud`. Existing
+  pairings keep their on-disk value (still works via 308); new
+  pairings point at the new domain from first heartbeat.
+- `solar_monitor/update/checker.py` — `DEFAULT_MANIFEST_URL` flips
+  to `https://wattpost.cloud/api/releases/latest`. Same back-compat
+  story.
+- `solar_monitor/api/cloud_admin.py` — pair-flow defaults and
+  PUT payload defaults flipped.
+- `solar_monitor/web/login-tunnel.html` — direct-tunnel-access
+  block page now points at `wattpost.cloud` for "sign in here".
+- `solar_monitor/web/app.js` — integrations panel's "Pair with"
+  fallback URL.
+- Comments + docstrings across appliance modules sweep-updated.
+
+### Docs
+- `docs/pairing.md`, `docs/kiosk.md`, `docs/release-pipeline.md`,
+  `docs/cloud-architecture.md` — every customer-visible reference
+  to `app.wattpost.io` swapped to `wattpost.cloud`. The 32 hits
+  in the docs tree are mechanical replacements; no behavioural
+  content changed.
+
+### Done with the rebrand
+This is the last code/doc commit in the migration. Future phases:
+- Phase 5: watch heartbeat logs over the next ~week to confirm
+  every paired appliance has hit `wattpost.cloud/api/heartbeat`
+  at least once; then remove the `app.wattpost.io` 308 block from
+  the Caddyfile entirely.
+- No customer-visible cleanup left after that.
+
 ## [0.0.44] — 2026-05-16
 
 ### Changed — Phase 2 of cloud rebrand: app.wattpost.io → wattpost.cloud (#139)

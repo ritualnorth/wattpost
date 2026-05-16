@@ -25,7 +25,7 @@ from .. import __version__ as APPLIANCE_VERSION
 log = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS = 24 * 3600   # 1 day
-DEFAULT_MANIFEST_URL   = "https://app.wattpost.io/api/releases/latest"
+DEFAULT_MANIFEST_URL   = "https://wattpost.cloud/api/releases/latest"
 DEFAULT_CHANGELOG_URL  = "https://releases.wattpost.io/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 

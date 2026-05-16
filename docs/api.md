@@ -1,6 +1,6 @@
 # REST API reference
 
-WattPost exposes a public REST API at `https://app.wattpost.io/api/v1/*` for paid-tier users. Read-only in v1, JSON, bearer-token auth.
+WattPost exposes a public REST API at `https://wattpost.cloud/api/v1/*` for paid-tier users. Read-only in v1, JSON, bearer-token auth.
 
 Use cases:
 
@@ -122,7 +122,7 @@ Max 1000 points per response, 90-day range cap.
 ```bash
 TOKEN=wp_xxx
 curl -sf -H "Authorization: Bearer $TOKEN" \
-  https://app.wattpost.io/api/v1/sites | jq .sites[]
+  https://wattpost.cloud/api/v1/sites | jq .sites[]
 ```
 
 ### Python
@@ -131,7 +131,7 @@ curl -sf -H "Authorization: Bearer $TOKEN" \
 import httpx
 TOKEN = "wp_xxx"
 r = httpx.get(
-    "https://app.wattpost.io/api/v1/sites",
+    "https://wattpost.cloud/api/v1/sites",
     headers={"Authorization": f"Bearer {TOKEN}"},
     timeout=10,
 )
@@ -148,7 +148,7 @@ for s in r.json()["sites"]:
 sensor:
   - platform: rest
     name: rv_soc
-    resource: https://app.wattpost.io/api/v1/sites/42
+    resource: https://wattpost.cloud/api/v1/sites/42
     headers:
       Authorization: Bearer wp_xxx
     value_template: "{{ value_json.latest.soc_pct }}"
@@ -158,11 +158,11 @@ sensor:
 
 ### Grafana
 
-Use the [JSON API datasource](https://grafana.github.io/grafana-json-datasource/) → URL `https://app.wattpost.io/api/v1/sites/42/history` with the bearer token as a custom HTTP header.
+Use the [JSON API datasource](https://grafana.github.io/grafana-json-datasource/) → URL `https://wattpost.cloud/api/v1/sites/42/history` with the bearer token as a custom HTTP header.
 
 ### Google Sheets
 
-`=IMPORTDATA("https://app.wattpost.io/api/v1/sites/42")` doesn't pass auth headers — wrap with [an Apps Script](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app) that adds `Authorization`.
+`=IMPORTDATA("https://wattpost.cloud/api/v1/sites/42")` doesn't pass auth headers — wrap with [an Apps Script](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app) that adds `Authorization`.
 
 ## Coming in v2
 

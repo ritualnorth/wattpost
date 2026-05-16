@@ -48,7 +48,7 @@ Same menu, same option. Generates a fresh random password and signs all existing
 
 ## The cloud-tunnel bypass
 
-Visits arriving through `<slug>.wattpost.io` come from `cloudflared` on the local appliance, which proxies to `localhost:80`. That means the source IP is `127.0.0.1` — kernel-decided, **can't be spoofed** by a LAN client. The middleware trusts loopback. So clicking **Open Site** in `app.wattpost.io` works without prompting for the local password.
+Visits arriving through `<slug>.wattpost.io` come from `cloudflared` on the local appliance, which proxies to `localhost:80`. That means the source IP is `127.0.0.1` — kernel-decided, **can't be spoofed** by a LAN client. The middleware trusts loopback. So clicking **Open Site** in `wattpost.cloud` works without prompting for the local password.
 
 ## Lost the password?
 

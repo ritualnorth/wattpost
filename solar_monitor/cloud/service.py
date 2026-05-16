@@ -66,7 +66,7 @@ class CloudService:
         try:
             # follow_redirects=True so an appliance still pointing at
             # an older hostname (e.g. https://wattpost.io after we
-            # moved the API to app.wattpost.io) succeeds via the 308
+            # moved the API to wattpost.cloud) succeeds via the 308
             # rather than silently 308-ing into a no-op. POST → POST
             # is method-preserving under 308 by spec.
             async with httpx.AsyncClient(

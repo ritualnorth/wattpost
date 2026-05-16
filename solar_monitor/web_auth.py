@@ -7,7 +7,7 @@ table):
   * Source-IP loopback (127.0.0.1 / ::1): trusted. cloudflared on the
     appliance proxies to localhost so any request from the loopback
     came through the authenticated CF tunnel (cloud already authed
-    the user when they signed in to app.wattpost.io). LAN visitors
+    the user when they signed in to wattpost.cloud). LAN visitors
     have non-loopback source IPs and can't spoof loopback — the
     kernel decides which interface a packet came in on.
   * LAN access to write endpoints / `/`: password required.

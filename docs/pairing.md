@@ -1,10 +1,10 @@
 # Pair an appliance
 
-Connect a WattPost Pi to your `app.wattpost.io` account so it appears in the multi-site dashboard, posts heartbeats, and gets a `<slug>.wattpost.io` remote-access URL.
+Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the multi-site dashboard, posts heartbeats, and gets a `<slug>.wattpost.io` remote-access URL.
 
 ## Steps
 
-1. **Sign in** at [app.wattpost.io](https://app.wattpost.io). New users can sign up there too.
+1. **Sign in** at [wattpost.cloud](https://wattpost.cloud). New users can sign up there too.
 2. Click **+ Add appliance** on the dashboard. A short pairing code appears, valid for 10 minutes.
 3. On your Pi's dashboard, go to **Settings → Integrations → WattPost cloud** and paste the code into the pairing field.
 4. Hit **Pair**. Within a few seconds the appliance:
@@ -12,7 +12,7 @@ Connect a WattPost Pi to your `app.wattpost.io` account so it appears in the mul
    - gets assigned a unique slug like `<slug>.wattpost.io`
    - starts a [Cloudflare tunnel](#how-the-tunnel-works) for the remote-access URL
    - posts its first heartbeat
-5. Refresh `app.wattpost.io` — your appliance is there, online.
+5. Refresh `wattpost.cloud` — your appliance is there, online.
 
 ## What pairing actually does
 
@@ -25,7 +25,7 @@ No port-forwarding, no inbound network changes. The tunnel is outbound-only from
 
 ## How the tunnel works
 
-Clicking **Open site →** on a card at `app.wattpost.io`:
+Clicking **Open site →** on a card at `wattpost.cloud`:
 
 1. Browser navigates to `https://<slug>.wattpost.io`
 2. Cloudflare routes the request through the tunnel
