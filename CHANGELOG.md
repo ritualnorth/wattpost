@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.52] — 2026-05-16
+
+### Fixed — 2FA enforcement allowlist locked users out of enrolment
+The require-2FA middleware's allowlist used the wrong path prefix
+(`/api/twofa/` instead of the actual `/api/account/2fa/`), so a
+user flagged `require_2fa=true` who hadn't yet enrolled TOTP would
+get 403'd from the very endpoints needed to enrol — locking them
+out of their own account with no escape hatch. Fixed the prefix +
+added a comment loud enough to prevent a repeat.
+
+### Added — Security events page on /app/account (#144)
+- "Recent security activity" card on the account page renders the
+  last 50 audit events from the API stood up in v0.0.50: sign-ins
+  (success + failure), 2FA changes, password updates, appliance
+  pair/delete, account deletion.
+- Failed sign-ins highlight in amber; each row shows IP +
+  user-agent + timestamp. Friendly event labels + per-category
+  icons. Refreshes after revoke-sessions to confirm the action.
+
+### Added — Audit log wired into the remaining security events
+- `twofa.enrol`, `twofa.disable`, `twofa.backup_codes_regen` from
+  /api/account/2fa/*.
+- `account.delete` recorded before the cascade.
+- `appliance.pair` from the anonymous /api/pair/exchange endpoint
+  (opens its own session, captures IP/UA).
+- `appliance.delete` from /api/sites/{id}.
+
+### Changed — AuditEvent FK now SET NULL not CASCADE
+So account.delete records survive the user row's deletion — admin
+and fraud workflows still get the "when did account X get
+deleted, from where" trail. PII is already gone with the user, so
+no privacy regression.
+
 ## [0.0.51] — 2026-05-16
 
 ### Fixed — rate limiter was bucketing on CF edge IP, not real client
