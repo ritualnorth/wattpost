@@ -30,6 +30,7 @@ from ..storage import Store
 from .setup import (
     ble_status,
     ble_scan,
+    usb_scan,
     add_transport,
     delete_setup_transport,
     list_setup_transports,
@@ -734,6 +735,7 @@ def build_app(
             test_mqtt,
             ble_status,
             ble_scan,
+            usb_scan,
             add_transport,
             delete_setup_transport,
             list_setup_transports,

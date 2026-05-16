@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.14] — 2026-05-16
+
+### Added
+- **Setup wizard now also finds USB-RS485 adapters.** Phase 1 of
+  the unified-wizard work (#120). The "no transports configured"
+  empty state now has two paths: "Bluetooth (e.g. Renogy BT-2)"
+  (existing) and "Wired (USB-RS485 adapter)" (new). The wired
+  path enumerates every `/dev/ttyUSB*` / `/dev/ttyACM*` the host
+  sees, labels each with the chip (FTDI FT232 / WCH CH340 /
+  Prolific PL2303 / Silicon Labs CP210x), and the user picks one
+  with a single tap. Add-transport writes a `serial_modbus` block
+  with sensible defaults (9600 baud, 8N1 — Renogy/Epever standard).
+- **Why this matters**: replacing the BT-2 dongle with a wired
+  USB-RS485 dongle (~£10) gives sub-millisecond round-trips, no
+  BLE timeouts, and proper FC06 ack frames (fixing the silent-ack
+  quirk we hit during #104 de-risk). It also opens the door for
+  customers who don't have line-of-sight BLE to their kit — cabin
+  installs, gear in a metal-roof barn, etc.
+
+### Notes
+- Phase 1B of #120 (Victron / JK BMS pattern-specific forms in
+  the wizard) lands in a follow-up. The current Victron driver
+  (v0.0.13) still needs manual YAML config; #118 tracks that gap.
+- See the wizard's new tooltip: the RJ45 port on chargers is
+  **RS-485, not Ethernet** — Cat5 from there terminates at a
+  USB-RS485 dongle on the Pi, NOT the Pi's network jack.
+
 ## [0.0.13] — 2026-05-16
 
 ### Added

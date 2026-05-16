@@ -355,6 +355,74 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
     }
 
 
+@get("/api/setup/usb_scan")
+async def usb_scan() -> dict[str, Any]:
+    """Enumerate USB serial adapters that could carry Modbus RTU.
+
+    Returns every `/dev/ttyUSB*` and `/dev/ttyACM*` the host can see,
+    along with the chip-level identifiers we can pull from sysfs
+    (vendor + product IDs, chip name) so the unified wizard can show
+    "USB-RS485 adapter · CH340 chip · /dev/ttyUSB0" instead of just
+    a path. The CH340/FT232 chip name is what most customers will
+    recognise from their adapter's product page.
+
+    We don't actively probe Modbus here — that would risk colliding
+    with other software on the bus. The existing `/api/setup/probe`
+    endpoint (slave-ID sweep) does that once the user picks a
+    transport to confirm it talks to real gear.
+    """
+    import glob
+    import os
+
+    out: list[dict[str, Any]] = []
+    for path in sorted(glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*")):
+        rec: dict[str, Any] = {"port": path}
+        leaf = path.rsplit("/", 1)[-1]
+        sys_base = f"/sys/class/tty/{leaf}/device"
+        # Walk up the sysfs chain to find the USB device node — the
+        # immediate `device` symlink is a per-driver wrapper that
+        # doesn't carry idVendor / idProduct, but its grand-parent
+        # (or great-grand-parent for FTDI) does.
+        for hop in range(0, 6):
+            probe = sys_base + ("/.." * hop)
+            try:
+                if os.path.isfile(probe + "/idVendor"):
+                    with open(probe + "/idVendor") as f:
+                        rec["vendor_id"] = f.read().strip()
+                    with open(probe + "/idProduct") as f:
+                        rec["product_id"] = f.read().strip()
+                    for fname in ("manufacturer", "product", "serial"):
+                        try:
+                            with open(f"{probe}/{fname}") as f:
+                                v = f.read().strip()
+                                if v:
+                                    rec[fname] = v
+                        except OSError:
+                            pass
+                    break
+            except OSError:
+                continue
+
+        # Friendly chip label so the UI doesn't need to map VID/PIDs.
+        # These four IDs cover ~95% of consumer USB-RS485 adapters in
+        # the wild — FTDI, WCH (CH340/CH341), Prolific, Silicon Labs.
+        vid = rec.get("vendor_id", "").lower()
+        pid = rec.get("product_id", "").lower()
+        chip = None
+        if vid == "0403":               chip = "FTDI FT232"
+        elif vid == "1a86" and pid == "7523": chip = "WCH CH340"
+        elif vid == "1a86" and pid == "5523": chip = "WCH CH341"
+        elif vid == "067b":             chip = "Prolific PL2303"
+        elif vid == "10c4":             chip = "Silicon Labs CP210x"
+        if chip:
+            rec["chip"] = chip
+
+        out.append(rec)
+
+    log.info("usb_scan: %d adapter(s) found", len(out))
+    return {"adapters": out}
+
+
 def _classify_disappearance(name: str | None) -> str | None:
     """Best-guess explanation for why a previously-seen MAC isn't
     in this scan's results. Renogy BT-2 single-master behaviour is
@@ -374,33 +442,28 @@ def _classify_disappearance(name: str | None) -> str | None:
 
 
 class AddTransportRequest(msgspec.Struct):
-    address: str           # BT MAC of the dongle
+    # BLE Modbus (Renogy BT-2 etc.): provide `address` (MAC).
+    # serial_modbus (USB-RS485 dongle):  provide `port` (e.g. /dev/ttyUSB0)
+    #                                    + optional `baudrate` (defaults to
+    #                                    9600 — Renogy default).
+    # Discriminated by `type` so a single endpoint handles every transport
+    # kind the unified wizard surfaces (#120).
+    address: str | None = None
+    port: str | None = None
+    baudrate: int = 9600
     label: str | None = None
-    type: str = "ble_modbus"   # Renogy BT-2 default; only kind today
+    type: str = "ble_modbus"
 
 
 @post("/api/setup/transports/add")
 async def add_transport(data: AddTransportRequest, state: State) -> dict[str, Any]:
-    """Append a new BLE transport to config.yaml. UI-driven replacement
-    for editing yaml by hand. Daemon restart required for the new
-    transport to start polling — the response carries that flag so
-    the SPA shows the "restart daemon" banner."""
+    """Append a new transport to config.yaml. UI-driven replacement for
+    editing yaml by hand. Supports `ble_modbus` (BLE dongles like
+    Renogy BT-2) and `serial_modbus` (USB-RS485 adapters for wired
+    installs). The unified wizard (#120) sends every transport
+    through this same endpoint regardless of category."""
     config_path: str = state.get("config_path", "config.yaml")
     path = Path(config_path)
-
-    # ---- validation ----
-    mac = (data.address or "").strip().upper()
-    if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
-        raise HTTPException(
-            status_code=400,
-            detail="address must be a Bluetooth MAC (e.g. CC:45:A5:83:B7:42)",
-        )
-    if data.type != "ble_modbus":
-        raise HTTPException(
-            status_code=400,
-            detail=f"unsupported transport type {data.type!r} — only "
-                   f"'ble_modbus' is supported in the UI today",
-        )
 
     # Read current yaml from disk (not the boot-time `state["config"]`)
     # so duplicate detection sees any transports added since boot via
@@ -408,36 +471,87 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     raw = yaml.safe_load(path.read_text()) or {}
     current_transports = raw.get("transports") or []
 
-    # Reject duplicates so we don't end up with two transports racing
-    # for the same BT-2 dongle.
-    for t in current_transports:
-        if (t.get("address") or "").upper() == mac:
+    if data.type == "ble_modbus":
+        mac = (data.address or "").strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
             raise HTTPException(
-                status_code=409,
-                detail=f"address {mac} is already configured as transport "
-                       f"{t.get('id')!r}",
+                status_code=400,
+                detail="address must be a Bluetooth MAC (e.g. CC:45:A5:83:B7:42)",
             )
+        # Reject duplicates so we don't end up with two transports
+        # racing for the same BT-2 dongle.
+        for t in current_transports:
+            if (t.get("address") or "").upper() == mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"address {mac} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        suffix = mac.replace(":", "").lower()[-4:]
+        new_id = f"ble_{suffix[:2]}_{suffix[2:]}"
+        block: dict[str, Any] = {
+            "type":    "ble_modbus",
+            "address": mac,
+        }
+        default_label = f"BLE dongle {mac[-5:]}"
 
-    # Generate a stable id from the MAC suffix. ble_b7_42 is human-
-    # readable when there's more than one dongle on the same site.
-    suffix = mac.replace(":", "").lower()[-4:]
-    new_id = f"ble_{suffix[:2]}_{suffix[2:]}"
-    # Bump if there's a collision (different MAC, same suffix).
+    elif data.type == "serial_modbus":
+        port = (data.port or "").strip()
+        # Tolerant validation: accept any /dev/* path; pyserial will
+        # raise a clearer error than a regex check if the path doesn't
+        # resolve to a real char device. We just block obviously-bad
+        # input like empty strings.
+        if not port or not port.startswith("/dev/"):
+            raise HTTPException(
+                status_code=400,
+                detail="port must be a serial-device path like /dev/ttyUSB0",
+            )
+        baud = int(data.baudrate or 9600)
+        if baud < 1200 or baud > 230400:
+            raise HTTPException(
+                status_code=400,
+                detail="baudrate must be in [1200, 230400]; Renogy/Epever default 9600",
+            )
+        # Dedupe on (port). Two transports holding the same /dev/ttyUSB*
+        # would race on every read.
+        for t in current_transports:
+            if (t.get("port") or "") == port and t.get("type") == "serial_modbus":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"port {port} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        # ID built from the tail of the device path so multiple USB
+        # dongles get distinct, human-readable ids (serial_ttyUSB0).
+        leaf = port.rsplit("/", 1)[-1] or "serial"
+        new_id = f"serial_{leaf}"
+        block = {
+            "type":     "serial_modbus",
+            "port":     port,
+            "baudrate": baud,
+        }
+        default_label = f"USB-RS485 {leaf}"
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported transport type {data.type!r} — wizard "
+                   f"currently supports 'ble_modbus' and 'serial_modbus'",
+        )
+
+    # Bump id if collision (rare — different MAC, same tail).
     existing_ids = {t.get("id") for t in current_transports}
     base = new_id; n = 2
     while new_id in existing_ids:
         new_id = f"{base}_{n}"
         n += 1
 
-    label = (data.label or "").strip() or f"BLE dongle {mac[-5:]}"
+    label = (data.label or "").strip() or default_label
 
     # ---- write ----
-    raw.setdefault("transports", []).append({
-        "id":      new_id,
-        "type":    data.type,
-        "address": mac,
-        "label":   label,
-    })
+    block["id"]    = new_id
+    block["label"] = label
+    raw.setdefault("transports", []).append(block)
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
@@ -472,11 +586,15 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
         tid = tcfg.get("id")
         t = scheduler.get_transport(tid) if tid else None
         client = getattr(t, "_client", None) if t else None
+        # BLE transports expose `address` (MAC); serial transports
+        # expose `port` (/dev/ttyUSB0). The wizard shows whichever is
+        # present so a mixed-transport install reads cleanly.
         out.append({
-            "id": tid,
-            "type": tcfg.get("type"),
+            "id":      tid,
+            "type":    tcfg.get("type"),
             "address": tcfg.get("address"),
-            "open": bool(client and getattr(client, "is_connected", False)),
+            "port":    tcfg.get("port"),
+            "open":    bool(client and getattr(client, "is_connected", False)),
         })
     return {"transports": out}
 
