@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.54] — 2026-05-16
+
+### Added — Staff admin page (#103, MVP)
+New /app/admin (staff-only, returns 404 to non-staff so the page's
+existence isn't leaked). Three tabs:
+
+- **Users** — last 500. Toggles for `require_2fa` and `is_staff`.
+  Critically, this is the in-app escape hatch for a 2FA-enrolment
+  lockout — the only previous fix was SSH + psql (see today's
+  incident). Self-demotion via the UI is refused — has to be done
+  manually to prevent accidental admin-lockout.
+- **Appliances** — last 500 with owner email, online flag (any
+  heartbeat in 15 min), tunnel link. "Is the fleet healthy"
+  eyeballing.
+- **Audit log** — last 200 events across all users, filterable by
+  email / event_type / IP. Failed sign-ins highlight in amber.
+
+All staff-side writes get their own audit entry (`staff.user.patch`)
+recording who changed what on whom, so admin actions on real users
+have a clean trail.
+
+The topbar now reveals an "Admin" link client-side via /api/me
+when the user is staff. Non-staff and anonymous visitors never
+see it.
+
+### Fixed — audit_events FK actually altered in prod (migration 0024)
+v0.0.52 edited the already-applied migration 0023 to flip CASCADE
+→ SET NULL, but that edit had no effect on the production DB.
+Migration 0024 performs the real ALTER so account.delete records
+actually outlive the user row in prod.
+
 ## [0.0.53] — 2026-05-16
 
 ### Fixed — 2FA enforcement could 403 /api/login itself
