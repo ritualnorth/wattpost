@@ -56,13 +56,24 @@ LOAD_REGISTER = 0x010A
 LOAD_ON  = 1
 LOAD_OFF = 0
 
-# Models we know expose a load output. Rover 40A / 60A / 100A all do;
-# the bigger Rover models (200A+) don't have an L terminal and aren't
-# listed here. Match on substring — Renogy's model string format is
-# `RNG-CTRL-RVR40`, `RNG-CTRL-WND10` and so on. Wanderer/Adventurer/
-# Voyager use the same Modbus map for load control.
-_LOAD_BEARING_PREFIXES = ("RNG-CTRL-RVR", "RNG-CTRL-WND",
-                          "RNG-CTRL-ADV", "RNG-CTRL-VNG")
+# Models we know expose a load output. Match on substring — Renogy
+# model strings come in several forms across the product line:
+#   * "RNG-CTRL-RVR40"  — Rover (current standard naming)
+#   * "RNG-CTRL-WND10"  — Wanderer
+#   * "RNG-CTRL-ADV30"  — Adventurer
+#   * "RNG-CTRL-VNG20"  — Voyager (waterproof)
+#   * "RVR40" / "WND10" — Some older firmware drops the RNG-CTRL- prefix
+#
+# Bigger Rovers (200A+) without an L terminal report a model that
+# matches these prefixes too, but flipping their non-existent load
+# register is a no-op rather than dangerous — adapters can still
+# discover an output here and the FC06 write goes nowhere.
+_LOAD_BEARING_PREFIXES = (
+    "RNG-CTRL-RVR", "RNG-CTRL-WND", "RNG-CTRL-ADV", "RNG-CTRL-VNG",
+    # Bare-prefix fallbacks for older firmware that doesn't emit
+    # the full RNG-CTRL- vendor tag.
+    "RVR", "WND", "ADV", "VNG",
+)
 
 
 class RoverLoadAdapter:
