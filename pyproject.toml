@@ -15,7 +15,7 @@ dependencies = [
     "httpx>=0.27",         # ntfy / Discord / generic-webhook alert transports
     "aiosmtplib>=4.0",     # SMTP alert transport
     "argon2-cffi>=23.1",   # local web UI password hash
-    "victron-ble>=0.10",   # Victron SmartShunt + SmartSolar BLE Instant Readout decoder
+    "victron-ble>=0.9",    # Victron SmartShunt + SmartSolar BLE Instant Readout decoder (latest published is 0.9.3)
 ]
 
 [project.scripts]

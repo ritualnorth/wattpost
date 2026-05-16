@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.28] — 2026-05-16
+
+### Fixed
+- **`pyproject.toml` pinned `victron-ble>=0.10`, which PyPI doesn't
+  have** (the latest published version is `0.9.3`). GitHub-hosted
+  runners had been cache-hitting through this since v0.0.13, but
+  the freshly-spun-up self-hosted runners on the VPS resolved deps
+  from scratch and failed the appliance + demo Docker builds.
+  Relaxed to `victron-ble>=0.9`.
+
+### Appliance code unchanged from v0.0.27.
+
 ## [0.0.27] — 2026-05-16
 
 ### Changed
