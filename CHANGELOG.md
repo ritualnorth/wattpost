@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.26] — 2026-05-16
+
+### Changed
+- **Pi-gen SD-image build now runs on our self-hosted Contabo VPS
+  runner**, not the GitHub-hosted shared pool. Eliminates the
+  ~90-minute hit each release was taking on the ritualnorth
+  account's 3000 GH Actions min/mo allowance — pi-gen is now
+  effectively free.
+- **Docker GHCR build + source-tarball publish** stay on GitHub-
+  hosted runners. They're fast (~45 s + ~30 s) so the minutes
+  cost is negligible, and keeping them on GitHub means Docker
+  releases still ship even if the VPS is down.
+- Restored the pi-gen trigger to all `v*` tags (we'd briefly
+  restricted to `v<major>.<minor>.0` only as a minute-saver —
+  no longer needed).
+
+### Appliance code unchanged from v0.0.25.
+
 ## [0.0.25] — 2026-05-16
 
 ### Added — USB GPS support (#125)
