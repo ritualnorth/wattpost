@@ -5746,30 +5746,111 @@ async function wizFindDongle() {
     list.innerHTML = missingHtml + `<div class="wiz-empty">Nothing visible right now. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
     return;
   }
-  // Build a row per discovered device. Renogy hint stays on top
-  // (sorted server-side); each row offers "Use this".
+  // Build a row per discovered device. Detection happens server-side
+  // (manufacturer ID for Victron, name pattern for Renogy/JK); the UI
+  // routes each row to the right add-transport flow.
+  //
+  //   * Renogy BT-2 → "Use this" → wizAddTransportFromMac (ble_modbus)
+  //   * Victron     → "Pair Victron" → expands a key-entry inline form
+  //                                    → wizAddTransportFromVictron
+  //   * JK BMS      → "Pair JK BMS" → wizAddTransportFromJk (placeholder
+  //                                   until #114-wizard support lands)
+  //   * Unknown     → "Use as Modbus" + manual-Y type warning
   list.innerHTML = missingHtml + data.devices.map(d => {
     const nameStr = d.name
       ? `<strong>${escHtml(d.name)}</strong>`
       : `<em class="settings-foot">(no name)</em>`;
     const rssi = d.rssi != null ? `${d.rssi} dBm` : "—";
-    const hint = (d.name || "").toLowerCase().startsWith("bt-th")
-      ? `<span class="wiz-vendor-hint">looks like a Renogy BT-2</span>` : "";
+
+    // Vendor-specific hint badge + action button.
+    const vendor = d.vendor || "unknown";
+    let hintHtml = "";
+    let actionHtml = "";
+    let keyFormHtml = "";
+    if (vendor === "victron") {
+      // The Victron-specific device class (when we could detect it
+      // from the payload header — SmartShunt/SmartSolar/Orion-Tr etc.)
+      // makes the badge richer than just "Victron".
+      const dc = d.victron_device_class || "Victron device";
+      hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">${escHtml(dc)}</span>`;
+      actionHtml = `<button class="btn-action btn-action--primary" data-pair-victron="${escHtml(d.address)}">Pair Victron</button>`;
+      // The key form is rendered hidden and revealed when the user
+      // taps "Pair Victron" — keeps the scan-results card compact.
+      keyFormHtml = `
+        <div class="wiz-victron-key" data-victron-key-for="${escHtml(d.address)}" hidden>
+          <p class="settings-foot">
+            Open VictronConnect on your phone, connect to this device,
+            tap <strong>Product info</strong>, then <strong>Show device
+            key</strong>. Paste it here. The key never leaves your
+            appliance — we store it locally only.
+          </p>
+          <label class="alerts-checkbox" style="display:flex;gap:.5rem;align-items:center">
+            <span class="settings-foot" style="min-width:7rem">Encryption key</span>
+            <input type="password" class="wiz-key-input"
+                   placeholder="32 hex chars" autocomplete="off"
+                   style="flex:1;padding:.3rem .45rem;font-family:var(--mono);font-size:.85rem;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text)"/>
+          </label>
+          <div style="display:flex;gap:.5rem;margin-top:.5rem">
+            <button class="btn-action btn-action--primary" data-victron-save="${escHtml(d.address)}">Save</button>
+            <button class="btn-action" data-victron-cancel="${escHtml(d.address)}">Cancel</button>
+            <span class="wiz-victron-status settings-foot" data-victron-status="${escHtml(d.address)}"></span>
+          </div>
+        </div>`;
+    } else if (vendor === "renogy") {
+      hintHtml = `<span class="wiz-vendor-hint">Renogy BT-2 / BT-1</span>`;
+      actionHtml = `<button class="btn-action btn-action--primary" data-use-mac="${escHtml(d.address)}" data-use-name="${escHtml(d.name || '')}">Use this</button>`;
+    } else if (vendor === "jkbms") {
+      hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">JK BMS</span>`;
+      // JK BMS wizard support isn't built yet (driver shipped in v0.0.21);
+      // surface the device + the manual-config workaround.
+      actionHtml = `<button class="btn-action" disabled title="JK BMS wizard support is on the roadmap. For now, add the transport manually via config.yaml (type: ble_jkbms).">JK BMS — manual config needed</button>`;
+    } else {
+      hintHtml = "";
+      actionHtml = `<button class="btn-action btn-action--primary" data-use-mac="${escHtml(d.address)}" data-use-name="${escHtml(d.name || '')}">Use as Modbus</button>`;
+    }
     return `
       <div class="wiz-result-row">
         <div class="wiz-result-info">
-          ${nameStr} ${hint}
+          ${nameStr} ${hintHtml}
           <div class="settings-foot">${escHtml(d.address)} · ${rssi}</div>
         </div>
-        <button class="btn-action btn-action--primary"
-                data-use-mac="${escHtml(d.address)}"
-                data-use-name="${escHtml(d.name || '')}">
-          Use this
-        </button>
-      </div>`;
+        ${actionHtml}
+      </div>
+      ${keyFormHtml}`;
   }).join("");
+
+  // Renogy / fallback path — unchanged.
   list.querySelectorAll("[data-use-mac]").forEach(b => {
     b.addEventListener("click", () => wizAddTransportFromMac(b.dataset.useMac, b.dataset.useName));
+  });
+  // Victron pairing — show + wire the key-entry form.
+  list.querySelectorAll("[data-pair-victron]").forEach(b => {
+    const mac = b.dataset.pairVictron;
+    b.addEventListener("click", () => {
+      const form = list.querySelector(`[data-victron-key-for="${mac}"]`);
+      if (form) {
+        form.hidden = false;
+        b.disabled = true;
+        form.querySelector(".wiz-key-input")?.focus();
+      }
+    });
+  });
+  list.querySelectorAll("[data-victron-cancel]").forEach(b => {
+    const mac = b.dataset.victronCancel;
+    b.addEventListener("click", () => {
+      const form = list.querySelector(`[data-victron-key-for="${mac}"]`);
+      const pair = list.querySelector(`[data-pair-victron="${mac}"]`);
+      if (form) form.hidden = true;
+      if (pair) pair.disabled = false;
+    });
+  });
+  list.querySelectorAll("[data-victron-save]").forEach(b => {
+    const mac = b.dataset.victronSave;
+    b.addEventListener("click", () => {
+      const form = list.querySelector(`[data-victron-key-for="${mac}"]`);
+      const key  = form?.querySelector(".wiz-key-input")?.value || "";
+      wizAddTransportFromVictron(mac, key);
+    });
   });
 }
 
@@ -5798,6 +5879,37 @@ function renderMissingPanel(missing) {
       </div>
     `).join("")}
   </div>`;
+}
+
+async function wizAddTransportFromVictron(mac, key) {
+  // Per-row status reflects what's happening so the user doesn't
+  // have to hunt for the wiz-find-status global.
+  const status = document.querySelector(`[data-victron-status="${mac}"]`);
+  if (status) status.textContent = "Saving…";
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        type: "ble_victron_advertise",
+        address: mac,
+        encryption_key: key,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    if (status) status.textContent = e.message || String(e);
+    return;
+  }
+  if (status) status.textContent = `Added · ${res.label || res.id}. Polling now.`;
+  // Refresh the transport list so the new Victron row appears.
+  await new Promise(r => setTimeout(r, 1200));
+  await wizLoadTransports();
 }
 
 // USB-RS485 path — same shape as wizFindDongle/wizAddTransportFromMac
