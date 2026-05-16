@@ -1090,7 +1090,41 @@ function renderWeather() {
       ? new Date(w.sunset_ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "—";
     const feels = w.feels_like_c != null ? ` · feels ${Math.round(w.feels_like_c)}°` : "";
     $("#weather-sub").textContent = `Open-Meteo${feels} · refreshed ${fmt.ago(w.fetched_at)}`;
+    renderWeatherHourly(w.hourly);
   });
+}
+
+// "Next few hours" strip — Apple-Weather-style hourly preview at the
+// bottom of the Right-now tile. Each cell: HH:00 label · tiny WMO
+// icon · °C. We always render from the next upcoming hour (drop any
+// slice whose timestamp is already in the past — provider may send
+// the current hour as the first slice, which would duplicate the
+// hero reading).
+function renderWeatherHourly(hourly) {
+  const host = $("#weather-hourly");
+  if (!host) return;
+  if (!Array.isArray(hourly) || hourly.length === 0) {
+    host.hidden = true; host.innerHTML = ""; return;
+  }
+  const nowS = Math.floor(Date.now() / 1000);
+  const cells = hourly
+    .filter(h => h && h.ts > nowS - 1800)   // keep the current hour through ~30 min in
+    .slice(0, 8)
+    .map(h => {
+      const hour = new Date(h.ts * 1000).getHours();
+      const label = `${String(hour).padStart(2, "0")}:00`;
+      const temp  = h.temperature_c == null ? "—" : `${Math.round(h.temperature_c)}°`;
+      const icon  = WMO.iconSvg(h.weather_code, h.is_day);
+      return `
+        <div class="weather-hour">
+          <span class="weather-hour-t">${label}</span>
+          <span class="weather-hour-i" aria-hidden="true">${icon}</span>
+          <span class="weather-hour-v">${temp}</span>
+        </div>`;
+    }).join("");
+  if (!cells) { host.hidden = true; host.innerHTML = ""; return; }
+  host.innerHTML = cells;
+  host.hidden = false;
 }
 
 function windCompass(deg) {
