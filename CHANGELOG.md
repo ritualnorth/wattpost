@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.53] — 2026-05-16
+
+### Fixed — 2FA enforcement could 403 /api/login itself
+Defense-in-depth on top of v0.0.52: auth-transition endpoints
+(/api/login, /api/logout, /api/signup, /api/account/password/forgot,
+/api/account/password/reset and their HTML page counterparts) are
+now always reachable, regardless of `require_2fa` enrolment state.
+
+Previously, a user with `require_2fa=true`, no TOTP enrolled, and
+a stale session cookie would get 403'd on `/api/login` — meaning
+they couldn't even start a fresh login from the same browser to
+escape the loop. Now they always can.
+
 ## [0.0.52] — 2026-05-16
 
 ### Fixed — 2FA enforcement allowlist locked users out of enrolment
