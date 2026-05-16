@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.51] — 2026-05-16
+
+### Fixed — rate limiter was bucketing on CF edge IP, not real client
+Once the middleware actually fired (v0.0.49), smoke-test logs
+showed every login attempt arrived with a different CF edge IP
+(172.68.x.x, 172.69.x.x, 141.101.x.x) because CF rotates which
+edge serves each request. Every request went into a fresh bucket
+→ rate limiter never tripped → bypassable.
+
+Fix: prefer `CF-Connecting-IP` (Cloudflare's authoritative
+real-client header; CF strips it on ingress so it can't be
+forged) over `X-Forwarded-For`. Falls back to XFF for direct
+non-CF hits, then TCP peer.
+
+After this deploys, brute-force from a single attacker IP hits
+the 5-per-minute limit regardless of CF edge distribution.
+
 ## [0.0.50] — 2026-05-16
 
 ### Added — Audit logging for security-relevant events (#144)
