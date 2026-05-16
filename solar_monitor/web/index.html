@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=88" />
+  <link rel="stylesheet" href="/web/styles.css?v=89" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -206,22 +206,41 @@
         <div id="flow" class="flow"></div>
       </section>
 
-      <!-- TODAY -->
-      <section class="panel today-panel">
+      <!-- TODAY -- headline panel: PV-so-far, remaining-forecast curve,
+           sub-stats, and a one-line Tomorrow preview. After sunset (no
+           PV remaining today + tomorrow forecast available) the panel
+           flips: Tomorrow becomes the headline and today demotes to a
+           "final" footer line. -->
+      <section class="panel today-panel" id="today-panel">
         <div class="panel-header today-header">
           <h2>
             <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
             </svg>
-            Today
+            <span id="today-headline">Today</span>
           </h2>
+          <div class="panel-sub" id="today-sub"></div>
         </div>
-        <div class="today-strip" id="today-strip">
-          <div class="today-cell"><span class="meta-k">PV today</span><span class="today-v" id="today-pv">—</span></div>
-          <div class="today-cell"><span class="meta-k">Charged Ah</span><span class="today-v" id="today-charged">—</span></div>
-          <div class="today-cell"><span class="meta-k">Peak today</span><span class="today-v" id="today-peak">—</span></div>
-          <div class="today-cell"><span class="meta-k">Load today</span><span class="today-v" id="today-load">—</span></div>
-          <div class="today-cell"><span class="meta-k">Lifetime</span><span class="today-v" id="today-lifetime">—</span></div>
+        <div class="today-grid">
+          <div class="today-hero">
+            <div class="today-hero-val"><span id="today-pv">—</span></div>
+            <div class="today-hero-cells">
+              <div class="today-cell"><span class="meta-k">Charged</span><span class="today-v" id="today-charged">—</span></div>
+              <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">—</span></div>
+              <div class="today-cell"><span class="meta-k">Load</span><span class="today-v" id="today-load">—</span></div>
+            </div>
+          </div>
+          <div class="today-spark" id="today-spark" aria-hidden="true"></div>
+        </div>
+        <div class="today-tomorrow" id="today-tomorrow" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
+          </svg>
+          <span id="today-tomorrow-text">—</span>
+        </div>
+        <div class="forecast-accuracy" id="forecast-accuracy" hidden>
+          <span class="meta-k">Yesterday</span>
+          <span class="forecast-accuracy-line" id="forecast-accuracy-line">—</span>
         </div>
       </section>
 
@@ -253,30 +272,6 @@
             <div class="weather-cell"><span class="meta-k">Sunrise</span><span class="weather-v" id="weather-sunrise">—</span></div>
             <div class="weather-cell"><span class="meta-k">Sunset</span><span class="weather-v" id="weather-sunset">—</span></div>
           </div>
-        </div>
-      </section>
-
-      <!-- TOMORROW (PV forecast — hidden until first fetch lands) -->
-      <section class="panel tomorrow-panel" id="tomorrow-panel" hidden>
-        <div class="panel-header">
-          <h2>
-            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
-              <path d="M9 13l1.5 2 2-3 2.5 3.5"/>
-            </svg>
-            Tomorrow
-          </h2>
-          <div class="panel-sub" id="tomorrow-sub">—</div>
-        </div>
-        <div class="today-strip" id="tomorrow-strip">
-          <div class="today-cell"><span class="meta-k">Tomorrow</span><span class="today-v" id="tomorrow-kwh">—</span></div>
-          <div class="today-cell"><span class="meta-k">Peak tomorrow</span><span class="today-v" id="tomorrow-peak">—</span></div>
-          <div class="today-cell"><span class="meta-k">Peak at</span><span class="today-v" id="tomorrow-peak-at">—</span></div>
-        </div>
-        <div class="tomorrow-spark" id="tomorrow-spark" aria-hidden="true"></div>
-        <div class="forecast-accuracy" id="forecast-accuracy" hidden>
-          <span class="meta-k">Yesterday</span>
-          <span class="forecast-accuracy-line" id="forecast-accuracy-line">—</span>
         </div>
       </section>
 
@@ -691,6 +686,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=107"></script>
+  <script src="/web/app.js?v=108"></script>
 </body>
 </html>
