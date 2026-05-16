@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.18] — 2026-05-16
+
+### Added
+- **Victron Orion-Tr Smart DC-DC support (read-only).** Trivial
+  follow-up to #112 — reuses the existing `ble_victron_advertise`
+  transport, just registers a new driver under `device_kind: dcdc`.
+  Exposes input voltage, output voltage, charging state (off/bulk/
+  abs/float/etc), charger error, off reason (e.g. ENGINE_SHUTDOWN
+  so the dashboard can show "waiting for ignition"), and model
+  name. Validated end-to-end against the victron-ble library's
+  upstream Orion fixture.
+- Models covered: Orion-Tr Smart 12/12-18, 12/12-30, 12/24-15,
+  24/12-30, 24/24-17. All share the same BLE Instant Readout
+  protocol so a single driver covers the family.
+
+### Deferred
+- **#113 Renogy Smart Shunt 300** — no widely-documented OSS
+  register map exists; shipping a guessed driver risks silently
+  returning wrong values. Deferred until either a customer
+  contributes a Modbus capture, or #129 (anonymous device-discovery
+  telemetry) gives us enough samples to reverse-engineer.
+
 ## [0.0.17] — 2026-05-16
 
 ### Added
