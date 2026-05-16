@@ -8,6 +8,49 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.46] — 2026-05-16
+
+### Security — hardening sprint
+Tier-1 gaps post-rebrand. No customers yet so blast radius is zero,
+but the work needed to land before any do.
+
+- **Per-IP rate limiting** on auth-adjacent POST endpoints. New
+  ASGI middleware (`cloud/wattpost_cloud/rate_limit.py`,
+  in-memory sliding window). Policy table:
+  - `/api/login`, `/api/login/2fa`, `/api/signup`: 5/min/IP
+  - `/api/account/password/forgot`: 3/hour/IP (enumeration)
+  - `/api/account/password/reset`: 5/hour/IP
+  - `/api/pair/exchange`: 10/hour/IP (8-char code brute force)
+  - 429 + Retry-After header on block. Trusts
+    `X-Forwarded-For` from Caddy (everyone else is behind
+    Caddy so can't spoof from the public internet).
+- **`/api/internal/can-access` lockdown**. Caddy's `forward_auth`
+  is the only legitimate caller. Endpoint now:
+  - Rejects with 404 (not 400) on any non-Caddy request, so
+    attackers can't tell the route exists.
+  - Verifies the TCP peer is a private-IP address (10/8, 172/12,
+    192.168/16) — public hits get 404.
+  - Still requires `X-Forwarded-Host` to end in `.wattpost.cloud`
+    so we don't leak ownership info via 401-vs-403 timing.
+- **Security headers on `wattpost.cloud` + `*.wattpost.cloud`** in
+  Caddyfile. HSTS-preload, X-Frame-Options, X-Content-Type-Options,
+  Referrer-Policy, Permissions-Policy. Verified live.
+
+### Verified
+- `curl https://wattpost.cloud/app -I` → headers present
+- `curl https://wattpost.cloud/api/internal/can-access` from public
+  → 404 (was 400 in v0.0.45)
+- Rate limiter live in middleware chain — first 5 logins/min OK,
+  6th gets 429
+
+### What's still on the audit list
+- CSRF tokens on cookie-auth POSTs
+- `sso_secret` column encryption at rest
+- 2FA enforcement option for staff accounts
+- Stripe webhook replay protection audit
+- External uptime monitoring + status page (#140, #141)
+- End-to-end signup → email-verify → pair re-test post-rebrand
+
 ## [0.0.45] — 2026-05-16
 
 ### Changed — Phase 3 of cloud rebrand: appliance side (#139)
