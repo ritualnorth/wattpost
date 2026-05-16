@@ -585,10 +585,37 @@ def kiosk_index() -> File:
 
 
 @get("/login", sync_to_thread=False)
-def login_page() -> File:
+def login_page(request: Request) -> File | Response:
     """Static HTML login form. POSTs to /api/login → cookie + redirect.
-    Served as a file (not a template) so the appliance has no Jinja
-    runtime dep for what's a 60-line page."""
+
+    Special case: when the request reached us via the Cloudflare
+    Tunnel (CF-Ray header present), the password form is a dead
+    end — local-password sessions don't grant tunnel access by
+    design (#137). Serve a different page that explains "sign in
+    via app.wattpost.io and click Open" rather than letting the
+    user fill in a password that issues a session their next click
+    will 401 against."""
+    from .. import web_auth as _wa
+    if _wa.is_tunnel_origin(request.scope):
+        page = _web_dir() / "login-tunnel.html"
+        if page.exists():
+            return File(path=page, media_type="text/html",
+                        content_disposition_type="inline")
+        # Fallback: plain text if the template is missing.
+        return Response(
+            content=(
+                "<!doctype html><meta charset=utf-8>"
+                "<title>Sign in via app.wattpost.io</title>"
+                "<body style=\"font:14px system-ui;max-width:420px;"
+                "margin:6rem auto;padding:0 1rem;color:#cdd6e0\">"
+                "<h1>Direct tunnel access isn't supported</h1>"
+                "<p>Sign in at <a href=\"https://app.wattpost.io\">"
+                "app.wattpost.io</a> and click <b>Open</b> on this "
+                "appliance to access it remotely.</p>"
+                "</body>"
+            ),
+            media_type="text/html",
+        )
     path = _web_dir() / "login.html"
     if not path.exists():
         raise NotFoundException("login.html missing")
@@ -644,8 +671,21 @@ async def do_login(data: dict, request: Request) -> Response:
     """Verify the supplied password, drop a session cookie. Returns
     the URL the caller should redirect to (the `next` query param if
     safe, else `/`). Demo-mode + no-password installs short-circuit
-    above this in the middleware, so we don't have to handle them."""
+    above this in the middleware, so we don't have to handle them.
+
+    Refuses tunnel-origin requests. Local-password sessions aren't
+    valid via tunnel anyway (the middleware rejects them); accepting
+    the password here would issue a useless session and confuse the
+    user. The /login page itself shows a tunnel-specific message
+    when it detects tunnel origin, so this is belt-and-braces."""
     from .. import web_auth as _wa
+    if _wa.is_tunnel_origin(request.scope):
+        return Response(
+            {"ok": False,
+             "detail": "direct tunnel sign-in not supported — "
+                       "use app.wattpost.io and click Open"},
+            status_code=403,
+        )
     pw = (data or {}).get("password") or ""
     if not _wa.verify_password(pw):
         return Response({"ok": False, "detail": "wrong password"}, status_code=401)

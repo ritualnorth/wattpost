@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.41] — 2026-05-16
+
+### Fixed — Tunnel `/login` no longer pretends to work
+- Direct tunnel URL access (e.g. someone bookmarked the tunnel
+  hostname, or shared the link) used to render the LAN password
+  form, accept the user's password, issue a session… that the
+  middleware then rejected for every subsequent tunnel request
+  because the session's origin was `local`, not `sso`. Dead end
+  with no explanation.
+- Tunnel-origin hits to `/login` now serve `login-tunnel.html`:
+  a dedicated page that says "sign in at app.wattpost.io and
+  click Open" with a CTA to the cloud dashboard. No password
+  field on tunnel — there's nothing to fill in.
+- `/api/login` also refuses tunnel-origin POSTs (403) — belt and
+  braces in case a client-side script or a manually-crafted
+  request hits it directly.
+
+### Next
+- Cloud-side broker (#139): instead of the tunnel exposing the
+  appliance dashboard at `<slug>.wattpost.io`, the cloud serves
+  it transparently at `app.wattpost.io/site/{id}/`. User never
+  leaves the cloud session; tunnel hostname is invisible. Multi-
+  day build — HTTP proxy + SSE bridging + appliance shared-secret
+  for defense-in-depth. Issue tracking the design.
+
 ## [0.0.40] — 2026-05-16
 
 ### Added — In-app password reset + Sign in header link
