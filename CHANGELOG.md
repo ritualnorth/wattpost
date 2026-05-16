@@ -8,6 +8,48 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.48] — 2026-05-16
+
+### Fixed — middleware registration (rate-limit was silently ignored)
+v0.0.46 / v0.0.47 registered ASGI middleware in Litestar's
+`middleware=[Cls, Cls]` list, assuming Litestar accepts plain
+ASGI middleware. It doesn't — they were loaded but never invoked
+on actual requests. Caught during smoke test (6 bad logins all
+returned 401 instead of 429 by the 6th). Fix: wrap each in
+`DefineMiddleware(...)`. Now ALL three security middlewares are
+actually in the request chain:
+
+  - RateLimitMiddleware (since v0.0.46) — now actually rate-limiting
+  - CSRFMiddleware (new this release)
+  - TwoFactorEnforcementMiddleware (since v0.0.47) — now actually enforcing
+
+### Added — CSRF protection via custom-header pattern (#142)
+- New `cloud/wattpost_cloud/csrf.py` middleware. Requires
+  `X-Requested-With: WattPost` on every cookie-auth POST / PUT /
+  PATCH / DELETE. Cross-origin form-submits can't set custom
+  headers; cross-origin JS would need CORS preflight (which we
+  don't grant); same-origin frontend always sets the header via
+  the wrapper in `_base.html.jinja`.
+- Allowlist exempts bearer/signature-auth endpoints:
+  `/api/heartbeat`, `/api/billing/webhook`, `/api/v1/*` (public
+  REST API), `/api/pair/exchange`, pre-auth flows (`/api/login`,
+  `/api/signup`, `/api/account/password/{forgot,reset}`), and
+  the internal Caddy-only endpoint.
+- Frontend `fetch()` wrapper in `_base.html.jinja` injects
+  `X-Requested-With: WattPost` on every same-origin request.
+  Cross-origin requests are passed through unchanged so the
+  header doesn't leak to third-party APIs.
+
+### Threat model after this ships
+- Credential stuffing → rate-limited
+- Account enumeration → rate-limited
+- Pair-code brute force → rate-limited
+- Form-based CSRF → blocked by custom-header requirement
+- Cookie-stealing via XSS → mitigated by HttpOnly + SameSite=Lax
+- Staff password leak → 2FA enrolment gate
+- Direct tunnel access (leaked URL) → SSO + broker-auth required
+- Internal endpoint probing → 404'd unless from Caddy
+
 ## [0.0.47] — 2026-05-16
 
 ### Security — 2FA enrolment enforcement for staff accounts
