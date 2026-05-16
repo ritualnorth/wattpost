@@ -283,6 +283,73 @@ body.is-demo #settings-update-apply { display: none !important; }
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
+/* "Sign in" affordance in the header — sits next to the status pill
+ * when there's no local session. Visual weight: pill-style like the
+ * status, but uses the accent blue so it reads as a CTA. */
+.header-signin {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .82rem;
+  color: var(--blue, #6c8ef2);
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--blue, #6c8ef2);
+  text-decoration: none;
+  transition: background 0.15s;
+  margin-left: .5rem;
+}
+.header-signin:hover { background: var(--surface-2); }
+.header-signin svg { width: 14px; height: 14px; }
+@media (max-width: 360px) {
+  .header-signin span { display: none; }
+  .header-signin { padding: .35rem .55rem; }
+}
+/* Rotate-password result panel (Settings → System) */
+.rotate-pw-result {
+  margin-top: .75rem;
+  padding: .8rem;
+  background: var(--bg-2);
+  border: 1px solid var(--amber, #d29922);
+  border-radius: 8px;
+}
+.rotate-pw-label {
+  font-size: .78rem;
+  color: var(--text-3);
+  margin-bottom: .4rem;
+}
+.rotate-pw-code {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 1rem;
+  padding: .35rem .55rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  user-select: all;
+  margin-right: .4rem;
+}
+.rotate-pw-copy {
+  font-size: .78rem;
+  padding: .35rem .65rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rotate-pw-copy:hover { background: var(--surface-2); }
+.rotate-pw-foot {
+  margin-top: .55rem;
+  font-size: .74rem;
+  color: var(--text-3);
+}
+.rotate-pw-foot code {
+  font-family: var(--mono);
+  font-size: .7rem;
+  padding: 0 .25rem;
+  background: var(--surface);
+  border-radius: 3px;
+}
 .status:hover { background: var(--surface-2); }
 .status .dot {
   width: 8px; height: 8px; border-radius: 50%;

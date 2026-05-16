@@ -72,7 +72,7 @@ from .outputs import (
 from .system import (
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
-    release_changelog, appliance_branding,
+    release_changelog, appliance_branding, rotate_web_password,
 )
 
 
@@ -927,6 +927,7 @@ def build_app(
             system_info,
             update_state,
             update_check_now,
+            rotate_web_password,
             update_apply,
             update_log,
             release_changelog,

@@ -8,6 +8,34 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.40] — 2026-05-16
+
+### Added — In-app password reset + Sign in header link
+- **Settings → System → "Rotate web password" button.** One-click
+  password rotation from the dashboard. Generates a ~16-char random
+  password, writes the hash + plaintext mirror, shows the new
+  password once with a Copy button. Closes the gap for Docker
+  users who don't have `wattpost-config` TUI access on the host.
+  Existing browser sessions on OTHER devices stay valid until
+  natural-expiry (30 days) so rotation doesn't sign you out of
+  the tab you're rotating from.
+- **Header "Sign in" pill.** Shown next to the status pill when
+  the user has no local session cookie AND a password is set on
+  the appliance. Jumps to `/login?next=<current-hash>`. Demo mode
+  hides it. Previously the login flow was hidden behind the red
+  "login required" error on attempted writes — now it's a visible
+  affordance the second you load the dashboard.
+
+### API
+- New `POST /api/system/web-password/rotate`. Auth: requires
+  existing session (the standard write-gated path). Returns
+  `{ok: true, password: <new>}` exactly once.
+
+### Coming
+- `wattpost-config` parity for Docker is a bigger lift (web port,
+  reset-to-defaults, log dumps); password reset is the first
+  slice. Track #138 for the rest.
+
 ## [0.0.39] — 2026-05-16
 
 ### Fixed — Settings → Cloud Save was wiping tunnel + SSO state

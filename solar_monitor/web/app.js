@@ -4644,6 +4644,79 @@ const restartBtn = $("#restart-daemon-btn");
 if (restartBtn) {
   restartBtn.addEventListener("click", restartDaemon);
 }
+// Rotate web password — Settings → System → "Rotate web password".
+// Generates a fresh ~16-char random password on the appliance and
+// shows it once. Docker users specifically asked for this — they
+// don't have wattpost-config TUI access on the host. Old hash is
+// replaced atomically; existing sessions on OTHER browsers stay
+// valid until they natural-expire (so you don't sign yourself out
+// of the tab you're rotating from).
+const rotatePwBtn = $("#rotate-pw-btn");
+if (rotatePwBtn) {
+  rotatePwBtn.addEventListener("click", async () => {
+    if (!confirm(
+      "Rotate the local web password?\n\n" +
+      "You'll be shown the new password ONCE. Save it before " +
+      "closing this dialog. Existing browser sessions stay valid " +
+      "until they expire (30 days)."
+    )) return;
+    const out = document.getElementById("rotate-pw-result");
+    rotatePwBtn.disabled = true;
+    try {
+      const r = await fetch("/api/system/web-password/rotate", {
+        method: "POST", credentials: "include",
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(`HTTP ${r.status}: ${t}`);
+      }
+      const j = await r.json();
+      if (out) {
+        out.hidden = false;
+        out.innerHTML = `
+          <div class="rotate-pw-label">New password — save it now:</div>
+          <code class="rotate-pw-code">${j.password.replace(/[<&>]/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[c]))}</code>
+          <button class="rotate-pw-copy" type="button">Copy</button>
+          <div class="rotate-pw-foot">
+            Also written to <code>/etc/wattpost/web-password</code>
+            inside the container (host bind-mount on Docker installs).
+          </div>`;
+        out.querySelector(".rotate-pw-copy")?.addEventListener("click", () => {
+          navigator.clipboard?.writeText(j.password).catch(() => {});
+        });
+      }
+    } catch (e) {
+      alert("Couldn't rotate the password:\n\n" + (e.message || e));
+    } finally {
+      rotatePwBtn.disabled = false;
+    }
+  });
+}
+// Sign-in affordance in the header. Visible when there's no local
+// session cookie (or it's expired) AND the appliance has a password
+// configured. Bumps the user straight to /login with a `next=` hash
+// so they bounce back to whichever page they were on.
+(function wireHeaderSignin() {
+  const link = document.getElementById("header-signin");
+  if (!link) return;
+  // Detect "no session" via the cookie. Local password is set on every
+  // first-boot in 0.0.37+, so we only need to gate on the cookie.
+  const hasSession = document.cookie.split(";").some(c =>
+    c.trim().startsWith("wp_local_session="));
+  if (hasSession) return;
+  // Demo mode: no login needed.
+  if (document.body.classList.contains("is-demo")) return;
+  link.hidden = false;
+  link.addEventListener("click", (e) => {
+    // Preserve the route the user was looking at so /login can
+    // bounce them back to e.g. #/settings.
+    const hash = window.location.hash || "";
+    if (hash) {
+      e.preventDefault();
+      window.location.href = "/login?next=/" + encodeURIComponent(hash);
+    }
+  });
+})();
 const diagRefreshBtn = $("#diag-refresh");
 if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
 
