@@ -692,11 +692,18 @@ function renderHero() {
   // text style so it fits the small grid cell on mobile.
   const bankMetaTile = $("#bank-meta").closest(".hero-stat-val");
   if (bankMetaTile) bankMetaTile.classList.add("is-text");
-  // Use a compact model: just the trailing pack count + abbreviated SKU
+  // Two patterns:
+  //   * Shunt-only install (#115 "no-BMS mode") — there are no
+  //     declared packs, so the count would render "0× SmartShunt 500A"
+  //     which reads as broken. Drop the count when packs=0 and just
+  //     show the model.
+  //   * Standard BMS install — "3× RBT100LFP12S-G1".
   const shortModel = (bank.model || "")
     .replace(/^RBT/, "RBT")
     .replace(/-G\d$/, "");
-  $("#bank-meta").textContent = `${bank.packs}× ${shortModel}`;
+  $("#bank-meta").textContent = bank.packs > 0
+    ? `${bank.packs}× ${shortModel}`
+    : shortModel;
 }
 
 // ---------- POWER FLOW ----------
