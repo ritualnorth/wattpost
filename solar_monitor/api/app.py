@@ -52,6 +52,7 @@ from .weather_admin import (
     get_current_weather, get_weather_config, update_weather_config,
     test_weather_fetch,
 )
+from .gps_admin import get_gps_status
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
     unpair_appliance, trigger_heartbeat,
@@ -726,6 +727,7 @@ def build_app(
             test_forecast_fetch,
             get_forecast_accuracy,
             get_current_weather,
+            get_gps_status,
             get_weather_config,
             update_weather_config,
             test_weather_fetch,

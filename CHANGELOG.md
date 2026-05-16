@@ -8,6 +8,47 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.25] — 2026-05-16
+
+### Added — USB GPS support (#125)
+- **New `gps:` config block** for mobile/van installs. Daemon
+  reads NMEA-0183 from a configured serial port (typically
+  `/dev/ttyACM0` for a USB-CDC receiver like the VK-162 G-Mouse).
+  No external dependency on `gpsd` — pyserial + a minimal RMC
+  decoder in `solar_monitor/gps/nmea.py`.
+- **Significant-move detection** via the haversine distance from
+  the last applied fix. Defaults: >5 km from previous applied
+  fix OR >30 min stale → triggers a one-shot re-fetch of weather
+  + Open-Meteo PV forecast at the new coordinates.
+- **Solcast is intentionally not re-fetched on moves** — it's
+  site-based (see `project_target_customer` in agent memory and
+  the #130 release notes). When GPS is active, switch your
+  forecast provider to `openmeteo` for moving-van support.
+- **In-memory location updates only.** We mutate
+  `config.weather.lat/lon` and (for Open-Meteo) `config.
+  forecast.lat/lon` at runtime; we DON'T rewrite config.yaml on
+  every move (would write hundreds of files a day in a moving
+  van). The original config-file values are the cold-start
+  fallback.
+- **`GET /api/gps` status endpoint** — surfaces `configured`,
+  latest fix, fix age, last-applied lat/lon. Settings UI panel
+  will land in a follow-up commit; for now enable by adding a
+  `gps:` block to config.yaml and restarting the daemon.
+
+### Configuration example
+    gps:
+      port: /dev/ttyACM0
+      baudrate: 9600           # default; usually fine for u-blox
+
+### Notes
+- VK-162 G-Mouse (£8 puck w/ magnetic base, 1 m USB cable) is the
+  recommended receiver — better satellite reception than a USB
+  stick because the puck can sit on the van roof.
+- Wizard support (the "GPS support coming soon" button currently
+  shown after USB-scan detects an NMEA-emitting device) will be
+  wired in a follow-up once a customer has end-to-end-tested the
+  serial → fix → re-fetch path with real hardware.
+
 ## [0.0.24] — 2026-05-16
 
 ### Added — Output schedules (Phase B of #104)
