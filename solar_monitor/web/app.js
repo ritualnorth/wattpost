@@ -5798,7 +5798,25 @@ function wireDeviceDetailChart(dev) {
         axes: [
           { stroke: pal.axis, grid: { stroke: pal.grid } },
           { stroke: pal.axis, grid: { stroke: pal.grid },
-            values: (_u, splits) => splits.map(v => v == null ? "" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`) },
+            // Wider left margin so multi-digit values like "15.0 A"
+            // don't get their leading digit clipped by uPlot's default
+            // axis allotment (~40 px, fits "0.00 A" but truncates
+            // "10.00 A" → looks like "0.00 A"; "15.00 A" → looks
+            // like "5.00 A"). 60 px holds up to "999.9 W".
+            size: 60,
+            // Adaptive precision: integers for values ≥ 10, one
+            // decimal for small values. Drops the perma-".00 A" tail
+            // that wasn't useful and was making labels overflow on
+            // narrow screens.
+            values: (_u, splits) => splits.map(v => {
+              if (v == null) return "";
+              const n = +v;
+              const abs = Math.abs(n);
+              const txt = abs >= 100 ? n.toFixed(0)
+                        : abs >= 10  ? n.toFixed(1)
+                        :              n.toFixed(2);
+              return unit ? `${txt} ${unit}` : txt;
+            }) },
         ],
       }, [data.ts, data.values], host);
     } catch (e) { console.error(e); }
