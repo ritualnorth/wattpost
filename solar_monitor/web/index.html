@@ -87,11 +87,12 @@
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
     </button>
-    {# Sign-in / sign-out lived here briefly but moved inside Settings
-       (the only place you actually need them) — clicking Settings on
-       an unauthed session bounces to /login automatically, so the
-       header button was redundant noise. Sign-out now lives inside
-       Settings → System. #}
+    <!-- Sign-in / sign-out lived here briefly but moved inside Settings
+         (the only place you actually need them) — clicking Settings on
+         an unauthed session bounces to /login automatically, so the
+         header button was redundant noise. Sign-out now lives inside
+         Settings → System. -->
+
 
     <!-- Status legend popover — opens when the pill is tapped. -->
     <div id="status-legend" class="status-legend" hidden>
@@ -784,6 +785,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=130"></script>
+  <script src="/web/app.js?v=131"></script>
 </body>
 </html>
