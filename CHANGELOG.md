@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.94] — 2026-05-17
+
+### Fixed — Restore now preserves the appliance's pairing
+Before this fix, restoring a backup taken on a different install
+(the actual rescue scenario — SD card died, fresh box paired to
+same account, restore the old DB) would clobber the fresh pair's
+`cloud.bearer_token`, `cloud.sso_secret`, `cloud.tunnel_*` etc.
+with the dead appliance's. Result: 401 on next heartbeat, SSO
+redirects fail, CF tunnel is wired to the wrong tunnel id.
+
+`_stage_and_swap` now reads the live `cloud:` block from the
+current config.yaml BEFORE applying the swap and re-injects it
+on top of the restored config. Same-appliance rollback is
+unaffected (the preserved values match what was in the backup
+anyway). The local-UI password files are also no longer
+overwritten when one already exists on disk — operator's
+current password on the fresh box wins over an old one they may
+not remember.
+
+### Tracked
+Three new backlog items for the cloud-side backup story:
+  - #164 Cloud UI: backups view on appliance detail page
+  - #165 Cloud UI: "Take backup now" button (queues backup_now
+    ApplianceCommand)
+  - #166 Cloud UI: "Restore from cloud" for fresh-appliance
+    rescue (queues restore_from_cloud:{id} ApplianceCommand)
+
 ## [0.0.93] — 2026-05-17
 
 ### Fixed — Cloud-upload toggle ignored tier

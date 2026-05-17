@@ -221,8 +221,36 @@ def _stage_and_swap(
     Order: write all `.new` siblings first; then swap each over its
     target. If a write fails, no target is touched.
 
+    Pairing-preserve: the live cloud block (bearer_token, sso_secret,
+    tunnel_*, appliance_id) is read BEFORE the swap and re-injected
+    into the restored YAML. Restoring a backup taken on a previous
+    install would otherwise clobber the fresh pair's tokens with
+    the dead appliance's, breaking heartbeat, SSO, and the CF
+    tunnel route. Same-appliance rollback is unaffected (the
+    preserved values match what was in the backup anyway).
+
+    The web-password files are *not* overwritten when the target
+    already exists — operator's current password on the fresh
+    install wins over whatever was in the backup, for the same
+    reason: shouldn't have to know the old password to use the
+    fresh box.
+
     Returns a dict describing what was written."""
-    summary: dict[str, Any] = {"files": []}
+    import yaml as _yaml
+    summary: dict[str, Any] = {"files": [], "preserved_pairing": False}
+
+    # Read current cloud block + flag whether a password file is
+    # already in place. Done up-front so we can apply both decisions
+    # while reading the tar.
+    preserved_cloud: dict | None = None
+    if config_target.is_file():
+        try:
+            raw_cur = _yaml.safe_load(config_target.read_text()) or {}
+            preserved_cloud = raw_cur.get("cloud")
+        except Exception:
+            log.exception("could not read current config for pairing-preserve")
+    existing_pw_hash = WEB_PASSWORD_HASH_PATH.is_file()
+    existing_pw_plain = WEB_PASSWORD_PLAIN_PATH.is_file()
 
     db_new = db_target.with_name(db_target.name + ".restoring")
     cfg_new = config_target.with_name(config_target.name + ".restoring")
@@ -250,15 +278,40 @@ def _stage_and_swap(
                 f = tar.extractfile(member)
                 if f is None:
                     continue
-                cfg_new.write_bytes(f.read())
+                raw_bytes = f.read()
+                if preserved_cloud is not None:
+                    try:
+                        raw_restored = _yaml.safe_load(raw_bytes) or {}
+                        raw_restored["cloud"] = preserved_cloud
+                        cfg_new.write_text(
+                            _yaml.safe_dump(raw_restored, sort_keys=False)
+                        )
+                        summary["preserved_pairing"] = True
+                    except Exception:
+                        # Pair-preserve failed — fall back to wholesale
+                        # replace so the operator at least gets their
+                        # DB back. They'll need to re-pair.
+                        log.exception(
+                            "pairing-preserve failed; restoring config.yaml as-is"
+                        )
+                        cfg_new.write_bytes(raw_bytes)
+                else:
+                    cfg_new.write_bytes(raw_bytes)
                 have_cfg = True
             elif member.name == "config/web-password.hash":
+                # Preserve existing — operator's current password on the
+                # fresh install shouldn't get clobbered by an old one
+                # they may not remember.
+                if existing_pw_hash:
+                    continue
                 f = tar.extractfile(member)
                 if f is None:
                     continue
                 pw_hash_new.write_bytes(f.read())
                 have_pw_hash = True
             elif member.name == "config/web-password":
+                if existing_pw_plain:
+                    continue
                 f = tar.extractfile(member)
                 if f is None:
                     continue
