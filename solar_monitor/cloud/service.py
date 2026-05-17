@@ -310,17 +310,22 @@ class CloudService:
                 ))
                 tot = await store.today_aggregate(midnight, now)
                 # Round to whole Wh — the cloud renders in kWh anyway.
-                # Ship `sources_today_wh` (PV + AC charger + DC-DC) so
-                # the cloud "Today in" tile reflects everything that
-                # fed the bus, not just PV. Multi-source installs
-                # (Victron Blue Smart, DC-DC alternator) were silently
-                # under-reported here — cloud showed PV only and made
-                # the AC charger's contribution invisible. Keep
-                # `pv_today_wh` for backwards compat with older
-                # cloud builds that only know that field.
-                extras["pv_today_wh"]      = int(tot.get("pv_today_wh") or 0)
-                extras["sources_today_wh"] = int(tot.get("sources_today_wh") or 0)
-                extras["load_today_wh"]    = int(tot.get("load_today_wh") or 0)
+                # `sources_today_wh` = PV + AC charger + DC-DC (the
+                # headline "Today in" the cloud shows). Keep
+                # `pv_today_wh` for backwards compat with older cloud
+                # builds. The per-source breakdown lets the card show
+                # "1.7 PV + 0.9 AC" rather than a single lump, which
+                # is the difference between "great solar day" and
+                # "mostly grid-fed". `bank_net_today_wh` powers the
+                # "Stored today" headline the user actually cares
+                # about (in − out, signed: positive = bank gained,
+                # negative = bank depleted today).
+                extras["pv_today_wh"]         = int(tot.get("pv_today_wh") or 0)
+                extras["ac_charger_today_wh"] = int(tot.get("ac_charger_today_wh") or 0)
+                extras["dcdc_today_wh"]       = int(tot.get("dcdc_today_wh") or 0)
+                extras["sources_today_wh"]    = int(tot.get("sources_today_wh") or 0)
+                extras["load_today_wh"]       = int(tot.get("load_today_wh") or 0)
+                extras["bank_net_today_wh"]   = int(tot.get("bank_net_today_wh") or 0)
         except Exception:
             log.warning("cloud heartbeat: today_aggregate read failed",
                         exc_info=True)

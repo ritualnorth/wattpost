@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.97] — 2026-05-17
+
+### Added — Cloud dashboard: "Stored today" + per-source breakdown
+Two follow-ons to v0.0.96's sources_today_wh fix, both surfacing
+information the appliance already had but the cloud didn't show:
+
+1. **Stored today** — new third cell on each per-site card and on
+   the fleet summary strip. Signed: `↑ +1.84 kWh` (bank gained
+   today) or `↓ 0.5 kWh` (bank depleted). The "did my system win
+   today?" headline you previously had to compute by subtracting
+   in − out. Powered by `bank_net_today_wh` from the appliance's
+   today_aggregate; for legacy appliances the per-site card falls
+   back to (in − out), the fleet aggregate suppresses the cell
+   entirely to avoid misleading zeros.
+
+2. **Source mix subline** — Today in now shows a small grey
+   second line like "1.7 PV · 0.9 AC" when more than one source
+   contributed today. PV-only installs are unchanged. Tells you
+   at a glance whether solar or mains topped you up — the
+   difference between a great solar day and a quiet one carried
+   by the AC charger.
+
+Three new heartbeat extras fields ship from the appliance:
+  - `ac_charger_today_wh`
+  - `dcdc_today_wh`
+  - `bank_net_today_wh`
+
+(`pv_today_wh` and `load_today_wh` are unchanged; everything is
+backwards-compatible with older cloud builds.)
+
 ## [0.0.96] — 2026-05-17
 
 ### Fixed — Cloud "Today in" silently excluded AC charger + DC-DC contributions
