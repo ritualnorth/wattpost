@@ -78,6 +78,7 @@ from .system import (
 from .backup import (
     export_backup, import_backup,
     backup_schedule, backup_run_now, backup_download_one, backup_delete_one,
+    backup_cloud_list, backup_cloud_restore,
 )
 from ..backup import BackupService
 
@@ -864,8 +865,24 @@ def build_app(
         # in api/backup.py work whether or not this service is running.
         from ..config import BackupCfg
         backup_cfg = config.backup or BackupCfg()
+        # If cloud_upload is on AND the appliance is paired, wire the
+        # uploader hook. Cloud-side enforces the Pro/Installer tier
+        # gate; we just send and surface the response (incl. 402) on
+        # the BackupService for the Settings UI to render.
+        uploader = None
+        if (backup_cfg.cloud_upload
+                and config.cloud is not None
+                and config.cloud.bearer_token
+                and config.cloud.endpoint):
+            from ..backup.cloud_uploader import make_uploader
+            uploader = make_uploader(
+                config.cloud.endpoint,
+                config.cloud.bearer_token,
+                backup_cfg.cloud_keep_count,
+            )
         backup_svc = BackupService(
             backup_cfg, Path(db_path), Path(config_path),
+            cloud_uploader=uploader,
         )
         await backup_svc.start()
         app.state["backup_service"] = backup_svc
@@ -1124,6 +1141,8 @@ def build_app(
             backup_run_now,
             backup_download_one,
             backup_delete_one,
+            backup_cloud_list,
+            backup_cloud_restore,
             battery_health,
             runtime_forecast,
             load_heatmap,

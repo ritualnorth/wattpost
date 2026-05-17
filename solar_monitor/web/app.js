@@ -2987,6 +2987,7 @@ function renderSettings() {
   wireBackupRestore();
   refreshBackupSchedule();
   wireBackupRunNow();
+  refreshCloudBackups();
 }
 
 // One-shot wireup for the Backup & restore block. Idempotent (settings
@@ -3140,6 +3141,89 @@ function wireBackupRunNow() {
     } finally {
       btn.disabled = false;
     }
+  });
+}
+
+async function refreshCloudBackups() {
+  const list = document.getElementById("backup-cloud-list");
+  const summary = document.getElementById("backup-cloud-summary");
+  if (!list) return;
+  let data;
+  try {
+    const r = await fetch(_withKiosk("/api/system/backup/cloud-list"), { cache: "no-store" });
+    if (r.status === 503) {
+      list.innerHTML = `<div class="settings-empty">Not paired or cloud upload disabled.</div>`;
+      return;
+    }
+    if (!r.ok) {
+      let detail = r.statusText;
+      try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
+      list.innerHTML = `<div class="settings-empty" style="color:#f87171">${detail}</div>`;
+      return;
+    }
+    data = await r.json();
+  } catch (e) {
+    list.innerHTML = `<div class="settings-empty" style="color:#f87171">${e.message}</div>`;
+    return;
+  }
+  if (summary && data.backups && data.backups.length > 0) {
+    summary.innerHTML =
+      `Off-site copies stored on wattpost.cloud. ${data.backups.length} backup(s) on file.`;
+  }
+  if (!data.backups || !data.backups.length) {
+    list.innerHTML = `<div class="settings-empty">No cloud backups yet. Next snapshot will push automatically.</div>`;
+    return;
+  }
+  list.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+      <thead><tr style="text-align:left;opacity:.7">
+        <th style="padding:.3rem 0">Name</th>
+        <th style="padding:.3rem 0">Size</th>
+        <th style="padding:.3rem 0">Uploaded</th>
+        <th style="padding:.3rem 0">From</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${data.backups.map(b => {
+          const sizeMb = (b.size_bytes / (1024 * 1024)).toFixed(1);
+          const uploaded = b.uploaded_at ? fmt.ago(new Date(b.uploaded_at).getTime() / 1000) : "—";
+          return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
+            <td style="padding:.35rem .4rem .35rem 0"><code>${b.filename}</code></td>
+            <td style="padding:.35rem .4rem .35rem 0">${sizeMb} MB</td>
+            <td style="padding:.35rem .4rem .35rem 0">${uploaded}</td>
+            <td style="padding:.35rem .4rem .35rem 0">${b.manifest_version || "—"}</td>
+            <td style="padding:.35rem 0;text-align:right">
+              <button class="btn-action" style="padding:.15rem .5rem" type="button"
+                      data-cloud-restore="${b.id}" data-cloud-name="${b.filename}">Restore</button>
+            </td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+  list.querySelectorAll("[data-cloud-restore]").forEach(b => {
+    b.addEventListener("click", async () => {
+      const id = b.dataset.cloudRestore;
+      const name = b.dataset.cloudName;
+      if (!window.confirm(
+        `Restore ${name} from wattpost.cloud?\n\n` +
+        "This will OVERWRITE the current database, config, and " +
+        "local-UI password, then restart the daemon."
+      )) return;
+      b.disabled = true; b.textContent = "Downloading…";
+      try {
+        const r = await fetch(_withKiosk(`/api/system/backup/cloud-restore/${id}`), { method: "POST" });
+        if (!r.ok) {
+          let detail = r.statusText;
+          try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
+          throw new Error(`${r.status} ${detail}`);
+        }
+        b.textContent = "Daemon restarting…";
+        setTimeout(pollUntilHealthyThenReload, 1500);
+      } catch (e) {
+        window.alert("Cloud restore failed: " + e.message);
+        b.disabled = false; b.textContent = "Restore";
+      }
+    });
   });
 }
 
