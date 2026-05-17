@@ -8,6 +8,43 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.98] — 2026-05-17
+
+### Added — Cloud dashboard cards: SoC envelope, ETA, charger pill, forecast
+Five small data surfaces I previously had on the deferred list,
+shipped together:
+
+1. **Today's SoC envelope** — small grey subline under the SoC cell:
+   "today: 65.2 – 70.1%". Answers "did the bank get critically low
+   overnight?" without opening History.
+2. **Time-to-empty / time-to-full** — subline under Net now:
+   `~ 8h 20m to empty` when discharging, `~ 3h 15m to full` when
+   charging. Powered by the same rolling-hour load average as the
+   local /api/runtime_forecast so the two are consistent. Hidden
+   when bank is idle (-5 .. +5 W).
+3. **Charger state pill** — coloured chip in the card head: orange
+   `bulk`, yellow `absorption`, green `float`, red `equalize`, grey
+   `storage`. Tells you whether the system is actively pushing or
+   just trickling.
+4. **Tomorrow's PV forecast** — already shipped in extras, already
+   rendered when present; no UI change required (rendered as
+   "Tomorrow X.X kWh" in the existing weather row once Solcast or
+   Open-Meteo forecast is available).
+5. **Active alerts** — already rendered as a chip when alert_count
+   > 0; no change.
+
+Three new heartbeat extras fields ship from the appliance:
+  - `soc_min_today_pct`
+  - `soc_max_today_pct`
+  - `time_to_empty_min` (when discharging > 5 W)
+  - `time_to_full_min`  (when charging > 5 W)
+  - `charger_state`     (first device that reports one — typically
+    the MPPT or AC charger)
+
+New `Store.bank_soc_minmax(since, until)` to power the envelope.
+All backwards compatible — older cloud builds ignore the new
+fields, older appliances just hide the new UI bits.
+
 ## [0.0.97] — 2026-05-17
 
 ### Added — Cloud dashboard: "Stored today" + per-source breakdown
