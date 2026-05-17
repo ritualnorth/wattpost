@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.69] — 2026-05-17
+
+### Fixed — Battery health panel was rendering empty (route never registered)
+The `/api/battery-health` handler existed in api/app.py since #109
+shipped, but I never added it to the Litestar `route_handlers`
+list. Result: panel-battery-health on the dashboard called it,
+got 404, JS gracefully fell back to "—" placeholders, panel
+looked permanently broken. Added the registration; cycles +
+lifetime + window cycles + SoC residency histogram now populate
+from the BMS + heartbeat history.
+
+
+
 ## [0.0.64] — 2026-05-17
 
 ### Changed — Removed Sign In / Sign Out buttons from appliance header

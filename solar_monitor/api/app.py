@@ -1046,6 +1046,7 @@ def build_app(
             device_history_csv,
             device_lifetime,
             device_efficiency,
+            battery_health,
             load_heatmap,
             stream,
             list_alerts,
