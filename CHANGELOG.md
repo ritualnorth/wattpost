@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.87] — 2026-05-17
+
+### Fixed — Victron AC charger device page rendering
+- Header showed `slave null` for BLE-only devices (no Modbus slave).
+  Hide the slave segment when `slave_id` is unset.
+- The "?" question-mark icon next to the device title now resolves
+  to a proper glyph for `ac_charger`, `dcdc`, `dcdc_xs`, `bms`,
+  and `load_disconnect` kinds (KIND_ICON entries were missing).
+- Hide the AC INPUT and TEMP cells when the BLE advertisement
+  doesn't carry those fields (Blue Smart IP22 doesn't report AC
+  input current or temperature) — they were rendering as bare
+  "— A" / "— °C" rows.
+- Hide the ERROR cell when `charger_error` is `"NO_ERROR"`
+  (case-insensitive — Victron returns it uppercase, the old check
+  only matched lowercase).
+
 ## [0.0.86] — 2026-05-17
 
 ### Fixed — Hard refresh on a #/device/<label> page lost the device
