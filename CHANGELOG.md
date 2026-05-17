@@ -8,6 +8,61 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-05-17
+
+### Milestone release — what shipped today
+
+A long single-day burst rolled together as the first 0.1
+milestone. No new code beyond the v0.0.99 tag; this is a
+version-only bump to round-trip past 0.0.99 cleanly without
+the awkward 0.0.100. The patch-tag chain below is the summary.
+
+**Local appliance**
+- Charger value-add stats on the device-detail page: lifetime
+  kWh delivered, today active, 24h charging-state ribbon
+  (v0.0.85)
+- Device-detail page recovers from a hard refresh that races
+  the first snapshot (v0.0.86)
+- Victron AC charger detail page: friendly icon, no `slave null`,
+  hide empty fields, NO_ERROR case-insensitive (v0.0.87)
+- Rename devices from the UI (display-name override; original
+  label stays as the immutable storage key) (v0.0.88)
+- One-click backup &amp; restore on Settings — full SQLite +
+  config + password tarball (v0.0.89)
+- Weekly local rotating snapshots (default-on; keep last 4)
+  (v0.0.90)
+- Cloud backup upload + restore — Pro/Installer tier only
+  (v0.0.91), with UI fixes to stop letting customers enable
+  it without paying (v0.0.92, v0.0.93) and a pairing-preserve
+  fix so restore-from-cloud on a fresh box doesn't clobber
+  the new pair's tokens (v0.0.94)
+- Kiosk Exit button no longer breaks out of the broker view
+  into full chrome (v0.0.95)
+- Today tile gains Stored + SoC envelope cells (v0.0.99)
+
+**Cloud SaaS (wattpost.cloud)**
+- "Today in" now counts AC charger + DC-DC contributions, not
+  just PV (v0.0.96)
+- Per-site cards gain Stored cell + per-source breakdown
+  ("1.7 PV · 0.9 AC") (v0.0.97)
+- Per-site cards gain SoC envelope subline, time-to-empty /
+  time-to-full ETA, charger-state pill (v0.0.98)
+- Rules page: layout tidy + 6 starter templates as one-click
+  chips (also v0.0.97 ship)
+
+**Cloud-side filed for next session**
+- #164 Backups view on appliance detail page
+- #165 "Take backup now" from cloud
+- #166 "Restore from cloud" rescue flow
+
+**Infrastructure**
+- CI concurrency on all tag-fired workflows so back-to-back
+  tags coalesce cleanly — no more pi-gen container collisions
+  and the stream of failure emails that came with them
+- Stuck `pigen-builder` Docker container cleared from the
+  self-hosted runner; v0.0.94 was the first run to pick up
+  the fix
+
 ## [0.0.99] — 2026-05-17
 
 ### Added — Appliance Today tile: Stored + SoC envelope
