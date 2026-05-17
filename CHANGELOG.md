@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.58] — 2026-05-17
+
+### Changed — Settings / Setup tabs require sign-in (UX gate)
+The previous READONLY_PUBLIC model lets GET requests through on
+LAN without a session and gates only mutations. That worked but
+landed users in a confusing state: tap Settings → page renders →
+click Save → 401 → no signal of what went wrong.
+
+New model: Settings + Setup tabs are gated client-side. Tapping
+either when not signed in redirects to /login?next=<route> and
+bounces back after auth. Dashboard / history / devices / docs /
+kiosk are still anonymous-readable on LAN — kiosk-on-wall
+deployments and family-on-WiFi viewing still work without a
+password.
+
+This is a UX guard, not a new security boundary. The server-side
+mutation gate (POST/PATCH/DELETE → session required) remains.
+
+app.js v=127, CACHE_VERSION bumped.
+
 ## [0.0.57] — 2026-05-17
 
 ### Added — Sign Out button in the appliance header
