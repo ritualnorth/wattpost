@@ -85,6 +85,95 @@ async def auth_status(request) -> dict[str, Any]:  # type: ignore[no-untyped-def
     }
 
 
+_SECRET_KEYS = {
+    "bearer_token", "tunnel_token", "sso_secret",
+    "api_key", "secret", "password", "smtp_password",
+    "vapid_private_key",
+}
+
+
+def _redact(obj: Any, depth: int = 0) -> Any:
+    """Walk a nested dict/list and replace any value whose KEY looks
+    sensitive with `"<redacted>"`. Used to scrub the config blob
+    before it's bundled into a diagnostics download.
+
+    Conservative: false-positives (over-redacting) are fine here;
+    false-negatives (leaking a token in a support ticket) are not."""
+    if depth > 20:
+        return obj  # recursion guard against pathological configs
+    if isinstance(obj, dict):
+        return {
+            k: ("<redacted>" if k in _SECRET_KEYS else _redact(v, depth + 1))
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact(x, depth + 1) for x in obj]
+    return obj
+
+
+@get("/api/system/diagnostics")
+async def diagnostics_bundle(state: State) -> Response:
+    """Single-shot diagnostics bundle for support tickets. Returns a
+    JSON document combining version + platform + redacted config +
+    recent log lines + a transport/device summary, with a
+    Content-Disposition that prompts a download.
+
+    All secrets are scrubbed via `_redact`. The user can attach the
+    resulting file to a support email without revealing tokens.
+
+    Works identically on Pi and Docker — no journalctl / docker-logs
+    dependency. The in-memory LOG_RING (solar_monitor.diagnostics)
+    keeps the last ~500 lines across both deployment shapes.
+    """
+    from datetime import datetime, timezone
+    from .. import __version__, diagnostics as _diag
+    settings = state["settings"] if "settings" in state else None
+    config = state.get("config") if hasattr(state, "get") else state["config"]
+    cfg_raw = config.to_dict() if hasattr(config, "to_dict") else {}
+    # Fall back to a manual dict-ification for msgspec.Struct configs
+    # that don't expose to_dict.
+    if not cfg_raw:
+        try:
+            import msgspec
+            cfg_raw = msgspec.to_builtins(config)
+        except Exception:
+            cfg_raw = {}
+    transports = getattr(config, "transports", None) or []
+    devices    = getattr(config, "devices",    None) or []
+    scheduler  = state.get("scheduler") if hasattr(state, "get") else state["scheduler"]
+    last_result = getattr(scheduler, "last_result", None) if scheduler else None
+    bundle = {
+        "generated_at":   datetime.now(timezone.utc).isoformat(),
+        "version":        __version__,
+        "deployment":     os.environ.get("WATTPOST_DEPLOYMENT", "pi"),
+        "demo":           os.environ.get("WATTPOST_DEMO") == "1",
+        "platform":       platform.platform(terse=True),
+        "python":         ".".join(map(str, sys.version_info[:3])),
+        "uptime_seconds": _proc_uptime_seconds(),
+        "disk":           _disk_usage("/"),
+        "config":         _redact(cfg_raw),
+        "transport_count": len(transports),
+        "device_count":   len(devices),
+        "last_poll": {
+            "completed_at": (
+                last_result.get("completed_at").isoformat()
+                if last_result and hasattr(last_result.get("completed_at"), "isoformat")
+                else None
+            ) if last_result else None,
+            "errors":   (last_result.get("errors") or []) if last_result else [],
+            "device_count": len(last_result.get("devices") or []) if last_result else 0,
+        },
+        "log_tail":       _diag.LOG_RING.lines(),
+    }
+    body = json.dumps(bundle, indent=2, default=str)
+    fname = f"wattpost-diagnostics-{__version__}-{int(time.time())}.json"
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @get("/api/system/info")
 async def system_info() -> dict[str, Any]:
     """One-shot system status payload for Settings → About."""

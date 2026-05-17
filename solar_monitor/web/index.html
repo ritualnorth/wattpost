@@ -692,6 +692,11 @@
               <label class="alerts-checkbox">
                 <input type="checkbox" id="diag-autoscroll" checked /> Follow tail
               </label>
+              <a id="diag-download" class="alerts-add-btn" href="/api/system/diagnostics"
+                 download
+                 title="Download a single JSON bundle (version, redacted config, recent logs, scheduler state) suitable for attaching to a support ticket.">
+                Download bundle
+              </a>
               <span class="settings-foot" id="diag-meta">—</span>
             </div>
             <pre id="diag-log" class="diag-log">Loading…</pre>

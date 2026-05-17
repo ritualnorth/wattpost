@@ -70,7 +70,7 @@ from .outputs import (
     delete_output_schedule,
 )
 from .system import (
-    auth_status,
+    auth_status, diagnostics_bundle,
     system_info, tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
@@ -994,6 +994,7 @@ def build_app(
             system_logs,
             system_info,
             auth_status,
+            diagnostics_bundle,
             update_state,
             update_check_now,
             rotate_web_password,
