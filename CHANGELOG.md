@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.59] — 2026-05-17
+
+### Fixed — CRITICAL: appliance crash-loop on startup (v0.0.56–v0.0.58)
+The auth_status handler I added in v0.0.56 declared `async def
+auth_status(request)` without a type annotation. Litestar's
+signature scanner refuses to start the app when a route parameter
+lacks a type — every container running :latest after v0.0.56 has
+been crash-looping (alembic-style "ImproperlyConfiguredException:
+'request' does not have a type annotation"). Anyone on Update-now
+since this morning needs v0.0.59 immediately.
+
+Annotated `request: Request` and imported it. Local smoke test
+passes. Stable on every install path again.
+
 ## [0.0.58] — 2026-05-17
 
 ### Changed — Settings / Setup tabs require sign-in (UX gate)

@@ -19,7 +19,7 @@ import time
 import time
 from typing import Any
 
-from litestar import get, post
+from litestar import Request, get, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 from litestar.response import Response
@@ -59,7 +59,7 @@ def _proc_uptime_seconds() -> float | None:
 
 
 @get("/api/system/auth-status")
-async def auth_status(request) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+async def auth_status(request: Request) -> dict[str, Any]:
     """Lightweight read-only signal of whether the current request
     carries a valid local session cookie. Exists because the cookie
     is HttpOnly (good — XSS can't steal it) so the SPA can't tell
