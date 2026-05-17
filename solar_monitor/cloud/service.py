@@ -22,11 +22,38 @@ log = logging.getLogger(__name__)
 
 
 class CloudService:
-    def __init__(self, cfg: CloudCfg, scheduler) -> None:
-        self.cfg = cfg
+    def __init__(self, config_or_cfg, scheduler) -> None:
+        """Accepts either a Config (preferred) or a bare CloudCfg
+        (legacy callers — Settings save still passes one in). When
+        given a Config we hold a reference to the parent so reading
+        `self.cfg` always reflects the current `config.cloud` — even
+        after Settings save rebinds the parent's `.cloud` attribute
+        to a freshly-built CloudCfg. Otherwise a heartbeat firing
+        after a user clicked Save in Settings → Cloud could mutate
+        a stale CloudCfg, persist its (outdated) state back to
+        config.yaml, and quietly drift the in-memory SSO secret away
+        from what /sso reads on the request path (#148).
+        """
+        from ..config import Config as _Config
+        if isinstance(config_or_cfg, _Config):
+            self._config = config_or_cfg
+            self._direct_cfg = None
+        else:
+            self._config = None
+            self._direct_cfg = config_or_cfg
         self.scheduler = scheduler
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+
+    @property
+    def cfg(self) -> CloudCfg:
+        """Always returns the live CloudCfg the rest of the daemon
+        reads from. When constructed from a Config (the normal
+        scheduler path), this resolves via the parent so a Settings
+        save that did `config.cloud = new_c` is visible immediately."""
+        if self._config is not None:
+            return self._config.cloud
+        return self._direct_cfg
 
     async def start(self) -> None:
         if not self.cfg.bearer_token:

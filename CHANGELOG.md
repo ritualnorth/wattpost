@@ -8,6 +8,71 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-17
+
+### Security — cyber backlog clear-down
+
+Three security tickets boxed off in one ship.
+
+**#148 — Fixed: sso_secret in-memory drift after Settings save.**
+CloudService cached `self.cfg = cfg` (a CloudCfg reference) at
+construction. When the Settings → Cloud → Save handler did
+`config.cloud = new_c`, it reassigned the parent's pointer to a
+freshly-built CloudCfg — but CloudService still held the OLD
+reference. Heartbeats firing after a save would mutate and
+persist the stale object while `/sso` + broker forward-auth read
+the new one, drifting the in-memory SSO secret away from what
+appliance request handlers actually used.
+
+Fix: CloudService now holds the parent `Config` and accesses
+`self.cfg` via a property that resolves through `config.cloud`
+on every read. Same call site change in both the scheduler and
+the post-pair hot-start. Legacy callers passing a bare CloudCfg
+still work — the property falls back to a direct reference.
+
+**#145 — Added: broker DDoS hardening.**
+Two layers added on top of the existing 600/min/IP cap on
+forward-auth:
+- Per-IP cap tightened to 300/min (5/s — still plenty for
+  legit users with many tabs, halves the headroom a single
+  attacker has to play with).
+- Per-slug cap of 1200/min added (20/s/appliance). One
+  harvested slug being hammered from a botnet can no longer
+  starve other appliances' tunnel ingress even when every
+  contributing IP stays under its per-IP limit.
+- Caddyfile: `request_body { max_size 4MB }` on the broker
+  block as a slow-POST defence. Legit dashboard POSTs are KB-
+  range; cloud-backup upload uses a different host so its
+  500 MB ceiling isn't constrained.
+
+**#143 — Added: sso_secret encrypted at rest cloud-side.**
+New `secrets_kek` module wraps appliances.sso_secret in
+AES-GCM, key derived from `SESSION_SECRET` via HKDF with a
+purpose-specific `info` salt. Encrypted values carry a `v1:`
+prefix so legacy plaintext rows pass through unchanged and get
+lazily re-encrypted on next write through the heartbeat, mint,
+or pair paths. Migration 0029 widens the column from 64 → 160
+chars to fit `v1:` + base64(nonce + ciphertext + tag) (≈83
+chars) with headroom for future envelope schemes.
+
+Three read sites updated to decrypt before HMAC operations:
+heartbeat response, /api/sites/{id}/sso mint, /api/internal/
+can-access broker forward-auth signature. Pair-exchange decrypts
+before returning to the appliance (which still stores plaintext
+hex in its local config.yaml — encryption is cloud-side only).
+
+What this protects against: a future cloud Postgres move to
+managed hosting (RDS / Aiven / Neon) where operators on the
+managed plane would otherwise see plaintext sso_secrets in
+`SELECT * FROM appliances`. Today's same-host deployment isn't
+affected either way.
+
+What it doesn't protect against: anyone with read access to
+both Postgres AND `SESSION_SECRET` (e.g. root on the VPS or the
+running cloud container). The KEK lives next to its ciphertext;
+this is a step toward proper KMS-backed encryption, not the end
+state.
+
 ## [0.1.1] — 2026-05-17
 
 ### Fixed — Hourly weather strip ran dry after early evening

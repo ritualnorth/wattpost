@@ -92,7 +92,11 @@ class PollScheduler:
         self._cloud: CloudService | None = None
         if config.cloud is not None and config.cloud.bearer_token:
             try:
-                self._cloud = CloudService(config.cloud, self)
+                # Pass the parent Config (not config.cloud) so that
+                # Settings → Cloud → Save (which rebinds config.cloud
+                # to a fresh CloudCfg) doesn't leave us holding the
+                # old reference. See CloudService.__init__ + #148.
+                self._cloud = CloudService(config, self)
             except Exception:
                 log.exception("cloud heartbeat service failed to initialise")
 
