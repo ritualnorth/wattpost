@@ -64,6 +64,12 @@ ANONYMOUS_PATH_PREFIXES = (
     "/service-worker.js",
     "/api/login",
     "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
+    # /api/system/auth-status is a read-only, no-PII "are you authed?"
+    # signal the SPA uses to gate the Sign In button. It HAS to be
+    # anonymous-accessible — if it required a session, the unauthed
+    # case would 401 instead of returning {authed: false} and the JS
+    # would have to interpret that as a no, which is more fragile.
+    "/api/system/auth-status",
     # /api/heartbeat is bearer-token authed elsewhere; the middleware
     # leaves the auth header path alone.
 )

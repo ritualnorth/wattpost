@@ -4692,30 +4692,42 @@ if (rotatePwBtn) {
     }
   });
 }
-// Sign-in affordance in the header. Visible when there's no local
-// session cookie (or it's expired) AND the appliance has a password
-// configured. Bumps the user straight to /login with a `next=` hash
-// so they bounce back to whichever page they were on.
+// Sign-in affordance in the header. Visible when the request DOESN'T
+// carry a valid local session — i.e. the auth middleware let us in
+// some other way (LAN-trusted + no password set, or readonly tunnel
+// view). Hidden when an SSO-origin OR password-origin session is
+// active. Demo mode also suppresses (no login needed).
+//
+// Why we ASK the server rather than read the cookie: wp_local_session
+// is HttpOnly (XSS protection), so document.cookie can't see it. The
+// previous "check the cookie name" heuristic always failed → button
+// stayed visible for every authenticated user.
 (function wireHeaderSignin() {
   const link = document.getElementById("header-signin");
   if (!link) return;
-  // Detect "no session" via the cookie. Local password is set on every
-  // first-boot in 0.0.37+, so we only need to gate on the cookie.
-  const hasSession = document.cookie.split(";").some(c =>
-    c.trim().startsWith("wp_local_session="));
-  if (hasSession) return;
-  // Demo mode: no login needed.
   if (document.body.classList.contains("is-demo")) return;
-  link.hidden = false;
+
   link.addEventListener("click", (e) => {
-    // Preserve the route the user was looking at so /login can
-    // bounce them back to e.g. #/settings.
+    // Preserve the SPA route so /login can bounce back to e.g.
+    // #/settings after sign-in.
     const hash = window.location.hash || "";
     if (hash) {
       e.preventDefault();
       window.location.href = "/login?next=/" + encodeURIComponent(hash);
     }
   });
+
+  fetch("/api/system/auth-status", { credentials: "same-origin" })
+    .then((r) => r.ok ? r.json() : null)
+    .then((data) => {
+      if (data && data.authed) return;  // hide stays
+      link.hidden = false;
+    })
+    .catch(() => {
+      // Network failure: leave the button hidden. A logged-out user
+      // who refreshes will still see the /login screen via the
+      // auth middleware redirect.
+    });
 })();
 const diagRefreshBtn = $("#diag-refresh");
 if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);

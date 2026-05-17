@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.56] — 2026-05-17
+
+### Fixed — Sign-in button always shown to authenticated users
+The header's "Sign in" affordance gated on `document.cookie.includes
+("wp_local_session=")` to decide whether to show. Trouble: the
+session cookie is HttpOnly (XSS protection — correct), so JS can
+never see it. Every authenticated user saw the button.
+
+Replaced the cookie sniff with a tiny `/api/system/auth-status`
+endpoint (anonymous-readable, returns `{authed, origin}` from the
+real session table). JS fetches it on load and only reveals the
+button when there's genuinely no session. Affects SSO-via-cloud
+users + LAN password sign-ins equally.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
 ## [0.0.55] — 2026-05-17
 
 ### Fixed — Appliances paired pre-rebrand silently failed heartbeats
