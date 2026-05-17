@@ -717,6 +717,40 @@
               <span class="settings-foot" id="kiosk-msg"></span>
             </div>
           </div>
+          <div class="settings-block settings-block--backup">
+            <h3>Backup &amp; restore</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Download a single archive containing the full SQLite
+              database (all history, devices, alerts) plus
+              <code>config.yaml</code> and your local-UI password
+              hash. Restore on a fresh install to come back exactly
+              where you were &mdash; useful before swapping the SD card,
+              moving to new hardware, or running a risky firmware update.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap">
+              <a id="backup-download" class="btn-action" href="/api/system/backup"
+                 title="Download a tar.gz of the daemon's mutable state.">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download backup</span>
+              </a>
+              <label class="btn-action" for="backup-restore-file"
+                     style="cursor:pointer"
+                     title="Pick a previously-downloaded .tar.gz to restore. The daemon will restart immediately after.">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Restore from file&hellip;</span>
+              </label>
+              <input id="backup-restore-file" type="file" accept=".tar.gz,.tgz,application/gzip"
+                     style="display:none"/>
+              <span class="settings-foot" id="backup-msg"></span>
+            </div>
+            <p class="settings-foot" style="margin-top:.6rem">
+              <strong>Restore is destructive.</strong> It overwrites
+              the current database and config, then restarts the
+              daemon. The previous <code>config.yaml</code> is kept
+              as <code>config.yaml.restored.bak</code> in case you
+              need to back out.
+            </p>
+          </div>
           <div class="settings-block settings-block--diagnostics">
             <h3>Diagnostics</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
@@ -795,6 +829,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=149"></script>
+  <script src="/web/app.js?v=150"></script>
 </body>
 </html>

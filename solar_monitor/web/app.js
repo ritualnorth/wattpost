@@ -2984,6 +2984,75 @@ function renderSettings() {
   refreshSystemInfo();
   refreshTailscale();
   refreshIntegrationsPanel();
+  wireBackupRestore();
+}
+
+// One-shot wireup for the Backup & restore block. Idempotent (settings
+// can re-render); we tag the input once we've bound it and bail out on
+// subsequent renders.
+function wireBackupRestore() {
+  const input = document.getElementById("backup-restore-file");
+  if (!input || input.dataset.wired === "1") return;
+  input.dataset.wired = "1";
+  const msg = document.getElementById("backup-msg");
+  input.addEventListener("change", async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const human = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    if (!window.confirm(
+      `Restore ${file.name} (${human})?\n\n` +
+      "This will OVERWRITE the current database, config, and " +
+      "local-UI password, then restart the daemon. The previous " +
+      "config is saved as config.yaml.restored.bak in case you " +
+      "need to back out."
+    )) {
+      input.value = "";
+      return;
+    }
+    if (msg) msg.textContent = `Uploading ${human}…`;
+    try {
+      const r = await fetch(_withKiosk("/api/system/restore"), {
+        method: "POST",
+        headers: { "Content-Type": "application/gzip" },
+        body: file,
+      });
+      if (!r.ok) {
+        let detail = r.statusText;
+        try { const j = await r.json(); if (j && j.detail) detail = j.detail; }
+        catch {}
+        throw new Error(`${r.status} ${detail}`);
+      }
+      const data = await r.json();
+      if (msg) msg.textContent =
+        `Restored ${(data?.applied?.files || []).length} file(s). Daemon restarting…`;
+      // The daemon re-execs ~0.4 s after responding. Poll /api/health
+      // until it comes back, then reload to pick up the new state.
+      setTimeout(pollUntilHealthyThenReload, 1500);
+    } catch (e) {
+      if (msg) msg.textContent = "Restore failed: " + e.message;
+      window.alert("Restore failed: " + e.message);
+    } finally {
+      input.value = "";  // let the same file be picked again
+    }
+  });
+}
+
+async function pollUntilHealthyThenReload() {
+  const msg = document.getElementById("backup-msg");
+  const deadline = Date.now() + 60_000;  // give the daemon a full minute
+  while (Date.now() < deadline) {
+    try {
+      const r = await fetch(_withKiosk("/api/health"), { cache: "no-store" });
+      if (r.ok) {
+        if (msg) msg.textContent = "Daemon back online. Reloading…";
+        setTimeout(() => window.location.reload(), 600);
+        return;
+      }
+    } catch { /* still restarting */ }
+    await new Promise(res => setTimeout(res, 1500));
+  }
+  if (msg) msg.textContent =
+    "Daemon hasn't come back in 60 s. Check the logs and reload manually.";
 }
 
 // ---------- system info (About block) ----------
