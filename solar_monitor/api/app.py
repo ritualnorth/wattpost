@@ -295,6 +295,37 @@ async def device_lifetime(label: str, state: State) -> dict[str, Any]:
     return await store.battery_lifetime_stats(label)
 
 
+@get("/api/devices/{label:str}/charger-stats")
+async def device_charger_stats(label: str, state: State) -> dict[str, Any]:
+    """Charger-specific aggregates for the device-detail page:
+    lifetime kWh delivered, today's active-time + state breakdown,
+    plus a `state_ribbon` (segments of charging_state across today)
+    for the colored 24h timeline.
+
+    Works for any device that exposes a power metric + charging_state:
+      - ac_charger    → output_1_power_w
+      - charge_controller → pv_power_w (Renogy MPPT etc.)
+    """
+    store: Store = state["store"]
+    # Determine which power metric to integrate based on what fields
+    # exist on the device — `latest` is the source of truth.
+    all_latest = await store.get_latest()
+    if label not in all_latest:
+        raise NotFoundException(f"unknown device {label!r}")
+    latest = all_latest[label]
+    if "output_1_power_w" in latest:
+        power_metric = "output_1_power_w"
+    elif "pv_power_w" in latest:
+        power_metric = "pv_power_w"
+    else:
+        return {"error": "device has no recognised charger power metric"}
+    now = int(time.time())
+    # Midnight LOCAL-time of today (uses the appliance's TZ).
+    from datetime import datetime
+    midnight = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+    return await store.charger_stats(label, power_metric, midnight, now)
+
+
 @get("/api/devices/{label:str}/efficiency")
 async def device_efficiency(label: str, state: State) -> dict[str, Any]:
     """SoC-corrected charge efficiency for one battery pack over a
@@ -1046,6 +1077,7 @@ def build_app(
             device_history_csv,
             device_lifetime,
             device_efficiency,
+            device_charger_stats,
             battery_health,
             runtime_forecast,
             load_heatmap,

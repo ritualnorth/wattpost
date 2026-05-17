@@ -1482,6 +1482,105 @@ class Store:
             "mean_w": (sum(all_w) / len(all_w)) if all_w else 0,
         }
 
+    async def charger_stats(
+        self, device: str, power_metric: str,
+        midnight_ts: int, now_ts: int,
+    ) -> dict[str, Any]:
+        """Charger value-add stats for the device-detail page.
+
+        For an AC charger (`output_1_power_w`) or solar MPPT
+        (`pv_power_w`) device, computes:
+          - `lifetime_energy_wh` — total energy delivered since first
+            poll (trapezoid-integrated power × dt). Cheap until the
+            device has years of samples; revisit if it bites.
+          - `today_energy_wh` — same integration, scoped to today.
+          - `today_active_s` — seconds today where power > 5 W (i.e.
+            charger was meaningfully on, ignoring sleep-tick noise).
+          - `today_state_seconds` — dict of `charging_state` value →
+            seconds spent in that state today (bulk, absorption,
+            float, etc.). Lets the UI render the "Today: 45m bulk,
+            2h abs, 5h float" breakdown.
+          - `state_ribbon` — list of `{start_ts, end_ts, state}`
+            segments today, condensed (consecutive same-state polls
+            collapsed). Used by the JS to render the 24h ribbon bar.
+
+        Independent of the `samples_str` table because `charging_state`
+        is stored as a TEXT sample. Power metric is taken from the
+        regular `samples` (numeric) table.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+
+        # ---- Lifetime + today energy (integration of power_metric) ----
+        async def _integrate(since: int, until: int) -> tuple[float, int]:
+            """(energy_wh, active_seconds_with_power_above_threshold)."""
+            energy_wh = 0.0
+            active_s = 0
+            prev_ts: int | None = None
+            prev_w: float = 0.0
+            async with self._db.execute(
+                "SELECT ts, value FROM samples "
+                "WHERE device = ? AND metric = ? "
+                "  AND ts BETWEEN ? AND ? "
+                "ORDER BY ts",
+                (device, power_metric, since, until),
+            ) as cur:
+                async for ts, w in cur:
+                    ts, w = int(ts), float(w)
+                    if prev_ts is not None:
+                        dt_s = ts - prev_ts
+                        avg = max(0.0, (prev_w + w) / 2.0)
+                        energy_wh += avg * (dt_s / 3600.0)
+                        if avg > 5.0:
+                            active_s += dt_s
+                    prev_ts, prev_w = ts, w
+            return energy_wh, active_s
+
+        lifetime_wh, _ = await _integrate(0, now_ts)
+        today_wh, today_active_s = await _integrate(midnight_ts, now_ts)
+
+        # ---- Today's charging-state ribbon + per-state seconds ----
+        state_rows: list[tuple[int, str]] = []
+        async with self._db.execute(
+            "SELECT ts, value FROM samples_str "
+            "WHERE device = ? AND metric = 'charging_state' "
+            "  AND ts BETWEEN ? AND ? "
+            "ORDER BY ts",
+            (device, midnight_ts, now_ts),
+        ) as cur:
+            async for ts, v in cur:
+                state_rows.append((int(ts), str(v)))
+
+        # Collapse consecutive identical states into segments + tally
+        ribbon: list[dict[str, Any]] = []
+        per_state: dict[str, int] = {}
+        if state_rows:
+            seg_start, seg_state = state_rows[0]
+            prev_ts = seg_start
+            for ts, st in state_rows[1:]:
+                if st != seg_state:
+                    dur = ts - seg_start
+                    ribbon.append({"start_ts": seg_start, "end_ts": ts, "state": seg_state})
+                    per_state[seg_state] = per_state.get(seg_state, 0) + dur
+                    seg_start, seg_state = ts, st
+                prev_ts = ts
+            # Close the trailing segment up to now.
+            dur = now_ts - seg_start
+            ribbon.append({"start_ts": seg_start, "end_ts": now_ts, "state": seg_state})
+            per_state[seg_state] = per_state.get(seg_state, 0) + dur
+
+        return {
+            "device":              device,
+            "since_ts":            midnight_ts,
+            "now_ts":              now_ts,
+            "lifetime_energy_wh":  round(lifetime_wh, 1),
+            "today_energy_wh":     round(today_wh, 1),
+            "today_active_s":      today_active_s,
+            "today_state_seconds": per_state,
+            "state_ribbon":        ribbon,
+        }
+
+
     async def battery_lifetime_stats(self, device: str) -> dict[str, Any]:
         """Compute coulomb-counted lifetime Ah in/out + cycle count for a pack.
 

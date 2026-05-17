@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.85] — 2026-05-17
+
+### Added — Charger value-add stats on the device-detail page
+Open a Victron AC Charger or any MPPT/charge-controller from
+Devices and the new **Charger stats** panel appears below the
+hero strip:
+
+- **Lifetime delivered (kWh)** + **today delivered** odometer
+  tiles. Integrated from the device's stored power samples since
+  first poll.
+- **Active today** — total seconds today the charger was
+  meaningfully on (power > 5 W, so sleep ticks don't pad it).
+- **24-hour charging-state ribbon** — single horizontal bar
+  showing the day's progression through bulk (orange) →
+  absorption (yellow) → float (green), with hover tooltips that
+  call out each segment's duration.
+- **Per-state breakdown legend** — "Today: 45m bulk, 2h abs,
+  5h float" so you can see at a glance what a full charge cycle
+  looked like and whether the charger ever made it to float.
+
+New endpoint `GET /api/devices/{label}/charger-stats` powers all
+of the above. Auto-detects the right power metric from the
+device's latest fields (`output_1_power_w` for AC chargers,
+`pv_power_w` for MPPTs).
+
+Dedicated `buildAcChargerDetail` renders Victron AC chargers
+with all three output channels surfaced (Blue Smart IP65 3-bank
+models — engine / aux / start) plus AC input current, temperature
+and any active charger error.
+
 ## [0.0.81] — 2026-05-17
 
 ### Fixed — Today's LOAD always showed 0 Wh on multi-source installs
