@@ -279,6 +279,14 @@ class CloudService:
         # 'pi'.
         import os as _os
         extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
+        # Kiosk share-token (Option C of the kiosk security model).
+        # The cloud dashboard's "Kiosk" button reads this and builds
+        # the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`.
+        # Safe to ship in extras: it IS the public bearer for the
+        # share URL — anyone with the URL has it anyway. Stays out
+        # of the audit log + isn't sensitive like the bearer_token.
+        if self.cfg.kiosk_token:
+            extras["kiosk_token"] = self.cfg.kiosk_token
         try:
             alert_count = len([
                 r for r in (getattr(self.scheduler._alerts, "rules", []) or [])

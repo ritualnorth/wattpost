@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.61] — 2026-05-17
+
+### Added — Tokened kiosk share URL (Option C)
+The cloud's "Kiosk" button used to copy a raw tunnel URL that
+didn't actually work via the internet (HTML loaded but every
+data fetch 401'd at the appliance — see earlier analysis). Now:
+
+- Appliance auto-generates `cloud.kiosk_token` (URL-safe 24-byte)
+  on first load_config. Persisted to config.yaml + survives
+  re-pair (preserved in cloud_admin.py).
+- Heartbeat sends `kiosk_token` in extras so the cloud dashboard
+  knows it.
+- Share URL is now `https://<slug>.wattpost.cloud/kiosk?key=<token>`.
+  Goes through the cloud broker; Caddy's forward_auth is skipped
+  for /kiosk* + the read-only data endpoints kiosk-mode uses
+  (/api/devices, /api/poll_run, /api/today).
+- Appliance middleware validates `?key=<token>` against the local
+  kiosk_token via `hmac.compare_digest`. Allow-list of GET paths
+  the kiosk page actually reads — strict, no API back-door.
+- Kiosk-mode JS captures the `?key=` once at page load + appends
+  it to every subsequent /api/* fetch.
+- POST /api/system/kiosk/rotate generates a fresh token + returns
+  the new share URL. Old token immediately stops working
+  (revocation = "I leaked the URL, kill it").
+
+Pre-v0.0.61 appliances haven't shipped a kiosk_token yet; the
+cloud dashboard falls back to the legacy direct-tunnel URL (LAN-
+only). Updating the appliance + waiting one heartbeat fixes the
+share button.
+
 ## [0.0.60] — 2026-05-17
 
 ### Fixed — CRITICAL: Docker users lost ALL history on every image pull

@@ -129,6 +129,13 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     # at least once post-v0.0.38; while empty, tunnel access falls
     # back to the local-password login page.
     sso_secret:        str  = ""
+    # Public-share kiosk token. Generated lazily by the daemon on
+    # first /kiosk request (or by load_config below). The cloud
+    # dashboard builds the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`
+    # so the recipient can open the chrome-free wall-display view
+    # without a session. Rotatable via POST /api/system/kiosk/rotate
+    # to revoke an over-shared URL.
+    kiosk_token:       str  = ""
 
 
 class WeatherCfg(msgspec.Struct, kw_only=True):
@@ -230,6 +237,20 @@ def load_config(path: str | Path) -> Config:
         "https://wattpost.io",
         "https://wattpost.io/",
     )
+    # Auto-generate kiosk_token if missing. Pure convenience — the
+    # token is the bearer for the public share URL, so anyone with
+    # the URL has access regardless of whether the token was
+    # auto-generated or user-set. Re-running this on every start is
+    # idempotent (only fires when empty).
+    if cfg.cloud is not None and not cfg.cloud.kiosk_token:
+        import secrets as _secrets
+        cfg.cloud.kiosk_token = _secrets.token_urlsafe(24)
+        try:
+            raw.setdefault("cloud", {})["kiosk_token"] = cfg.cloud.kiosk_token
+            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+        except Exception:
+            pass  # in-memory generation is fine for this run
+
     if cfg.cloud is not None and cfg.cloud.endpoint in legacy_endpoints:
         cfg.cloud.endpoint = "https://wattpost.cloud"
         try:
