@@ -509,7 +509,15 @@ def _cloud_creds(state: State) -> tuple[str, str]:
 async def backup_cloud_list(state: State) -> dict[str, Any]:
     """List the appliance's cloud-side backups. Bare proxy through
     to /api/internal/backups/list on wattpost.cloud — auth handled
-    by the appliance's bearer token."""
+    by the appliance's bearer token.
+
+    Maps a few upstream conditions to friendlier shapes so the UI
+    doesn't surface raw cloud-side errors:
+      - 404 → cloud is on an older build that doesn't have the
+        endpoint yet. Returned as `{backups: [], not_yet_available: true}`.
+      - 402 → Hobby-tier account. Returned with `tier_required: true`
+        so the UI can show an upgrade CTA.
+    """
     import httpx
     endpoint, token = _cloud_creds(state)
     async with httpx.AsyncClient(timeout=15) as client:
@@ -517,9 +525,61 @@ async def backup_cloud_list(state: State) -> dict[str, Any]:
             f"{endpoint}/api/internal/backups/list",
             headers={"Authorization": f"Bearer {token}"},
         )
+    if r.status_code == 404:
+        return {"backups": [], "not_yet_available": True}
+    if r.status_code == 402:
+        return {"backups": [], "tier_required": True, "message": r.text[:300]}
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.text[:300])
     return r.json()
+
+
+@post("/api/system/backup/cloud-toggle", status_code=200)
+async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
+    """Flip `backup.cloud_upload` in the running config and persist
+    to disk. Re-wires the BackupService's uploader hook in-process
+    so no daemon restart is needed. Body: `{enabled: bool}`.
+    """
+    import shutil as _shutil
+    import yaml as _yaml
+    body = await request.json()
+    enabled = bool(body.get("enabled")) if isinstance(body, dict) else False
+
+    config_path = state.get("config_path")
+    if not config_path:
+        raise HTTPException(status_code=500, detail="config_path unset")
+    path = Path(config_path)
+
+    # Mutate on-disk YAML — same pattern as alerts_admin._save_config.
+    raw = _yaml.safe_load(path.read_text()) or {}
+    backup_block = raw.get("backup") or {}
+    backup_block["cloud_upload"] = enabled
+    raw["backup"] = backup_block
+    bak = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, bak)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+    # Update the live Config object so subsequent restarts read the
+    # right value, and re-wire the running BackupService's uploader.
+    config = state.get("config")
+    svc = state.get("backup_service")
+    if config is not None and config.backup is not None:
+        config.backup.cloud_upload = enabled
+    if svc is not None:
+        svc.cfg.cloud_upload = enabled
+        if enabled and config is not None and config.cloud is not None and config.cloud.bearer_token:
+            from ..backup.cloud_uploader import make_uploader
+            svc.cloud_uploader = make_uploader(
+                config.cloud.endpoint,
+                config.cloud.bearer_token,
+                svc.cfg.cloud_keep_count,
+            )
+        else:
+            svc.cloud_uploader = None
+
+    return {"ok": True, "cloud_upload": enabled}
 
 
 @post("/api/system/backup/cloud-restore/{backup_id:int}", status_code=202)

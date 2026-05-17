@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.92] — 2026-05-17
+
+### Fixed — Cloud backups UI was customer-hostile
+Two papercuts from v0.0.91:
+
+1. The cloud-backups blurb told customers to edit `config.yaml`
+   to turn the feature on. Now there's an in-UI
+   **Enable cloud upload** / **Disable cloud upload** button that
+   flips `backup.cloud_upload` for them and re-wires the running
+   service in-process &mdash; no restart, no YAML.
+2. When the cloud was on an older build that didn't yet have the
+   new ingest endpoint, the appliance proxied the raw upstream 404
+   straight to the page (literal `{"status_code":404,"detail":"Not Found"}`
+   in a red box). Replaced with: "Cloud account is on an older build
+   that doesn't accept backup uploads yet" &mdash; explicit, with no
+   raw error JSON. Same for 402 (tier required) and 503 (not paired).
+
+New endpoint: `POST /api/system/backup/cloud-toggle {enabled: bool}`.
+
 ## [0.0.91] — 2026-05-17
 
 ### Added — Cloud backup upload + restore (Pro/Installer tier)
