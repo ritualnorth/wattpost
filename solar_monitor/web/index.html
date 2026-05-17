@@ -87,14 +87,20 @@
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
     </button>
-    <!-- "Sign in" affordance — only shown when the user has no
-         local session AND a password is set on the appliance. Goes
-         to /login?next=<current-hash>. Driven by JS that probes
-         /api/system/info + checks for the session cookie. -->
+    <!-- Sign In / Sign Out — exactly one is shown, gated on the
+         server's /api/system/auth-status (HttpOnly cookies aren't
+         readable from JS so we ask the server). Sign In hidden by
+         default (revealed when authed=false); Sign Out hidden by
+         default (revealed when authed=true). -->
     <a id="header-signin" class="header-signin" href="/login" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
       <span>Sign in</span>
     </a>
+    <button id="header-signout" class="header-signin" type="button" hidden
+            title="Sign out — clears your local session cookie.">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      <span>Sign out</span>
+    </button>
 
     <!-- Status legend popover — opens when the pill is tapped. -->
     <div id="status-legend" class="status-legend" hidden>
@@ -759,6 +765,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=125"></script>
+  <script src="/web/app.js?v=126"></script>
 </body>
 </html>

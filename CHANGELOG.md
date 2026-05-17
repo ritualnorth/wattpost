@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.57] — 2026-05-17
+
+### Added — Sign Out button in the appliance header
+There wasn't one. The dashboard had a Sign In button (broken in
+its own way until v0.0.56) but no way to *un*-sign-in. Ritual North
+reported the appliance UI never asked him to log in (the
+READONLY_PUBLIC bypass lets GET requests through on LAN without
+a session, by design — so the SPA loads, no login prompt) and
+that there was no logout affordance.
+
+Both Sign In + Sign Out live in the header now. Auth-status
+endpoint decides which one to reveal: authed → Sign Out, not
+authed → Sign In. Demo mode suppresses both.
+
+### Added — Diagnostics bundle download (#138)
+"Download bundle" button on Settings → Diagnostics. Single JSON
+file: version, deployment (pi|docker), platform, uptime, disk,
+redacted config (bearer_token / tunnel_token / sso_secret /
+api_key / password values scrubbed), transport+device counts,
+last poll result, ~500 lines of recent logs. Suitable to attach
+to a support ticket.
+
 ## [0.0.56] — 2026-05-17
 
 ### Fixed — Sign-in button always shown to authenticated users

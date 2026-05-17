@@ -4692,42 +4692,53 @@ if (rotatePwBtn) {
     }
   });
 }
-// Sign-in affordance in the header. Visible when the request DOESN'T
-// carry a valid local session — i.e. the auth middleware let us in
-// some other way (LAN-trusted + no password set, or readonly tunnel
-// view). Hidden when an SSO-origin OR password-origin session is
-// active. Demo mode also suppresses (no login needed).
-//
-// Why we ASK the server rather than read the cookie: wp_local_session
-// is HttpOnly (XSS protection), so document.cookie can't see it. The
-// previous "check the cookie name" heuristic always failed → button
-// stayed visible for every authenticated user.
-(function wireHeaderSignin() {
-  const link = document.getElementById("header-signin");
-  if (!link) return;
+// Sign In / Sign Out — exactly one is revealed, based on the
+// server's auth state. HttpOnly cookies aren't readable from JS so
+// we have to ASK the server (/api/system/auth-status); a previous
+// "check document.cookie for wp_local_session" heuristic silently
+// always returned false and left the Sign In button visible to
+// every authenticated user.
+(function wireHeaderAuth() {
+  const signinLink   = document.getElementById("header-signin");
+  const signoutBtn   = document.getElementById("header-signout");
+  if (!signinLink && !signoutBtn) return;
   if (document.body.classList.contains("is-demo")) return;
 
-  link.addEventListener("click", (e) => {
-    // Preserve the SPA route so /login can bounce back to e.g.
-    // #/settings after sign-in.
-    const hash = window.location.hash || "";
-    if (hash) {
-      e.preventDefault();
-      window.location.href = "/login?next=/" + encodeURIComponent(hash);
-    }
-  });
+  if (signinLink) {
+    signinLink.addEventListener("click", (e) => {
+      const hash = window.location.hash || "";
+      if (hash) {
+        e.preventDefault();
+        window.location.href = "/login?next=/" + encodeURIComponent(hash);
+      }
+    });
+  }
+  if (signoutBtn) {
+    signoutBtn.addEventListener("click", async () => {
+      // POST /api/logout drops the session cookie + clears the
+      // server-side session record. Reload to re-evaluate auth
+      // state (will land on /login when the auth middleware fires
+      // on the next request that needs a session — or stay on the
+      // dashboard if READONLY_PUBLIC bypass is in effect).
+      try {
+        await fetch("/api/logout", {
+          method: "POST", credentials: "same-origin",
+        });
+      } catch (_) { /* network error — still reload */ }
+      window.location.href = "/";
+    });
+  }
 
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
     .then((data) => {
-      if (data && data.authed) return;  // hide stays
-      link.hidden = false;
+      if (data && data.authed) {
+        if (signoutBtn) signoutBtn.hidden = false;
+      } else if (signinLink) {
+        signinLink.hidden = false;
+      }
     })
-    .catch(() => {
-      // Network failure: leave the button hidden. A logged-out user
-      // who refreshes will still see the /login screen via the
-      // auth middleware redirect.
-    });
+    .catch(() => { /* leave both hidden on network error */ });
 })();
 const diagRefreshBtn = $("#diag-refresh");
 if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
