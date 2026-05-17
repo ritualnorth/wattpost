@@ -3151,19 +3151,55 @@ async function refreshCloudBackups() {
   const toggleMsg = document.getElementById("backup-cloud-toggle-msg");
   if (!list || !toggleBtn) return;
 
-  // Read schedule first — it tells us whether cloud_upload is on,
-  // and whether the appliance is paired (we can't know the latter
-  // for sure from here, so we look for a recent cloud upload OR
-  // fall back to trying the list).
+  // Read schedule first — tells us whether cloud_upload is on
+  // (and whether the local backup service is running at all).
   let sched;
   try { sched = await api("/api/system/backup/schedule"); }
   catch { sched = null; }
   const cloudOn = !!(sched && sched.cloud_upload_enabled);
 
-  // Toggle button — let the user flip cloud_upload right here.
+  // Always probe cloud-list — its response carries the cues we
+  // need (paired? Pro/Installer tier? cloud on a build that
+  // supports backups?) to decide what to show. Doing this before
+  // wiring the toggle means we can grey-out for Hobby etc.
+  let data, fetchError;
+  try {
+    const r = await fetch(_withKiosk("/api/system/backup/cloud-list"), { cache: "no-store" });
+    if (r.status === 503) {
+      data = { _not_paired: true };
+    } else if (r.ok) {
+      data = await r.json();
+    } else {
+      let detail = r.statusText;
+      try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
+      fetchError = detail;
+    }
+  } catch (e) {
+    fetchError = e.message;
+  }
+
+  // Decide toggle state up-front based on what we learned.
+  const notPaired = data && data._not_paired;
+  const tierRequired = data && data.tier_required;
+  const notYetAvailable = data && data.not_yet_available;
+  const canToggle = !notPaired && !tierRequired && !notYetAvailable && !fetchError;
+
   toggleBtn.hidden = false;
-  toggleBtn.textContent = cloudOn ? "Disable cloud upload" : "Enable cloud upload";
+  toggleBtn.disabled = !canToggle && !cloudOn;  // allow disabling even when cloud no longer accepts
+  if (notPaired) {
+    toggleBtn.textContent = "Pair to wattpost.cloud first";
+  } else if (tierRequired) {
+    toggleBtn.textContent = "Upgrade to enable";
+  } else if (notYetAvailable) {
+    toggleBtn.textContent = "Cloud account not ready";
+  } else {
+    toggleBtn.textContent = cloudOn ? "Disable cloud upload" : "Enable cloud upload";
+  }
   toggleBtn.onclick = async () => {
+    if (tierRequired) {
+      window.location.href = "https://wattpost.cloud/app/account";
+      return;
+    }
     toggleBtn.disabled = true;
     toggleMsg.textContent = cloudOn ? "Disabling…" : "Enabling…";
     try {
@@ -3187,35 +3223,23 @@ async function refreshCloudBackups() {
     }
   };
 
-  if (!cloudOn) {
+  // Now render the list area based on the same data.
+  if (notPaired) {
     list.innerHTML = `<div class="settings-empty">
-      Cloud upload is off. Click <strong>Enable cloud upload</strong>
-      to push each scheduled snapshot to wattpost.cloud.
+      Pair this appliance to wattpost.cloud first (Settings → Cloud)
+      to enable off-site backups.
     </div>`;
     return;
   }
-
-  let data;
-  try {
-    const r = await fetch(_withKiosk("/api/system/backup/cloud-list"), { cache: "no-store" });
-    if (r.status === 503) {
-      list.innerHTML = `<div class="settings-empty">
-        Cloud upload is on, but this appliance isn't paired to wattpost.cloud yet.
-      </div>`;
-      return;
-    }
-    if (!r.ok) {
-      let detail = r.statusText;
-      try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
-      list.innerHTML = `<div class="settings-empty" style="color:#f87171">${detail}</div>`;
-      return;
-    }
-    data = await r.json();
-  } catch (e) {
-    list.innerHTML = `<div class="settings-empty" style="color:#f87171">${e.message}</div>`;
+  if (tierRequired) {
+    list.innerHTML = `<div class="settings-empty">
+      Cloud backups require <strong>Pro</strong> or
+      <strong>Installer</strong> tier on the paired account.
+      <a href="https://wattpost.cloud/app/account">Upgrade here</a>.
+    </div>`;
     return;
   }
-  if (data.not_yet_available) {
+  if (notYetAvailable) {
     list.innerHTML = `<div class="settings-empty">
       Cloud account is on an older build that doesn't accept backup
       uploads yet. The next cloud deploy will enable this — your
@@ -3223,11 +3247,14 @@ async function refreshCloudBackups() {
     </div>`;
     return;
   }
-  if (data.tier_required) {
+  if (fetchError) {
+    list.innerHTML = `<div class="settings-empty" style="color:#f87171">${fetchError}</div>`;
+    return;
+  }
+  if (!cloudOn) {
     list.innerHTML = `<div class="settings-empty">
-      Cloud backups require <strong>Pro</strong> or
-      <strong>Installer</strong> tier on the paired account.
-      <a href="https://wattpost.cloud/app/account">Upgrade here</a>.
+      Cloud upload is off. Click <strong>Enable cloud upload</strong>
+      to push each scheduled snapshot to wattpost.cloud.
     </div>`;
     return;
   }
