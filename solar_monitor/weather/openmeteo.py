@@ -50,9 +50,12 @@ class OpenMeteoProvider(WeatherProvider):
             "daily":     "sunrise,sunset",
             "timezone":  "auto",
             "wind_speed_unit": "ms",
-            # One day of sunrise/sunset is enough for the dashboard
-            # "Sunrise / sunset" line; reduces payload size.
-            "forecast_days": 1,
+            # 2 days so the rolling 12-hour preview has runway late
+            # in the evening. With `forecast_days: 1`, after ~18:00
+            # local the hourly strip degrades to "next 2-3 hours,
+            # then nothing" because Open-Meteo only returns hours
+            # within today. 2 days is still tiny (~50 hourly rows).
+            "forecast_days": 2,
         }
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
             r = await client.get(BASE_URL, params=params)
