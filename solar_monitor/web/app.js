@@ -3413,9 +3413,20 @@ function renderIntegrationsPanel() {
         <div class="integration-row-sub">
           ${cloudConfigured
             ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
-                integrationsState.cloud.tunnel_hostname
-                  ? ` · remote: <a href="https://${integrationsState.cloud.tunnel_hostname}/" target="_blank" rel="noopener">${integrationsState.cloud.tunnel_hostname}</a>`
-                  : (integrationsState.cloud.tunnel_enabled === false ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel — re-pair to enable remote access</span>` : "")
+                // Used to display the raw CF Tunnel hostname here
+                // (humnb7h4n6.wattpost.io). Removed because (a) the
+                // tunnel URL is for cloud → appliance plumbing, not
+                // for end-user navigation — customers should use the
+                // broker URL <slug>.wattpost.cloud from their cloud
+                // dashboard, and (b) surfacing it implied "you can
+                // share this link" which is exactly wrong (the tunnel
+                // requires an SSO session that only the cloud can
+                // mint; sharing the URL gets you a "Sign in via
+                // wattpost.cloud" page, not access). Keep the "no
+                // tunnel" warning since that IS actionable diagnostic.
+                integrationsState.cloud.tunnel_enabled === false
+                  ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel — re-pair to enable remote access</span>`
+                  : ""
               }`
             : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`
           }
