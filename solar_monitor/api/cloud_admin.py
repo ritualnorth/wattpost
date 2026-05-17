@@ -240,7 +240,12 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
                 await old.stop()
             except Exception:
                 log.warning("hot-start: stopping old cloud svc raised", exc_info=True)
-        new_svc = CloudService(cfg, scheduler)
+        # Pass the parent Config (not the bare CloudCfg) so
+        # CloudService resolves `self.cfg` via property and stays
+        # in sync if Settings → Cloud → Save later rebinds
+        # config.cloud to a fresh struct. See #148.
+        parent_config = getattr(scheduler, "config", None)
+        new_svc = CloudService(parent_config or cfg, scheduler)
         scheduler._cloud = new_svc
         await new_svc.start()
     except Exception:
