@@ -2706,6 +2706,23 @@ function drawHeatmap(root, data) {
 //   #/device/<label>     → per-device detail page (dispatched by device kind)
 const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "settings", "kiosk", "docs"]);
 
+// Routes that mutate config + therefore require an authed session.
+// Anonymous LAN viewers (kiosks, family members on the WiFi) get
+// dashboard / history / devices / docs / kiosk for free; the moment
+// they hit Settings or Setup they're bounced to /login. Backend
+// mutation endpoints stay gated regardless — this is a UX guard,
+// not a security boundary on its own.
+const AUTH_GATED_ROUTES = new Set(["settings", "setup"]);
+
+// Cached auth state — populated by wireHeaderAuth's auth-status
+// fetch, refreshed on logout. setRoute() reads this when gating
+// AUTH_GATED_ROUTES; null = unknown (treat as anonymous to be safe).
+let _authState = null;
+function _setAuthState(authed) {
+  _authState = { authed };
+}
+window._setAuthState = _setAuthState;  // for wireHeaderAuth handoff
+
 function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
   const m = raw.match(/^device\/(.+)$/);
@@ -2720,6 +2737,40 @@ function currentRouteName() { return parseRoute().name; }
 
 function setRoute(_unused) {
   const route = parseRoute();
+  // Auth gate: redirect to /login when an unauthed visitor tries to
+  // open Settings or Setup. Demo mode skips (no auth at all). If we
+  // haven't yet resolved the auth state (race with the bootstrap
+  // /api/system/auth-status fetch), fall back to a quick synchronous
+  // check via fetch — UX cost is small (one round-trip on first nav
+  // to settings).
+  if (AUTH_GATED_ROUTES.has(route.name)
+      && !document.body.classList.contains("is-demo")) {
+    if (_authState && !_authState.authed) {
+      window.location.href = "/login?next=/%23/" + encodeURIComponent(route.name);
+      return;
+    }
+    if (_authState === null) {
+      // Defer the route render until we know. Bounce home meanwhile
+      // so the user isn't staring at a partially-rendered Settings
+      // pane that's about to be replaced.
+      fetch("/api/system/auth-status", { credentials: "same-origin" })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          _setAuthState(!!(data && data.authed));
+          if (!_authState.authed) {
+            window.location.href = "/login?next=/%23/" + encodeURIComponent(route.name);
+          } else {
+            setRoute();  // re-enter now that we know
+          }
+        })
+        .catch(() => {
+          // Network error — assume unauthed and bounce.
+          window.location.href = "/login?next=/%23/" + encodeURIComponent(route.name);
+        });
+      return;
+    }
+  }
+
   // Mirror current route onto <body> so route-conditional CSS (e.g.
   // hiding the help FAB on /docs) has a hook without needing JS.
   document.body.dataset.route = route.name;
@@ -4732,7 +4783,11 @@ if (rotatePwBtn) {
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
     .then((data) => {
-      if (data && data.authed) {
+      const authed = !!(data && data.authed);
+      // Share with the SPA router so it can gate Settings + Setup
+      // without re-fetching on every tab change.
+      if (typeof window._setAuthState === "function") window._setAuthState(authed);
+      if (authed) {
         if (signoutBtn) signoutBtn.hidden = false;
       } else if (signinLink) {
         signinLink.hidden = false;
