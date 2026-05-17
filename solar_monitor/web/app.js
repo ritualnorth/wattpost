@@ -326,8 +326,27 @@ function setStatus(cls, text) {
 }
 
 // ---------- api ----------
+// Kiosk-via-tunnel uses ?key=<token> bearer auth (see middleware in
+// solar_monitor/api/app.py). When the page was loaded at
+// /kiosk?key=<token>, every subsequent /api/* fetch needs to carry
+// that same key or the appliance will 401. Captured once at load
+// from window.location and re-applied to outgoing URLs.
+const KIOSK_KEY_PARAM = (() => {
+  try {
+    if (window.location.pathname !== "/kiosk") return "";
+    return new URLSearchParams(window.location.search).get("key") || "";
+  } catch (_) { return ""; }
+})();
+function _withKiosk(path) {
+  if (!KIOSK_KEY_PARAM) return path;
+  // Only attach to relative paths (don't leak the token to third
+  // parties on absolute URLs). The appliance API is always relative.
+  if (/^https?:/.test(path)) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}key=${encodeURIComponent(KIOSK_KEY_PARAM)}`;
+}
 async function api(path) {
-  const r = await fetch(path);
+  const r = await fetch(_withKiosk(path));
   if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
   return r.json();
 }

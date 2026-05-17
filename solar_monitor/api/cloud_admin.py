@@ -123,6 +123,7 @@ async def update_cloud_config(
         tunnel_token=existing.tunnel_token if existing else "",
         tunnel_hostname=existing.tunnel_hostname if existing else "",
         sso_secret=existing.sso_secret if existing else "",
+        kiosk_token=existing.kiosk_token if existing else "",
     )
     config.cloud = new_c
 
@@ -181,6 +182,11 @@ async def pair_appliance(
         tunnel_token=body.get("tunnel_token") or "",
         tunnel_hostname=body.get("tunnel_hostname") or "",
         sso_secret=body.get("sso_secret") or "",
+        # Preserve kiosk_token across a re-pair so existing share
+        # URLs don't break. If the previous CloudCfg had one set,
+        # carry it forward; otherwise load_config will generate
+        # one lazily on the next start.
+        kiosk_token=(config.cloud.kiosk_token if config.cloud else ""),
     )
     config.cloud = new_c
 
@@ -337,4 +343,6 @@ def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
         out["tunnel_hostname"] = c.tunnel_hostname
     if c.sso_secret:
         out["sso_secret"]      = c.sso_secret
+    if c.kiosk_token:
+        out["kiosk_token"]     = c.kiosk_token
     return out
