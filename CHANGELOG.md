@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.99] — 2026-05-17
+
+### Added — Appliance Today tile: Stored + SoC envelope
+Bringing two of the new cloud-card cells home to the local
+dashboard, where the same questions matter just as much:
+
+- **Stored** — bank net today (`↑ 1.84 kWh` or `↓ 500 Wh`).
+  Uses `today_aggregate.bank_net_today_wh` when present;
+  falls back to (sources − load) on older builds.
+- **SoC today** — today's min – max envelope
+  (`28.4 – 70.1 %`). Powered by a new
+  `GET /api/today/soc-envelope` endpoint that wraps the
+  `bank_soc_minmax` method shipped in v0.0.98 for cloud
+  heartbeats.
+
+Both render alongside Charged / Peak / Load in the existing
+Today tile — no new screen real-estate needed.
+
 ## [0.0.98] — 2026-05-17
 
 ### Added — Cloud dashboard cards: SoC envelope, ETA, charger pill, forecast

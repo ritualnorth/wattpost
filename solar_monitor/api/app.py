@@ -104,6 +104,26 @@ async def today(state: State) -> dict[str, Any]:
     return await store.today_aggregate(midnight, now)
 
 
+@get("/api/today/soc-envelope")
+async def today_soc_envelope(state: State) -> dict[str, Any]:
+    """Min/max of bank.soc_pct since local midnight. Powers the
+    "SoC today" cell on the Today tile — answers "did the bank get
+    critically low overnight?" without opening History."""
+    store: Store = state["store"]
+    now = int(time.time())
+    local = time.localtime(now)
+    midnight = int(time.mktime(
+        (local.tm_year, local.tm_mon, local.tm_mday, 0, 0, 0, 0, 0, -1)
+    ))
+    lo, hi = await store.bank_soc_minmax(midnight, now)
+    return {
+        "since_ts": midnight,
+        "now_ts":   now,
+        "min_pct":  round(lo, 1) if lo is not None else None,
+        "max_pct":  round(hi, 1) if hi is not None else None,
+    }
+
+
 @get("/api/runtime-forecast")
 async def runtime_forecast(state: State) -> dict[str, Any]:
     """Battery runtime prediction (#99).
@@ -1127,6 +1147,7 @@ def build_app(
             health,
             last_poll_run,
             today,
+            today_soc_envelope,
             list_devices,
             device_latest,
             device_history,

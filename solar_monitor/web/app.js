@@ -1543,6 +1543,44 @@ function renderToday() {
   $("#today-peak").textContent    = peakSoFarStr;
   $("#today-load").textContent    = loadStr;
 
+  // Stored today = bank net (in − out, signed). Matches the cloud
+  // dashboard's headline answer to "did my system win today?".
+  // Uses today_aggregate's bank_net_today_wh when available; falls
+  // back to (sources − load) for older builds.
+  const storedEl = $("#today-stored");
+  if (storedEl) {
+    let storedWh = null;
+    if (todayAggregate && typeof todayAggregate.bank_net_today_wh === "number") {
+      storedWh = todayAggregate.bank_net_today_wh;
+    } else if (typeof sourcesWh === "number" && typeof loadWh === "number") {
+      storedWh = sourcesWh - loadWh;
+    }
+    if (storedWh == null) {
+      storedEl.textContent = "—";
+    } else if (Math.abs(storedWh) < 5) {
+      storedEl.textContent = "0 Wh";
+    } else {
+      const sign = storedWh > 0 ? "↑ " : "↓ ";
+      storedEl.textContent = sign + fmt.wh(Math.abs(storedWh));
+    }
+  }
+
+  // Today's SoC envelope — answers "did the bank get critically low
+  // overnight?" at a glance. Sourced from /api/today_soc_minmax
+  // (fresh endpoint, cheap MIN/MAX over today's bank.soc_pct
+  // samples). Render lazily so we don't block the rest of the tile;
+  // the value lands on the next paint.
+  const socEnvEl = $("#today-soc-env");
+  if (socEnvEl) {
+    fetch("/api/today/soc-envelope").then(r => r.ok ? r.json() : null).then(d => {
+      if (!d || d.min_pct == null || d.max_pct == null) {
+        socEnvEl.textContent = "—";
+        return;
+      }
+      socEnvEl.textContent = `${d.min_pct.toFixed(1)} – ${d.max_pct.toFixed(1)}%`;
+    }).catch(() => { socEnvEl.textContent = "—"; });
+  }
+
   // Yesterday-accuracy line lives under this tile now — refresh on the
   // same cadence as the dashboard poll; the API call is cheap and the
   // result hides itself if no archive exists yet.
