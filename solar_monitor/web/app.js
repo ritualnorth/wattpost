@@ -4729,8 +4729,27 @@ if (kioskToggle) {
 }
 const kioskExitBtn = $("#kiosk-exit");
 if (kioskExitBtn) {
+  // Hide Exit Kiosk entirely when the visitor only has kiosk-token
+  // auth (#150). They got here via the public share URL and have no
+  // session — letting them "exit" into the dashboard would render
+  // appliance chrome they never had permission to see. The button
+  // re-appears for authed users (cloud-broker session OR local
+  // session) for whom Exit is a legitimate navigation.
+  if (KIOSK_KEY_PARAM) {
+    kioskExitBtn.hidden = true;
+  }
   kioskExitBtn.addEventListener("click", () => {
-    window.location.hash = "#/";
+    // Belt-and-braces: even if the button is somehow clicked while
+    // KIOSK_KEY_PARAM is set, do a full reload to "/" so the URL
+    // key drops out of memory. The new page load captures
+    // KIOSK_KEY_PARAM = "" (no /kiosk pathname) and api() calls go
+    // through normal auth — the appliance will 401 anything the
+    // user actually shouldn't see.
+    if (KIOSK_KEY_PARAM) {
+      window.location.href = "/";
+    } else {
+      window.location.hash = "#/";
+    }
   });
 }
 const restartBtn = $("#restart-daemon-btn");
