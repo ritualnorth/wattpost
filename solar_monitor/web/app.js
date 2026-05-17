@@ -4762,57 +4762,40 @@ if (rotatePwBtn) {
     }
   });
 }
-// Sign In / Sign Out — exactly one is revealed, based on the
-// server's auth state. HttpOnly cookies aren't readable from JS so
-// we have to ASK the server (/api/system/auth-status); a previous
-// "check document.cookie for wp_local_session" heuristic silently
-// always returned false and left the Sign In button visible to
-// every authenticated user.
-(function wireHeaderAuth() {
-  const signinLink   = document.getElementById("header-signin");
-  const signoutBtn   = document.getElementById("header-signout");
-  if (!signinLink && !signoutBtn) return;
+// Sign-out button — lives inside Settings → System (the only place
+// where being signed in actually matters; mutations require a
+// session, everything else on LAN is anonymous read-only). Hidden
+// when the user isn't authed (no session to end). Sign-IN is
+// triggered implicitly by tapping Settings or Setup — the SPA
+// router (AUTH_GATED_ROUTES) bounces unauthed visitors to /login.
+(function wireSignout() {
+  const signoutBtn = document.getElementById("signout-btn");
+  if (!signoutBtn) return;
   if (document.body.classList.contains("is-demo")) return;
 
-  if (signinLink) {
-    signinLink.addEventListener("click", (e) => {
-      const hash = window.location.hash || "";
-      if (hash) {
-        e.preventDefault();
-        window.location.href = "/login?next=/" + encodeURIComponent(hash);
-      }
-    });
-  }
-  if (signoutBtn) {
-    signoutBtn.addEventListener("click", async () => {
-      // POST /api/logout drops the session cookie + clears the
-      // server-side session record. Reload to re-evaluate auth
-      // state (will land on /login when the auth middleware fires
-      // on the next request that needs a session — or stay on the
-      // dashboard if READONLY_PUBLIC bypass is in effect).
-      try {
-        await fetch("/api/logout", {
-          method: "POST", credentials: "same-origin",
-        });
-      } catch (_) { /* network error — still reload */ }
-      window.location.href = "/";
-    });
-  }
+  signoutBtn.addEventListener("click", async () => {
+    try {
+      await fetch("/api/logout", {
+        method: "POST", credentials: "same-origin",
+      });
+    } catch (_) { /* network error — still reload */ }
+    // Land on the dashboard (read-only anonymous). If the user
+    // re-opens Settings the auth gate will bounce them to /login.
+    window.location.href = "/";
+  });
 
+  // Hide until we know the user is actually signed in. Avoids
+  // showing a Sign-out button to an anonymous LAN viewer who's
+  // never authed in the first place.
+  signoutBtn.hidden = true;
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
     .then((data) => {
       const authed = !!(data && data.authed);
-      // Share with the SPA router so it can gate Settings + Setup
-      // without re-fetching on every tab change.
       if (typeof window._setAuthState === "function") window._setAuthState(authed);
-      if (authed) {
-        if (signoutBtn) signoutBtn.hidden = false;
-      } else if (signinLink) {
-        signinLink.hidden = false;
-      }
+      if (authed) signoutBtn.hidden = false;
     })
-    .catch(() => { /* leave both hidden on network error */ });
+    .catch(() => { /* leave hidden on network error */ });
 })();
 const diagRefreshBtn = $("#diag-refresh");
 if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
