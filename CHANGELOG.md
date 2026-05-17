@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.73] — 2026-05-17
+
+### Fixed — "Idle" shown when slow-charging from PV
+The 1.5 A "Idle" guard added in v0.0.70 was applied symmetrically
+to both charge and discharge currents. That broke the charging
+case: a battery taking +1 A from a low-output MPPT was labelled
+"Idle" — but it's charging, just slowly. Customer-confusing:
+"Idle" implies nothing is happening, when in fact the bank is
+recovering from a low SoC.
+
+Made the guard discharge-only:
+  - charging at <0.2 A → "Charging · trickle"
+  - charging at ≥0.2 A → "X h until full" (existing math)
+  - discharging at <0.1 A → "Idle"
+  - discharging at <1.5 A → "Light load · 0.XX A draw"
+  - discharging at ≥1.5 A → "X h until empty" (with 10% reserve)
+
+The "Light load" variant also surfaces the actual draw current, so
+the user can see how close they are to the standby threshold and
+why we're declining to project hours.
+
 ## [0.0.72] — 2026-05-17
 
 ### Fixed — Battery health endpoint 500'd on any window > 6 hours

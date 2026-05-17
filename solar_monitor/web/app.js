@@ -619,19 +619,25 @@ function computeRemaining(bank) {
   }
   const i = bank.sumI;
   const absI = Math.abs(i);
-  // <1.5 A absolute ≈ <20 W at 12.8 V = standby territory. Reporting
-  // "2 days until empty" off of a literal divide here is technically
-  // correct ("if your load stays at 8 W forever") but practically
-  // useless — the moment any real load kicks in, the estimate is
-  // wildly wrong, and customers reasonably read it as "my battery
-  // will last 2 days" which is misleading. Show "Idle" for very low,
-  // "Light load" with a hint for low-but-discharging.
-  if (absI < 1.5) {
-    return { primary: "Idle", secondary: i < 0 ? "light load" : "—" };
-  }
+  // The 1.5 A "Idle" guard is one-sided — it only protects the
+  // discharge case. Reporting "2 days until empty" off a 0.6 A
+  // standby draw is misleading (the moment real load kicks in,
+  // the estimate is wildly wrong). But applying the same threshold
+  // to charging would label slow MPPT trickle as "Idle", which is
+  // worse — the user IS charging, just slowly. So: only suppress
+  // the discharge estimate; always show charging.
   if (i > 0) {
+    if (absI < 0.2) {
+      return { primary: "Charging", secondary: "trickle" };
+    }
     const hoursToFull = (bank.totalCap - bank.totalRem) / i;
     return { primary: fmt.duration(hoursToFull), secondary: "until full" };
+  }
+  if (absI < 1.5) {
+    return {
+      primary: absI < 0.1 ? "Idle" : "Light load",
+      secondary: absI < 0.1 ? "—" : `${absI.toFixed(2)} A draw`,
+    };
   }
   // Discharging at a meaningful rate. Trim a 10% reserve off the
   // remaining capacity before the divide — LFP wants to stay above
