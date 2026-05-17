@@ -49,6 +49,13 @@ log = logging.getLogger(__name__)
 # there too.
 _PASSWORD_DIR = Path(os.environ.get("WATTPOST_PASSWORD_DIR", "/etc/wattpost"))
 PASSWORD_HASH_PATH      = _PASSWORD_DIR / "web-password.hash"
+# Sessions persist to a tiny JSON file in the same config dir. A SQLite
+# table would be overkill for the ~handful of active sessions a typical
+# install ever holds, and JSON keeps web_auth decoupled from the
+# storage layer (Store is wired in at scheduler-time, web_auth gets
+# imported earlier than that). Atomic write-then-rename means a power
+# loss can't half-corrupt the file.
+SESSIONS_PATH           = _PASSWORD_DIR / "sessions.json"
 PASSWORD_PLAINTEXT_PATH = _PASSWORD_DIR / "web-password"
 SESSION_COOKIE_NAME     = "wp_local_session"
 SESSION_TTL_SECONDS     = 60 * 60 * 24 * 30   # 30 days
@@ -79,7 +86,67 @@ ANONYMOUS_PATH_PREFIXES = (
 # "sso" session — a local-password session shouldn't grant tunnel
 # access (the password is a fallback for LAN, not the perimeter for
 # internet exposure).
+#
+# Read-through cache over SESSIONS_PATH: every issue/revoke writes the
+# file, every read hits the dict. On module import we slurp whatever
+# the file had (so daemon restart preserves logged-in users — fixed
+# in v0.0.75 after a pentest revealed the in-memory-only store would
+# silently log everyone out on every container restart, including the
+# user-initiated Settings → Restart daemon).
 _SESSIONS: dict[str, dict[str, float | str]] = {}
+
+
+def _load_sessions_from_disk() -> None:
+    """Populate _SESSIONS from SESSIONS_PATH at module-import time.
+    Tolerates a missing or unreadable file by starting empty — sessions
+    are recoverable (user re-logs in) so a clobbered file isn't fatal."""
+    import json as _json
+    if not SESSIONS_PATH.is_file():
+        return
+    try:
+        raw = _json.loads(SESSIONS_PATH.read_text(encoding="utf-8"))
+        if isinstance(raw, dict):
+            now = time.time()
+            for token, rec in raw.items():
+                if not isinstance(rec, dict): continue
+                issued = rec.get("issued_at")
+                if not isinstance(issued, (int, float)): continue
+                if now - float(issued) > SESSION_TTL_SECONDS: continue
+                _SESSIONS[token] = {
+                    "issued_at": float(issued),
+                    "origin":    str(rec.get("origin", "local")),
+                }
+    except (OSError, ValueError, TypeError):
+        # Corrupt or missing file → start with empty cache. Users will
+        # need to re-login; recoverable, no data loss.
+        pass
+
+
+def _persist_sessions_to_disk() -> None:
+    """Atomic-write the current _SESSIONS dict to SESSIONS_PATH. Called
+    on every issue + revoke (cheap — dict is tiny). Write-temp-rename
+    means a power loss can't half-corrupt the on-disk file.
+
+    Failure is non-fatal: a write error logs and continues. The
+    in-memory cache stays correct for THIS process; only the persisted
+    state lags. Next successful write catches up."""
+    import json as _json
+    try:
+        SESSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = SESSIONS_PATH.with_suffix(".json.tmp")
+        tmp.write_text(_json.dumps(_SESSIONS), encoding="utf-8")
+        tmp.replace(SESSIONS_PATH)
+    except OSError:
+        # Disk full, permissions, RO filesystem. Don't break login —
+        # the user's session is still valid in memory for this run.
+        import logging as _lg
+        _lg.getLogger(__name__).warning(
+            "could not persist sessions to %s — sessions will not "
+            "survive daemon restart this cycle", SESSIONS_PATH,
+        )
+
+
+_load_sessions_from_disk()
 # Recently-used SSO nonces (jti claims). HMAC tokens are otherwise
 # replayable within their 60 s window if intercepted. Keys are the
 # nonce strings; values are the unix-second they expire. Cleaned on
@@ -138,11 +205,13 @@ def issue_session(origin: str = "local") -> str:
     _gc_sessions()
     token = secrets.token_urlsafe(32)
     _SESSIONS[token] = {"issued_at": time.time(), "origin": origin}
+    _persist_sessions_to_disk()
     return token
 
 
 def revoke_session(token: str) -> None:
-    _SESSIONS.pop(token, None)
+    if _SESSIONS.pop(token, None) is not None:
+        _persist_sessions_to_disk()
 
 
 def _session_record(token: str | None) -> dict[str, float | str] | None:
@@ -153,6 +222,7 @@ def _session_record(token: str | None) -> dict[str, float | str] | None:
         return None
     if time.time() - float(rec["issued_at"]) > SESSION_TTL_SECONDS:
         _SESSIONS.pop(token, None)
+        _persist_sessions_to_disk()
         return None
     return rec
 
@@ -180,8 +250,10 @@ def _gc_sessions() -> None:
     now = time.time()
     expired = [t for t, rec in _SESSIONS.items()
                if now - float(rec["issued_at"]) > SESSION_TTL_SECONDS]
-    for t in expired:
-        _SESSIONS.pop(t, None)
+    if expired:
+        for t in expired:
+            _SESSIONS.pop(t, None)
+        _persist_sessions_to_disk()
     # Also GC the SSO nonce cache.
     expired_n = [n for n, exp in _SSO_NONCES_SEEN.items() if exp < int(now)]
     for n in expired_n:

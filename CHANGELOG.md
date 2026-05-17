@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.75] — 2026-05-17
+
+### Fixed — Appliance sessions wipe on container restart (#149)
+The local-auth session dict lived in process memory only, so every
+restart (Update now, Settings → Restart daemon, customer power-cycle)
+silently logged everyone out. The SPA's cached "you're authed" state
+then disagreed with the empty server-side store and any state-changing
+API call returned "login required" — surfaced via a customer reporting
+that "Send heartbeat" failed even though Settings was open.
+
+Sessions now persist to /etc/wattpost/sessions.json (same config dir
+as web-password.hash). Read-through cache: every issue/revoke writes
+the dict to disk via atomic write-temp-then-rename. Module-import
+loads the file back, expired entries dropped on load. Storage cost
+is trivial (a typical install holds a handful of sessions, ~100 bytes
+each). Disk write failures degrade to in-memory-only with a warning
+log — never breaks login.
+
+Side benefit: also fixes the related #148 sso_secret divergence —
+restart-to-recover is no longer needed because no state is held only
+in memory.
+
+### Security — cloud-side hardening (#152, #153, #154)
+These ship in the cloud (auto-deployed to wattpost.cloud on push to
+main), not the appliance. Documented here for visibility:
+  - #152: signup is now always-202 regardless of email existence;
+    eliminates user-enumeration signal.
+  - #153: password policy = 10+ chars, ~50-entry common-password
+    blocklist, HIBP k-anonymity check.
+  - #154: /schema (OpenAPI) gated behind a SESSION_SECRET-derived
+    randomised path in prod; default `/schema` in dev only.
+Found in the pre-launch pentest.
+
 ## [0.0.74] — 2026-05-17
 
 ### Fixed — Dashboard stuck at "connecting" when accessed via cloud broker on iOS Safari
