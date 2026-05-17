@@ -121,20 +121,38 @@ async def rotate_kiosk_token(state: State) -> dict[str, Any]:
 
 
 @get("/api/system/auth-status")
-async def auth_status(request: Request) -> dict[str, Any]:
-    """Lightweight read-only signal of whether the current request
-    carries a valid local session cookie. Exists because the cookie
-    is HttpOnly (good — XSS can't steal it) so the SPA can't tell
-    via document.cookie. JS used to read the cookie name directly,
-    which silently failed and left the Sign In button visible to
-    every authenticated user.
+async def auth_status(request: Request, state: State) -> dict[str, Any]:
+    """Read-only signal of whether the current request is authed,
+    and by what mechanism. Three positive cases:
 
-    Returns `{authed: bool, origin: str | None}`. `origin` is
-    "local" for password sign-in or "sso" for cloud-broker SSO
-    (see web_auth.issue_session). Used by the header to show /
-    hide the Sign In affordance.
+      1. Local session cookie — set by /api/login after a password
+         sign-in. origin="local".
+      2. SSO session cookie — set by /sso after a cloud-minted token
+         (e.g. dashboard "Open" button → broker-redirect-with-token).
+         origin="sso".
+      3. Broker HMAC header — every request via the cloud broker
+         (<slug>.wattpost.cloud) carries X-WP-Broker-Auth signed by
+         the per-appliance sso_secret. Stateless, per-request.
+         origin="broker".
+
+    The SPA uses this to gate Settings/Setup (skip the bounce-to-
+    /login redirect when the request is already broker-authed) and
+    to decide whether to show a Sign Out button.
+
+    Required for cloud broker UX: without case 3, broker-authed
+    users would be bounced to /login by the SPA gate, hit a dead
+    end (login-tunnel.html says "sign in via wattpost.cloud"), and
+    be stuck.
     """
     from .. import web_auth as _wa
+    # Broker first: cheap header check, no DB roundtrip.
+    broker_header = request.headers.get("x-wp-broker-auth")
+    if broker_header:
+        cfg = state.get("config") if hasattr(state, "get") else state["config"]
+        sso = (cfg.cloud.sso_secret if (cfg and cfg.cloud) else "") or ""
+        if sso and _wa.verify_broker_auth(broker_header, sso):
+            return {"authed": True, "origin": "broker"}
+    # Cookie-based session (local password OR cloud SSO redirect).
     token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
     if not token:
         return {"authed": False, "origin": None}
