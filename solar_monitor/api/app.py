@@ -279,6 +279,27 @@ async def list_devices(state: State) -> dict[str, Any]:
     }
 
 
+@post("/api/devices/{label:str}/display-name", status_code=200)
+async def set_device_display_name(
+    label: str, request: Request, state: State,
+) -> dict[str, Any]:
+    """Set or clear the user-facing display name for a device. The
+    underlying device label is the immutable storage key (history,
+    samples, alerts, exporters all reference it) — this only changes
+    what the dashboard shows. POST `{"display_name": "..."}` to set,
+    or `{"display_name": ""}` (or null) to clear and fall back to the
+    original label.
+    """
+    store: Store = state["store"]
+    body = await request.json()
+    name = body.get("display_name") if isinstance(body, dict) else None
+    devs = {d["label"]: d for d in await store.list_devices()}
+    if label not in devs:
+        raise NotFoundException(f"unknown device {label!r}")
+    await store.set_device_display_name(label, name)
+    return {"label": label, "display_name": (name or "").strip() or None}
+
+
 @get("/api/devices/{label:str}/latest")
 async def device_latest(label: str, state: State) -> dict[str, Any]:
     store: Store = state["store"]
@@ -1078,6 +1099,7 @@ def build_app(
             device_lifetime,
             device_efficiency,
             device_charger_stats,
+            set_device_display_name,
             battery_health,
             runtime_forecast,
             load_heatmap,
