@@ -8,6 +8,46 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.91] — 2026-05-17
+
+### Added — Cloud backup upload + restore (Pro/Installer tier)
+Phase 2 of the backup story (#146). When `backup.cloud_upload: true`
+in config.yaml on a paired Pro/Installer appliance, every scheduled
+local snapshot is also pushed to wattpost.cloud and retained per
+the configured `cloud_keep_count`.
+
+Cloud side (new):
+  - migration 0028: `appliance_backups` table (metadata only; bytes
+    on the VPS filesystem under `/srv/wattpost-cloud-backups` via
+    bind mount added to `vps-infra/docker-compose.yml`)
+  - `POST /api/internal/backups/upload` (bearer-auth, Pro/Installer
+    gate, 402 with explicit upgrade copy for Hobby tier, capped at
+    500 MB per upload, rate-limited 6/h per IP)
+  - `GET /api/internal/backups/list`
+  - `GET /api/internal/backups/{id}/download`
+  - `DELETE /api/internal/backups/{id}`
+  - per-appliance retention enforced on upload; hard cap of 12
+    backups per appliance regardless of customer request
+
+Appliance side (new):
+  - `solar_monitor/backup/cloud_uploader.py` — HMAC-bearer POST to
+    cloud after each successful local snapshot
+  - Wired automatically as the BackupService's `cloud_uploader`
+    hook when both `cloud_upload: true` and the appliance is paired
+  - `GET /api/system/backup/cloud-list` — proxy showing the
+    appliance's cloud-side rows
+  - `POST /api/system/backup/cloud-restore/{id}` — downloads from
+    cloud + feeds straight into the local restore swap
+
+Settings UI: "Cloud backups (Pro)" subsection mirrors the local
+table with per-row Restore buttons that fetch from cloud + apply.
+
+### Operator notes for the next vps-infra deploy
+- Create `/srv/wattpost-cloud-backups` on the VPS (the bind mount
+  target) before bringing the cloud back up:
+  `sudo mkdir -p /srv/wattpost-cloud-backups`.
+- Migration 0028 runs automatically on container start.
+
 ## [0.0.90] — 2026-05-17
 
 ### Added — Scheduled local backups (Settings → Backup &amp; restore)

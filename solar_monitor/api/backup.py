@@ -312,7 +312,13 @@ def _stage_and_swap(
     return summary
 
 
-@post("/api/system/restore", status_code=202)
+@post(
+    "/api/system/restore",
+    status_code=202,
+    # Generous body cap: appliances with a year+ of history can
+    # produce snapshots well over Litestar's default 10 MB ceiling.
+    request_max_body_size=2 * 1024 * 1024 * 1024,
+)
 async def import_backup(request: Request, state: State) -> dict[str, Any]:
     """Validate + apply a backup tarball uploaded as raw bytes (the JS
     sends `application/gzip` directly — no multipart wrapping, keeps
@@ -479,3 +485,79 @@ async def backup_delete_one(name: str, state: State) -> dict[str, Any]:
     target = _safe_snapshot_path(svc, name)
     await asyncio.to_thread(target.unlink)
     return {"ok": True, "deleted": name}
+
+
+# ---- Cloud-side backup mirror (phase 2)
+#
+# Proxies through to wattpost.cloud's /api/internal/backups/* so the
+# Settings UI doesn't have to know cloud credentials. Returns 503
+# when the appliance isn't paired or cloud upload is disabled — the
+# UI shows an explanatory placeholder in that case.
+
+
+def _cloud_creds(state: State) -> tuple[str, str]:
+    cfg = state.get("config")
+    if cfg is None or cfg.cloud is None or not cfg.cloud.bearer_token:
+        raise HTTPException(
+            status_code=503,
+            detail="appliance is not paired to wattpost.cloud",
+        )
+    return cfg.cloud.endpoint.rstrip("/"), cfg.cloud.bearer_token
+
+
+@get("/api/system/backup/cloud-list")
+async def backup_cloud_list(state: State) -> dict[str, Any]:
+    """List the appliance's cloud-side backups. Bare proxy through
+    to /api/internal/backups/list on wattpost.cloud — auth handled
+    by the appliance's bearer token."""
+    import httpx
+    endpoint, token = _cloud_creds(state)
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(
+            f"{endpoint}/api/internal/backups/list",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text[:300])
+    return r.json()
+
+
+@post("/api/system/backup/cloud-restore/{backup_id:int}", status_code=202)
+async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
+    """Download a specific cloud backup and feed it through the local
+    restore path. End-to-end "rebuild from cloud" flow without the
+    operator having to download then re-upload by hand."""
+    import httpx
+    endpoint, token = _cloud_creds(state)
+    async with httpx.AsyncClient(timeout=300) as client:
+        r = await client.get(
+            f"{endpoint}/api/internal/backups/{backup_id}/download",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+    if r.status_code >= 400:
+        raise HTTPException(status_code=r.status_code, detail=r.text[:300])
+    body = r.content
+    verdict = await asyncio.to_thread(_verify_archive, body)
+    db_target = _resolve_db_path(state)
+    config_target = Path(state.get("config_path") or "/etc/wattpost/config.yaml")
+    summary = await asyncio.to_thread(
+        _stage_and_swap, body, db_target, config_target,
+    )
+    scheduler = state.get("scheduler")
+
+    async def _delayed_exec() -> None:
+        await asyncio.sleep(0.4)
+        try:
+            if scheduler is not None:
+                await scheduler.stop()
+        except Exception:
+            log.exception("scheduler stop failed before cloud-restore exec")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    asyncio.create_task(_delayed_exec())
+    return {
+        "ok": True,
+        "message": "cloud restore staged, daemon restarting",
+        "applied": summary,
+        "verdict": verdict,
+    }

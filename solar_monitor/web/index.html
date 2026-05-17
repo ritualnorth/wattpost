@@ -766,6 +766,17 @@
             <div id="backup-snap-list" class="settings-foot" style="margin-top:.6rem">
               <div class="settings-empty">No snapshots yet.</div>
             </div>
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:1rem 0">
+            <h4 style="margin:0 0 .35rem 0">Cloud backups <span class="pill" style="font-size:.7rem;vertical-align:middle">Pro</span></h4>
+            <p class="settings-foot" id="backup-cloud-summary" style="margin-top:0;margin-bottom:.5rem">
+              Off-site copies stored on wattpost.cloud — survives an
+              SD-card failure. Enable in <code>config.yaml</code>:
+              <code>backup.cloud_upload: true</code>. Requires Pro or
+              Installer tier on the paired account.
+            </p>
+            <div id="backup-cloud-list" class="settings-foot">
+              <div class="settings-empty">Not paired or cloud upload disabled.</div>
+            </div>
           </div>
           <div class="settings-block settings-block--diagnostics">
             <h3>Diagnostics</h3>
@@ -845,6 +856,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=151"></script>
+  <script src="/web/app.js?v=152"></script>
 </body>
 </html>
