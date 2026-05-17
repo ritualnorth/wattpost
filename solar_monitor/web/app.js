@@ -2985,6 +2985,8 @@ function renderSettings() {
   refreshTailscale();
   refreshIntegrationsPanel();
   wireBackupRestore();
+  refreshBackupSchedule();
+  wireBackupRunNow();
 }
 
 // One-shot wireup for the Backup & restore block. Idempotent (settings
@@ -3033,6 +3035,110 @@ function wireBackupRestore() {
       window.alert("Restore failed: " + e.message);
     } finally {
       input.value = "";  // let the same file be picked again
+    }
+  });
+}
+
+async function refreshBackupSchedule() {
+  const summary = document.getElementById("backup-sched-summary");
+  const list = document.getElementById("backup-snap-list");
+  if (!summary || !list) return;
+  let s;
+  try { s = await api("/api/system/backup/schedule"); }
+  catch (e) {
+    summary.textContent = "Could not load backup schedule: " + e.message;
+    return;
+  }
+  if (!s.enabled) {
+    summary.innerHTML =
+      `Scheduled backups are <strong>disabled</strong>. Set <code>backup.enabled: true</code> in <code>config.yaml</code> to turn them on.`;
+    list.innerHTML = `<div class="settings-empty">No snapshots.</div>`;
+    return;
+  }
+  const next = s.next_run_ts ? fmt.ago(s.next_run_ts) : "—";
+  const last = s.last_run_ts ? fmt.ago(s.last_run_ts) : "never";
+  const intervalH = s.interval_hours;
+  const intervalLabel = intervalH % 24 === 0
+    ? (intervalH / 24 === 1 ? "daily" : `every ${intervalH / 24} days`)
+    : `every ${intervalH} h`;
+  const cloudBit = s.cloud_upload_enabled
+    ? ` · cloud upload <strong>on</strong>${s.last_cloud_upload_ts ? ` (last: ${fmt.ago(s.last_cloud_upload_ts)}, ${s.last_cloud_upload_ok ? "ok" : "failed"})` : ""}`
+    : "";
+  summary.innerHTML =
+    `Running ${intervalLabel}, keeping the last ${s.keep_count}. ` +
+    `Last run: ${last}. Next run: ${next}.${cloudBit}` +
+    (s.last_run_error ? `<br><span style="color:#f87171">Last error: ${s.last_run_error}</span>` : "");
+  if (!s.snapshots || !s.snapshots.length) {
+    list.innerHTML = `<div class="settings-empty">No snapshots yet.</div>`;
+    return;
+  }
+  list.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:.88rem">
+      <thead><tr style="text-align:left;opacity:.7">
+        <th style="padding:.3rem 0">Name</th>
+        <th style="padding:.3rem 0">Size</th>
+        <th style="padding:.3rem 0">Created</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${s.snapshots.map(snap => {
+          const sizeMb = (snap.size_bytes / (1024 * 1024)).toFixed(1);
+          return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
+            <td style="padding:.35rem .4rem .35rem 0"><code>${snap.name}</code></td>
+            <td style="padding:.35rem .4rem .35rem 0">${sizeMb} MB</td>
+            <td style="padding:.35rem .4rem .35rem 0">${fmt.ago(snap.mtime_ts)}</td>
+            <td style="padding:.35rem 0;text-align:right">
+              <a class="btn-action" style="padding:.15rem .5rem"
+                 href="/api/system/backup/file/${encodeURIComponent(snap.name)}" download>Download</a>
+              <button class="btn-action" style="padding:.15rem .5rem"
+                      type="button" data-snap-del="${snap.name}">Delete</button>
+            </td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>`;
+  list.querySelectorAll("[data-snap-del]").forEach(b => {
+    b.addEventListener("click", async () => {
+      const name = b.dataset.snapDel;
+      if (!window.confirm(`Delete snapshot ${name}? This can't be undone.`)) return;
+      try {
+        const r = await fetch(_withKiosk(`/api/system/backup/file/${encodeURIComponent(name)}`), {
+          method: "DELETE",
+        });
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        refreshBackupSchedule();
+      } catch (e) {
+        window.alert("Delete failed: " + e.message);
+      }
+    });
+  });
+}
+
+function wireBackupRunNow() {
+  const btn = document.getElementById("backup-run-now");
+  if (!btn || btn.dataset.wired === "1") return;
+  btn.dataset.wired = "1";
+  btn.addEventListener("click", async () => {
+    const msg = document.getElementById("backup-run-msg");
+    btn.disabled = true;
+    if (msg) msg.textContent = "Capturing snapshot…";
+    try {
+      const r = await fetch(_withKiosk("/api/system/backup/run-now"), { method: "POST" });
+      if (!r.ok) {
+        let detail = r.statusText;
+        try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
+        throw new Error(`${r.status} ${detail}`);
+      }
+      const data = await r.json();
+      if (msg) {
+        const sizeMb = (data.size_bytes / (1024 * 1024)).toFixed(1);
+        msg.textContent = `Snapshot ${data.snapshot} (${sizeMb} MB) written.`;
+      }
+      refreshBackupSchedule();
+    } catch (e) {
+      if (msg) msg.textContent = "Snapshot failed: " + e.message;
+    } finally {
+      btn.disabled = false;
     }
   });
 }

@@ -8,6 +8,54 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.90] — 2026-05-17
+
+### Added — Scheduled local backups (Settings → Backup &amp; restore)
+A weekly rotating snapshot loop now runs alongside the on-demand
+download added in v0.0.89:
+
+- Every `interval_hours` (default 168 = weekly) the daemon writes
+  a `wattpost-auto-YYYY-MM-DD-HHMMSS.tar.gz` to `<db_dir>/backups/`
+  (override with `backup.dir` in config.yaml).
+- Oldest snapshots beyond `keep_count` (default 4) are pruned
+  after each successful capture.
+- Boot-anchored: on start the loop checks the newest snapshot's
+  age and either fires immediately or waits out the remainder of
+  the interval, so a Pi that reboots every couple of days still
+  gets the configured cadence without drift.
+- Same archive format as the on-demand download → any scheduled
+  snapshot can be fed straight into the restore flow.
+
+Settings UI shows the current cadence, last-run age, next-run
+ETA, plus a table of on-disk snapshots with per-row Download /
+Delete and a "Run backup now" button.
+
+New endpoints, behind the same session-cookie auth:
+  - `GET    /api/system/backup/schedule`    — status + listing
+  - `POST   /api/system/backup/run-now`     — manual trigger
+  - `GET    /api/system/backup/file/{name}` — download one
+  - `DELETE /api/system/backup/file/{name}` — operator cleanup
+
+New optional config block (defaults preserve the previous
+"no-scheduled-backup" behaviour iff you explicitly disable it —
+default is enabled at weekly):
+```yaml
+backup:
+  enabled: true            # default true
+  interval_hours: 168      # weekly
+  keep_count: 4
+  dir: ""                  # "" → <db_dir>/backups
+  cloud_upload: false      # Pro/Installer tier — see next release
+  cloud_keep_count: 4
+```
+
+### Coming next
+Phase 2 of this work — pushing each new local snapshot to
+`wattpost.cloud` for Pro/Installer customers so it survives an
+SD-card death — lands in a separate release. The `cloud_upload`
+config field is staged but the appliance-side uploader is a no-op
+stub until the cloud-side ingest endpoint lands.
+
 ## [0.0.89] — 2026-05-17
 
 ### Added — Backup &amp; restore (Settings → Backup &amp; restore)
