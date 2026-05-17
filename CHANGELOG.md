@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.80] — 2026-05-17
+
+### Fixed — Victron AC charger labelled "Other source" in flow strip
+The dashboard's Power-Flow strip mapped device kinds to source/load
+tiles via the `FLOW_MAPPING` table. None of the Victron-specific
+kinds shipped in #112/#118 (ac_charger, dcdc_xs, bms,
+load_disconnect) were in that table, so the Victron's real
+output_1_power_w reading was ignored and the energy-balance
+inference kicked in instead — showing "Other source · estimated"
+for the wattage gap. Ritual North saw 232 W Solar + 104 W "Other source"
+adding to the 336 W charging his bank, while the Victron driver
+was actually reading 202 W → the missing ~100 W was load draw
+the inference subtraction couldn't account for.
+
+Added flow mappings for:
+  - ac_charger → "AC Charger" tile using output_1_power_w
+  - dcdc, dcdc_xs → "DC-DC" tile using output_power_w
+  - bms → battery (same as smart_battery / shunt)
+  - load_disconnect → no flow tile (state-only telemetry, shows in
+    device cards)
+
+Result: the Victron now appears as its own correctly-named source
+tile with real wattage. The inferred "Other source" only fires
+when there's a GENUINE energy gap we can't measure — which is
+its actual job.
+
+Multi-output AC chargers (output_2 / output_3 in addition to
+output_1) only render output 1 right now. Rare in van/cabin
+installs; expand if a customer requests it.
+
 ## [0.0.79] — 2026-05-17
 
 ### Fixed — Victron transports left no device polled

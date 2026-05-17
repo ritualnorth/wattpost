@@ -120,15 +120,46 @@ const FLOW_MAPPING = {
   },
   smart_battery: { battery: true },
   shunt:         { battery: true },
+  bms:           { battery: true },  // Victron Lynx Smart BMS, JK BMS
   dcdc_charger:  {
     sources: [{ id: "alt", label: "Alternator", color: "grid", icon: "alternator",
                 metric: "alt_power_w", vMetric: "alt_voltage_v", aMetric: "alt_current_a" }],
+  },
+  // Victron Orion DC-DC chargers (Orion-Tr Smart + Orion XS). Same
+  // flow role as a Renogy DCC: takes alternator/aux DC, outputs to
+  // the bank. The Victron driver exposes input/output as paired
+  // current/voltage; we surface the OUTPUT power as the contribution
+  // to the bank (input - efficiency = output, the output is what
+  // actually reaches the busbar).
+  dcdc:    { sources: [{ id: "alt", label: "DC-DC", color: "grid", icon: "alternator",
+                          metric: "output_power_w",
+                          vMetric: "output_voltage_v", aMetric: "output_current_a" }] },
+  dcdc_xs: { sources: [{ id: "alt", label: "DC-DC", color: "grid", icon: "alternator",
+                          metric: "output_power_w",
+                          vMetric: "output_voltage_v", aMetric: "output_current_a" }] },
+  // Victron AC chargers (Blue Smart IP22 / IP65 / Phoenix Smart).
+  // Up to 3 outputs but most installs use output 1 only; we surface
+  // output_1 here. Multi-output models would need this expanded to
+  // sum all three or render them separately — out of scope for now
+  // since output_2 / output_3 are rare in van/cabin installs.
+  ac_charger: {
+    sources: [{ id: "ac_chg", label: "AC Charger", color: "grid", icon: "plug",
+                metric: "output_1_power_w",
+                vMetric: "output_1_voltage_v", aMetric: "output_1_current_a" }],
   },
   inverter: {
     loads: [{ id: "ac", label: "AC Load", color: "ac", icon: "bolt",
               metric: "ac_output_power_w", vMetric: "ac_output_voltage_v",
               aMetric: "ac_output_current_a" }],
   },
+  // Victron SmartBatteryProtect / similar load-disconnect modules.
+  // Their telemetry is mostly state (connected / disconnected / fault)
+  // not power — we don't have a clean "watts through" reading to plot,
+  // so they don't appear in the flow strip directly. They show up in
+  // the device cards under Devices instead. Listed here so the kind
+  // is "known" to FLOW_MAPPING (avoids the "Other source" inferred
+  // fallback firing because the kind wasn't in the table).
+  load_disconnect: {},
 };
 
 // ---------- helpers ----------
