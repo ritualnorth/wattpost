@@ -94,7 +94,12 @@ const KIND_ICON = {
   smart_battery: "battery",
   inverter: "bolt",
   dcdc_charger: "alternator",
+  dcdc: "alternator",
+  dcdc_xs: "alternator",
+  ac_charger: "feed",
   shunt: "battery",
+  bms: "battery",
+  load_disconnect: "plug",
   // Synthetic aggregate — re-uses the battery glyph but the label
   // (and a CSS hook in styles.css, .dev-card.kind-bank) sets it
   // apart so users read it as "the whole bank" not "another pack".
@@ -5209,7 +5214,7 @@ function renderDeviceDetail(label) {
           ${dev.label}
         </span>
         <span class="dev-detail-meta">
-          ${dev.vendor} · ${dev.kind} · slave ${dev.slave_id}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}
+          ${dev.vendor} · ${dev.kind}${dev.slave_id != null ? " · slave " + dev.slave_id : ""}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}
         </span>
       </div>
       <div class="dev-detail-nav">
@@ -5751,10 +5756,10 @@ function buildAcChargerDetail(dev) {
         <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "—"}</span></div>
       </div>
       <div class="today-strip" style="margin-top:.4rem">
-        <div class="today-cell"><span class="meta-k">AC input</span><span class="today-v">${fmt.num(l.ac_input_current_a, 2)} A</span></div>
+        ${l.ac_input_current_a != null ? `<div class="today-cell"><span class="meta-k">AC input</span><span class="today-v">${fmt.num(l.ac_input_current_a, 2)} A</span></div>` : ""}
         ${outs}
-        <div class="today-cell"><span class="meta-k">Temp</span><span class="today-v">${fmt.num(l.temperature_c, 0)} °C</span></div>
-        ${l.charger_error && l.charger_error !== "no_error" ? `<div class="today-cell"><span class="meta-k">Error</span><span class="today-v">${l.charger_error}</span></div>` : ""}
+        ${l.temperature_c != null ? `<div class="today-cell"><span class="meta-k">Temp</span><span class="today-v">${fmt.num(l.temperature_c, 0)} °C</span></div>` : ""}
+        ${l.charger_error && String(l.charger_error).toLowerCase() !== "no_error" ? `<div class="today-cell"><span class="meta-k">Error</span><span class="today-v">${l.charger_error}</span></div>` : ""}
       </div>
     </section>
     ${buildChargerStatsBlock(dev)}
