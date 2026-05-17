@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.77] — 2026-05-17
+
+### Fixed — Victron encryption-key form unusable on mobile
+The "Pair Victron" form had its key input + label in a horizontal
+flex row with the label at `min-width:7rem`. On a phone-sized
+viewport that left maybe 3cm for the input field, with no easy way
+to see what was typed and a tiny Save button below. Customer
+couldn't actually save the encryption key from VictronConnect.
+
+Rewrite of the form:
+  - Label stacks above the input (vertical, full-width)
+  - Input is `type="text"` not `password` so iOS doesn't truncate
+    for autocomplete suggestions; key is a long random hex string
+    that's already on the user's phone in VictronConnect, password-
+    masking adds no security
+  - `inputmode="latin"`, `autocapitalize="none"`, `autocorrect="off"`,
+    `spellcheck="false"` so iOS doesn't fight the user
+  - `pattern="[0-9a-fA-F]{32}"`, `maxlength="32"` for browser-level
+    validation hints
+  - Save button is 2.4rem tall, full-width-flex on narrow screens
+  - Client-side validation strips spaces / colons / dashes the user
+    might paste from notes, lowercases, then matches `/^[0-9a-f]{32}$/`.
+    Bad input shows an error in the form, no API round-trip.
+  - Updated instructions to reflect VictronConnect's actual menu
+    path (Settings → Product info → Instant readout encryption data,
+    not just "Show device key")
+
+### Known limitation
+There's still no way to edit an existing Victron transport's key
+from the transport list — if you added it with the wrong key (or no
+key), trash-icon-delete + rescan + re-add. PATCH endpoint on
+existing transports is a backlog task.
+
 ## [0.0.76] — 2026-05-17
 
 ### Security — kiosk-share URL no longer leaks dashboard chrome (#150)
