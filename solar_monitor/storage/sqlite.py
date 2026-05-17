@@ -1227,12 +1227,13 @@ class Store:
         # averages, but we only have those if the window is long
         # enough — otherwise sample raw.
         table, ts_col, _ = self._pick_history_table(until_ts - since_ts)
+        value_col = "value" if table == "samples" else "avg"
         soc_sql = (
-            f"SELECT {('avg_value' if table != 'samples' else 'value')} "
+            f"SELECT {value_col} "
             f"FROM {table} "
             f"WHERE device = 'bank' AND metric = 'soc_pct' "
             f"  AND {ts_col} BETWEEN ? AND ? "
-            f"  AND {('avg_value' if table != 'samples' else 'value')} IS NOT NULL"
+            f"  AND {value_col} IS NOT NULL"
         )
         soc_buckets = [0] * 10  # 0-10, 10-20, …, 90-100
         async with self._db.execute(soc_sql, (since_ts, until_ts)) as cur:

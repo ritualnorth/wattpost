@@ -8,6 +8,43 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.72] — 2026-05-17
+
+### Fixed — Battery health endpoint 500'd on any window > 6 hours
+`battery_health_aggregate` referenced an `avg_value` column when
+falling back to the rollup tables (samples_1min / samples_1hour /
+samples_1day) — but those tables store the averaged value in a
+column called `avg`. SQLite returned "no such column: avg_value"
+and the endpoint 500'd for the default 30-day window (the only
+window the UI ever requests). Customers saw a permanently broken
+Battery health tile and — because the JS dashboard refresh fires
+the same call on boot — a blank dashboard until the request
+eventually settled. Net effect: feature shipped in #109 silently
+broken for everyone on the rollup window. Caught while debugging
+a "blank dashboard after broker login" report.
+
+## [0.0.71] — 2026-05-17
+
+### Fixed — "Remaining" tile showed instant rate, not realistic forecast
+The forecast-aware overlay ("Forecast: ~6 h until 10% at 19:30")
+that walks PV forecast vs avg load was supposed to handle the
+"2d 5h until empty" misleading-instant-rate case. But
+`/api/runtime-forecast` was returning 404 because the function
+existed in api/app.py but was never added to the route_handlers
+list — same bug class as #109. JS silently hid the forecast line
+on the 404, leaving only the naive instant-rate reading. Pure
+registration fix.
+
+## [0.0.70] — 2026-05-17
+
+### Changed — Saner "until empty" estimate
+At standby loads (sub-1.5 A net), the naive `capacity ÷ current`
+estimate produced laughably long times ("2 d 5 h until empty"
+when the server was just idling). Bumped the "idle, don't show
+runtime" threshold from 0.5 A to 1.5 A and subtract a 10 %
+reserve from the headline number, so the displayed figure
+matches what the user can practically use.
+
 ## [0.0.69] — 2026-05-17
 
 ### Fixed — Battery health panel was rendering empty (route never registered)
