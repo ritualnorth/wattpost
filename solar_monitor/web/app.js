@@ -4817,6 +4817,91 @@ if (rotatePwBtn) {
 const diagRefreshBtn = $("#diag-refresh");
 if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
 
+// ---------- kiosk share URL (Settings → Kiosk share URL) ----------
+// Surfaces the per-appliance kiosk_token as a copy-paste-able URL
+// + lets the user rotate it (revoke a leaked URL with one click).
+// Hidden until the cloud tunnel is provisioned — share URL needs
+// a slug to point anywhere.
+(function wireKioskShare() {
+  const block    = document.getElementById("kiosk-block");
+  const input    = document.getElementById("kiosk-url");
+  const copyBtn  = document.getElementById("kiosk-copy-btn");
+  const rotBtn   = document.getElementById("kiosk-rotate-btn");
+  const msg      = document.getElementById("kiosk-msg");
+  if (!block || !input || !copyBtn || !rotBtn) return;
+
+  async function load() {
+    try {
+      const r = await fetch("/api/system/kiosk", { credentials: "same-origin" });
+      if (!r.ok) return;  // unauthed user — Settings tab gate will redirect anyway
+      const data = await r.json();
+      block.hidden = false;
+      if (data.share_url) {
+        input.value = data.share_url;
+        copyBtn.disabled = false;
+      } else {
+        input.value = "";
+        input.placeholder = "No cloud tunnel — pair the appliance first";
+        copyBtn.disabled = true;
+      }
+    } catch (_) { /* network error — leave block hidden */ }
+  }
+
+  copyBtn.addEventListener("click", async () => {
+    if (!input.value) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+      msg.textContent = "Copied ✓";
+      setTimeout(() => { msg.textContent = ""; }, 1500);
+    } catch (_) {
+      input.select();
+      msg.textContent = "Press Ctrl+C / Cmd+C to copy";
+    }
+  });
+
+  rotBtn.addEventListener("click", async () => {
+    if (!confirm(
+      "Rotate the kiosk token?\n\n" +
+      "The current share URL stops working immediately. Anyone you " +
+      "previously shared it with will need the new URL. Use this if " +
+      "the URL leaked or you want to revoke a specific share."
+    )) return;
+    rotBtn.disabled = true;
+    msg.textContent = "Rotating…";
+    try {
+      const r = await fetch("/api/system/kiosk/rotate", {
+        method: "POST", credentials: "same-origin",
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      if (data.share_url) {
+        input.value = data.share_url;
+        copyBtn.disabled = false;
+      }
+      msg.textContent = "Rotated ✓ — old URL is dead";
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    } catch (e) {
+      msg.textContent = `Rotate failed: ${e.message}`;
+    } finally {
+      rotBtn.disabled = false;
+    }
+  });
+
+  // Lazy-load when Settings tab is opened, not on every page load.
+  // Re-uses the same hashchange firing setRoute() — when route ==
+  // settings AND we haven't loaded yet, fetch once.
+  let loaded = false;
+  function maybeLoad() {
+    if (loaded) return;
+    if (!document.body.dataset.route || document.body.dataset.route === "settings") {
+      loaded = true;
+      load();
+    }
+  }
+  window.addEventListener("hashchange", maybeLoad);
+  maybeLoad();
+})();
+
 // Status pill legend popover — click the pill to open, click outside or
 // the close button to dismiss.
 const statusEl = $("#status");
