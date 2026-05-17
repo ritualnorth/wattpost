@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.93] — 2026-05-17
+
+### Fixed — Cloud-upload toggle ignored tier
+Toggle let Hobby-tier (and unpaired) accounts flip cloud_upload to
+true even though every subsequent upload would 402. Now:
+
+- Cloud-toggle endpoint pre-flights against the cloud and rejects
+  enable with explicit 402 / 503 / 401 when the account isn't
+  eligible. Defence in depth — UI can't bypass via curl.
+- Settings UI always probes `/cloud-list` on render, so even before
+  the toggle is touched the button reflects reality: greyed out and
+  labelled "Upgrade to enable" for Hobby, "Pair to wattpost.cloud
+  first" for unpaired, "Cloud account not ready" while the cloud
+  is on an older build. Clicking the Hobby variant jumps straight
+  to the upgrade page.
+
 ## [0.0.92] — 2026-05-17
 
 ### Fixed — Cloud backups UI was customer-hostile

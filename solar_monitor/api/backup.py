@@ -539,11 +539,55 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
     """Flip `backup.cloud_upload` in the running config and persist
     to disk. Re-wires the BackupService's uploader hook in-process
     so no daemon restart is needed. Body: `{enabled: bool}`.
+
+    Server-side defence in depth: when enabling, pre-flight a call
+    to the cloud so a Hobby-tier or unpaired user can't sneak past
+    the UI gate by curl-ing this endpoint. The UI is also expected
+    to greys-out the toggle, but the endpoint must reject too.
     """
     import shutil as _shutil
     import yaml as _yaml
+    import httpx as _httpx
     body = await request.json()
     enabled = bool(body.get("enabled")) if isinstance(body, dict) else False
+
+    if enabled:
+        # Pre-flight against the cloud. Same path the UI hits when
+        # rendering — `tier_required` for Hobby accounts,
+        # `not_yet_available` if the cloud is on an older build.
+        try:
+            endpoint, token = _cloud_creds(state)
+        except HTTPException as e:
+            raise HTTPException(
+                status_code=e.status_code,
+                detail="Pair the appliance to wattpost.cloud before enabling cloud backups.",
+            )
+        async with _httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"{endpoint}/api/internal/backups/list",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+        if r.status_code == 402:
+            raise HTTPException(
+                status_code=402,
+                detail=(
+                    "Cloud backups require Pro or Installer tier. "
+                    "Upgrade at https://wattpost.cloud/app/account to enable."
+                ),
+            )
+        if r.status_code == 404:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Cloud account is on an older build that doesn't "
+                    "accept backup uploads yet. Try again shortly."
+                ),
+            )
+        if r.status_code >= 400:
+            raise HTTPException(
+                status_code=r.status_code,
+                detail=f"Cloud rejected pre-flight: {r.text[:200]}",
+            )
 
     config_path = state.get("config_path")
     if not config_path:
