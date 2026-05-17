@@ -586,7 +586,7 @@ def kiosk_index() -> File:
 
 
 @get("/login", sync_to_thread=False)
-def login_page(request: Request) -> File | Response:
+def login_page(request: Request, state: State) -> File | Response:
     """Static HTML login form. POSTs to /api/login → cookie + redirect.
 
     Special case: when the request reached us via the Cloudflare
@@ -598,6 +598,37 @@ def login_page(request: Request) -> File | Response:
     will 401 against."""
     from .. import web_auth as _wa
     if _wa.is_tunnel_origin(request.scope):
+        # Broker-authed users are already signed in from the appliance's
+        # POV — every request from the cloud broker carries a valid
+        # X-WP-Broker-Auth HMAC. They have no business seeing the
+        # "Sign in via wattpost.cloud" dead-end. Bounce them straight
+        # to wherever they were heading (the `next` param) or the SPA.
+        # Triggered when the SPA's Settings gate races + redirects to
+        # /login before auth-status resolves.
+        broker_header = None
+        for k, v in request.scope.get("headers", []):
+            if k == b"x-wp-broker-auth":
+                broker_header = v.decode("latin-1", errors="ignore")
+                break
+        if broker_header:
+            cfg = state.get("config") if hasattr(state, "get") else state["config"]
+            sso = (cfg.cloud.sso_secret if (cfg and cfg.cloud) else "") or ""
+            if sso and _wa.verify_broker_auth(broker_header, sso):
+                # Honour ?next= but only when it's an internal path;
+                # bare "/" otherwise. Open-redirect defence.
+                qs = request.scope.get("query_string", b"") or b""
+                target = "/"
+                for part in qs.split(b"&"):
+                    if part.startswith(b"next="):
+                        nxt = part[5:].decode("latin-1", errors="ignore")
+                        # Decode + sanity-check it's a relative same-origin path
+                        from urllib.parse import unquote
+                        nxt = unquote(nxt)
+                        if nxt.startswith("/") and not nxt.startswith("//"):
+                            target = nxt
+                        break
+                return Response(content="", status_code=302,
+                                headers={"Location": target})
         page = _web_dir() / "login-tunnel.html"
         if page.exists():
             return File(path=page, media_type="text/html",
