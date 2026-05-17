@@ -6336,8 +6336,12 @@ async function wizFindDongle() {
       // from the payload header — SmartShunt/SmartSolar/Orion-Tr etc.)
       // makes the badge richer than just "Victron".
       const dc = d.victron_device_class || "Victron device";
+      const dcRaw = d.victron_device_class || "";
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">${escHtml(dc)}</span>`;
-      actionHtml = `<button class="btn-action btn-action--primary" data-pair-victron="${escHtml(d.address)}">Pair Victron</button>`;
+      // Stash device_class on the Pair button so the Save handler can
+      // pass it to the backend — needed to pick the right device_kind
+      // when auto-creating the device row (#159-adjacent fix).
+      actionHtml = `<button class="btn-action btn-action--primary" data-pair-victron="${escHtml(d.address)}" data-victron-class="${escHtml(dcRaw)}">Pair Victron</button>`;
       // The key form is rendered hidden and revealed when the user
       // taps "Pair Victron" — keeps the scan-results card compact.
       keyFormHtml = `
@@ -6418,6 +6422,12 @@ async function wizFindDongle() {
   });
   list.querySelectorAll("[data-victron-save]").forEach(b => {
     const mac = b.dataset.victronSave;
+    // Pick up the device_class the scan card stashed on the Pair
+    // button (the one in the same row as this Save button). Passed
+    // through to wizAddTransportFromVictron so the backend can
+    // auto-create the device row with the right kind.
+    const pairBtn = list.querySelector(`[data-pair-victron="${mac}"]`);
+    const deviceClass = pairBtn?.dataset.victronClass || "";
     b.addEventListener("click", () => {
       const form = list.querySelector(`[data-victron-key-for="${mac}"]`);
       const status = list.querySelector(`[data-victron-status="${mac}"]`);
@@ -6437,7 +6447,7 @@ async function wizFindDongle() {
         return;
       }
       if (status) status.style.color = "";
-      wizAddTransportFromVictron(mac, key);
+      wizAddTransportFromVictron(mac, key, deviceClass);
     });
   });
 }
@@ -6469,7 +6479,7 @@ function renderMissingPanel(missing) {
   </div>`;
 }
 
-async function wizAddTransportFromVictron(mac, key) {
+async function wizAddTransportFromVictron(mac, key, deviceClass) {
   // Per-row status reflects what's happening so the user doesn't
   // have to hunt for the wiz-find-status global.
   const status = document.querySelector(`[data-victron-status="${mac}"]`);
@@ -6483,6 +6493,11 @@ async function wizAddTransportFromVictron(mac, key) {
         type: "ble_victron_advertise",
         address: mac,
         encryption_key: key,
+        // Pass the victron-ble class name the scan detected so the
+        // backend auto-creates the device row with the right kind
+        // (ac_charger / shunt / charge_controller / …) instead of
+        // falling back to a generic default.
+        device_class: deviceClass || "",
       }),
     });
     if (!r.ok) {

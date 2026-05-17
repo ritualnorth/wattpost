@@ -36,7 +36,13 @@ class DeviceCfg(msgspec.Struct, kw_only=True):
     vendor: str
     kind: str
     transport: str
-    slave_id: int
+    # slave_id is the Modbus unit ID for ble_modbus / serial_modbus
+    # devices. Victron Instant Readout devices (ble_victron_advertise
+    # transport) don't have a Modbus address — they're identified by
+    # MAC at the transport level. Optional so a Victron device config
+    # block can omit it. Drivers that genuinely need a slave_id
+    # validate it on poll().
+    slave_id: int | None = None
     label: str | None = None
 
 
