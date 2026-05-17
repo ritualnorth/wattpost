@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.96] — 2026-05-17
+
+### Fixed — Cloud "Today in" silently excluded AC charger + DC-DC contributions
+The cloud-side dashboard (multi-site summary + per-site card) was
+reading `pv_today_wh` from heartbeat extras and labelling the
+total as "Today in". For PV-only installs that's correct, but on
+multi-source installs (Victron Blue Smart AC charger, Orion DC-DC
+alternator charger) the AC charger and DC-DC contributions were
+invisible — a bench appliance showing 1.7 PV + 0.9 AC = 2.6 kWh
+actually delivered today rendered as "1.7 kWh" on the cloud tile.
+
+Now the appliance also ships `sources_today_wh` (all sources
+summed; the value already lived in `today_aggregate` since v0.0.81
+but wasn't surfaced over heartbeat). Cloud dashboards prefer it
+and fall back to `pv_today_wh` for appliances on older builds,
+so no upgrade ordering hazard.
+
 ## [0.0.95] — 2026-05-17
 
 ### Fixed — Kiosk "Exit" button breaks out of broker view into full chrome
