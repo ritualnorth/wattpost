@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.78] — 2026-05-17
+
+### Fixed — Victron transport perpetually reported OFFLINE
+The `/api/setup/transports` endpoint determined "open" state by
+checking `transport._client.is_connected`, which only Modbus-style
+transports have. The passive Victron transport
+(`ble_victron_advertise`) has no GATT client to "open" — it just
+registers a listener with the shared scanner and waits for
+broadcasts. So a perfectly healthy Victron transport that was
+actively decoding the customer's device showed OFFLINE in the
+wizard's transport list. Hit by Ritual North pairing his BSC IP22.
+
+Class-aware open-state probe added: for ble_victron_advertise we
+check `_registered` (listener attached to shared scanner) AND
+`_latest_at` (last advertisement was within 60s). Modbus-style
+transports keep the old `_client.is_connected` path. Both branches
+documented inline; a future Transport.is_connected property on the
+base class would let us drop the per-class switch.
+
 ## [0.0.77] — 2026-05-17
 
 ### Fixed — Victron encryption-key form unusable on mobile

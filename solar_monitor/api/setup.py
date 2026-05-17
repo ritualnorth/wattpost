@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import re
 import shutil
 from pathlib import Path
@@ -778,23 +779,50 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
 
 @get("/api/setup/transports")
 async def list_setup_transports(state: State) -> dict[str, Any]:
-    """Return configured transports with their live open/closed state."""
+    """Return configured transports with their live open/closed state.
+
+    The notion of "open" varies by transport class:
+      * `ble_modbus` / `serial_modbus`: a GATT or serial connection is
+        actually held open. `_client.is_connected` (bleak) or the
+        socket-style equivalent is the signal.
+      * `ble_victron_advertise`: PASSIVE — no connection is ever held.
+        The transport is "open" iff its passive listener is registered
+        with the shared scanner AND we've seen an advertisement
+        recently (within 60s). Otherwise we'd mark a perfectly-healthy
+        Victron transport OFFLINE indefinitely (#159-adjacent UX bug
+        from v0.0.77).
+    Per-class fallbacks below; new transport types should add a
+    branch here OR expose a uniform `is_connected` property on the
+    Transport base class (preferred when we get around to it).
+    """
     scheduler: PollScheduler = state["scheduler"]
     config: Config = state["config"]
     out: list[dict[str, Any]] = []
     for tcfg in config.transports:
         tid = tcfg.get("id")
+        ttype = tcfg.get("type") or ""
         t = scheduler.get_transport(tid) if tid else None
-        client = getattr(t, "_client", None) if t else None
+        # Class-aware open-state probe.
+        is_open = False
+        if t is not None:
+            if ttype == "ble_victron_advertise":
+                # Passive: registered + recent advertisement = "open".
+                registered = bool(getattr(t, "_registered", False))
+                last_at = float(getattr(t, "_latest_at", 0.0) or 0.0)
+                fresh = (time.time() - last_at) < 60 if last_at else False
+                is_open = registered and fresh
+            else:
+                client = getattr(t, "_client", None)
+                is_open = bool(client and getattr(client, "is_connected", False))
         # BLE transports expose `address` (MAC); serial transports
         # expose `port` (/dev/ttyUSB0). The wizard shows whichever is
         # present so a mixed-transport install reads cleanly.
         out.append({
             "id":      tid,
-            "type":    tcfg.get("type"),
+            "type":    ttype,
             "address": tcfg.get("address"),
             "port":    tcfg.get("port"),
-            "open":    bool(client and getattr(client, "is_connected", False)),
+            "open":    is_open,
         })
     return {"transports": out}
 
