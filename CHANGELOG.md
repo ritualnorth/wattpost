@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.76] — 2026-05-17
+
+### Security — kiosk-share URL no longer leaks dashboard chrome (#150)
+The public kiosk URL (`/kiosk?key=<token>`) captured the token into
+KIOSK_KEY_PARAM in memory, then the "Exit Kiosk" button just changed
+the SPA hash to `#/`. Token stayed in memory, every subsequent api()
+call appended `?key=`, the Caddy @kiosk_open bypass + appliance
+kiosk allow-list happily served data — so a kiosk-share visitor
+could exit into the dashboard chrome and see all the panels that
+the kiosk allow-list happens to cover. Mutations + Settings + sensitive
+endpoints were still gated, but the "share this link and they see the
+kiosk only" UX promise was broken.
+
+Fix:
+  - Hide the Exit Kiosk button entirely when KIOSK_KEY_PARAM is set
+    (the visitor has no real session, exit is meaningless to them).
+  - Belt-and-braces: if the button is somehow clicked while a key is
+    still in memory, do a FULL page reload to `/` (not a hash change),
+    which drops KIOSK_KEY_PARAM. api() calls then go through normal
+    auth and 401 anything the user isn't entitled to.
+
+Found in the pre-launch pentest, Ritual North spotted it manually.
+
+### Security — cloud-side hardening (#155, #156)
+Ship in the cloud (auto-deploys to wattpost.cloud on push), documented
+here for visibility:
+  - #155: /healthz/deep no longer leaks raw user / appliance counts.
+    Returns a boolean `checks.heartbeats = "ok" | "stale"` instead.
+    Public /status page reworked to show health states, not numerics.
+  - #156: /api/heartbeat now rate-limited to 60/5min/IP. Real
+    appliances heartbeat 1/5min so this is 60× headroom; brute-force
+    against bearer tokens hits a wall quickly.
+
 ## [0.0.75] — 2026-05-17
 
 ### Fixed — Appliance sessions wipe on container restart (#149)
