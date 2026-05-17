@@ -3147,12 +3147,61 @@ function wireBackupRunNow() {
 async function refreshCloudBackups() {
   const list = document.getElementById("backup-cloud-list");
   const summary = document.getElementById("backup-cloud-summary");
-  if (!list) return;
+  const toggleBtn = document.getElementById("backup-cloud-toggle");
+  const toggleMsg = document.getElementById("backup-cloud-toggle-msg");
+  if (!list || !toggleBtn) return;
+
+  // Read schedule first — it tells us whether cloud_upload is on,
+  // and whether the appliance is paired (we can't know the latter
+  // for sure from here, so we look for a recent cloud upload OR
+  // fall back to trying the list).
+  let sched;
+  try { sched = await api("/api/system/backup/schedule"); }
+  catch { sched = null; }
+  const cloudOn = !!(sched && sched.cloud_upload_enabled);
+
+  // Toggle button — let the user flip cloud_upload right here.
+  toggleBtn.hidden = false;
+  toggleBtn.textContent = cloudOn ? "Disable cloud upload" : "Enable cloud upload";
+  toggleBtn.onclick = async () => {
+    toggleBtn.disabled = true;
+    toggleMsg.textContent = cloudOn ? "Disabling…" : "Enabling…";
+    try {
+      const r = await fetch(_withKiosk("/api/system/backup/cloud-toggle"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !cloudOn }),
+      });
+      if (!r.ok) {
+        let detail = r.statusText;
+        try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
+        throw new Error(`${r.status} ${detail}`);
+      }
+      toggleMsg.textContent = !cloudOn ? "Enabled." : "Disabled.";
+      refreshBackupSchedule();
+      refreshCloudBackups();
+    } catch (e) {
+      toggleMsg.textContent = "Failed: " + e.message;
+    } finally {
+      toggleBtn.disabled = false;
+    }
+  };
+
+  if (!cloudOn) {
+    list.innerHTML = `<div class="settings-empty">
+      Cloud upload is off. Click <strong>Enable cloud upload</strong>
+      to push each scheduled snapshot to wattpost.cloud.
+    </div>`;
+    return;
+  }
+
   let data;
   try {
     const r = await fetch(_withKiosk("/api/system/backup/cloud-list"), { cache: "no-store" });
     if (r.status === 503) {
-      list.innerHTML = `<div class="settings-empty">Not paired or cloud upload disabled.</div>`;
+      list.innerHTML = `<div class="settings-empty">
+        Cloud upload is on, but this appliance isn't paired to wattpost.cloud yet.
+      </div>`;
       return;
     }
     if (!r.ok) {
@@ -3166,12 +3215,28 @@ async function refreshCloudBackups() {
     list.innerHTML = `<div class="settings-empty" style="color:#f87171">${e.message}</div>`;
     return;
   }
+  if (data.not_yet_available) {
+    list.innerHTML = `<div class="settings-empty">
+      Cloud account is on an older build that doesn't accept backup
+      uploads yet. The next cloud deploy will enable this — your
+      local snapshots are unaffected.
+    </div>`;
+    return;
+  }
+  if (data.tier_required) {
+    list.innerHTML = `<div class="settings-empty">
+      Cloud backups require <strong>Pro</strong> or
+      <strong>Installer</strong> tier on the paired account.
+      <a href="https://wattpost.cloud/app/account">Upgrade here</a>.
+    </div>`;
+    return;
+  }
   if (summary && data.backups && data.backups.length > 0) {
     summary.innerHTML =
       `Off-site copies stored on wattpost.cloud. ${data.backups.length} backup(s) on file.`;
   }
   if (!data.backups || !data.backups.length) {
-    list.innerHTML = `<div class="settings-empty">No cloud backups yet. Next snapshot will push automatically.</div>`;
+    list.innerHTML = `<div class="settings-empty">No cloud backups yet. The next scheduled snapshot will upload automatically.</div>`;
     return;
   }
   list.innerHTML = `
