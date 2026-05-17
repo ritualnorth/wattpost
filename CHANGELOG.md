@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.89] — 2026-05-17
+
+### Added — Backup &amp; restore (Settings → Backup &amp; restore)
+One-click download of a tar.gz containing:
+  - the full SQLite database (history, samples, devices, alerts,
+    kiosk tokens, web sessions) — taken via SQLite's online-backup
+    API so it's safe to download mid-poll without locking writers
+  - `config.yaml` (devices, transports, alert rules, schedules)
+  - `web-password.hash` (local-UI password)
+  - a `MANIFEST` recording version + capture timestamp
+
+Restore takes the same archive back, validates it (must be a real
+tar.gz, must contain a SQLite file that passes `PRAGMA
+integrity_check`), atomically swaps everything into place, and
+re-execs the daemon. The pre-restore config is kept alongside as
+`config.yaml.restored.bak` so a bad restore is reversible.
+
+Two new endpoints, both behind the same session-cookie auth as
+the rest of Settings:
+  - `GET /api/system/backup` → streams the archive
+  - `POST /api/system/restore` → accepts the raw `.tar.gz` body
+
+UI lives next to the existing Diagnostics block on the Settings
+page — Download / Restore-from-file… buttons + a destructive-action
+confirm before any swap, and the dashboard auto-reloads once
+`/api/health` comes back after the restart.
+
 ## [0.0.88] — 2026-05-17
 
 ### Added — Rename devices from the UI

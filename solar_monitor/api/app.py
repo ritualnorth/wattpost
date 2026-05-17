@@ -75,6 +75,7 @@ from .system import (
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
 )
+from .backup import export_backup, import_backup
 
 
 def _web_dir() -> Path:
@@ -1100,6 +1101,8 @@ def build_app(
             device_efficiency,
             device_charger_stats,
             set_device_display_name,
+            export_backup,
+            import_backup,
             battery_health,
             runtime_forecast,
             load_heatmap,
