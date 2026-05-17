@@ -8,6 +8,34 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.60] — 2026-05-17
+
+### Fixed — CRITICAL: Docker users lost ALL history on every image pull
+config.db_path was settable but the daemon completely ignored it.
+`cmd_serve` always passed `args.db` (default `solar-monitor.db`)
+to build_app, which resolved to `/app/solar-monitor.db` inside
+the container — i.e. the IMAGE's ephemeral writable layer, not
+the bind-mounted /var/lib/wattpost volume. Every
+`docker compose pull && up -d` swapped the image → /app gone →
+every metric the user had ever collected, vanished.
+
+`_resolve_db_path` now picks (in order): explicit --db arg →
+config.db_path → CLI default. Pi installs are unaffected (their
+default db_path lands in /var/lib/wattpost anyway via the
+systemd unit). Docker installs with a v0.0.60+ image will now
+write to the bind-mounted volume + survive image upgrades.
+
+### Migrated — Legacy in-image-layer DB → persistent path
+On startup, if config.db_path points somewhere new but the legacy
+./solar-monitor.db exists at the daemon's CWD, the file gets
+copied to the new location and the source renamed to
+.legacy.bak (preserved for one container restart in case
+anything goes wrong). One-shot, idempotent.
+
+Anyone whose container has been crash-looping since v0.0.56
+(see v0.0.59 hotfix) and has no DB at the legacy path either:
+nothing to migrate, fresh start unfortunately.
+
 ## [0.0.59] — 2026-05-17
 
 ### Fixed — CRITICAL: appliance crash-loop on startup (v0.0.56–v0.0.58)
