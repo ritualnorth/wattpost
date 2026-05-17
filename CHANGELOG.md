@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-05-17
+
+### Fixed — Hourly weather strip ran dry after early evening
+The Open-Meteo provider requested `forecast_days: 1`, meaning the
+hourly array only contained timestamps within the current local
+calendar day. By ~18:00 the rolling 12-hour preview was already
+showing 4 future hours; by 22:00 it was down to 1 (or zero, since
+the cutoff filter also rejected the just-passed hour). Result:
+the Right-now tile's hourly strip looked broken late in the day.
+
+Bumped to `forecast_days: 2` so the API returns the next 48 hours
+of forecast — _HOURLY_KEEP=12 still caps what we render. ~50
+hourly rows on the wire (vs ~24) is negligible payload growth.
+
 ## [0.1.0] — 2026-05-17
 
 ### Milestone release — what shipped today
