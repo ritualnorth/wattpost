@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.79] — 2026-05-17
+
+### Fixed — Victron transports left no device polled
+"Pair Victron" added a transport row to config.yaml but never the
+corresponding device row. The transport happily decoded
+advertisements but the poller had nothing to bind the data to, so
+the dashboard showed no Victron metrics. The wizard's "Scan for
+devices" button is Modbus-only (sweeps slave IDs) so users had no
+path to add the device manually either. Stuck-without-data state.
+
+Three coordinated changes:
+  - `DeviceCfg.slave_id` is now `int | None = None` instead of a
+    required int. Victron BLE Instant Readout devices are MAC-
+    addressed at the transport layer; demanding a fake slave_id
+    just to satisfy the schema was wrong.
+  - `add_transport` for `ble_victron_advertise` now also appends
+    a device row to config.yaml, mapping the victron-ble class
+    name (AcCharger / SolarCharger / BatteryMonitor / OrionXS /
+    DcDcConverter / SmartLithium / LynxSmartBMS / SmartBattery
+    Protect) to the WattPost device_kind. Falls back to
+    `ac_charger` if class is unknown.
+  - `AddTransportRequest.device_class` field added; the wizard's
+    Pair button now stashes the class from scan results and the
+    Save handler passes it through.
+
+Customer impact: adding a Victron via the wizard is now actually
+one-click — Pair → key → Save → data flowing. No second config
+edit needed. Existing customers who paired before this release
+need to add a device row manually OR delete + re-pair via the
+new wizard flow.
+
+Hit by Ritual North pairing his BSC IP22 12/15 on the new VM appliance.
+
 ## [0.0.78] — 2026-05-17
 
 ### Fixed — Victron transport perpetually reported OFFLINE

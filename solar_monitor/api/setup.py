@@ -609,6 +609,12 @@ class AddTransportRequest(msgspec.Struct):
     port: str | None = None
     baudrate: int = 9600
     encryption_key: str | None = None
+    # device_class: optional hint from the wizard's scan results (the
+    # victron-ble Device class name, e.g. "AcCharger" / "SolarCharger" /
+    # "BatteryMonitor"). Used by ble_victron_advertise to pick the
+    # right device_kind when auto-creating the device row. Falls back to
+    # a sensible default if absent.
+    device_class: str | None = None
     label: str | None = None
     type: str = "ble_modbus"
 
@@ -753,6 +759,45 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     block["id"]    = new_id
     block["label"] = label
     raw.setdefault("transports", []).append(block)
+
+    # Victron Instant Readout transports auto-create their corresponding
+    # device row. Unlike Modbus transports (where the user runs a slave-ID
+    # scan to discover devices), a Victron passive transport IS the
+    # device — one MAC, one device, one driver. Without this row the
+    # daemon happily listens for advertisements but has no DeviceCfg to
+    # bind the decoded data to. The wizard's slave-ID scan button
+    # doesn't apply (Victron has no slave_id), so the user has no path
+    # to add the device manually from the UI. Auto-create here so the
+    # data starts flowing the moment Save is clicked.
+    if data.type == "ble_victron_advertise":
+        # Map victron-ble's device-class names → WattPost device_kind.
+        # Filled when the wizard scan passes data.device_class; falls
+        # back to "ac_charger" (a safe poll-anything kind) if we don't
+        # know — the driver's payload-classifier will still parse,
+        # just under a less-specific kind label.
+        VICTRON_CLASS_TO_KIND = {
+            "AcCharger":           "ac_charger",
+            "BatteryMonitor":      "shunt",
+            "SolarCharger":        "charge_controller",
+            "OrionXS":             "dcdc_xs",
+            "DcDcConverter":       "dcdc",
+            "SmartLithium":        "smart_battery",
+            "LynxSmartBMS":        "bms",
+            "SmartBatteryProtect": "load_disconnect",
+        }
+        cls = (data.device_class or "").strip()
+        kind = VICTRON_CLASS_TO_KIND.get(cls, "ac_charger")
+        device_block = {
+            "vendor":    "victron",
+            "kind":      kind,
+            "transport": new_id,
+            # slave_id intentionally omitted — Victron BLE is MAC-addressed.
+            # DeviceCfg.slave_id is `int | None = None` so this is valid.
+            "label":     label,
+        }
+        raw.setdefault("devices", []).append(device_block)
+        log.info("setup wizard: auto-added victron device kind=%s for transport %s",
+                 kind, new_id)
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
