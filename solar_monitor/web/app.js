@@ -383,6 +383,22 @@ const KIOSK_KEY_PARAM = (() => {
     return new URLSearchParams(window.location.search).get("key") || "";
   } catch (_) { return ""; }
 })();
+
+// True when the dashboard is being served via the cloud broker
+// (`<slug>.wattpost.cloud` / legacy `.wattpost.io`) rather than
+// directly on the appliance's LAN IP. Used to suppress UI bits
+// that only make sense for someone with full local access — most
+// notably the Kiosk → Exit button, which on broker would dump
+// the customer into the Settings/Devices/etc full chrome that
+// app.wattpost.cloud is supposed to own. Locally (192.168.x or
+// wattpost.local) Exit stays — the van/cabin operator wants to
+// flip between the SoC kiosk and the dashboard freely.
+const IS_BROKER_VIEW = (() => {
+  try {
+    const h = (window.location.hostname || "").toLowerCase();
+    return /\.wattpost\.cloud$|\.wattpost\.io$/.test(h);
+  } catch (_) { return false; }
+})();
 function _withKiosk(path) {
   if (!KIOSK_KEY_PARAM) return path;
   // Only attach to relative paths (don't leak the token to third
@@ -5187,24 +5203,30 @@ if (kioskToggle) {
 }
 const kioskExitBtn = $("#kiosk-exit");
 if (kioskExitBtn) {
-  // Hide Exit Kiosk entirely when the visitor only has kiosk-token
-  // auth (#150). They got here via the public share URL and have no
-  // session — letting them "exit" into the dashboard would render
-  // appliance chrome they never had permission to see. The button
-  // re-appears for authed users (cloud-broker session OR local
-  // session) for whom Exit is a legitimate navigation.
-  if (KIOSK_KEY_PARAM) {
+  // Hide Exit Kiosk for two cases:
+  //   - kiosk-token share URL (#150): visitor has no session at
+  //     all, would land in the dashboard with no auth and see
+  //     401s everywhere — bad UX.
+  //   - Cloud-broker view: customer IS authed via the cloud, but
+  //     the broker dashboard at xyz.wattpost.cloud should be
+  //     SoC-kiosk-only. Full Settings / Devices / Setup chrome
+  //     belongs in app.wattpost.cloud, not on the appliance
+  //     broker URL. Keeps the broker view focused.
+  // The Exit button still renders on direct local access
+  // (192.168.x.x / wattpost.local) where the van/cabin operator
+  // genuinely wants to flip between SoC kiosk and the full UI.
+  if (KIOSK_KEY_PARAM || IS_BROKER_VIEW) {
     kioskExitBtn.hidden = true;
   }
   kioskExitBtn.addEventListener("click", () => {
     // Belt-and-braces: even if the button is somehow clicked while
-    // KIOSK_KEY_PARAM is set, do a full reload to "/" so the URL
-    // key drops out of memory. The new page load captures
-    // KIOSK_KEY_PARAM = "" (no /kiosk pathname) and api() calls go
-    // through normal auth — the appliance will 401 anything the
-    // user actually shouldn't see.
+    // KIOSK_KEY_PARAM or IS_BROKER_VIEW is set, just stay on /kiosk
+    // rather than navigating into chrome that should be hidden.
     if (KIOSK_KEY_PARAM) {
       window.location.href = "/";
+    } else if (IS_BROKER_VIEW) {
+      // Broker — stay put, no breakout.
+      return;
     } else {
       window.location.hash = "#/";
     }

@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.95] — 2026-05-17
+
+### Fixed — Kiosk "Exit" button breaks out of broker view into full chrome
+Follow-on to #150. That fix hid Exit for anonymous kiosk-token
+visitors but the button was still available on cloud-broker
+sessions (`xyz.wattpost.cloud`), which let an authed customer
+exit out of the SoC kiosk into the full Settings / Devices /
+Setup chrome — chrome that's owned by app.wattpost.cloud, not by
+the appliance's broker hostname.
+
+Now: hide Exit + neutralise its click when the page is loaded
+over a `*.wattpost.cloud` or `*.wattpost.io` hostname (the
+broker pattern). Direct local access (LAN IP, wattpost.local)
+keeps the button — van/cabin operators legitimately need to
+swap between kiosk and dashboard from a single device.
+
+New `IS_BROKER_VIEW` constant in app.js for any future UI bits
+that should be broker-aware.
+
 ## [0.0.94] — 2026-05-17
 
 ### Fixed — Restore now preserves the appliance's pairing
