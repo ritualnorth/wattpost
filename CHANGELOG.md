@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.64] — 2026-05-17
+
+### Changed — Removed Sign In / Sign Out buttons from appliance header
+Both were ugly clutter. The auth model since v0.0.58 only gates
+Settings + Setup; tapping either bounces to /login automatically.
+A Sign In button at the top was redundant. Sign Out moved inside
+Settings → System (only visible when actually signed in) — that's
+where you'd realise you want to drop the session anyway.
+
+Dashboard / History / Devices / Kiosk / Docs all stay completely
+anonymous-readable on LAN — no chrome, no buttons, just data.
+
+app.js v=130, sw.js CACHE_VERSION bumped.
+
 ## [0.0.63] — 2026-05-17
 
 ### Fixed — CRITICAL: db_path field was missing from Config, so v0.0.60 fix did nothing
