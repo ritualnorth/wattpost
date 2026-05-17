@@ -207,6 +207,14 @@ class QuietHoursCfg(msgspec.Struct, kw_only=True):
 
 
 class Config(msgspec.Struct, kw_only=True):
+    # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
+    # the read logic but I FORGOT to add the field here, so msgspec
+    # silently dropped the YAML value — every Docker user's history
+    # was still landing in /app/solar-monitor.db (inside the
+    # ephemeral writable layer). v0.0.63 actually wires it up.
+    # Default matches the historical CLI default so absence of the
+    # key in config.yaml keeps existing installs working unchanged.
+    db_path: str = "solar-monitor.db"
     transports: list[dict[str, Any]]
     devices: list[DeviceCfg]
     exporters: list[dict[str, Any]] = []  # optional
