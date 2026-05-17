@@ -618,14 +618,31 @@ function computeRemaining(bank) {
     };
   }
   const i = bank.sumI;
-  if (Math.abs(i) < 0.5) return { primary: "Idle", secondary: "—" };
+  const absI = Math.abs(i);
+  // <1.5 A absolute ≈ <20 W at 12.8 V = standby territory. Reporting
+  // "2 days until empty" off of a literal divide here is technically
+  // correct ("if your load stays at 8 W forever") but practically
+  // useless — the moment any real load kicks in, the estimate is
+  // wildly wrong, and customers reasonably read it as "my battery
+  // will last 2 days" which is misleading. Show "Idle" for very low,
+  // "Light load" with a hint for low-but-discharging.
+  if (absI < 1.5) {
+    return { primary: "Idle", secondary: i < 0 ? "light load" : "—" };
+  }
   if (i > 0) {
     const hoursToFull = (bank.totalCap - bank.totalRem) / i;
     return { primary: fmt.duration(hoursToFull), secondary: "until full" };
-  } else {
-    const hoursToEmpty = bank.totalRem / Math.abs(i);
-    return { primary: fmt.duration(hoursToEmpty), secondary: "until empty" };
   }
+  // Discharging at a meaningful rate. Trim a 10% reserve off the
+  // remaining capacity before the divide — LFP wants to stay above
+  // 10% SoC, and the BMS will cut earlier than 0% anyway. Keeps the
+  // estimate from over-promising runtime that the battery will
+  // never actually deliver.
+  const RESERVE_FRAC = 0.10;
+  const usableRem = Math.max(0,
+    bank.totalRem - bank.totalCap * RESERVE_FRAC);
+  const hoursToEmpty = usableRem / absI;
+  return { primary: fmt.duration(hoursToEmpty), secondary: "until empty" };
 }
 
 // ---------- HERO ----------
