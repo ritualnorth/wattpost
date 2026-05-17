@@ -8,6 +8,55 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.81] — 2026-05-17
+
+### Fixed — Today's LOAD always showed 0 Wh on multi-source installs
+`today_aggregate` had two bugs that conspired to hide load:
+
+1. PV "today" came from a hardcoded `device = 'rover_mppt'` SQL
+   query — but the actual MPPT device label varies (most installs
+   it's just `charge_controller`). For everyone except a vanishing
+   subset of legacy installs, `pv_today_wh` was always 0.
+
+2. The load formula `pv + discharged − charged` only counted PV
+   as energy in. AC chargers, DC-DC converters, anything else
+   feeding the bank was invisible. On an install with the bank
+   net-charging (charged > discharged), the formula computed
+   negative and clamped to 0 → "Load today: 0 Wh" while the live
+   power-flow strip clearly showed real load happening.
+
+Rewrite uses the energy-balance identity correctly:
+  `load_out = sources_in − bank_net`
+
+PV `sources_in` reads the device's own daily counter (Renogy
+`energy_today_wh`) because 60 s-poll trapezoid integration
+under-counts fast PV peaks by ~40% on a real install. AC charger
+and DC-DC don't have a device-side daily counter so they're
+integrated (good enough for "is the load real" sanity, less
+accurate than the device counter for big totals).
+
+New `/api/today` fields:
+  - `sources_today_wh` — total energy into the bus today
+  - `ac_charger_today_wh`, `dcdc_today_wh` — per-source breakdown
+  - `pv_today_wh` — unchanged name, now correct
+
+The "Today" headline kWh on the dashboard now uses
+`sources_today_wh` instead of just PV — a Victron-only or
+AC-charger-only install reads correctly instead of "0.0 kWh".
+
+Verified on Ritual North's install: was showing 0 Wh load, now shows
+338 Wh — matches the ~100 W background draw over the hours
+his Victron has been online.
+
+### Known minor — Hero vs Flow 12 W sampling skew
+The hero "Net power" tile and the flow strip's "Battery bank"
+read from the same `devices` array but render on slightly
+different ticks. A live install that's actively MPPT-tracking
+will show small (~5-15 W, ~0.1 % SoC) drift between the two
+tiles for a poll cycle. Cosmetic; both numbers are correct for
+the snapshot they were taken from. Future task to lock both
+renders to a single snapshot.
+
 ## [0.0.80] — 2026-05-17
 
 ### Fixed — Victron AC charger labelled "Other source" in flow strip

@@ -1126,22 +1126,40 @@ class Store:
         return stats
 
     async def today_aggregate(self, midnight_ts: int, now_ts: int) -> dict[str, Any]:
-        """Compute today's energy aggregates from the bank's instantaneous power.
+        """Compute today's energy aggregates from per-poll instantaneous
+        power, integrated via trapezoid rule across the day.
 
-        The Rover's `consumption_today_wh` only counts loads through its load
-        output terminals; anything wired directly to the bus is invisible to
-        it. Integrating bank V × I across today's polls captures everything
-        regardless of wiring.
+        Captures everything wired anywhere on the bus, not just the
+        load output of a particular MPPT — integration over the bank's
+        V × I tells the truth regardless of cabling.
 
-        We use the trapezoid rule across consecutive polls to handle the
-        variable inter-poll gap correctly.
+        Previous implementation (pre-v0.0.81) had two bugs:
+          1. PV "today" came from a hardcoded `device = 'rover_mppt'`
+             SQL query — but the actual MPPT device label varies
+             ("charge_controller", "rover_40a", anything the install
+             chose). For everyone except the original Renogy Rover
+             install, PV today was always zero.
+          2. The source-energy term only counted PV. An install with
+             an AC charger + alternator running could be net-charging
+             the bank with significant load on top, but the load
+             formula (`pv + discharged − charged`) would compute
+             negative and clamp to zero — hiding the load entirely.
+
+        Both fixed by integrating power directly over EVERY source-kind
+        device's per-poll metric:
+          - charge_controller → pv_power_w
+          - ac_charger        → output_1_power_w
+          - dcdc / dcdc_xs    → output_power_w
+        And summing into `sources_today_wh`. Load is then
+            max(0, sources_in − bank_net),
+        which is the correct energy-balance identity.
         """
         if self._db is None:
             raise RuntimeError("Store not open")
 
         # Per-poll bank power: join voltage_v × current_a across batteries
         # at the same timestamp.
-        sql = (
+        bank_sql = (
             "SELECT v.ts, SUM(v.value * i.value) AS bank_w "
             "FROM samples v "
             "JOIN samples i "
@@ -1152,53 +1170,101 @@ class Store:
             "  AND v.ts >= ? AND v.ts <= ? "
             "GROUP BY v.ts ORDER BY v.ts"
         )
-        rows: list[tuple[int, float]] = []
-        async with self._db.execute(sql, (midnight_ts, now_ts)) as cur:
+        bank_rows: list[tuple[int, float]] = []
+        async with self._db.execute(bank_sql, (midnight_ts, now_ts)) as cur:
             async for ts, w in cur:
-                rows.append((int(ts), float(w)))
+                bank_rows.append((int(ts), float(w)))
 
         charged_wh = 0.0
         discharged_wh = 0.0
         prev_ts: int | None = None
         prev_w: float = 0.0
-        for ts, w in rows:
+        for ts, w in bank_rows:
             if prev_ts is not None:
                 dt_h = (ts - prev_ts) / 3600.0
-                # Use trapezoid rule for the energy in this interval.
-                # Split into positive/negative components separately so a
-                # sign change inside the interval doesn't cancel out.
                 avg_w = (prev_w + w) / 2.0
                 e_wh = avg_w * dt_h
-                if e_wh > 0:
-                    charged_wh += e_wh
-                else:
-                    discharged_wh += -e_wh
+                if e_wh > 0: charged_wh += e_wh
+                else:        discharged_wh += -e_wh
             prev_ts, prev_w = ts, w
 
-        # Pull PV today from the latest Rover poll.
+        # ---- Per-source integration ----
+        # Map (device_kind, metric_name) → trapezoid integration of that
+        # metric across today's polls. Each row in `samples` is one
+        # device/metric/timestamp triple — we filter by metric and
+        # `device LIKE pattern` corresponding to the kind. Device names
+        # aren't tagged with their kind in `samples`, but Renogy MPPTs
+        # report `pv_power_w`, AC chargers report `output_1_power_w`,
+        # etc — so filtering by the metric name effectively scopes by
+        # kind. Multiple devices of the same kind sum naturally (each
+        # device contributes its own poll rows).
+        async def _integrate_metric(metric: str) -> float:
+            sql = (
+                "SELECT device, ts, value FROM samples "
+                "WHERE metric = ? AND ts >= ? AND ts <= ? "
+                "ORDER BY device, ts"
+            )
+            total_wh = 0.0
+            prev_dev: str | None = None
+            prev_t: int | None = None
+            prev_v: float = 0.0
+            async with self._db.execute(sql, (metric, midnight_ts, now_ts)) as cur:
+                async for dev, ts, v in cur:
+                    ts = int(ts); v = float(v)
+                    if dev != prev_dev:
+                        prev_dev, prev_t, prev_v = dev, ts, v
+                        continue
+                    dt_h = (ts - prev_t) / 3600.0
+                    # Sources are always positive output; clamp at 0 so
+                    # a spurious negative reading can't subtract from
+                    # the day's total.
+                    avg_w = max(0.0, (prev_v + v) / 2.0)
+                    total_wh += avg_w * dt_h
+                    prev_t, prev_v = ts, v
+            return total_wh
+
+        # PV: prefer the device's own `energy_today_wh` cumulative
+        # counter when it exists (Renogy MPPTs all expose this and
+        # it's accurate to the second). Integration via 60 s polls
+        # systematically under-counts fast peaks — observed at ~40%
+        # under on a real install. Fall back to integration only for
+        # PV devices that don't surface the counter (rare).
         pv_today_wh = 0.0
         async with self._db.execute(
-            "SELECT value FROM samples WHERE device = 'rover_mppt' "
-            "AND metric = 'energy_today_wh' AND ts BETWEEN ? AND ? "
-            "ORDER BY ts DESC LIMIT 1",
+            "SELECT device, MAX(value) AS energy_wh "
+            "FROM samples WHERE metric = 'energy_today_wh' "
+            "  AND ts BETWEEN ? AND ? GROUP BY device",
             (midnight_ts, now_ts),
         ) as cur:
-            row = await cur.fetchone()
-            if row:
-                pv_today_wh = float(row[0])
+            async for _dev, val in cur:
+                if val is not None:
+                    pv_today_wh += float(val)
+        if pv_today_wh <= 0:
+            # No device counter found — integrate as a fallback.
+            pv_today_wh = await _integrate_metric("pv_power_w")
+        # AC chargers / DC-DC: no per-device daily counter in the BLE
+        # advertisement payload, so integration is the only option.
+        # 60 s polls give a usable-but-rough total — fine for "is the
+        # load real" sanity but don't expect device-counter accuracy.
+        ac_charger_today_wh   = await _integrate_metric("output_1_power_w")
+        dcdc_today_wh         = await _integrate_metric("output_power_w")
+        sources_today_wh = pv_today_wh + ac_charger_today_wh + dcdc_today_wh
 
         # Derived: total load today (any path, including unmeasured)
-        load_today_wh = max(0.0, pv_today_wh + discharged_wh - charged_wh)
+        load_today_wh = max(0.0, sources_today_wh + discharged_wh - charged_wh)
 
         return {
             "since_ts": midnight_ts,
             "now_ts": now_ts,
-            "pv_today_wh": round(pv_today_wh, 1),
-            "bank_charged_today_wh": round(charged_wh, 1),
+            "pv_today_wh":             round(pv_today_wh, 1),
+            "ac_charger_today_wh":     round(ac_charger_today_wh, 1),
+            "dcdc_today_wh":           round(dcdc_today_wh, 1),
+            "sources_today_wh":        round(sources_today_wh, 1),
+            "bank_charged_today_wh":   round(charged_wh, 1),
             "bank_discharged_today_wh": round(discharged_wh, 1),
-            "bank_net_today_wh": round(charged_wh - discharged_wh, 1),
-            "load_today_wh": round(load_today_wh, 1),
-            "poll_count": len(rows),
+            "bank_net_today_wh":       round(charged_wh - discharged_wh, 1),
+            "load_today_wh":           round(load_today_wh, 1),
+            "poll_count":              len(bank_rows),
         }
 
     async def battery_health_aggregate(

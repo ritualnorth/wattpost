@@ -1448,8 +1448,17 @@ function renderToday() {
   const rover = devices.find(d => d.kind === "charge_controller");
   const l = rover?.latest || {};
 
-  const pvActualWh   = l.energy_today_wh || 0;
-  const pvActualStr  = fmt.wh(pvActualWh);
+  // Headline kWh: prefer the server-side integrated total across ALL
+  // sources (PV + AC charger + DC-DC) so a Victron-only install or
+  // a multi-source install reads correctly. Fall back to the Renogy
+  // MPPT's own daily counter for legacy clients that haven't pulled
+  // v0.0.81's `sources_today_wh` field yet.
+  const sourcesWh = (todayAggregate
+    && typeof todayAggregate.sources_today_wh === "number"
+    && todayAggregate.sources_today_wh > 0)
+    ? todayAggregate.sources_today_wh
+    : (l.energy_today_wh || 0);
+  const pvActualStr  = fmt.wh(sourcesWh);
   const chargedStr   = (l.charging_ah_today ?? 0) + " Ah";
   const peakSoFarStr = fmt.num(l.max_charging_power_today_w, 0) + " W";
   const loadWh = (todayAggregate && typeof todayAggregate.load_today_wh === "number")
