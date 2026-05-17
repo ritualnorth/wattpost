@@ -6341,24 +6341,32 @@ async function wizFindDongle() {
       // The key form is rendered hidden and revealed when the user
       // taps "Pair Victron" — keeps the scan-results card compact.
       keyFormHtml = `
-        <div class="wiz-victron-key" data-victron-key-for="${escHtml(d.address)}" hidden>
-          <p class="settings-foot">
+        <div class="wiz-victron-key" data-victron-key-for="${escHtml(d.address)}" hidden style="margin-top:.6rem;padding:.7rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+          <p class="settings-foot" style="margin:0 0 .5rem">
             Open VictronConnect on your phone, connect to this device,
-            tap <strong>Product info</strong>, then <strong>Show device
-            key</strong>. Paste it here. The key never leaves your
-            appliance — we store it locally only.
+            tap <strong>Settings</strong> → <strong>Product info</strong>,
+            then <strong>Show</strong> next to <strong>Instant readout
+            encryption data</strong>. Paste it here.
           </p>
-          <label class="alerts-checkbox" style="display:flex;gap:.5rem;align-items:center">
-            <span class="settings-foot" style="min-width:7rem">Encryption key</span>
-            <input type="password" class="wiz-key-input"
-                   placeholder="32 hex chars" autocomplete="off"
-                   style="flex:1;padding:.3rem .45rem;font-family:var(--mono);font-size:.85rem;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text)"/>
+          <label style="display:block;margin-bottom:.5rem">
+            <span class="settings-foot" style="display:block;margin-bottom:.25rem">Encryption key (32 hex chars)</span>
+            <input type="text"
+                   inputmode="latin"
+                   autocapitalize="none"
+                   autocorrect="off"
+                   spellcheck="false"
+                   autocomplete="off"
+                   class="wiz-key-input"
+                   placeholder="e.g. 2cf1e4a8…"
+                   pattern="[0-9a-fA-F]{32}"
+                   maxlength="32"
+                   style="display:block;width:100%;box-sizing:border-box;padding:.55rem .65rem;font-family:var(--mono);font-size:1rem;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text)"/>
           </label>
-          <div style="display:flex;gap:.5rem;margin-top:.5rem">
-            <button class="btn-action btn-action--primary" data-victron-save="${escHtml(d.address)}">Save</button>
-            <button class="btn-action" data-victron-cancel="${escHtml(d.address)}">Cancel</button>
-            <span class="wiz-victron-status settings-foot" data-victron-status="${escHtml(d.address)}"></span>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem">
+            <button class="btn-action btn-action--primary" data-victron-save="${escHtml(d.address)}" style="min-height:2.4rem;flex:1;min-width:6rem">Save key</button>
+            <button class="btn-action" data-victron-cancel="${escHtml(d.address)}" style="min-height:2.4rem">Cancel</button>
           </div>
+          <div class="wiz-victron-status settings-foot" data-victron-status="${escHtml(d.address)}" style="margin-top:.5rem;min-height:1.2rem"></div>
         </div>`;
     } else if (vendor === "renogy") {
       hintHtml = `<span class="wiz-vendor-hint">Renogy BT-2 / BT-1</span>`;
@@ -6412,7 +6420,23 @@ async function wizFindDongle() {
     const mac = b.dataset.victronSave;
     b.addEventListener("click", () => {
       const form = list.querySelector(`[data-victron-key-for="${mac}"]`);
-      const key  = form?.querySelector(".wiz-key-input")?.value || "";
+      const status = list.querySelector(`[data-victron-status="${mac}"]`);
+      const raw = (form?.querySelector(".wiz-key-input")?.value || "").trim();
+      // Normalise: lowercase, strip any spaces / colons / dashes the
+      // user might have included copy-pasting. Victron-Connect copies
+      // a clean 32-char hex but transit through chat / notepad apps
+      // can sneak whitespace in.
+      const key = raw.replace(/[\s:\-]/g, "").toLowerCase();
+      if (!/^[0-9a-f]{32}$/.test(key)) {
+        if (status) {
+          status.textContent = `Expected 32 hex chars; got ${key.length}. ` +
+            `Double-check VictronConnect → Settings → Product info → ` +
+            `Instant readout encryption data.`;
+          status.style.color = "var(--err)";
+        }
+        return;
+      }
+      if (status) status.style.color = "";
       wizAddTransportFromVictron(mac, key);
     });
   });
