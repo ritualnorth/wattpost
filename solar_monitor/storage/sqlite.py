@@ -109,12 +109,13 @@ CREATE TABLE IF NOT EXISTS latest (
 );
 
 CREATE TABLE IF NOT EXISTS device_meta (
-    device      TEXT PRIMARY KEY,
-    vendor      TEXT NOT NULL,
-    kind        TEXT NOT NULL,
-    slave_id    INTEGER,
-    first_seen  INTEGER NOT NULL,
-    last_seen   INTEGER NOT NULL
+    device       TEXT PRIMARY KEY,
+    vendor       TEXT NOT NULL,
+    kind         TEXT NOT NULL,
+    slave_id     INTEGER,
+    first_seen   INTEGER NOT NULL,
+    last_seen    INTEGER NOT NULL,
+    display_name TEXT
 );
 
 CREATE TABLE IF NOT EXISTS poll_runs (
@@ -237,13 +238,12 @@ PRAGMAS = (
 # Adding a NEW TABLE doesn't need a migration — add it to SCHEMA
 # above with CREATE IF NOT EXISTS and it'll appear on next boot.
 # Migrations are for ALTERing tables that already exist.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 MIGRATIONS: list[tuple[int, str, str]] = [
     # (version, description, SQL).
-    # Placeholder for the first real migration. Example shape:
-    #   (1, "samples: add quality column",
-    #    "ALTER TABLE samples ADD COLUMN quality INTEGER DEFAULT 0"),
+    (1, "device_meta: add display_name column",
+     "ALTER TABLE device_meta ADD COLUMN display_name TEXT"),
 ]
 
 
@@ -911,10 +911,10 @@ class Store:
             raise RuntimeError("Store not open")
         rows = []
         async with self._db.execute(
-            "SELECT device, vendor, kind, slave_id, first_seen, last_seen "
+            "SELECT device, vendor, kind, slave_id, first_seen, last_seen, display_name "
             "FROM device_meta ORDER BY device"
         ) as cur:
-            async for device, vendor, kind, slave_id, first_seen, last_seen in cur:
+            async for device, vendor, kind, slave_id, first_seen, last_seen, display_name in cur:
                 rows.append({
                     "label": device,
                     "vendor": vendor,
@@ -922,8 +922,25 @@ class Store:
                     "slave_id": slave_id,
                     "first_seen": first_seen,
                     "last_seen": last_seen,
+                    "display_name": display_name,
                 })
         return rows
+
+    async def set_device_display_name(self, device: str, name: str | None) -> None:
+        """User-facing rename. Stores a display override in device_meta.
+        Pass `None` (or empty string) to clear the override and fall
+        back to the original label. The underlying `device` key is the
+        primary identifier for history, samples, alerts, etc. and is
+        never touched — only the human-readable label changes.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        clean = (name or "").strip() or None
+        await self._db.execute(
+            "UPDATE device_meta SET display_name = ? WHERE device = ?",
+            (clean, device),
+        )
+        await self._db.commit()
 
     def _pick_history_table(self, range_seconds: int) -> tuple[str, str, int]:
         """Choose the right rollup table for a query range.

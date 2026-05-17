@@ -78,6 +78,16 @@ const ICONS = {
   </svg>`,
 };
 
+// Returns the user-visible name for a device — the override set via
+// /api/devices/<label>/display-name if present, else the underlying
+// label. Use this everywhere a device is *displayed* to a human; keep
+// the raw label for routing, storage keys, and API paths.
+function dispName(d) {
+  if (!d) return "";
+  const v = (d.display_name || "").trim();
+  return v || d.label;
+}
+
 // Map color → icon key (used for default tile icons when no explicit override)
 const COLOR_TO_ICON = {
   pv: "sun",
@@ -1922,7 +1932,7 @@ function renderDeviceCards() {
     iconSpan.innerHTML = ICONS[iconKey] || ICONS.unknown;
     const name = document.createElement("div");
     name.className = "dev-card-name";
-    name.textContent = dev.label;
+    name.textContent = dispName(dev);
     left.append(iconSpan, name);
     const right = document.createElement("div");
     right.className = "dev-card-head-right";
@@ -1933,7 +1943,9 @@ function renderDeviceCards() {
     // into the device detail page.
     const slaveLabel = dev.kind === "bank"
       ? `<span class="dev-card-slave">aggregate</span>`
-      : `<span class="dev-card-slave">slave ${dev.slave_id}</span>`;
+      : (dev.slave_id != null
+         ? `<span class="dev-card-slave">slave ${dev.slave_id}</span>`
+         : `<span class="dev-card-slave">${dev.vendor || ""}</span>`);
     const delBtnHtml = dev.kind === "bank" ? "" : `
       <button class="dev-card-del" type="button"
               data-del-label="${escHtml(dev.label)}"
@@ -5205,21 +5217,33 @@ function renderDeviceDetail(label) {
   const next = idx < siblings.length - 1 ? siblings[idx + 1] : null;
 
   const fw = dev.latest?.firmware_version || dev.latest?.firmware_version_raw || "";
+  const shown = dispName(dev);
+  const renamed = shown !== dev.label;
   host.innerHTML = `
     <div class="dev-detail-head">
       <div class="dev-detail-crumb">
         <a href="#/devices">← Devices</a>
         <span class="dev-detail-title">
           <span class="dev-detail-icon">${ICONS[KIND_ICON[dev.kind] || "unknown"]}</span>
-          ${dev.label}
+          <span data-dev-display-name>${shown}</span>
+          <button class="dev-rename-btn" data-dev-rename="${dev.label}"
+                  title="Rename this device"
+                  aria-label="Rename"
+                  style="background:none;border:none;cursor:pointer;padding:.15rem .3rem;opacity:.55;color:inherit">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+            </svg>
+          </button>
         </span>
         <span class="dev-detail-meta">
-          ${dev.vendor} · ${dev.kind}${dev.slave_id != null ? " · slave " + dev.slave_id : ""}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}
+          ${dev.vendor} · ${dev.kind}${dev.slave_id != null ? " · slave " + dev.slave_id : ""}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}${renamed ? ` · label <code>${dev.label}</code>` : ""}
         </span>
       </div>
       <div class="dev-detail-nav">
-        ${prev ? `<a class="btn-action" href="#/device/${encodeURIComponent(prev.label)}">← ${prev.label}</a>` : ""}
-        ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${next.label} →</a>` : ""}
+        ${prev ? `<a class="btn-action" href="#/device/${encodeURIComponent(prev.label)}">← ${dispName(prev)}</a>` : ""}
+        ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${dispName(next)} →</a>` : ""}
       </div>
     </div>
     ${inner}
@@ -5230,6 +5254,8 @@ function renderDeviceDetail(label) {
   // Async-load charger value-add stats (lifetime kWh, today active,
   // 24h state ribbon) when the device exposes a charger power metric.
   wireChargerStats(dev);
+  // Rename button → prompt → PUT /display-name → optimistic refresh.
+  wireDeviceRename(dev);
   // Async-fetch controllable outputs registered against this device.
   // Renders nothing if the device has none — Rovers get a Load panel,
   // smart batteries / shunts get nothing today (until #114 adds JK BMS
@@ -5872,6 +5898,39 @@ async function wireChargerStats(dev) {
       `).join("");
     }
   }
+}
+
+async function wireDeviceRename(dev) {
+  const btn = document.querySelector(`[data-dev-rename="${CSS.escape(dev.label)}"]`);
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const current = dispName(dev);
+    const next = window.prompt(
+      `Rename "${current}" to:\n\n(Leave blank to reset to the original label "${dev.label}".)`,
+      current === dev.label ? "" : current,
+    );
+    if (next === null) return;  // cancelled
+    try {
+      const r = await fetch(_withKiosk(`/api/devices/${encodeURIComponent(dev.label)}/display-name`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: next }),
+      });
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      const data = await r.json();
+      // Optimistic update — patch the in-memory devices entry so the
+      // header re-renders correctly even before the next snapshot.
+      const target = devices.find(d => d.label === dev.label);
+      if (target) target.display_name = data.display_name;
+      renderDeviceDetail(dev.label);
+      // Force a snapshot refresh so cards etc. catch up immediately
+      // (the SSE will deliver it on next poll anyway, but this feels
+      // instant from the user's POV).
+      refresh();
+    } catch (e) {
+      window.alert("Rename failed: " + e.message);
+    }
+  });
 }
 
 function buildGenericDetail(dev) {

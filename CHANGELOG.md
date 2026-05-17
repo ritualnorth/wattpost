@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.88] — 2026-05-17
+
+### Added — Rename devices from the UI
+Open a device from Devices → click the pencil next to the title →
+type a new display name → save. The original label is still the
+storage key (history, samples, alerts, exporters all reference it)
+so renaming is non-destructive — no migration, no orphaned data,
+clear the name and you're back to the original. The detail-page
+meta line shows the real underlying label as a chip when a custom
+name is in use, so you can always see what's what.
+
+- New `POST /api/devices/{label}/display-name` endpoint (body
+  `{display_name: "…"}` — pass empty or null to reset).
+- New `device_meta.display_name` column (schema migration v1).
+- Device cards on the Devices page now show the display name.
+- BLE-only devices (no Modbus slave) no longer show `slave null`
+  in the device card — show the vendor name instead.
+
 ## [0.0.87] — 2026-05-17
 
 ### Fixed — Victron AC charger device page rendering
