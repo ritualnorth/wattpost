@@ -5174,6 +5174,7 @@ function renderDeviceDetail(label) {
   if (dev.kind === "smart_battery") inner = buildSmartBatteryDetail(dev);
   else if (dev.kind === "charge_controller") inner = buildControllerDetail(dev);
   else if (dev.kind === "shunt") inner = buildShuntDetail(dev);
+  else if (dev.kind === "ac_charger") inner = buildAcChargerDetail(dev);
   else inner = buildGenericDetail(dev);
 
   // Prev/next nav between devices of the same kind makes "compare packs"
@@ -5206,6 +5207,9 @@ function renderDeviceDetail(label) {
 
   // Wire up the per-device chart after DOM is in place.
   wireDeviceDetailChart(dev);
+  // Async-load charger value-add stats (lifetime kWh, today active,
+  // 24h state ribbon) when the device exposes a charger power metric.
+  wireChargerStats(dev);
   // Async-fetch controllable outputs registered against this device.
   // Renders nothing if the device has none — Rovers get a Load panel,
   // smart batteries / shunts get nothing today (until #114 adds JK BMS
@@ -5704,8 +5708,150 @@ function buildControllerDetail(dev) {
         <div class="today-cell"><span class="meta-k">Temp</span><span class="today-v">${fmt.num(l.controller_temperature_c, 0)} °C</span></div>
       </div>
     </section>
+    ${buildChargerStatsBlock(dev)}
     ${buildHistoryBlock(dev, "pv_power_w")}
   `;
+}
+
+function buildAcChargerDetail(dev) {
+  const l = dev.latest || {};
+  // Each output channel as a column — many Blue Smart IP65 chargers
+  // have 3 outputs feeding separate banks (engine / aux / start).
+  const outs = [1, 2, 3].map(n => {
+    const v = l[`output_${n}_voltage_v`];
+    const i = l[`output_${n}_current_a`];
+    const p = l[`output_${n}_power_w`];
+    if (v == null && i == null && p == null) return "";
+    return `
+      <div class="today-cell">
+        <span class="meta-k">Output ${n}</span>
+        <span class="today-v">${fmt.num(p, 0)} W</span>
+        <span class="meta-k" style="opacity:.7">${fmt.num(v, 1)} V · ${fmt.num(i, 1)} A</span>
+      </div>`;
+  }).join("");
+  return `
+    <section class="panel">
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v4M15 3v4"/><rect x="6" y="7" width="12" height="9" rx="2"/><path d="M12 16v5"/></svg> AC Charger</h2>
+        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "—"}</span></div>
+      </div>
+      <div class="today-strip" style="margin-top:.4rem">
+        <div class="today-cell"><span class="meta-k">AC input</span><span class="today-v">${fmt.num(l.ac_input_current_a, 2)} A</span></div>
+        ${outs}
+        <div class="today-cell"><span class="meta-k">Temp</span><span class="today-v">${fmt.num(l.temperature_c, 0)} °C</span></div>
+        ${l.charger_error && l.charger_error !== "no_error" ? `<div class="today-cell"><span class="meta-k">Error</span><span class="today-v">${l.charger_error}</span></div>` : ""}
+      </div>
+    </section>
+    ${buildChargerStatsBlock(dev)}
+    ${buildHistoryBlock(dev, "output_1_power_w")}
+  `;
+}
+
+// Lifetime kWh + today active time + 24h charging-state ribbon.
+// Populated async by wireChargerStats from /api/devices/.../charger-stats.
+function buildChargerStatsBlock(dev) {
+  return `
+    <section class="panel" id="dd-chgstats-${dev.label}" hidden>
+      <div class="panel-header">
+        <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg> Charger stats</h2>
+      </div>
+      <div class="today-strip" style="margin-top:.4rem" data-chgstats-tiles></div>
+      <div class="chgstats-ribbon-wrap" style="margin-top:.7rem">
+        <div class="meta-k" style="margin-bottom:.3rem">Last 24 hours</div>
+        <div data-chgstats-ribbon class="chgstats-ribbon"></div>
+        <div class="chgstats-legend" data-chgstats-legend
+             style="margin-top:.45rem;display:flex;flex-wrap:wrap;gap:.4rem .9rem;font-size:.85rem"></div>
+      </div>
+    </section>
+  `;
+}
+
+const CHARGING_STATE_COLOR = {
+  bulk:       "#f59e0b",
+  absorption: "#eab308",
+  float:      "#22c55e",
+  equalize:   "#ef4444",
+  storage:    "#94a3b8",
+  off:        "#334155",
+  fault:      "#dc2626",
+};
+function chargingStateColor(s) {
+  if (!s) return "#334155";
+  const k = String(s).toLowerCase();
+  return CHARGING_STATE_COLOR[k] || "#64748b";
+}
+function fmtHm(sec) {
+  if (!sec || sec < 60) return `${Math.round(sec || 0)}s`;
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+async function wireChargerStats(dev) {
+  const panel = document.getElementById(`dd-chgstats-${dev.label}`);
+  if (!panel) return;
+  let stats;
+  try {
+    stats = await api(`/api/devices/${encodeURIComponent(dev.label)}/charger-stats`);
+  } catch { return; }
+  if (!stats || stats.error) return;
+  panel.hidden = false;
+
+  // Tiles
+  const tilesHost = panel.querySelector("[data-chgstats-tiles]");
+  if (tilesHost) {
+    tilesHost.innerHTML = `
+      <div class="today-cell"><span class="meta-k">Lifetime delivered</span><span class="today-v">${fmt.wh(stats.lifetime_energy_wh)}</span></div>
+      <div class="today-cell"><span class="meta-k">Today delivered</span><span class="today-v">${fmt.wh(stats.today_energy_wh)}</span></div>
+      <div class="today-cell"><span class="meta-k">Active today</span><span class="today-v">${fmtHm(stats.today_active_s)}</span></div>
+    `;
+  }
+
+  // Ribbon — single horizontal bar of colored state segments over 24h.
+  const ribbonHost = panel.querySelector("[data-chgstats-ribbon]");
+  if (ribbonHost) {
+    const segs = stats.state_ribbon || [];
+    if (!segs.length) {
+      ribbonHost.innerHTML = `<div class="settings-empty" style="padding:.6rem">No state history yet — wait for the next poll cycle.</div>`;
+    } else {
+      const total = segs[segs.length - 1].end_ts - segs[0].start_ts;
+      const parts = segs.map(s => {
+        const pct = total > 0 ? ((s.end_ts - s.start_ts) / total) * 100 : 0;
+        const minutes = Math.round((s.end_ts - s.start_ts) / 60);
+        const c = chargingStateColor(s.state);
+        const fromHm = new Date(s.start_ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const untilHm = new Date(s.end_ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return `<span style="flex:${pct} 0 0;background:${c};height:100%;display:block"
+                      title="${s.state} · ${fromHm}–${untilHm} · ${minutes}m"></span>`;
+      }).join("");
+      ribbonHost.innerHTML = `
+        <div style="display:flex;height:22px;width:100%;border-radius:6px;overflow:hidden;background:#1e293b">
+          ${parts}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:.25rem;font-size:.75rem;opacity:.7">
+          <span>${new Date(segs[0].start_ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>now</span>
+        </div>`;
+    }
+  }
+
+  // Per-state minutes breakdown legend.
+  const legendHost = panel.querySelector("[data-chgstats-legend]");
+  if (legendHost) {
+    const byState = stats.today_state_seconds || {};
+    const entries = Object.entries(byState).sort(([, a], [, b]) => b - a);
+    if (!entries.length) {
+      legendHost.innerHTML = `<span class="meta-k">No state breakdown yet today.</span>`;
+    } else {
+      legendHost.innerHTML = entries.map(([state, sec]) => `
+        <span style="display:inline-flex;align-items:center;gap:.35rem">
+          <span style="width:12px;height:12px;border-radius:3px;background:${chargingStateColor(state)};display:inline-block"></span>
+          <span style="text-transform:capitalize">${state}</span>
+          <span class="meta-k">${fmtHm(sec)}</span>
+        </span>
+      `).join("");
+    }
+  }
 }
 
 function buildGenericDetail(dev) {
