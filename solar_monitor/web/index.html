@@ -548,6 +548,29 @@
           </h2>
         </div>
         <div class="settings-grid">
+          <!-- Session + system actions promoted to the top of the
+               grid (#147). Sign Out specifically — easy to miss when
+               buried under five blocks of config; finishing at "Sign
+               out" up here means you don't accidentally walk away
+               from an authed session on a shared tablet. -->
+          <div class="settings-block">
+            <h3>Session &amp; system</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Restart the daemon to apply pending changes (new transports,
+              devices, exporters). The UI reconnects automatically — takes
+              ~5 seconds.
+            </p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <button id="restart-daemon-btn" class="btn-action btn-action--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                <span>Restart daemon</span>
+              </button>
+              <button id="signout-btn" class="btn-action" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                <span>Sign out</span>
+              </button>
+            </div>
+          </div>
           <div class="settings-block settings-block--cta">
             <h3>Devices &amp; setup</h3>
             <p class="settings-cta-blurb">Scan over Bluetooth and pair Renogy gear. No config files.</p>
@@ -654,21 +677,8 @@
               </span>
             </div>
           </div>
-          <div class="settings-block">
-            <h3>System</h3>
-            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
-              Restart the daemon to apply pending changes (new transports, devices, exporters).
-              The UI reconnects automatically — takes ~5 seconds.
-            </p>
-            <button id="restart-daemon-btn" class="btn-action btn-action--primary">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-              <span>Restart daemon</span>
-            </button>
-            <button id="signout-btn" class="btn-action" type="button" style="margin-left:.5rem">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-              <span>Sign out</span>
-            </button>
-          </div>
+          <!-- Session & system block moved to top of the grid above. -->
+
           <div class="settings-block">
             <h3>Web password</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
@@ -785,6 +795,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=132"></script>
+  <script src="/web/app.js?v=133"></script>
 </body>
 </html>
