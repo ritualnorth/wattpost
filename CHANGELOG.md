@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.63] — 2026-05-17
+
+### Fixed — CRITICAL: db_path field was missing from Config, so v0.0.60 fix did nothing
+v0.0.60 added `cli._resolve_db_path` to honour `config.db_path`
+over the CLI default. But `Config` (msgspec.Struct) didn't declare
+a `db_path` field, so msgspec silently dropped the YAML value
+and `getattr(config, 'db_path', None)` was always None. Result:
+the resolve helper always fell through to `args.db` and Docker
+users were STILL writing the DB to /app/solar-monitor.db
+(ephemeral image layer). The v0.0.60 "fix" was cosmetic.
+
+v0.0.63 actually adds `db_path: str = "solar-monitor.db"` to
+Config. Default matches the historical CLI default so existing
+installs without the YAML key keep their current behaviour
+(though all reference configs DO set the key, so Docker users
+get the persistent path).
+
+Smoke-tested: container now opens DB at
+/var/lib/wattpost/solar-monitor.db (the bind-mount target), WAL
+files visible on the host side, data survives restart.
+
+### Changed — Service worker evicts old caches on activate
+Was leaving every prior cache version on disk forever. Now
+deletes anything that isn't the current CACHE_VERSION on
+activate. Belt-and-braces alongside skipWaiting + clients.claim
+to keep "stale UI being served from cache" from biting.
+
 ## [0.0.62] — 2026-05-17
 
 ### Added — Settings → Kiosk share URL panel

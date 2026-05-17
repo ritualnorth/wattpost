@@ -48,6 +48,13 @@ self.addEventListener('activate', (event) => {
       keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k))
     );
     await self.clients.claim();
+    // Evict every cache that isn't the current version. Without this
+    // the old shell hangs around indefinitely, costing disk + giving
+    // ammo to "cache poisoning" debugging confusion (stale content
+    // served because the OLD SW was still active on a long-running
+    // tab). Belt-and-braces with skipWaiting + claim above.
+    const live = await caches.keys();
+    await Promise.all(live.map((k) => k === CACHE_VERSION ? null : caches.delete(k)));
   })());
 });
 
