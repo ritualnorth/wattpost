@@ -326,6 +326,63 @@ class CloudService:
                 extras["sources_today_wh"]    = int(tot.get("sources_today_wh") or 0)
                 extras["load_today_wh"]       = int(tot.get("load_today_wh") or 0)
                 extras["bank_net_today_wh"]   = int(tot.get("bank_net_today_wh") or 0)
+                # Today's SoC envelope — answers "did the bank get
+                # critically low overnight?" at a glance, without
+                # opening History. One cheap SELECT per heartbeat.
+                try:
+                    soc_lo, soc_hi = await store.bank_soc_minmax(midnight, now)
+                    if soc_lo is not None:
+                        extras["soc_min_today_pct"] = round(soc_lo, 1)
+                    if soc_hi is not None:
+                        extras["soc_max_today_pct"] = round(soc_hi, 1)
+                except Exception:
+                    log.exception("cloud heartbeat: soc minmax failed")
+
+                # Re-fetch latest for the next two blocks (it was only
+                # in scope for the earlier soc_pct / net_w extraction).
+                latest_for_extras = await store.get_latest()
+
+                # Time to empty (discharging) or time to full (charging),
+                # in minutes. Uses the same rolling-hour load average as
+                # the runtime-forecast endpoint, so it's the same number
+                # the local dashboard would show — keeps cloud + local
+                # consistent. Skipped entirely when the bank is idle
+                # (-5 .. +5 W) or capacity is unknown.
+                try:
+                    bank_state = latest_for_extras.get("bank") or {}
+                    cap_ah  = bank_state.get("capacity_ah")
+                    voltage = bank_state.get("voltage_v") or 12.8
+                    soc_now = bank_state.get("soc_pct")
+                    if (isinstance(cap_ah, (int, float)) and cap_ah > 0
+                            and isinstance(soc_now, (int, float))):
+                        bank_wh = float(cap_ah) * float(voltage)
+                        avg_w = await store.rolling_load_avg(3600)
+                        if avg_w is not None:
+                            if avg_w < -5:  # discharging
+                                # 10% reserve — don't predict past LFP minimum
+                                usable_wh = bank_wh * max(0.0, float(soc_now) - 10.0) / 100.0
+                                if usable_wh > 0:
+                                    extras["time_to_empty_min"] = int(usable_wh / abs(avg_w) * 60)
+                            elif avg_w > 5:  # charging
+                                empty_wh = bank_wh * (1.0 - float(soc_now) / 100.0)
+                                if empty_wh > 0:
+                                    extras["time_to_full_min"] = int(empty_wh / float(avg_w) * 60)
+                except Exception:
+                    log.exception("cloud heartbeat: time-to-empty/full failed")
+
+                # Charger state pill — pick the first device that reports
+                # one (typically the MPPT or AC charger). On a mixed
+                # install we just surface "any active charger's mode",
+                # which is the headline customer-facing answer ("bulk?
+                # absorption? float?"). 16-char cap stays cheap.
+                try:
+                    for _label, dev in latest_for_extras.items():
+                        st = dev.get("charging_state") if isinstance(dev, dict) else None
+                        if st:
+                            extras["charger_state"] = str(st).lower()[:16]
+                            break
+                except Exception:
+                    pass
         except Exception:
             log.warning("cloud heartbeat: today_aggregate read failed",
                         exc_info=True)

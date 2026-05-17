@@ -1413,6 +1413,27 @@ class Store:
             "bank_capacity_ah": round(cap_ah, 1) if cap_ah else None,
         }
 
+    async def bank_soc_minmax(
+        self, since_ts: int, until_ts: int,
+    ) -> tuple[float | None, float | None]:
+        """(min, max) of bank.soc_pct over the window. None if no rows.
+
+        Used by the cloud heartbeat to surface "today's low/high SoC"
+        on the dashboard card — answers "did the bank get critically
+        low overnight?" without needing the operator to open History."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        async with self._db.execute(
+            "SELECT MIN(value), MAX(value) FROM samples "
+            "WHERE device = 'bank' AND metric = 'soc_pct' "
+            "  AND ts BETWEEN ? AND ?",
+            (since_ts, until_ts),
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0] is not None and row[1] is not None:
+                return float(row[0]), float(row[1])
+        return None, None
+
     async def rolling_load_avg(self, window_seconds: int = 3600) -> float | None:
         """Mean bank power (W) over the last `window_seconds`. Negative
         when discharging.
