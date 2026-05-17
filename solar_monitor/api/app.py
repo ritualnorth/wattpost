@@ -75,7 +75,11 @@ from .system import (
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
 )
-from .backup import export_backup, import_backup
+from .backup import (
+    export_backup, import_backup,
+    backup_schedule, backup_run_now, backup_download_one, backup_delete_one,
+)
+from ..backup import BackupService
 
 
 def _web_dir() -> Path:
@@ -855,8 +859,21 @@ def build_app(
         app.state["scheduler"] = scheduler
         app.state["config"] = config
         app.state["config_path"] = config_path
+        # Scheduled local-snapshot service — only spins up the loop if
+        # backup.enabled is set in config.yaml. The on-demand endpoints
+        # in api/backup.py work whether or not this service is running.
+        from ..config import BackupCfg
+        backup_cfg = config.backup or BackupCfg()
+        backup_svc = BackupService(
+            backup_cfg, Path(db_path), Path(config_path),
+        )
+        await backup_svc.start()
+        app.state["backup_service"] = backup_svc
 
     async def on_shutdown(app: Litestar) -> None:
+        svc = app.state.get("backup_service")
+        if svc is not None:
+            await svc.stop()
         await scheduler.stop()
         await store.close()
 
@@ -1103,6 +1120,10 @@ def build_app(
             set_device_display_name,
             export_backup,
             import_backup,
+            backup_schedule,
+            backup_run_now,
+            backup_download_one,
+            backup_delete_one,
             battery_health,
             runtime_forecast,
             load_heatmap,

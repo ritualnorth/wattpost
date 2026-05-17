@@ -212,6 +212,34 @@ class QuietHoursCfg(msgspec.Struct, kw_only=True):
     end_hour: int
 
 
+class BackupCfg(msgspec.Struct, kw_only=True):
+    """Local rotating-snapshot policy. Disabled by default for
+    backward-compat with installs that pre-date this feature; flip
+    `enabled: true` in config.yaml to opt in. Cloud upload (Pro/
+    Installer tier) is a separate field and only fires when
+    `cloud_upload: true` AND the cloud pairing reports a paying
+    tier.
+    """
+    enabled: bool = True
+    # Interval in hours between auto-snapshots. Default = weekly.
+    interval_hours: int = 168
+    # How many auto-snapshots to keep on disk. Older ones pruned
+    # after each successful capture. Manual snapshots live under
+    # the same dir so they count too.
+    keep_count: int = 4
+    # Where the .tar.gz files land. Empty string = "<db_dir>/backups".
+    dir: str = ""
+    # Push each new local snapshot to wattpost.cloud after capture.
+    # Only effective when the appliance is paired AND on a paying
+    # tier — the cloud rejects uploads from Hobby with an explicit
+    # "upgrade for cloud backups" 402.
+    cloud_upload: bool = False
+    # How many cloud-side backups to retain per appliance. The cloud
+    # enforces this independently; this value is purely a hint sent
+    # along with each upload so the cloud knows the operator's wish.
+    cloud_keep_count: int = 4
+
+
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
@@ -232,6 +260,7 @@ class Config(msgspec.Struct, kw_only=True):
     cloud: CloudCfg | None = None        # optional
     gps: GpsCfg | None = None            # optional (USB GPS — #125)
     bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
+    backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
 
 
 def load_config(path: str | Path) -> Config:

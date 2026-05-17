@@ -750,6 +750,22 @@
               as <code>config.yaml.restored.bak</code> in case you
               need to back out.
             </p>
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:1rem 0">
+            <h4 style="margin:0 0 .35rem 0">Automatic backups</h4>
+            <p class="settings-foot" id="backup-sched-summary" style="margin-top:0;margin-bottom:.5rem">
+              Loading&hellip;
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap">
+              <button id="backup-run-now" class="btn-action" type="button"
+                      title="Take a snapshot right now (rolls into the keep-N rotation just like a scheduled one).">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                <span>Run backup now</span>
+              </button>
+              <span class="settings-foot" id="backup-run-msg"></span>
+            </div>
+            <div id="backup-snap-list" class="settings-foot" style="margin-top:.6rem">
+              <div class="settings-empty">No snapshots yet.</div>
+            </div>
           </div>
           <div class="settings-block settings-block--diagnostics">
             <h3>Diagnostics</h3>
@@ -829,6 +845,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=150"></script>
+  <script src="/web/app.js?v=151"></script>
 </body>
 </html>

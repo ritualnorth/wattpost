@@ -24,9 +24,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from litestar import Request, Response, get, post
+from litestar import Request, Response, delete, get, post
 from litestar.datastructures import State
-from litestar.exceptions import HTTPException
+from litestar.exceptions import HTTPException, NotFoundException
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +78,37 @@ def _resolve_db_path(state: State) -> Path:
     return Path(p)
 
 
+def build_archive_bytes(db_path: Path, config_path: Path | None) -> bytes:
+    """Build the backup tarball as a bytes payload. Reusable by the
+    on-demand HTTP endpoint and the scheduled BackupService — same
+    archive layout, same SQLite online-backup safety, same MANIFEST."""
+    from .. import __version__
+    ts = int(time.time())
+    with tempfile.TemporaryDirectory(prefix="wattpost-backup-") as td:
+        tmpdb = Path(td) / "data.sqlite"
+        _sqlite_snapshot_to(str(db_path), str(tmpdb))
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=6) as tar:
+            tar.add(tmpdb, arcname="data.sqlite")
+            if config_path and config_path.is_file():
+                tar.add(config_path, arcname="config/config.yaml")
+            if WEB_PASSWORD_HASH_PATH.is_file():
+                tar.add(WEB_PASSWORD_HASH_PATH, arcname="config/web-password.hash")
+            if WEB_PASSWORD_PLAIN_PATH.is_file():
+                tar.add(WEB_PASSWORD_PLAIN_PATH, arcname="config/web-password")
+            manifest = (
+                f"wattpost_version={__version__}\n"
+                f"created_ts={ts}\n"
+                f"db_path_at_capture={db_path}\n"
+                f"config_path_at_capture={config_path}\n"
+            ).encode()
+            info = tarfile.TarInfo("MANIFEST")
+            info.size = len(manifest)
+            info.mtime = ts
+            tar.addfile(info, io.BytesIO(manifest))
+        return buf.getvalue()
+
+
 @get("/api/system/backup")
 async def export_backup(state: State) -> Response:
     """Stream a tar.gz of the daemon's mutable state. Layout inside:
@@ -89,44 +120,10 @@ async def export_backup(state: State) -> Response:
 
     The DB snapshot is taken via the sqlite3 online-backup API so it's
     safe to download mid-poll without locking writers."""
-    from .. import __version__
-
     db_path = _resolve_db_path(state)
     config_path = Path(state.get("config_path") or "/etc/wattpost/config.yaml")
-    ts = int(time.time())
-
-    def _build_archive() -> bytes:
-        # Snapshot DB into a temp file first, then stream the temp into
-        # the tarball. Building the tarball in memory keeps the code
-        # simple — typical DB is a few hundred MB at worst, well within
-        # the appliance's RAM budget (Pi 4 / 8GB).
-        with tempfile.TemporaryDirectory(prefix="wattpost-backup-") as td:
-            tmpdb = Path(td) / "data.sqlite"
-            _sqlite_snapshot_to(str(db_path), str(tmpdb))
-
-            buf = io.BytesIO()
-            with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=6) as tar:
-                tar.add(tmpdb, arcname="data.sqlite")
-                if config_path.is_file():
-                    tar.add(config_path, arcname="config/config.yaml")
-                if WEB_PASSWORD_HASH_PATH.is_file():
-                    tar.add(WEB_PASSWORD_HASH_PATH, arcname="config/web-password.hash")
-                if WEB_PASSWORD_PLAIN_PATH.is_file():
-                    tar.add(WEB_PASSWORD_PLAIN_PATH, arcname="config/web-password")
-                manifest = (
-                    f"wattpost_version={__version__}\n"
-                    f"created_ts={ts}\n"
-                    f"db_path_at_capture={db_path}\n"
-                    f"config_path_at_capture={config_path}\n"
-                ).encode()
-                info = tarfile.TarInfo("MANIFEST")
-                info.size = len(manifest)
-                info.mtime = ts
-                tar.addfile(info, io.BytesIO(manifest))
-            return buf.getvalue()
-
-    data = await asyncio.to_thread(_build_archive)
-    stamp = time.strftime("%Y-%m-%d-%H%M%S", time.localtime(ts))
+    data = await asyncio.to_thread(build_archive_bytes, db_path, config_path)
+    stamp = time.strftime("%Y-%m-%d-%H%M%S", time.localtime())
     fname = f"wattpost-backup-{stamp}.tar.gz"
     return Response(
         content=data,
@@ -366,3 +363,119 @@ async def import_backup(request: Request, state: State) -> dict[str, Any]:
         "applied": summary,
         "verdict": verdict,
     }
+
+
+# ---- Scheduled snapshots (Settings → Backup & restore → "Automatic")
+#
+# The on-demand endpoint above is for "give me the current state as a
+# file right now"; these endpoints surface the local rotating snapshots
+# the BackupService writes on a timer. Same archive format, same
+# restore path — a scheduled .tar.gz is interchangeable with a manual
+# download for restore purposes.
+
+def _backup_service(state: State):
+    svc = state.get("backup_service")
+    if svc is None:
+        raise HTTPException(
+            status_code=503,
+            detail="backup service not running — set backup.enabled: true in config.yaml",
+        )
+    return svc
+
+
+def _safe_snapshot_path(svc, name: str) -> Path:
+    """Resolve `name` to a real file under the backup dir, rejecting
+    any path traversal. We never accept absolute paths or names
+    containing `/` — the only thing a client should send is the
+    basename of an entry from the list endpoint."""
+    if "/" in name or name.startswith(".") or not name.endswith(".tar.gz"):
+        raise HTTPException(status_code=400, detail="invalid snapshot name")
+    target = (svc.backup_dir / name).resolve()
+    try:
+        target.relative_to(svc.backup_dir.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="snapshot escapes backup dir")
+    if not target.is_file():
+        raise NotFoundException(f"no such snapshot {name!r}")
+    return target
+
+
+@get("/api/system/backup/schedule")
+async def backup_schedule(state: State) -> dict[str, Any]:
+    """Status payload for the Settings UI: what the service is doing
+    right now, plus the catalogue of local snapshots on disk."""
+    from ..backup.service import list_auto_snapshots
+    svc = state.get("backup_service")
+    if svc is None:
+        return {"enabled": False, "snapshots": []}
+    snaps = list_auto_snapshots(svc.backup_dir)
+    return {
+        "enabled": svc.cfg.enabled,
+        "interval_hours": svc.cfg.interval_hours,
+        "keep_count": svc.cfg.keep_count,
+        "dir": str(svc.backup_dir),
+        "next_run_ts": svc.next_run_ts(),
+        "last_run_ts": svc.last_run_ts,
+        "last_run_path": str(svc.last_run_path) if svc.last_run_path else None,
+        "last_run_error": svc.last_run_error,
+        "cloud_upload_enabled": svc.cfg.cloud_upload,
+        "last_cloud_upload_ok": svc.last_cloud_upload_ok,
+        "last_cloud_upload_ts": svc.last_cloud_upload_ts,
+        "last_cloud_upload_error": svc.last_cloud_upload_error,
+        "snapshots": [
+            {
+                "name": p.name,
+                "size_bytes": p.stat().st_size,
+                "mtime_ts": int(p.stat().st_mtime),
+            }
+            for p in reversed(snaps)  # newest first for the UI
+        ],
+    }
+
+
+@post("/api/system/backup/run-now", status_code=200)
+async def backup_run_now(state: State) -> dict[str, Any]:
+    """Trigger an immediate snapshot. Synchronous so the UI can show
+    the new file in the listing right away — for a few-hundred-MB DB
+    on a Pi this takes a couple of seconds, well within an HTTP
+    request budget."""
+    svc = _backup_service(state)
+    try:
+        out = await svc.snapshot_now()
+    except Exception as e:
+        log.exception("manual snapshot failed")
+        raise HTTPException(status_code=500, detail=f"snapshot failed: {e}")
+    return {
+        "ok": True,
+        "snapshot": out.name,
+        "size_bytes": out.stat().st_size,
+        "mtime_ts": int(out.stat().st_mtime),
+    }
+
+
+@get("/api/system/backup/file/{name:str}")
+async def backup_download_one(name: str, state: State) -> Response:
+    """Download a specific scheduled snapshot. The list endpoint hands
+    out names; this serves them up as application/gzip downloads with
+    the same Content-Disposition pattern as the on-demand backup."""
+    svc = _backup_service(state)
+    target = _safe_snapshot_path(svc, name)
+    data = await asyncio.to_thread(target.read_bytes)
+    return Response(
+        content=data,
+        media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "Content-Length": str(len(data)),
+        },
+    )
+
+
+@delete("/api/system/backup/file/{name:str}", status_code=200)
+async def backup_delete_one(name: str, state: State) -> dict[str, Any]:
+    """Remove a single scheduled snapshot. Operator-driven cleanup;
+    distinct from the service's automatic pruning by keep_count."""
+    svc = _backup_service(state)
+    target = _safe_snapshot_path(svc, name)
+    await asyncio.to_thread(target.unlink)
+    return {"ok": True, "deleted": name}
