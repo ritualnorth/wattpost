@@ -215,4 +215,32 @@ class Config(msgspec.Struct, kw_only=True):
 
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
-    return msgspec.convert(raw, Config)
+    cfg = msgspec.convert(raw, Config)
+
+    # Legacy endpoint auto-upgrade. Appliances paired before the
+    # rebrand have `cloud.endpoint: https://app.wattpost.io` saved.
+    # That hostname now 301s to wattpost.cloud at the edge — and
+    # httpx (correctly) strips the Authorization header on cross-host
+    # redirects, so every heartbeat 401s before being rewritten and
+    # the appliance shows offline forever. Detect + upgrade in-place
+    # so paired appliances heal themselves on next start.
+    legacy_endpoints = (
+        "https://app.wattpost.io",
+        "https://app.wattpost.io/",
+        "https://wattpost.io",
+        "https://wattpost.io/",
+    )
+    if cfg.cloud is not None and cfg.cloud.endpoint in legacy_endpoints:
+        cfg.cloud.endpoint = "https://wattpost.cloud"
+        try:
+            raw["cloud"]["endpoint"] = "https://wattpost.cloud"
+            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+        except Exception:
+            # Persist-back is best-effort. The in-memory upgrade above
+            # is enough to make this run work; the next save (pair,
+            # settings edit) will then write the upgraded value
+            # naturally. A read-only mount or permissions issue here
+            # shouldn't break the daemon.
+            pass
+
+    return cfg
