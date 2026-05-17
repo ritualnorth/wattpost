@@ -58,6 +58,33 @@ def _proc_uptime_seconds() -> float | None:
     return time.time() - _DAEMON_STARTED_AT
 
 
+@get("/api/system/auth-status")
+async def auth_status(request) -> dict[str, Any]:  # type: ignore[no-untyped-def]
+    """Lightweight read-only signal of whether the current request
+    carries a valid local session cookie. Exists because the cookie
+    is HttpOnly (good — XSS can't steal it) so the SPA can't tell
+    via document.cookie. JS used to read the cookie name directly,
+    which silently failed and left the Sign In button visible to
+    every authenticated user.
+
+    Returns `{authed: bool, origin: str | None}`. `origin` is
+    "local" for password sign-in or "sso" for cloud-broker SSO
+    (see web_auth.issue_session). Used by the header to show /
+    hide the Sign In affordance.
+    """
+    from .. import web_auth as _wa
+    token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
+    if not token:
+        return {"authed": False, "origin": None}
+    sess = _wa._session_record(token)
+    if sess is None:
+        return {"authed": False, "origin": None}
+    return {
+        "authed": True,
+        "origin": sess.get("origin", "local"),
+    }
+
+
 @get("/api/system/info")
 async def system_info() -> dict[str, Any]:
     """One-shot system status payload for Settings → About."""
