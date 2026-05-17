@@ -58,6 +58,30 @@ def _proc_uptime_seconds() -> float | None:
     return time.time() - _DAEMON_STARTED_AT
 
 
+@get("/api/system/kiosk")
+async def kiosk_status(state: State) -> dict[str, Any]:
+    """Returns the current kiosk share state for the Settings panel.
+
+    `share_url` is the public URL the user copy-pastes to wherever
+    they want to display the kiosk view. `null` when no cloud tunnel
+    is provisioned (the appliance needs a slug for the URL to point
+    anywhere — pair to enable).
+    """
+    config = state["config"]
+    if config.cloud is None:
+        return {"share_url": None, "enabled": False}
+    hostname = config.cloud.tunnel_hostname or ""
+    slug = hostname.split(".", 1)[0] if hostname else ""
+    tok  = config.cloud.kiosk_token or ""
+    share_url = None
+    if slug and tok:
+        share_url = f"https://{slug}.wattpost.cloud/kiosk?key={tok}"
+    return {
+        "share_url": share_url,
+        "enabled":   bool(slug and tok),
+    }
+
+
 @post("/api/system/kiosk/rotate", status_code=200)
 async def rotate_kiosk_token(state: State) -> dict[str, Any]:
     """Generate a new kiosk_token, persist to config, return the new

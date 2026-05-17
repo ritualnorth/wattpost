@@ -304,6 +304,26 @@ body.is-demo #settings-update-apply { display: none !important; }
   .header-signin span { display: none; }
   .header-signin { padding: .35rem .55rem; }
 }
+/* Kiosk share URL panel (Settings → Kiosk share URL) */
+.kiosk-url-row {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: .55rem;
+}
+.kiosk-url-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .82rem;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .4rem .55rem;
+  min-width: 0;  /* let the flex item shrink below content width */
+}
+.kiosk-url-input:focus { outline: 2px solid var(--accent, #58a6ff); outline-offset: -2px; }
+.kiosk-actions { display: flex; align-items: center; gap: .75rem; }
+
 /* Rotate-password result panel (Settings → System) */
 .rotate-pw-result {
   margin-top: .75rem;

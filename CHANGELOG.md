@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.62] — 2026-05-17
+
+### Added — Settings → Kiosk share URL panel
+Surfaces the per-appliance public share URL the cloud dashboard
+already builds, plus a Rotate button for one-click revocation
+when the URL leaks. Reads via GET /api/system/kiosk; rotates via
+POST /api/system/kiosk/rotate (already shipped in v0.0.61).
+Block hides itself when the appliance has no cloud tunnel (no
+slug = no public URL).
+
+app.js v=129, styles.css v=103, CACHE_VERSION bumped.
+
 ## [0.0.61] — 2026-05-17
 
 ### Added — Tokened kiosk share URL (Option C)
