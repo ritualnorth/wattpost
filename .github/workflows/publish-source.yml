@@ -19,6 +19,15 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# Coalesce back-to-back tags: only the newest tarball matters for
+# "Update now" (manifest.json always points at latest), and the
+# appleboy/scp-action Docker layer occasionally flakes on the
+# self-hosted runner with a "pull access denied" — cancelling
+# in-flight older runs trims the failure-email noise.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

@@ -16,6 +16,18 @@ on:
       - 'v*'
   workflow_dispatch:
 
+# Coalesce back-to-back tag pushes. Pi-gen runs in a shared
+# `pigen-builder` Docker container on the self-hosted runner; two
+# parallel runs collide with "The build is already running in
+# container pigen-builder. Aborting." which manifested as a stream
+# of failure emails when a rapid sequence of patch tags landed in
+# one session. Cancelling the older queued/running build is the
+# right behaviour anyway — only the newest SD image is what
+# customers download from /download.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
 permissions:
   contents: write   # needed to create the release on tag push
 

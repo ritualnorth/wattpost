@@ -21,6 +21,15 @@ on:
     paths-ignore: []
   workflow_dispatch:
 
+# Coalesce per-ref so back-to-back commits to the same branch or
+# rapid tag pushes don't pile up on the runner. Different tags
+# still produce distinct runs (each tag is a different ref → its
+# own concurrency group) so we don't lose the :vX.Y.Z Docker
+# tags anyone might pin to.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write    # GHCR push via GITHUB_TOKEN
