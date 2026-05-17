@@ -987,6 +987,13 @@ function renderFlow(targetHost) {
   }
   host.classList.remove("flow--idle");
 
+  // Busbar voltage = bank's measured voltage. Every source's output
+  // AND every load's input sit at this same voltage on the busbar,
+  // so dividing pill-W by it gives the actual amperage flowing across
+  // that connection. Hoisted out of the per-block scopes so both
+  // sources and loads pills can compute it.
+  const busbarV = model.bank?.meanV || 0;
+
   // ----- Sources column (only when present) -----
   if (hasSources) {
     const sourcesCol = document.createElement("div");
@@ -994,8 +1001,11 @@ function renderFlow(targetHost) {
     for (const s of model.sources) sourcesCol.appendChild(makeFlowTile(s));
     host.appendChild(sourcesCol);
 
+    const sourcesPillA = busbarV > 0 ? totalSourceW / busbarV : null;
     host.appendChild(makeConnector({
-      label: `${totalSourceW.toFixed(0)} W`,
+      label: sourcesPillA != null
+        ? `${totalSourceW.toFixed(0)} W · ${sourcesPillA.toFixed(1)} A`
+        : `${totalSourceW.toFixed(0)} W`,
       fromColor: model.sources[0]?.color || "neutral",
       toColor: "batt",
       active: totalSourceW > 1,
@@ -1007,6 +1017,17 @@ function renderFlow(targetHost) {
   battCol.className = "flow-col";
   if (model.bank) {
     const b = model.bank;
+    // Sub-line now includes A — sumI is what the BMS sees flowing
+    // through its terminals (= net charge/discharge at battery side).
+    // Reads alongside "+269 W" as "20.2 A" so users can match the
+    // pill amperage to bank amperage directly.
+    const subParts = [
+      `${b.soc.toFixed(1)} %`,
+      `${b.meanV.toFixed(2)} V`,
+    ];
+    if (typeof b.sumI === "number") {
+      subParts.push(`${b.sumI >= 0 ? "+" : ""}${b.sumI.toFixed(1)} A`);
+    }
     battCol.appendChild(makeFlowTile({
       label: "Battery bank",
       color: "batt",
@@ -1014,7 +1035,7 @@ function renderFlow(targetHost) {
       power: b.netW,
       signed: true,
       active: Math.abs(b.netW) > 1,
-      sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V`,
+      sub: subParts.join(" · "),
     }));
   } else {
     battCol.appendChild(makeFlowTile({ label: "Battery", color: "neutral", icon: "battery", power: 0, sub: "—" }, true));
@@ -1023,8 +1044,11 @@ function renderFlow(targetHost) {
 
   // ----- Loads column (only when present) -----
   if (hasLoads) {
+    const loadsPillA = busbarV > 0 ? totalLoadW / busbarV : null;
     host.appendChild(makeConnector({
-      label: `${totalLoadW.toFixed(0)} W`,
+      label: loadsPillA != null
+        ? `${totalLoadW.toFixed(0)} W · ${loadsPillA.toFixed(1)} A`
+        : `${totalLoadW.toFixed(0)} W`,
       fromColor: "batt",
       toColor: model.loads[0]?.color || "neutral",
       active: totalLoadW > 1,
