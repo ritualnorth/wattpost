@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.74] — 2026-05-17
+
+### Fixed — Dashboard stuck at "connecting" when accessed via cloud broker on iOS Safari
+On the broker URL (`<slug>.wattpost.cloud`), the dashboard would load
+the shell + tabs but every tile stayed empty and the status pill
+stayed at "connecting…" forever. Confirmed in headless Chromium that
+the JS code was fine — render succeeds when the page is allowed to
+breathe. The trap was iOS Safari's HTTP connection pool: a long-lived
+EventSource through Cloudflare Tunnel holds a connection open, and
+Safari serialises subsequent /api/* fetches behind it, so refresh()
+never resolves and the pill never flips.
+
+Fix: in `wireSignout`'s auth-status callback, detect `origin === "broker"`,
+close any open EventSource, and start the 5 s polling fallback instead.
+LAN access keeps SSE (fresh local connection, no CF in the path, no
+pool starvation). The reroute is transparent — same data shape via the
+same `applySnapshot`, just delivered by REST poll instead of stream.
+
+Caught while writing a headless-Chromium reproduction with synthesized
+broker headers (CF-Ray + freshly-minted HMAC). Before fix: page navigation
+timed out waiting for networkidle, status pill stuck on initial HTML
+default. After fix: clean 200, pill flips to "Healthy", real data renders.
+
 ## [0.0.73] — 2026-05-17
 
 ### Fixed — "Idle" shown when slow-charging from PV

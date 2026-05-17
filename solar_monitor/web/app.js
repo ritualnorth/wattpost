@@ -2760,8 +2760,8 @@ const AUTH_GATED_ROUTES = new Set(["settings", "setup"]);
 // fetch, refreshed on logout. setRoute() reads this when gating
 // AUTH_GATED_ROUTES; null = unknown (treat as anonymous to be safe).
 let _authState = null;
-function _setAuthState(authed) {
-  _authState = { authed };
+function _setAuthState(authed, origin) {
+  _authState = { authed, origin: origin || null };
 }
 window._setAuthState = _setAuthState;  // for wireHeaderAuth handoff
 
@@ -4822,8 +4822,22 @@ if (rotatePwBtn) {
     .then((data) => {
       const authed = !!(data && data.authed);
       const origin = data && data.origin;
-      if (typeof window._setAuthState === "function") window._setAuthState(authed);
+      if (typeof window._setAuthState === "function") window._setAuthState(authed, origin);
       if (authed && origin !== "broker") signoutBtn.hidden = false;
+      // Broker-origin: skip SSE, use polling. iOS Safari serialises
+      // its small per-host HTTP connection pool around a long-lived
+      // EventSource through the Cloudflare tunnel, queuing every
+      // /api/* fetch behind the SSE — dashboard sits at "connecting"
+      // forever even though the data is one request away. Polling
+      // every 5 s is plenty for a remote view and dodges the trap.
+      // Local LAN keeps SSE — it works fine on a fresh connection.
+      if (authed && origin === "broker") {
+        if (typeof eventStream !== "undefined" && eventStream) {
+          try { eventStream.close(); } catch (_) {}
+          eventStream = null;
+        }
+        if (typeof startPollingFallback === "function") startPollingFallback();
+      }
     })
     .catch(() => { /* leave hidden on network error */ });
 })();
