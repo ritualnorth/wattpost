@@ -4786,14 +4786,21 @@ if (rotatePwBtn) {
 
   // Hide until we know the user is actually signed in. Avoids
   // showing a Sign-out button to an anonymous LAN viewer who's
-  // never authed in the first place.
+  // never authed in the first place. Also hides for broker-origin
+  // sessions — the broker re-injects an HMAC header on every
+  // request from the user's wattpost.cloud session, so there's no
+  // appliance-side session for "Sign out" to actually end. The
+  // only way to sign out of a broker view is to log out of
+  // wattpost.cloud itself; rendering a button here that does
+  // nothing useful is just confusing.
   signoutBtn.hidden = true;
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
     .then((data) => {
       const authed = !!(data && data.authed);
+      const origin = data && data.origin;
       if (typeof window._setAuthState === "function") window._setAuthState(authed);
-      if (authed) signoutBtn.hidden = false;
+      if (authed && origin !== "broker") signoutBtn.hidden = false;
     })
     .catch(() => { /* leave hidden on network error */ });
 })();
