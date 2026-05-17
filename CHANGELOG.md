@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.86] — 2026-05-17
+
+### Fixed — Hard refresh on a #/device/<label> page lost the device
+On a cold load (hard refresh or paste-the-URL), the router fired
+`renderDeviceDetail()` before the first snapshot had populated the
+`devices` array, so the page stuck on "No device named …" until you
+clicked Back. `applySnapshot()` now re-renders the device-detail
+route if the placeholder is showing and the requested device has
+since arrived.
+
 ## [0.0.85] — 2026-05-17
 
 ### Added — Charger value-add stats on the device-detail page

@@ -406,6 +406,21 @@ function applySnapshot(frame) {
   $("#devices-meta").textContent = lastRun
     ? `${devices.length} devices · last poll ${lastRun.elapsed_ms} ms · ${fmt.ago(lastRun.ts)}`
     : "";
+  // If we landed on a #/device/<label> route before the first snapshot
+  // arrived, `devices` was empty and renderDeviceDetail showed the
+  // "no such device" message. Re-render now that data is in hand.
+  try {
+    const r = parseRoute();
+    if (r.name === "device" && devices.find(d => d.label === r.label)) {
+      const host = document.querySelector("#device-route");
+      if (host && host.querySelector("a[href='#/devices']")) {
+        // Only re-render if the placeholder is showing (avoid clobbering
+        // an already-good detail view + its wireups on subsequent polls).
+        const isPlaceholder = host.textContent.includes("No device named");
+        if (isPlaceholder) renderDeviceDetail(r.label);
+      }
+    }
+  } catch {}
 }
 
 async function refresh() {
