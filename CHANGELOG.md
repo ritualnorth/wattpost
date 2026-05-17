@@ -8,6 +8,30 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.0.55] — 2026-05-17
+
+### Fixed — Appliances paired pre-rebrand silently failed heartbeats
+Appliances paired before the wattpost.io → wattpost.cloud rebrand
+have `cloud.endpoint: https://app.wattpost.io` baked into their
+local config. That hostname now 301s at the Cloudflare edge, and
+httpx (correctly) strips the `Authorization` header when following
+a cross-host redirect — so the bearer never reached wattpost.cloud
+and every heartbeat 401'd. Appliance showed offline despite working
+locally + having a valid bearer + the cloud being healthy.
+
+config.load_config now auto-upgrades any legacy endpoint
+(`https://app.wattpost.io`, `https://wattpost.io`) to
+`https://wattpost.cloud` and persists the change back to the YAML.
+Affected appliances heal themselves on next daemon start. New
+pairings already default to wattpost.cloud (CloudCfg.endpoint).
+
+### Fixed — Cloud theme defaulted to dark regardless of device
+The inline theme bootstrap in _base.html.jinja defaulted to "dark"
+(via the `default_theme` block) when no localStorage preference was
+set. So a light-mode user landing on the dashboard saw dark forever
+until they manually visited /app/account and picked "System". Now
+defaults to "system" so OS preference is honoured from first visit.
+
 ## [0.0.54] — 2026-05-16
 
 ### Added — Staff admin page (#103, MVP)
