@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-05-18
+
+### Added — Setup wizard: edit existing transport (#159)
+Customers can now change a transport's BLE MAC, Victron
+encryption key, or serial port path without the
+delete-and-recreate dance every time Victron rotates the key
+after a factory reset, a BT-2 dongle gets replaced, or a
+USB-RS485 adapter moves to a different tty.
+
+- New `PATCH /api/setup/transports/{id}` endpoint with the same
+  validation rules as the add path (MAC format, key length,
+  /dev/... prefix). Transport `id` is the stable handle and is
+  never renamed — devices and history reference it.
+- Pencil-icon button on every transport row in the setup wizard.
+  Click → window.prompt for the new value(s) → PATCH → hot-reload.
+  Empty answers keep the existing value; Cancel exits cleanly
+  without touching config.
+- Same .bak rotation + hot-reload as add and delete, so the
+  BLE connection re-opens with the new credentials without a
+  daemon restart.
+
+### Closed without action — #161 AC charger / DC-DC "today" totals
+The victron-ble Instant Readout protocol doesn't surface daily
+energy counters for `AcCharger` or `DcDcConverter` device types
+(verified directly against the appliance's installed library —
+only `get_temperature`, `get_charge_state`, output V/A are
+exposed). Trapezoid integration over power samples is the best
+we can do upstream-side. Re-open if Victron adds the fields in a
+future firmware/protocol revision.
+
 ## [0.1.4] — 2026-05-18
 
 ### Fixed — White page on iOS Safari broker view (root cause this time)

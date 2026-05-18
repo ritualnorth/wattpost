@@ -23,7 +23,7 @@ import json
 
 import msgspec
 import yaml
-from litestar import delete, get, post
+from litestar import delete, get, patch, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException, NotFoundException
 from litestar.response import Stream
@@ -908,6 +908,117 @@ async def delete_device(
     return {
         "ok": True,
         "removed":          1,
+        "restart_required": False,
+        "reloaded":         True,
+        "reload_error":     None,
+        "backup_path":      str(backup),
+    }
+
+
+class EditTransportRequest(msgspec.Struct, kw_only=True):
+    """In-place edits to an existing transport. None = leave alone.
+    Editable fields are exactly the ones that change in the field:
+    the Victron encryption key when the device is factory-reset, the
+    BLE MAC when a dongle is replaced, the serial port path when a
+    USB-RS485 adapter moves to a different tty. The transport `id`
+    is the stable handle and is never renamed — devices reference
+    it, history rows are keyed off it, MQTT topics include it."""
+    address:        str | None = None
+    encryption_key: str | None = None
+    port:           str | None = None
+
+
+@patch("/api/setup/transports/{transport_id:str}", status_code=200)
+async def edit_setup_transport(
+    transport_id: str, data: EditTransportRequest, state: State,
+) -> dict[str, Any]:
+    """In-place edit of an existing transport's mutable fields.
+    Saves the customer from the delete-and-recreate dance every time
+    Victron rotates the BLE key after a factory reset or a BT-2 gets
+    replaced. Hot-reloads on success so the connection re-opens with
+    the new credentials without a daemon restart."""
+    config_path: str = state.get("config_path", "config.yaml")
+    path = Path(config_path)
+    raw = yaml.safe_load(path.read_text()) or {}
+    transports = raw.get("transports") or []
+    target = next((t for t in transports if t.get("id") == transport_id), None)
+    if target is None:
+        raise NotFoundException(f"no transport with id {transport_id!r}")
+
+    t_type = target.get("type")
+    changes: dict[str, Any] = {}
+
+    if data.address is not None:
+        new_mac = data.address.strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", new_mac):
+            raise HTTPException(
+                status_code=400,
+                detail="address must be a Bluetooth MAC (e.g. CC:45:A5:83:B7:42)",
+            )
+        # Reject duplicates with OTHER transports (same MAC on the same
+        # transport-id is a no-op rewrite, that's fine).
+        for t in transports:
+            if t.get("id") == transport_id:
+                continue
+            if (t.get("address") or "").upper() == new_mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"MAC {new_mac} is already configured on transport "
+                           f"{t.get('id')!r}",
+                )
+        changes["address"] = new_mac
+
+    if data.encryption_key is not None:
+        if t_type != "ble_victron_advertise":
+            raise HTTPException(
+                status_code=400,
+                detail="encryption_key only applies to ble_victron_advertise transports",
+            )
+        key_clean = (data.encryption_key
+                     .strip()
+                     .replace(" ", "")
+                     .replace(":", "")
+                     .replace("-", "")
+                     .lower())
+        if not re.fullmatch(r"[0-9a-f]{32}", key_clean):
+            raise HTTPException(
+                status_code=400,
+                detail="encryption_key must be 32 hex chars (VictronConnect "
+                       "→ Product info → Show device key)",
+            )
+        changes["encryption_key"] = key_clean
+
+    if data.port is not None:
+        if t_type != "serial_modbus":
+            raise HTTPException(
+                status_code=400,
+                detail="port only applies to serial_modbus transports",
+            )
+        new_port = data.port.strip()
+        if not new_port.startswith("/dev/"):
+            raise HTTPException(
+                status_code=400,
+                detail="port must be an absolute /dev/... path",
+            )
+        changes["port"] = new_port
+
+    if not changes:
+        raise HTTPException(status_code=400, detail="no editable fields supplied")
+
+    # Apply, persist, hot-reload — same pattern as add/delete.
+    target.update(changes)
+    backup = path.with_suffix(path.suffix + ".bak")
+    shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    log.info("setup wizard: edited transport %s (changed: %s)",
+             transport_id, ", ".join(changes.keys()))
+    asyncio.create_task(_hot_reload_bg(state))
+    return {
+        "ok":               True,
+        "transport_id":     transport_id,
+        "changed":          list(changes.keys()),
         "restart_required": False,
         "reloaded":         True,
         "reload_error":     None,
