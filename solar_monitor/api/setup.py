@@ -153,6 +153,12 @@ _MODEL_PROBES: list[tuple[str, str, int, int]] = [
 # generic Rover catch-all doesn't claim them by mistake.
 def _classify_renogy(model: str) -> str | None:
     m = (model or "").upper()
+    # Shunt / Battery Monitor — RBM-S100 / S300 / S500. Must come BEFORE
+    # the smart-battery RBT check; RBM and RBT differ by one letter but
+    # are completely different products. Also catches "SHUNT" in case
+    # newer firmware names it that way.
+    if m.startswith("RBM") or "SHUNT" in m:
+        return "shunt"
     # Smart batteries: most LFP packs start with "RBT" (Renogy Battery
     # Type) or include "LFP" in the model.
     if m.startswith("RBT") or "LFP" in m:
