@@ -38,19 +38,32 @@ tar czf wattpost-backup-$(date +%F).tar.gz wattpost-config/ wattpost-data/
 Restore: copy that file to the new host, untar in place, `docker
 compose up -d`.
 
-## Cloud backup (coming with the cloud tier)
+## Built-in local backups
 
-Once we ship the cloud tier, every poll's data syncs upward as it
-happens, and your config gets pushed whenever you change it. After a
-hardware failure:
+**Settings → System → Backups** runs a Home-Assistant-style snapshot
+flow: rotating weekly archives of `config.yaml` + the SQLite DB,
+stored on the appliance itself (or any USB stick you mount). Restore
+is one click from the same panel.
 
-1. Flash a fresh SD card.
-2. Log into `wattpost.cloud`.
-3. Pick the site, hit **Restore**.
+## Cloud backups (Pro tier)
+
+If the appliance is [paired to wattpost.cloud](/docs/pairing) on the
+Pro tier, every snapshot is pushed off-site as it's taken. The cloud
+keeps the last 8 weekly archives encrypted at rest.
+
+After a hardware failure:
+
+1. Flash a fresh SD card and finish first-boot.
+2. Log into `wattpost.cloud`, open the dead site, click
+   **Restore from cloud → pick a snapshot**.
+3. The cloud sends a one-time pairing code + restore URL to the new
+   Pi; the daemon downloads the snapshot, swaps `config.yaml` + the
+   DB into place, restarts.
 4. ~10 minutes later you're back: history, paired BLE addresses,
    alert rules, exporter config — everything.
 
-No more re-pairing four batteries by hand.
+No more re-pairing four batteries by hand. See
+[Cloud overview](/docs/cloud-overview) for the full feature list.
 
 ## Config edits via the UI are safe
 

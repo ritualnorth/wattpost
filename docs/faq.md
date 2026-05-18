@@ -60,14 +60,19 @@ If you're 100% grid-tied with no batteries, dedicated solar-PV monitoring tools 
 
 ## How much does the cloud tier cost?
 
-The cloud is in beta and free during beta. Pricing TBD. Sign up at [wattpost.cloud/signup](https://wattpost.cloud/signup).
+- **Hobby** — £3/mo, 1 site, multi-site dashboard + tunnel + REST API
+- **Pro** — £6/mo, 3 sites, push notifications, rules engine, cloud-stored backups
+- **Installer** — £39/mo + £3/site, white-label kiosk for paid installs
+
+14-day free trial. Cancel anytime. Full breakdown at [wattpost.cloud/pricing](https://wattpost.cloud/pricing).
 
 ## What hardware do you recommend buying?
 
 - **Raspberry Pi 4** (1 GB is enough — about £60 / $80 with PSU)
 - **8 GB+ microSD card**
-- **Renogy BT-2 dongle** (£8 / $12) if you have Renogy gear
+- A Bluetooth source for each vendor you own:
+  - Renogy → **BT-2 dongle** (~£8) plugs into the comms port
+  - Victron → no dongle, devices advertise directly (you'll need the Instant Readout encryption key from VictronConnect)
+  - JK BMS → no dongle, it advertises directly
 
-Victron and JK BMS support are on the roadmap; if you have them, sign up at [wattpost.cloud](https://wattpost.cloud/signup) so we can ping you when those land.
-
-Total kit for a Renogy setup: **~£70**. About 1/4 the cost of a comparable commercial monitor.
+Total kit for one vendor: **~£70**. About 1/4 the cost of a comparable commercial monitor.
