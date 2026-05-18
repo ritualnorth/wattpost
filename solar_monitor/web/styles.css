@@ -2885,6 +2885,64 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   white-space: nowrap;
   text-align: right;
 }
+/* Edit modal for #111 phase 2. Hand-rolled rather than carrying a
+ * generic modal component just for this. */
+.settings-edit-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.settings-edit-modal {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem 1.25rem 1rem;
+  width: 100%; max-width: 24rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.settings-edit-modal h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+.settings-edit-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin: .85rem 0;
+}
+.settings-edit-row label {
+  font-size: .82rem; color: var(--text-2); flex-shrink: 0;
+}
+.settings-edit-row input[type="number"],
+.settings-edit-row select {
+  width: 11rem;
+  padding: .45rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-1);
+  font: inherit;
+}
+.settings-edit-cur-label { font-size: .78rem; color: var(--text-3); }
+.settings-edit-cur {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.settings-edit-warn {
+  font-size: .78rem; color: #d9886f;
+  padding: .4rem .55rem;
+  background: rgba(255, 138, 122, .08);
+  border: 1px solid rgba(255, 138, 122, .25);
+  border-radius: 6px;
+  margin-top: .25rem;
+}
+.settings-edit-actions {
+  display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem;
+}
+.btn-action--primary {
+  background: var(--accent, #3a86ff);
+  color: #fff;
+  border-color: transparent;
+}
+.btn-action--primary:hover { filter: brightness(1.1); }
+.btn-action--primary[disabled] { opacity: .6; cursor: not-allowed; }
 .alerts-sub-head {
   display: flex; align-items: center; justify-content: space-between;
   margin: .85rem 0 .35rem;

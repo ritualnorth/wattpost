@@ -8,6 +8,48 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.13] — 2026-05-18
+
+### Added — Editable device settings (#111 phase 2)
+The disabled "Edit" buttons on the device-detail Settings panel
+are now live. Click → modal opens with the current value, the
+right input shape for the descriptor (select for enum, number with
+min/max/step for numeric) + the help text. Apply hits FC06 via the
+same code path the Rover load-output adapter has used in
+production since #104 — write, optional read-back to confirm,
+BT-2 ack-swallowing tolerated.
+
+Customers running Renogy Rover charge controllers can now edit
+the 5 declared settings from WattPost without opening the BT-2
+app: battery type, absorption voltage, float voltage,
+low-voltage disconnect, low-voltage reconnect. Edit modal
+validates client- AND server-side against the descriptor's
+range / choice list before issuing the write.
+
+Path:
+- New `solar_monitor/settings_write.py` — reusable FC06 helper
+  with the same ack-swallowing fallback the load-output uses.
+- `PATCH /api/devices/{label}/settings/{key}` validates body
+  `{value: ...}` against the descriptor, encodes via scale,
+  resolves the live transport, writes, read-backs, audit-logs,
+  pushes the new value into the `latest` store so the UI
+  reflects it before the next regular poll cycle.
+- Transports that don't support `request()` (Victron BLE
+  broadcast-only) return 409 — the descriptors don't exist on
+  Victron drivers per scope, but defence-in-depth.
+
+Phase 3 (#170) will fan the descriptor catalog out across the
+rest of the Renogy line + the JK BMS write surface (charge /
+discharge MOS, cell-balance).
+
+CACHE_VERSION bumped to v74-app164-css107.
+
+### Note — v0.1.12 was a hot-patch
+Sentinel-age fix for the never-seen Victron device case (the
+86400 sentinel that makes the dashboard grey out tiles correctly
+even on first-poll after a daemon restart). Shipped without a
+`__version__` bump by accident; v0.1.13 corrects the label.
+
 ## [0.1.11] — 2026-05-18
 
 ### Fixed — Stale Victron BLE data shown as live (#171)

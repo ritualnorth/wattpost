@@ -5811,6 +5811,9 @@ async function renderDeviceSettings(label) {
         cur = `${val}${s.units ? " " + esc(s.units) : ""}`;
       }
     }
+    const editAttrs = s.editable
+      ? `data-setting-key="${esc(s.key)}" data-setting-label="${esc(label)}"`
+      : `disabled title="Read-only — driver hasn't declared a write path"`;
     return `
       <tr>
         <td>
@@ -5819,8 +5822,7 @@ async function renderDeviceSettings(label) {
         </td>
         <td class="settings-row-value">${cur}</td>
         <td>
-          <button class="btn-action" type="button" disabled
-                  title="Editing lands in v0.2.0">
+          <button class="btn-action settings-edit-btn" type="button" ${editAttrs}>
             Edit
           </button>
         </td>
@@ -5830,14 +5832,136 @@ async function renderDeviceSettings(label) {
     <section class="device-detail-card">
       <h3 style="margin:0 0 .5rem">Settings</h3>
       <p class="settings-foot" style="margin:0 0 .75rem">
-        Live values pulled from the device. Editing from WattPost
-        is coming in v0.2.0 — for now, change these from the
-        vendor app.
+        Live values pulled from the device. Edits write FC06
+        Modbus to the device and read back to confirm.
       </p>
       <table class="settings-table">
         <tbody>${rows}</tbody>
       </table>
     </section>`;
+  // Wire each enabled Edit button. The handler captures the
+  // descriptor by key from the items array so the modal has the
+  // full schema (choices / min / max / step / units) without
+  // re-fetching.
+  host.querySelectorAll(".settings-edit-btn").forEach((btn) => {
+    if (btn.disabled) return;
+    const key = btn.dataset.settingKey;
+    const dev = btn.dataset.settingLabel;
+    const setting = items.find((it) => it.key === key);
+    if (!setting) return;
+    btn.addEventListener("click", () => openSettingsEditModal(dev, setting));
+  });
+}
+
+function openSettingsEditModal(deviceLabel, setting) {
+  // Build a modal in-place. The dashboard doesn't have a generic
+  // modal component yet; rather than carry one in just for this,
+  // we hand-roll the dom + escape on Esc / click-outside.
+  const existing = document.getElementById("settings-edit-modal");
+  if (existing) existing.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "settings-edit-modal";
+  modal.className = "settings-edit-modal-backdrop";
+
+  // Input markup depends on kind.
+  let inputHtml = "";
+  if (setting.kind === "enum") {
+    const opts = (setting.choices || []).map((c) =>
+      `<option value="${c.value}" ${c.value === setting.current_value ? "selected" : ""}>${esc(c.label)}</option>`
+    ).join("");
+    inputHtml = `<select id="settings-edit-input">${opts}</select>`;
+  } else {
+    const step = setting.step || 1;
+    const val = setting.current_value != null ? setting.current_value : "";
+    const minA = setting.min != null ? ` min="${setting.min}"` : "";
+    const maxA = setting.max != null ? ` max="${setting.max}"` : "";
+    inputHtml = `<input type="number" step="${step}"${minA}${maxA}
+                        id="settings-edit-input" value="${val}"
+                        inputmode="decimal" />`;
+  }
+
+  const curStr = (() => {
+    if (setting.current_value == null) return "—";
+    if (setting.kind === "enum") {
+      const m = (setting.choices || []).find((c) => c.value === setting.current_value);
+      return m ? m.label : String(setting.current_value);
+    }
+    const v = (typeof setting.current_value === "number")
+      ? setting.current_value.toFixed(setting.step && setting.step < 1 ? 1 : 0)
+      : String(setting.current_value);
+    return `${v}${setting.units ? " " + setting.units : ""}`;
+  })();
+
+  modal.innerHTML = `
+    <div class="settings-edit-modal">
+      <h3>${esc(setting.label)}</h3>
+      <p class="settings-foot">${esc(setting.help_text || "")}</p>
+      <div class="settings-edit-row">
+        <span class="settings-edit-cur-label">Current</span>
+        <span class="settings-edit-cur">${esc(curStr)}</span>
+      </div>
+      <div class="settings-edit-row">
+        <label for="settings-edit-input">New value${setting.units ? " (" + esc(setting.units) + ")" : ""}</label>
+        ${inputHtml}
+      </div>
+      <div class="settings-edit-warn" id="settings-edit-warn" hidden></div>
+      <div class="settings-edit-actions">
+        <button type="button" class="btn-action" id="settings-edit-cancel">Cancel</button>
+        <button type="button" class="btn-action btn-action--primary"
+                id="settings-edit-save">Apply</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+  document.addEventListener("keydown", function onKey(e) {
+    if (e.key === "Escape") { close(); document.removeEventListener("keydown", onKey); }
+  });
+  document.getElementById("settings-edit-cancel").addEventListener("click", close);
+
+  document.getElementById("settings-edit-save").addEventListener("click", async () => {
+    const input = document.getElementById("settings-edit-input");
+    const warn = document.getElementById("settings-edit-warn");
+    const saveBtn = document.getElementById("settings-edit-save");
+    const raw = input.value;
+    let val;
+    if (setting.kind === "enum") {
+      val = parseInt(raw, 10);
+    } else {
+      val = parseFloat(raw);
+      if (!Number.isFinite(val)) {
+        warn.hidden = false; warn.textContent = "Enter a number";
+        return;
+      }
+    }
+    saveBtn.disabled = true; saveBtn.textContent = "Writing…";
+    warn.hidden = true;
+    try {
+      const r = await fetch(
+        `/api/devices/${encodeURIComponent(deviceLabel)}/settings/${encodeURIComponent(setting.key)}`,
+        {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({value: val}),
+        },
+      );
+      const body = await r.json().catch(() => ({}));
+      if (r.ok && body.ok) {
+        close();
+        renderDeviceSettings(deviceLabel);
+      } else {
+        warn.hidden = false;
+        warn.textContent = body.detail || `HTTP ${r.status}`;
+        saveBtn.disabled = false; saveBtn.textContent = "Apply";
+      }
+    } catch (e) {
+      warn.hidden = false; warn.textContent = e.message || String(e);
+      saveBtn.disabled = false; saveBtn.textContent = "Apply";
+    }
+  });
 }
 
 // ---------- CONTROLLABLE OUTPUTS (#104) ----------
