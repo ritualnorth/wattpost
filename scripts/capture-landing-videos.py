@@ -33,6 +33,10 @@ CLIPS = [
     ("video-devices.webm",   "/#/devices", {"width": 1280, "height": 800}, 6),
     # Mobile dashboard — vertical orientation, hand-held framing.
     ("video-mobile.webm",    "/",        {"width": 414,  "height": 896}, 7),
+    # Kiosk view — chrome-free, giant SoC donut + flow. 16:9 aspect
+    # for a wall-mounted touch-display / monitor feel; the lock=1
+    # query strips the Exit button so the recording stays clean.
+    ("video-kiosk.webm",     "/kiosk?lock=1", {"width": 1280, "height": 720}, 8),
 ]
 
 
