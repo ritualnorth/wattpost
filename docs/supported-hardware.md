@@ -12,8 +12,11 @@ Communicates via a **BT-1** or **BT-2** dongle plugged into the device's RJ45 / 
 
 Drivers:
 
-- **Rover MPPT** charge controllers (Rover Li, Rover Boost)
+- **Rover MPPT** charge controllers (Rover, Rover Li, Rover Elite, Rover Boost, Wanderer, Adventurer, Voyager)
+- **DCC50S / DCC30S / DCC25S / DCC15S** DC-DC + MPPT combo chargers
 - **Smart Lithium batteries** — per-pack voltage, temperature, cell drift, cycle count
+- **1000 W / 2000 W / 3000 W pure-sine inverter-chargers** — AC in/out, MPPT side, load %
+- **Battery Monitor with Shunt** — RBM-S100 / S300 / S500 — voltage, current, SoC, time-to-empty / time-to-full, cumulative Ah counters
 
 Connect one BT-2 to the master device on a shared RS-485 bus and WattPost can talk to every Renogy unit on the chain via the same dongle.
 
@@ -21,9 +24,7 @@ Connect one BT-2 to the master device on a shared RS-485 bus and WattPost can ta
 
 No commit dates yet. If you want one of these sooner, email [support@wattpost.io](mailto:support@wattpost.io).
 
-- **Victron** — Smart MPPT, SmartShunt, Phoenix inverters via Victron Smart Bluetooth / VE.Direct
-- **JK BMS** — Inverter BMS B-series, JK-B1A20S / B2A24S via the JK BLE module
-- **Renogy DC-DC chargers** (DCC30S, DCC50S) and **Smart Shunt 300**
+- **Victron** — Phoenix inverters via VE.Direct USB
 - **Hybrid inverters** — EG4, Sol-Ark
 - **Sub-metering** — Shelly EM, IoTaWatt
 

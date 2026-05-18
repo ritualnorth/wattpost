@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-05-18
+
+### Added — Renogy Battery Monitor + Shunt driver (#113)
+The RBM-S100 / S300 / S500 Battery Monitor with Shunt is the
+budget-upgrade entry point for "I just want to know my real bank
+state" — single clamp on the negative terminal, no BMS required.
+Persona B unlock per the target-customer notes: someone buying
+their first shunt to get visibility.
+
+Driver speaks Modbus FC03 over the same BT-1 / BT-2 / USB-RS485
+transports the rest of the Renogy line uses — no new transport
+work. Surfaces voltage, current, SoC, temperature, remaining /
+full capacity (Ah), cumulative charge + discharge (Ah), and
+time-to-empty / time-to-full so the hero donut, flow strip,
+Remaining tile, Battery health (#109) and runtime forecast (#99)
+all light up the moment a customer adds one.
+
+Wizard auto-detection: model strings starting with `RBM` or
+containing `SHUNT` route to the new `vendor=renogy, kind=shunt`
+driver. Slot 48 (0x30) is already in the slave-id scan list so
+existing customers won't need to know the addressing detail.
+
+Register map is from cyril/renogy-bt's `BatteryMonitorClient.py`
++ the public Renogy Modbus PDF; flagged provisional until a paying
+customer's unit is verified. Discovery telemetry (#129) will flag
+any field-decoding mismatches.
+
+Same bank-aggregation logic as the Victron SmartShunt (#112) —
+mix-and-match is automatic via shared `device_kind = "shunt"`.
+
 ## [0.1.7] — 2026-05-18
 
 ### Added — Broker-auth diagnostic ring buffer (#167)

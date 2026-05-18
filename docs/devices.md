@@ -51,8 +51,16 @@ the roadmap.
 
 | Vendor | Kind | Notes |
 |---|---|---|
-| renogy | charge_controller | Rover MPPT family |
-| renogy | smart_battery | RBT100LFP12S-G1 and siblings |
-| (roadmap) victron | smart_shunt | BMV-712 / SmartShunt 500A |
-| (roadmap) jk | bms | JK-BMS over BLE |
-| (roadmap) renogy | inverter | Renogy AC inverter via BLE |
+| renogy | charge_controller | Rover / Wanderer / Adventurer / Voyager MPPT family |
+| renogy | dcdc | DCC50S / DCC30S / DCC25S / DCC15S DC-DC + MPPT combos |
+| renogy | smart_battery | RBT100LFP12S-G1 and LFP siblings |
+| renogy | inverter | 1000 W / 2000 W / 3000 W pure-sine inverter-chargers |
+| renogy | shunt | RBM-S100 / S300 / S500 Battery Monitor + Shunt |
+| victron | shunt | SmartShunt 500 / 1000 / 2000 A, BMV-700 / 702 / 712 (BLE) |
+| victron | charge_controller | SmartSolar MPPT family (BLE Instant Readout) |
+| victron | dcdc | Orion-Tr Smart / Orion XS DC-DC chargers |
+| victron | ac_charger | Blue Smart IP22 / IP65 chargers |
+| victron | smart_battery | SmartLithium batteries |
+| victron | bms | LynxSmartBMS |
+| victron | load_disconnect | SmartBatteryProtect |
+| jkbms | bms | JK-B series BMS via BLE |

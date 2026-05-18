@@ -10,6 +10,7 @@ from .smart_battery import RenogySmartBattery
 from .rover import RenogyRover
 from .dcc50s import RenogyDcc
 from .inverter import RenogyInverter
+from .shunt import RenogyShunt
 
 INFO = VendorInfo(
     id="renogy",
@@ -18,8 +19,9 @@ INFO = VendorInfo(
         "Full Renogy product line over Modbus RTU: Rover/Wanderer/"
         "Adventurer/Voyager charge controllers, LFP smart batteries, "
         "DCC50S/DCC30S DC-DC + MPPT combo chargers (the van-build "
-        "staple), and 1000W/2000W/3000W pure-sine inverter/chargers. "
-        "Works over BT-1/BT-2 dongles + direct USB-RS485."
+        "staple), 1000W/2000W/3000W pure-sine inverter/chargers, and "
+        "the RBM-S100/300/500 Battery Monitor with Shunt. Works over "
+        "BT-1/BT-2 dongles + direct USB-RS485."
     ),
 )
 
@@ -30,10 +32,12 @@ register_vendor(
         "smart_battery":     RenogySmartBattery,
         "dcdc":              RenogyDcc,
         "inverter":          RenogyInverter,
+        "shunt":             RenogyShunt,
     },
 )
 
 __all__ = [
     "INFO",
     "RenogyRover", "RenogySmartBattery", "RenogyDcc", "RenogyInverter",
+    "RenogyShunt",
 ]
