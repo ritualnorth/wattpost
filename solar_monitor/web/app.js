@@ -3077,6 +3077,59 @@ function renderSettings() {
   refreshBackupSchedule();
   wireBackupRunNow();
   refreshCloudBackups();
+  refreshDiscoveryToggle();
+}
+
+// Discovery telemetry (#129). Reads /api/system/discovery to render
+// the current opt-in state, wires the toggle to /toggle. Cheap +
+// idempotent — safe to call on every settings render.
+async function refreshDiscoveryToggle() {
+  const btn = document.getElementById("discovery-toggle");
+  const msg = document.getElementById("discovery-toggle-msg");
+  if (!btn || !msg) return;
+  let state;
+  try {
+    state = await api("/api/system/discovery");
+  } catch (_) {
+    btn.hidden = true;
+    msg.textContent = "—";
+    return;
+  }
+  btn.hidden = false;
+  btn.dataset.enabled = state.enabled ? "1" : "0";
+  btn.textContent = state.enabled ? "Disable discovery" : "Enable discovery";
+  if (!state.paired) {
+    btn.disabled = true;
+    msg.textContent = "Pair the appliance to wattpost.cloud to enable.";
+  } else {
+    btn.disabled = false;
+    msg.textContent = state.enabled
+      ? "On — unknown devices in scans send anonymous fingerprints."
+      : "Off — no data leaves this appliance.";
+  }
+  if (btn.dataset.wired === "1") return;
+  btn.dataset.wired = "1";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const next = btn.dataset.enabled !== "1";
+    try {
+      const r = await fetch("/api/system/discovery/toggle", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({enabled: next}),
+      });
+      if (!r.ok) {
+        let d = `HTTP ${r.status}`;
+        try { const j = await r.json(); d = j.detail || d; } catch (_) {}
+        msg.textContent = d;
+      }
+    } catch (e) {
+      msg.textContent = e.message || String(e);
+    } finally {
+      await refreshDiscoveryToggle();
+    }
+  });
 }
 
 // One-shot wireup for the Backup & restore block. Idempotent (settings

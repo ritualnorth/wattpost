@@ -783,6 +783,21 @@
               <div class="settings-empty">Loading&hellip;</div>
             </div>
           </div>
+          <div class="settings-block">
+            <h3>Discovery telemetry</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Anonymous: when you scan for BLE / Modbus devices, the
+              appliance sends a fingerprint of anything our drivers
+              don't recognise to wattpost.cloud, so we know which
+              hardware to support next. <strong>Off by default.</strong>
+              No full MAC, no IP, no account info — just OUI, advertised
+              name, and a few bytes of manufacturer data.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+              <button id="discovery-toggle" class="btn-action" type="button" hidden></button>
+              <span class="settings-foot" id="discovery-toggle-msg"></span>
+            </div>
+          </div>
           <div class="settings-block settings-block--diagnostics">
             <h3>Diagnostics</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
@@ -861,6 +876,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=160"></script>
+  <script src="/web/app.js?v=161"></script>
 </body>
 </html>

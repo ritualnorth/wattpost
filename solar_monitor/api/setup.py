@@ -280,7 +280,7 @@ _BLE_SEEN_TTL_S = 15 * 60   # 15 min — long enough to catch most
 
 
 @post("/api/setup/ble_scan")
-async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
+async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     """Scan BLE advertisements for `seconds`. Returns a list of every
     advertising device the host can see — MAC, name (if advertised),
     RSSI. The UI dedupes and shows them so the user can pick their
@@ -371,6 +371,24 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
                 rec["vendor"] = "jkbms"
                 rec["protocol"] = "jk_ble"
 
+        # For the discovery telemetry path (#129), stash enough of the
+        # advertisement to build a fingerprint for unknown devices.
+        # These fields are NOT serialised to the UI — they're stripped
+        # below before the response is returned. We only use them
+        # internally when discovery is opted-in.
+        if not rec.get("vendor"):
+            if mfr_data:
+                try:
+                    first_id = min(mfr_data.keys())
+                    rec["_mfr_id"] = first_id
+                    payload = mfr_data[first_id] or b""
+                    rec["_mfr_prefix_hex"] = bytes(payload[:4]).hex()
+                except Exception:
+                    pass
+            svc = getattr(ad, "service_uuids", None) or []
+            if svc:
+                rec["_service_uuids"] = list(svc)[:8]
+
         out.append(rec)
         # Refresh the cache so re-appearing devices stay fresh.
         _BLE_SEEN_CACHE[mac] = {
@@ -418,11 +436,59 @@ async def ble_scan(data: BleScanRequest) -> dict[str, Any]:
     seen_recently_missing.sort(key=lambda d: d.get("seconds_ago", 99999))
     log.info("ble_scan: %d devices, %d recently-missing",
              len(out), len(seen_recently_missing))
+    # Anonymous discovery telemetry (#129). Strict opt-in — config
+    # block discovery.enabled must be true AND the appliance must be
+    # cloud-paired. Fire-and-forget; failures are logged but never
+    # bubble up to the scan response. Stripping the underscore-prefixed
+    # internal keys happens unconditionally just below.
+    cfg = state.get("config") if hasattr(state, "get") else state["config"]
+    await _maybe_push_discovery(out, cfg)
+    # Scrub internal-only fields from the response shape.
+    for rec in out:
+        for k in ("_mfr_id", "_mfr_prefix_hex", "_service_uuids"):
+            rec.pop(k, None)
     return {
         "devices": out,
         "scanned_seconds": secs,
         "seen_recently_missing": seen_recently_missing,
     }
+
+
+async def _maybe_push_discovery(
+    scanned: list[dict[str, Any]], cfg: Any,
+) -> None:
+    """Best-effort: push fingerprints of unrecognised scan results to
+    the cloud when the user has opted in. Never raises."""
+    from ..discovery import build_ble_fingerprint, push_observations
+    if cfg is None or cfg.discovery is None or not cfg.discovery.enabled:
+        return
+    if cfg.cloud is None or not (
+        cfg.cloud.bearer_token and cfg.cloud.endpoint
+    ):
+        return  # paired-only — discovery POST is bearer-authed
+    fps: list[dict[str, Any]] = []
+    for rec in scanned:
+        enriched = dict(rec)
+        # Promote internal fields to the explicit names build_ble_fingerprint
+        # expects, without leaking them to the scan response.
+        if "_mfr_id" in rec:
+            enriched["manufacturer_first_id"] = rec["_mfr_id"]
+        if "_mfr_prefix_hex" in rec:
+            enriched["manufacturer_prefix_hex"] = rec["_mfr_prefix_hex"]
+        if "_service_uuids" in rec:
+            enriched["service_uuids"] = rec["_service_uuids"]
+        fp = build_ble_fingerprint(enriched)
+        if fp is not None:
+            fps.append(fp)
+    if not fps:
+        return
+    try:
+        await push_observations(
+            cfg.cloud.endpoint, cfg.cloud.bearer_token, fps,
+        )
+    except Exception:
+        # Never let telemetry break the user-facing scan.
+        log.debug("discovery push raised — swallowing", exc_info=True)
 
 
 @get("/api/setup/usb_scan")
