@@ -1,8 +1,10 @@
 # Adding devices
 
-WattPost reads telemetry from devices that speak Modbus over BLE
-(via a Renogy BT-1 / BT-2 dongle today; Victron and JK BMS are on
-the roadmap).
+WattPost reads telemetry from three kinds of Bluetooth source:
+
+- **Renogy** — Modbus over BLE via a [BT-1 or BT-2 dongle](/docs/supported-hardware) plugged into the device's comms port
+- **Victron** — passive **Instant Readout** BLE advertisements, one encryption key per device
+- **JK BMS** — its own advertised BLE service, no dongle, no key
 
 Everything below works the same on the SD-card install and the
 Docker install. No config files to hand-edit.
@@ -42,10 +44,9 @@ previous version is preserved at `config.yaml.bak`).
 
 ## Removing a device
 
-Edit `config.yaml` directly (`/etc/wattpost/config.yaml` on the Pi,
-`./wattpost-config/config.yaml` on the Docker host) — remove the
-`devices:` entry, restart the daemon. A UI "remove" button is on
-the roadmap.
+**Settings → Setup → Devices** lists every paired device with a
+**Remove** button next to each. The wizard rewrites `config.yaml`
+atomically and prompts to restart the daemon.
 
 ## Supported vendors / kinds
 
