@@ -1605,6 +1605,51 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .weather-panel {
   border-color: rgba(88, 166, 255, 0.18);
   --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
+  transition: --panel-tint .8s ease, border-color .8s ease;
+}
+/* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
+ * by renderWeather() based on WMO code + is_day. All intentionally
+ * gentle (<=8% alpha) — the dashboard's information density is the
+ * star; this is mood lighting, not a Weather Channel takeover. */
+.weather-panel.wx-bg-clear-day {
+  border-color: rgba(245, 158, 11, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(250,204,21,0.08), rgba(245,158,11,0.02) 70%);
+}
+.weather-panel.wx-bg-clear-night {
+  border-color: rgba(99, 102, 241, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(30,41,59,0.02) 70%);
+}
+.weather-panel.wx-bg-partly-day {
+  border-color: rgba(125, 211, 252, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(125,211,252,0.08), rgba(125,211,252,0) 70%);
+}
+.weather-panel.wx-bg-partly-night {
+  border-color: rgba(100, 116, 139, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(100,116,139,0.08), rgba(100,116,139,0) 70%);
+}
+.weather-panel.wx-bg-cloudy {
+  border-color: rgba(148, 163, 184, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(148,163,184,0.08), rgba(148,163,184,0) 70%);
+}
+.weather-panel.wx-bg-fog {
+  border-color: rgba(203, 213, 225, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(203,213,225,0.08), rgba(203,213,225,0) 70%);
+}
+.weather-panel.wx-bg-drizzle {
+  border-color: rgba(56, 189, 248, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(56,189,248,0.07), rgba(56,189,248,0) 70%);
+}
+.weather-panel.wx-bg-rain {
+  border-color: rgba(59, 130, 246, 0.24);
+  --panel-tint: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(30,64,175,0.02) 70%);
+}
+.weather-panel.wx-bg-snow {
+  border-color: rgba(186, 230, 253, 0.28);
+  --panel-tint: linear-gradient(135deg, rgba(224,242,254,0.10), rgba(186,230,253,0.02) 70%);
+}
+.weather-panel.wx-bg-thunder {
+  border-color: rgba(168, 85, 247, 0.26);
+  --panel-tint: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(67,56,202,0.03) 70%);
 }
 .weather-strip {
   display: flex; flex-direction: column; gap: .65rem;
