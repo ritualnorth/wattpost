@@ -8,6 +8,55 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-05-18
+
+### Added — Broker-auth diagnostic ring buffer (#167)
+Every request that arrives at the appliance bearing an
+`X-WP-Broker-Auth` header now lands in an in-memory ring (last 200).
+Each entry records the verdict (ok / no-secret / bad-format /
+expired / bad-mac), the path, the method, the header age in seconds,
+and the originating CF-Ray. Surfaced at
+`GET /api/diagnostics/broker-auth` and folded into the existing
+support-bundle download at `/api/system/diagnostics`.
+
+Pays for itself the next time the white-page-on-broker bug recurs:
+gaps in the timeline = upstream (Caddy / CF / tunnel) problem,
+flood of `expired` = clock drift, `bad-mac` = sso_secret drift
+(#148-class), `ok` for the failing path = bug post-auth. No more
+SSH-into-Caddy-and-grep-JSON during incidents.
+
+### Added — "Take backup now" button on cloud appliance detail (#165)
+Pro-tier owners can request an immediate cloud-stored snapshot from
+`/app/site/{id}` instead of waiting for the weekly tick. Reuses the
+existing heartbeat command-queue: cloud queues a `backup_now`
+command, the appliance picks it up on its next heartbeat (≤5 min),
+runs `BackupService.snapshot_now()` through the exact same code path
+as the scheduled snapshot, and the new row appears in the cloud
+backups list once the upload arm completes. The dashboard polls
+every 30 s after the click and surfaces the result.
+
+Cloud rejects `backup_now` for Hobby tier with 402; appliance
+takes the local snapshot whether or not cloud_upload is enabled,
+so clicking the button is never a silent no-op.
+
+### Added — Anonymous device-discovery telemetry (#129)
+Off-by-default opt-in (Settings → Discovery telemetry on the
+appliance). When enabled, the appliance posts fingerprints of
+unrecognised BLE devices its setup-wizard scan picks up to the
+cloud — OUI only (never full MAC), advertised local name, first
+manufacturer ID + leading 4 bytes, service UUIDs. Nothing
+identifying: no FK back to appliance, no owner, no IP.
+
+Cloud rolls observations up by fingerprint hash in
+`discovery_observations` and exposes a staff-only roll-up at
+`/app/admin/discovery` — the next-driver pipeline reads the top of
+that list when prioritising work. Migration 0030 creates the
+table; pg_insert ON CONFLICT bumps observation_count + last_seen
+on repeats so a popular dongle becomes more visible the more it's
+seen, not noisier.
+
+CACHE_VERSION bumped to v71-app161; shell cache-buster ?v=161.
+
 ## [0.1.6] — 2026-05-18
 
 ### Fixed — White page recurrence after v0.1.4 (stale-shell trap)

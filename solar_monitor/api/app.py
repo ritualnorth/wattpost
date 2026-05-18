@@ -81,6 +81,7 @@ from .backup import (
     export_backup, import_backup,
     backup_schedule, backup_run_now, backup_download_one, backup_delete_one,
     backup_cloud_list, backup_cloud_restore, backup_cloud_toggle,
+    discovery_state, discovery_toggle,
 )
 from ..backup import BackupService
 
@@ -1187,6 +1188,8 @@ def build_app(
             backup_cloud_list,
             backup_cloud_restore,
             backup_cloud_toggle,
+            discovery_state,
+            discovery_toggle,
             battery_health,
             runtime_forecast,
             load_heatmap,

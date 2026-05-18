@@ -679,6 +679,65 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
     return {"ok": True, "cloud_upload": enabled}
 
 
+@get("/api/system/discovery", status_code=200)
+async def discovery_state(state: State) -> dict[str, Any]:
+    """Read whether anonymous discovery telemetry (#129) is enabled.
+    Lives next to backup_cloud_toggle in the file because it follows
+    the exact same config-mutate-and-persist pattern; the surfaced
+    UI lives on the Settings page in the same area as backups."""
+    config = state.get("config")
+    enabled = False
+    if config is not None and getattr(config, "discovery", None) is not None:
+        enabled = bool(config.discovery.enabled)
+    paired = bool(
+        config is not None
+        and getattr(config, "cloud", None) is not None
+        and config.cloud.bearer_token
+        and config.cloud.endpoint
+    )
+    return {"enabled": enabled, "paired": paired}
+
+
+@post("/api/system/discovery/toggle", status_code=200)
+async def discovery_toggle(request: Request, state: State) -> dict[str, Any]:
+    """Flip `discovery.enabled` in the running config and persist.
+    Body: `{enabled: bool}`.
+
+    No cloud preflight — the appliance just won't push when disabled,
+    and the cloud endpoint is the same bearer-token surface anyone
+    else hits. The user-facing setting is purely local consent.
+    """
+    import shutil as _shutil
+    import yaml as _yaml
+    body = await request.json()
+    enabled = bool(body.get("enabled")) if isinstance(body, dict) else False
+
+    config_path = state.get("config_path")
+    if not config_path:
+        raise HTTPException(status_code=500, detail="config_path unset")
+    path = Path(config_path)
+
+    raw = _yaml.safe_load(path.read_text()) or {}
+    block = raw.get("discovery") or {}
+    block["enabled"] = enabled
+    raw["discovery"] = block
+    bak = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, bak)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+    config = state.get("config")
+    if config is not None:
+        from ..config import DiscoveryCfg
+        if config.discovery is None:
+            config.discovery = DiscoveryCfg(enabled=enabled)
+        else:
+            config.discovery.enabled = enabled
+
+    return {"ok": True, "enabled": enabled}
+
+
 @post("/api/system/backup/cloud-restore/{backup_id:int}", status_code=202)
 async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
     """Download a specific cloud backup and feed it through the local

@@ -240,6 +240,25 @@ class BackupCfg(msgspec.Struct, kw_only=True):
     cloud_keep_count: int = 4
 
 
+class DiscoveryCfg(msgspec.Struct, kw_only=True):
+    """Anonymous hardware-discovery telemetry (#129).
+
+    OFF by default. When opted in, the appliance forwards anonymised
+    fingerprints of devices its scans see but our drivers don't
+    recognise — feeding the next-driver pipeline. No customer-
+    identifying information leaves the appliance:
+
+      * MAC truncated to vendor prefix (first 3 octets / OUI)
+      * advertised local name (typically just a model + serial — we
+        strip the serial suffix server-side)
+      * manufacturer-data ID + first 4 bytes (model identifier)
+      * service UUIDs
+      * appliance bearer-token is the only auth — cloud derives no
+        owner/email from it for the discovery write path
+    """
+    enabled: bool = False
+
+
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
@@ -261,6 +280,7 @@ class Config(msgspec.Struct, kw_only=True):
     gps: GpsCfg | None = None            # optional (USB GPS — #125)
     bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
     backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
+    discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)
 
 
 def load_config(path: str | Path) -> Config:
