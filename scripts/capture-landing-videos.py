@@ -47,9 +47,17 @@ async def main() -> None:
                 viewport=viewport,
                 record_video_dir=str(OUT_DIR),
                 record_video_size=viewport,
+                color_scheme="dark",   # OS-level dark preference
             )
             page = await ctx.new_page()
             try:
+                # Force the appliance's theme to dark BEFORE the page
+                # loads — localStorage is read by an inline script in
+                # <head> on first paint, so we seed it via init script.
+                # See solar_monitor/web/index.html line ~36.
+                await page.add_init_script(
+                    "try { localStorage.setItem('wp-theme', 'dark'); } catch (_) {}"
+                )
                 # Don't use networkidle — SSE keeps the connection alive
                 # forever, so playwright would wait the full 30 s timeout.
                 # `domcontentloaded` returns as soon as initial HTML is
