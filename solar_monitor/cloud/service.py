@@ -198,6 +198,10 @@ class CloudService:
             await self._dispatch_backup_now(cmd_id)
             return
 
+        if kind == "restore_from_cloud":
+            await self._dispatch_restore_from_cloud(cmd_id, cmd)
+            return
+
         if kind != "update":
             await self._patch_command_status(
                 cmd_id, "failed",
@@ -291,6 +295,121 @@ class CloudService:
             return
         log.info("cloud backup_now: cmd %d wrote %s", cmd_id, out_path.name)
         await self._patch_command_status(cmd_id, "success")
+
+    async def _dispatch_restore_from_cloud(
+        self, cmd_id: int, cmd: dict[str, Any],
+    ) -> None:
+        """Cloud-triggered restore from a specific cloud-stored backup
+        (#166). Downloads the archive via the cloud's bearer-authed
+        internal endpoint, applies it through the same `_stage_and_swap`
+        path the appliance's local Settings → Restore button uses, then
+        re-execs the daemon so the new SQLite + config are loaded fresh.
+
+        Critical UX note: the live `cloud.bearer_token`,
+        `cloud.sso_secret`, and `cloud.tunnel_token` are preserved by
+        `_stage_and_swap` (#146 phase-2 fix) — pairing survives the
+        restore. Without that the appliance would come back online
+        un-paired and the user would have to re-pair to see it on the
+        dashboard.
+
+        Status is PATCHed to "success" BEFORE the re-exec, otherwise
+        the daemon-restart kills the python process before the report
+        is on the wire and the command sits forever as "applying".
+        """
+        backup_id = cmd.get("target_backup_id")
+        if not isinstance(backup_id, int):
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="restore_from_cloud missing target_backup_id",
+            )
+            return
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+
+        # Fetch the archive bytes.
+        url = (f"{self.cfg.endpoint.rstrip('/')}/api/internal/backups/"
+               f"{backup_id}/download")
+        headers = {"Authorization": f"Bearer {self.cfg.bearer_token}"}
+        try:
+            async with httpx.AsyncClient(
+                timeout=300, follow_redirects=True,
+            ) as client:
+                r = await client.get(url, headers=headers)
+        except Exception as e:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"download failed: {type(e).__name__}: {e}",
+            )
+            return
+        if r.status_code >= 400:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"cloud returned HTTP {r.status_code}: {r.text[:200]}",
+            )
+            return
+
+        body = r.content
+        # Re-use the appliance's restore plumbing — same code path as
+        # the user-initiated restore endpoint.
+        try:
+            from ..api.backup import _stage_and_swap, _verify_archive
+            await asyncio.to_thread(_verify_archive, body)
+        except Exception as e:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"archive failed verification: {e}",
+            )
+            return
+
+        # Resolve where to write the new DB + config. The DB path
+        # lives on the open Store (mirrors how api/backup.py resolves
+        # it for the user-driven restore); the config path was pinned
+        # onto the scheduler by build_app at startup.
+        from pathlib import Path
+        import os, sys
+        store = getattr(self.scheduler, "store", None)
+        store_path = (
+            getattr(store, "_path", None) or getattr(store, "path", None)
+            if store is not None else None
+        )
+        db_target = Path(
+            store_path
+            or os.environ.get("WATTPOST_DB_PATH")
+            or "solar-monitor.db"
+        )
+        config_target = Path(
+            getattr(self.scheduler, "config_path", None)
+            or os.environ.get("WATTPOST_CONFIG_PATH")
+            or "/etc/wattpost/config.yaml"
+        )
+        try:
+            await asyncio.to_thread(
+                _stage_and_swap, body, db_target, config_target,
+            )
+        except Exception as e:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"apply failed: {type(e).__name__}: {e}",
+            )
+            return
+
+        log.info(
+            "cloud restore_from_cloud: cmd %d applied backup %d, re-execing",
+            cmd_id, backup_id,
+        )
+        # Report success BEFORE re-exec — once execv runs the process
+        # image is replaced and any in-flight PATCH dies with it.
+        await self._patch_command_status(cmd_id, "success")
+
+        async def _delayed_exec() -> None:
+            await asyncio.sleep(0.5)
+            try:
+                await self.scheduler.stop()
+            except Exception:
+                log.exception("scheduler stop failed before restore re-exec")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        asyncio.create_task(_delayed_exec())
 
     async def _patch_command_status(
         self, cmd_id: int, status: str, *, error: str | None = None,

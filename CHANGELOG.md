@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-05-18
+
+### Added — Cloud "Restore from cloud" rescue flow (#166)
+Closes the backup arc started in #146 (local backup/restore),
+extended in #164 (cloud-side view of uploaded backups) and #165
+("Take backup now"). Owners on Pro+ can now restore any cloud-
+stored backup onto the originating appliance via a button on
+`/app/site/{id}` — same heartbeat command-queue plumbing as the
+other appliance-side actions.
+
+Sequence:
+1. Click "Restore" next to a backup row, confirm the destructive-
+   action prompt.
+2. Cloud queues a `restore_from_cloud` command with
+   `target_backup_id` pinning the specific backup.
+3. Appliance picks it up on its next heartbeat, downloads via the
+   bearer-authed `/api/internal/backups/{id}/download`, runs the
+   same `_stage_and_swap` + verify path the local restore button
+   uses, PATCHes the command to `success`, then re-execs the daemon
+   so the new SQLite + config load fresh.
+4. Pairing survives the restore — `_stage_and_swap` preserves the
+   live `cloud.bearer_token` / `sso_secret` / `tunnel_token` (the
+   #146-phase-2 fix). The appliance comes back online still linked
+   to this account.
+
+Cloud-side: Hobby tier 402, target_backup_id required, backup
+must belong to this appliance (cross-appliance restore is a
+separate v2 — would let "rebuild on new SD card" customers pull
+a previous appliance's backup, but adds a layer of "which one is
+this" UX). Migration 0031 adds `appliance_commands.target_backup_id`
+as a nullable FK with ON DELETE SET NULL so deleting a backup
+doesn't cascade-kill the command audit trail.
+
 ## [0.1.8] — 2026-05-18
 
 ### Added — Renogy Battery Monitor + Shunt driver (#113)
