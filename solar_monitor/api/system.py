@@ -244,6 +244,7 @@ async def diagnostics_bundle(state: State) -> Response:
             "device_count": len(last_result.get("devices") or []) if last_result else 0,
         },
         "log_tail":       _diag.LOG_RING.lines(),
+        "broker_auth":    _diag.recent_broker_auth(),
     }
     body = json.dumps(bundle, indent=2, default=str)
     fname = f"wattpost-diagnostics-{__version__}-{int(time.time())}.json"
@@ -252,6 +253,28 @@ async def diagnostics_bundle(state: State) -> Response:
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
+
+
+@get("/api/diagnostics/broker-auth")
+async def broker_auth_log() -> dict[str, Any]:
+    """Return the recent broker-auth verify ring (last ~200 hits).
+
+    Each entry: `ts`, `path`, `method`, `verdict`, `header_age_s`,
+    `cf_ray`. Verdicts: ok / no-secret / bad-format / expired / bad-mac.
+
+    Use during white-page-on-broker incidents: gaps in the timeline =
+    requests not reaching the appliance (Caddy/CF problem upstream);
+    a flood of `expired` = clock drift; `bad-mac` = sso_secret drift
+    (#148-class bug); `ok` for the failing path = bug post-auth.
+
+    Lives under /api/diagnostics/ not /api/system/ to keep the
+    Diagnostics UI page from having to also gate by admin role —
+    middleware applies the same session/broker rules as everything
+    else; on the broker side the user already authenticated cloud-
+    side to reach here.
+    """
+    from .. import diagnostics as _diag
+    return {"items": _diag.recent_broker_auth()}
 
 
 @get("/api/system/info")
