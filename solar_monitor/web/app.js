@@ -870,20 +870,46 @@ function buildFlowModel() {
     if (!mapping) continue;
     const l = dev.latest || {};
 
-    // Silent-device check (#171). Victron BLE drivers stamp
-    // `advertisement_age_s` on every poll; > 60 s means we haven't
-    // decoded a fresh broadcast (charger switched off, dongle out of
-    // range, etc.). The values still in `latest` are the LAST seen
-    // ones — honest history but a lie about "live now". The flow
-    // tile must not pretend that stale 206 W AC charger is currently
-    // pushing watts; the math would inflate source totals and the
-    // bank's "Load" estimate. We still render the tile (the device
-    // is configured, the customer should see something) but with
-    // power forced to 0 and a Silent sub-label.
+    // Silent-device check (#171). Two cases collapse into one
+    // "treat as silent" branch:
+    //
+    //  1. Stale broadcast — Victron BLE drivers stamp
+    //     `advertisement_age_s` on every poll; > 60 s means we
+    //     haven't decoded a fresh broadcast (charger switched off
+    //     at the wall, dongle out of range, etc.).
+    //
+    //  2. Explicitly idle — the device IS still broadcasting fresh
+    //     adverts but the payload reports it's not producing. Most
+    //     common on Victron AC chargers in standby: the radio keeps
+    //     blasting the LAST V/A readings (e.g. 13.7 V · 15.00 A ·
+    //     206 W) forever even though `charging_state == "off"`.
+    //     The fresh-advert age would otherwise fool the silent
+    //     check and the tile would pretend 206 W is flowing.
+    //
+    // Both cases: power forced to 0, silent flag set, sub-label
+    // explains which kind of silent it is.
     const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
-    const isSilent = ageS != null && ageS > 60;
+    const isStale = ageS != null && ageS > 60;
+    // Idle-state strings that mean "not actively producing watts".
+    // Victron's ChargerState enum: OFF / LOW_POWER / FAULT are all
+    // "not charging right now"; everything else (BULK, ABS, FLOAT,
+    // STORAGE, EQUALIZE, INVERTING, POWER_SUPPLY) means active.
+    const IDLE_CHARGE_STATES = new Set(["off", "low_power", "fault"]);
+    const isExplicitlyIdle = (
+      typeof l.charging_state === "string"
+      && IDLE_CHARGE_STATES.has(l.charging_state.toLowerCase())
+    );
+    const isSilent = isStale || isExplicitlyIdle;
     const silentSub = (() => {
       if (!isSilent) return null;
+      if (isExplicitlyIdle && !isStale) {
+        // Fresh broadcast says "I'm off" — be specific rather than
+        // pretending we haven't heard from it.
+        if (l.charging_state === "off")       return "Off";
+        if (l.charging_state === "low_power") return "Standby (low power)";
+        if (l.charging_state === "fault")     return "Fault — not producing";
+        return "Idle";
+      }
       if (ageS < 90)     return `Silent — last heard ${Math.round(ageS)} s ago`;
       if (ageS < 5400)   return `Silent — last heard ${Math.round(ageS / 60)} min ago`;
       if (ageS < 86000)  return `Silent — last heard ${(ageS / 3600).toFixed(1)} h ago`;

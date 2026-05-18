@@ -8,6 +8,35 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.16] — 2026-05-18
+
+### Fixed — AC charger Power Flow tile: also treat "explicitly off" as silent
+v0.1.15 caught the stale-broadcast case (no advert in 60 s →
+power forced to 0, Silent badge). It missed the related case
+where the device IS still broadcasting fresh adverts but the
+payload says it's not producing.
+
+Reproduction: Ritual North's Victron Blue Smart AC Charger is unplugged
+from the AC source. The BLE radio keeps beaconing the LAST V/A
+readings every ~1 s (so `advertisement_age_s` stays < 60 s), but
+`charging_state` switches to `"off"`. v0.1.15's silent check
+relied solely on advertisement age, so the Power Flow tile kept
+rendering 13.7 V · 15.00 A · 206 W indefinitely.
+
+Fix in `buildFlowModel` (app.js): collapse "stale broadcast" and
+"explicitly idle" into one `isSilent` branch. The idle check
+treats Victron `ChargerState` values `OFF` / `LOW_POWER` /
+`FAULT` as not-actively-producing — everything else (BULK, ABS,
+FLOAT, STORAGE, EQUALIZE, INVERTING, POWER_SUPPLY) stays active.
+When idle, the tile sub-label becomes "Off" / "Standby (low
+power)" / "Fault — not producing" instead of the misleading
+"Silent — last heard X s ago" (because the device is talking,
+just not producing).
+
+`app.js` cache buster 165 → 166, sw.js CACHE_VERSION
+`wattpost-v75-app165-css108` → `wattpost-v76-app166-css108` so
+browsers re-fetch the new logic.
+
 ## [0.1.15] — 2026-05-18
 
 ### Fixed — Power Flow tile rendering stale silent-device watts (#171 follow-on)
