@@ -11,6 +11,7 @@
     { "slug": "alerts",          "title": "Alerts & notifications",   "section": "Features" },
     { "slug": "history",         "title": "History & CSV export",     "section": "Features" },
     { "slug": "kiosk",           "title": "Kiosk mode",               "section": "Features" },
+    { "slug": "vanlife-kiosk",   "title": "Vanlife kiosk install",    "section": "Features" },
     { "slug": "updates",         "title": "Updates",                  "section": "Features" },
     { "slug": "release-notes",   "title": "What's new",               "section": "Features" },
 
