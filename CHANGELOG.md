@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.15] — 2026-05-18
+
+### Fixed — Power Flow tile rendering stale silent-device watts (#171 follow-on)
+Backend was correctly stamping `advertisement_age_s` past 60 s when
+a Victron BLE device stopped broadcasting (v0.1.11 + the 86400
+sentinel in v0.1.12), and the Devices-tab cards were greying out
+properly. But the Dashboard's Power Flow tile was reading
+`output_1_power_w` straight from the latest snapshot and rendering
+it as live — so Ritual North's screen showed "AC Charger 206 W · 13.7 V ·
+15.00 A" for a charger he'd had switched off for hours, with the
+fake watts inflating Source totals + Load estimate downstream.
+
+Fix: `buildFlowModel` in app.js now checks each device's
+`advertisement_age_s` before contributing to sources / loads /
+battery. Stale devices (> 60 s) get `power: 0`, a `silent: true`
+flag, and a "Silent — last heard X ago" sub-label. The tile still
+renders (the device is configured; hiding it would be confusing)
+but visually mutes via `.flow-tile.is-silent` — opacity .5,
+greyscale .6, sub-label switched to the age. Source totals and
+the bank's Load estimate no longer include the phantom watts.
+
+CACHE_VERSION bumped to v75-app165-css108.
+
 ## [0.1.14] — 2026-05-18
 
 ### Fixed — Migration v1 crashloop on partially-migrated DBs
