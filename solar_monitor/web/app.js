@@ -5746,7 +5746,8 @@ function renderDeviceDetail(label) {
       </div>
     </div>
     ${inner}
-    <div id="outputs-host"></div>`;
+    <div id="outputs-host"></div>
+    <div id="settings-host"></div>`;
 
   // Wire up the per-device chart after DOM is in place.
   wireDeviceDetailChart(dev);
@@ -5760,6 +5761,64 @@ function renderDeviceDetail(label) {
   // smart batteries / shunts get nothing today (until #114 adds JK BMS
   // charge/discharge MOS outputs).
   renderDeviceOutputs(dev.label);
+  // Async-fetch declared writable settings (#111). Renders nothing
+  // if the driver doesn't expose any. Phase 1 = read-only display;
+  // phase 2 will add the edit modal.
+  renderDeviceSettings(dev.label);
+}
+
+// ---------- DEVICE SETTINGS (#111 phase 1, read-only) ----------
+async function renderDeviceSettings(label) {
+  const host = document.getElementById("settings-host");
+  if (!host) return;
+  let data;
+  try {
+    data = await api(`/api/devices/${encodeURIComponent(label)}/settings`);
+  } catch (_) {
+    return; // 404 or network — leave the host empty.
+  }
+  const items = (data && data.items) || [];
+  if (!items.length) return;
+  const rows = items.map((s) => {
+    let cur = "—";
+    if (s.current_value != null) {
+      if (s.kind === "enum") {
+        const match = (s.choices || []).find((c) => c.value === s.current_value);
+        cur = match ? esc(match.label) : esc(String(s.current_value));
+      } else {
+        const val = (typeof s.current_value === "number")
+          ? s.current_value.toFixed(s.step && s.step < 1 ? 1 : 0)
+          : esc(String(s.current_value));
+        cur = `${val}${s.units ? " " + esc(s.units) : ""}`;
+      }
+    }
+    return `
+      <tr>
+        <td>
+          <div class="settings-row-label">${esc(s.label)}</div>
+          ${s.help_text ? `<div class="settings-row-help">${esc(s.help_text)}</div>` : ""}
+        </td>
+        <td class="settings-row-value">${cur}</td>
+        <td>
+          <button class="btn-action" type="button" disabled
+                  title="Editing lands in v0.2.0">
+            Edit
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+  host.innerHTML = `
+    <section class="device-detail-card">
+      <h3 style="margin:0 0 .5rem">Settings</h3>
+      <p class="settings-foot" style="margin:0 0 .75rem">
+        Live values pulled from the device. Editing from WattPost
+        is coming in v0.2.0 — for now, change these from the
+        vendor app.
+      </p>
+      <table class="settings-table">
+        <tbody>${rows}</tbody>
+      </table>
+    </section>`;
 }
 
 // ---------- CONTROLLABLE OUTPUTS (#104) ----------

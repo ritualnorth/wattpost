@@ -376,6 +376,67 @@ async def device_charger_stats(label: str, state: State) -> dict[str, Any]:
     return await store.charger_stats(label, power_metric, midnight, now)
 
 
+@get("/api/devices/{label:str}/settings")
+async def device_settings(label: str, state: State) -> dict[str, Any]:
+    """Per-device user-tunable settings (#111 phase 1).
+
+    Returns the `WritableSetting` descriptors declared by the device's
+    driver, paired with the current value pulled from the most recent
+    poll snapshot. Edit support lands in phase 2 (PATCH endpoint +
+    UI modal); right now this is read-only so the UI can render a
+    "Current settings" panel without giving customers a way to brick
+    their charger before the confirm-flow is in place.
+
+    404 if the device isn't configured. Empty `items` if the driver
+    doesn't declare any writable settings (default — Victron devices
+    are read-only forever per product scope, JK BMS write surface is
+    a future phase, only Renogy Rover exposes settings today).
+    """
+    from ..vendors.registry import VENDORS
+    config = state.get("config") if hasattr(state, "get") else state["config"]
+    cfg_dev = None
+    for d in (getattr(config, "devices", None) or []):
+        if d.label == label:
+            cfg_dev = d
+            break
+    if cfg_dev is None:
+        raise NotFoundException(f"unknown device {label!r}")
+    vendor_reg = VENDORS.get(cfg_dev.vendor)
+    if vendor_reg is None:
+        return {"label": label, "items": [], "reason": "vendor not registered"}
+    driver_cls = vendor_reg.drivers.get(cfg_dev.kind)
+    if driver_cls is None:
+        return {"label": label, "items": [], "reason": "no driver for kind"}
+    # Instantiate just for the descriptor list — slave_id doesn't
+    # matter at this point, we're not polling.
+    inst = driver_cls(slave_id=cfg_dev.slave_id or 0, label=label)
+    settings = inst.writable_settings()
+    if not settings:
+        return {"label": label, "items": []}
+
+    store: Store = state["store"]
+    snapshot = (await store.get_latest()).get(label, {}) or {}
+    items = []
+    for s in settings:
+        current = snapshot.get(s.read_from) if s.read_from else None
+        items.append({
+            "key":        s.key,
+            "label":      s.label,
+            "kind":       s.kind,
+            "units":      s.units,
+            "choices":    [{"value": v, "label": l} for v, l in s.choices],
+            "min":        s.min,
+            "max":        s.max,
+            "step":       s.step,
+            "help_text":  s.help_text,
+            "current_value": current,
+            # Phase 1 ships read-only; UI greys out the edit button.
+            # Phase 2 will flip this true once the PATCH path lands.
+            "editable":   False,
+        })
+    return {"label": label, "items": items}
+
+
 @get("/api/devices/{label:str}/efficiency")
 async def device_efficiency(label: str, state: State) -> dict[str, Any]:
     """SoC-corrected charge efficiency for one battery pack over a
@@ -1178,6 +1239,7 @@ def build_app(
             device_lifetime,
             device_efficiency,
             device_charger_stats,
+            device_settings,
             set_device_display_name,
             export_backup,
             import_backup,

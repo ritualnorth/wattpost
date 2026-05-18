@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-05-18
+
+### Added — Per-device settings panel (#111 phase 1, read-only)
+First phase of the per-device write-back story. The device-detail
+page now renders a "Settings" card showing the user-tunable
+parameters the driver declares — current battery type, absorption
+/ float voltages, low-voltage disconnect / reconnect thresholds
+for Renogy Rover today, more drivers + edit support to follow.
+
+Framework:
+- `WritableSetting` descriptor added to `vendors/base.py` —
+  drivers declare key / label / kind (enum|float|int) / register /
+  scale / min / max / step / choices / help_text / read_from.
+  Defaults to `()` so existing read-only drivers are unaffected.
+- `DeviceDriver.writable_settings()` is the override point;
+  Renogy Rover is the first implementer with 5 settings.
+- `GET /api/devices/{label}/settings` surfaces the descriptors
+  paired with the current value pulled from the latest poll
+  snapshot. Empty `items` for any device whose driver hasn't
+  opted in (Victron — read-only forever per product scope —
+  JK BMS + the rest of Renogy will opt in over subsequent
+  phases).
+
+UI: new "Settings" card on the device-detail page below the
+existing outputs section. Each row shows label, current value,
+help text, and a disabled "Edit" button with a tooltip pointing
+at v0.2.0 when the PATCH path lands.
+
+Phase 2 (next): PATCH endpoint that hits FC06 with confirm modal
++ readback + cloud-side audit logging. Phase 3 fans the
+descriptor catalog out across the Renogy line + JK BMS.
+
+CACHE_VERSION bumped to v72-app162-css105.
+
 ## [0.1.9] — 2026-05-18
 
 ### Added — Cloud "Restore from cloud" rescue flow (#166)

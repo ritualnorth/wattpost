@@ -1,7 +1,7 @@
 """Renogy Rover / Wanderer / Adventurer charge-controller driver."""
 from __future__ import annotations
 
-from ..base import DeviceDriver, Section
+from ..base import DeviceDriver, Section, WritableSetting
 from ._util import bytes_to_int, parse_byte_temperature_c
 
 CHARGING_STATE = {
@@ -70,6 +70,21 @@ def _parse_battery_type(bs: bytes) -> dict:
     return {"battery_type": BATTERY_TYPE.get(int(bytes_to_int(bs, 3, 2)))}
 
 
+def _parse_charge_voltages(bs: bytes) -> dict:
+    """Registers 0xE007..0xE00C (6 words) — the user-tunable charge
+    profile. Voltages stored as deci-volts (X.X V × 10) on Rovers;
+    LFP customers commonly need to tune these from the open-lead-acid
+    defaults so the bank actually reaches absorption."""
+    return {
+        "boost_voltage_v":      bytes_to_int(bs, 3, 2, scale=0.1),
+        "float_voltage_v":      bytes_to_int(bs, 5, 2, scale=0.1),
+        "boost_recovery_v":     bytes_to_int(bs, 7, 2, scale=0.1),
+        "equalize_voltage_v":   bytes_to_int(bs, 9, 2, scale=0.1),
+        "low_voltage_disconnect_v":  bytes_to_int(bs, 11, 2, scale=0.1),
+        "low_voltage_reconnect_v":   bytes_to_int(bs, 13, 2, scale=0.1),
+    }
+
+
 class RenogyRover(DeviceDriver):
     vendor_id = "renogy"
     device_kind = "charge_controller"
@@ -82,4 +97,88 @@ class RenogyRover(DeviceDriver):
             Section(register=26, word_count=1, parser=_parse_device_address, name="device_address"),
             Section(register=256, word_count=34, parser=_parse_charging_info, name="charging_info"),
             Section(register=57348, word_count=1, parser=_parse_battery_type, name="battery_type"),
+            Section(register=0xE007, word_count=6, parser=_parse_charge_voltages, name="charge_voltages"),
+        ]
+
+    def writable_settings(self) -> list[WritableSetting]:
+        # Conservative ranges: a bit tighter than the Rover's nominal
+        # absolute limits, with the goal of "operator error doesn't
+        # cycle the bank to death". Real upper bounds are vendor-doc'd
+        # at +0.5 V or so above each cap; we trim those to avoid the
+        # foot-gun. The low-voltage-disconnect minimum (10.0 V) is
+        # below where a flooded lead-acid bank starts taking permanent
+        # damage; we expose it for completeness but warn in help_text.
+        return [
+            WritableSetting(
+                key="battery_type",
+                label="Battery type",
+                kind="enum",
+                register=57348,    # 0xE004
+                read_from="battery_type",
+                choices=(
+                    (1, "Flooded / open lead-acid"),
+                    (2, "Sealed lead-acid (AGM)"),
+                    (3, "Gel"),
+                    (4, "Lithium"),
+                    (5, "Custom"),
+                ),
+                help_text=(
+                    "Picks the default charge profile. Set to "
+                    "Lithium for any LFP / Li-ion bank — open-lead "
+                    "defaults will under-charge it."
+                ),
+            ),
+            WritableSetting(
+                key="boost_voltage",
+                label="Absorption (boost) voltage",
+                kind="float",
+                register=0xE008,
+                read_from="boost_voltage_v",
+                units="V",
+                min=12.0, max=16.0, step=0.1, scale=0.1,
+                help_text=(
+                    "Target voltage during the absorption stage. "
+                    "Typical LFP: 14.2–14.4 V. Lead-acid: 14.4–14.8 V."
+                ),
+            ),
+            WritableSetting(
+                key="float_voltage",
+                label="Float voltage",
+                kind="float",
+                register=0xE009,
+                read_from="float_voltage_v",
+                units="V",
+                min=12.0, max=15.0, step=0.1, scale=0.1,
+                help_text=(
+                    "Voltage the charger holds at after absorption "
+                    "completes. LFP: 13.5 V. Lead-acid: 13.6–13.8 V."
+                ),
+            ),
+            WritableSetting(
+                key="low_voltage_disconnect",
+                label="Low-voltage disconnect",
+                kind="float",
+                register=0xE00B,
+                read_from="low_voltage_disconnect_v",
+                units="V",
+                min=10.0, max=12.8, step=0.1, scale=0.1,
+                help_text=(
+                    "Load output cuts off below this voltage. "
+                    "Set too low and lead-acid banks take permanent "
+                    "damage; 11.0 V is a safe lower bound."
+                ),
+            ),
+            WritableSetting(
+                key="low_voltage_reconnect",
+                label="Low-voltage reconnect",
+                kind="float",
+                register=0xE00C,
+                read_from="low_voltage_reconnect_v",
+                units="V",
+                min=10.5, max=13.5, step=0.1, scale=0.1,
+                help_text=(
+                    "Load output re-enables once the bank rises to "
+                    "this voltage. Must be above the disconnect."
+                ),
+            ),
         ]
