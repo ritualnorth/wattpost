@@ -182,13 +182,20 @@ class CloudService:
         """Apply a single cloud-queued command. Reports status
         transitions back to /api/heartbeat/command/{id} as it goes.
 
-        Only handles `kind='update'` today. Unknown kinds get marked
-        failed with a clear error message so they don't sit forever
-        as 'queued' on the dashboard."""
+        Handled kinds:
+          update      — run wattpost-update (Pi installs only)
+          backup_now  — snapshot + upload to cloud (#165)
+
+        Unknown kinds get marked failed with a clear error message
+        so they don't sit forever as 'queued' on the dashboard."""
         cmd_id = cmd.get("id")
         kind   = cmd.get("kind")
         if not isinstance(cmd_id, int):
             log.warning("cloud command missing id: %r", cmd)
+            return
+
+        if kind == "backup_now":
+            await self._dispatch_backup_now(cmd_id)
             return
 
         if kind != "update":
@@ -234,6 +241,56 @@ class CloudService:
                 cmd_id, "failed",
                 error=f"failed to start updater: {type(e).__name__}: {e}",
             )
+
+    async def _dispatch_backup_now(self, cmd_id: int) -> None:
+        """Cloud-triggered immediate snapshot (#165).
+
+        Runs the same code path as the scheduled weekly snapshot: write
+        to the local backup_dir AND, if a cloud uploader is configured,
+        push the archive to the cloud's appliance_backups table so the
+        owner can rescue from it later via /app/site/{id}.
+
+        If `cloud_upload` is OFF in config (Hobby tier user with cloud
+        paired but no cloud-backup retention) we still take the LOCAL
+        snapshot — clicking "Take backup now" from the cloud UI should
+        never be a silent no-op. The user gets a fresh local snapshot
+        either way; the cloud-side ApplianceBackup row only appears if
+        the uploader was wired at startup.
+        """
+        backup_svc = getattr(self.scheduler, "backup_service", None)
+        if backup_svc is None:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="backup service not running on this appliance",
+            )
+            return
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        try:
+            out_path = await backup_svc.snapshot_now()
+        except Exception as e:
+            log.exception("cloud backup_now: snapshot failed for cmd %d", cmd_id)
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"snapshot failed: {type(e).__name__}: {e}",
+            )
+            return
+        # Did the cloud-upload arm succeed? snapshot_now() stores the
+        # result on the service for the local Settings UI; we surface
+        # it here too so the dashboard can render "snapshot stored on
+        # cloud" vs "local-only — enable cloud backups in Settings".
+        if (backup_svc.cfg.cloud_upload
+                and backup_svc.cloud_uploader is not None
+                and backup_svc.last_cloud_upload_ok is False):
+            err = backup_svc.last_cloud_upload_error or "unknown error"
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"local snapshot ok ({out_path.name}) but "
+                      f"cloud upload failed: {err}",
+            )
+            return
+        log.info("cloud backup_now: cmd %d wrote %s", cmd_id, out_path.name)
+        await self._patch_command_status(cmd_id, "success")
 
     async def _patch_command_status(
         self, cmd_id: int, status: str, *, error: str | None = None,
