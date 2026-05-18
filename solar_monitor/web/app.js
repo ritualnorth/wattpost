@@ -870,9 +870,31 @@ function buildFlowModel() {
     if (!mapping) continue;
     const l = dev.latest || {};
 
+    // Silent-device check (#171). Victron BLE drivers stamp
+    // `advertisement_age_s` on every poll; > 60 s means we haven't
+    // decoded a fresh broadcast (charger switched off, dongle out of
+    // range, etc.). The values still in `latest` are the LAST seen
+    // ones — honest history but a lie about "live now". The flow
+    // tile must not pretend that stale 206 W AC charger is currently
+    // pushing watts; the math would inflate source totals and the
+    // bank's "Load" estimate. We still render the tile (the device
+    // is configured, the customer should see something) but with
+    // power forced to 0 and a Silent sub-label.
+    const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
+    const isSilent = ageS != null && ageS > 60;
+    const silentSub = (() => {
+      if (!isSilent) return null;
+      if (ageS < 90)     return `Silent — last heard ${Math.round(ageS)} s ago`;
+      if (ageS < 5400)   return `Silent — last heard ${Math.round(ageS / 60)} min ago`;
+      if (ageS < 86000)  return `Silent — last heard ${(ageS / 3600).toFixed(1)} h ago`;
+      return "Silent — no broadcast since restart";
+    })();
+
     if (mapping.battery) {
       // Smart batteries: sum V × I across packs. Shunts (future): just power_w.
-      if (typeof l.voltage_v === "number" && typeof l.current_a === "number") {
+      if (isSilent) {
+        // pass — stale battery contributes nothing
+      } else if (typeof l.voltage_v === "number" && typeof l.current_a === "number") {
         batteryNetW += l.voltage_v * l.current_a;
       } else if (typeof l.power_w === "number") {
         batteryNetW += l.power_w;
@@ -884,8 +906,8 @@ function buildFlowModel() {
     // look misconfigured.
     for (const s of mapping.sources || []) {
       if (s.onlyIf && !s.onlyIf(l)) continue;
-      const w = +l[s.metric] || 0;
-      const subParts = [
+      const w = isSilent ? 0 : (+l[s.metric] || 0);
+      const subParts = isSilent ? [] : [
         typeof l[s.vMetric] === "number" ? `${l[s.vMetric].toFixed(1)} V` : null,
         typeof l[s.aMetric] === "number" ? `${l[s.aMetric].toFixed(2)} A` : null,
       ].filter(Boolean);
@@ -897,9 +919,12 @@ function buildFlowModel() {
         icon: s.icon || COLOR_TO_ICON[s.color],
         power: w,
         active: w > 1,
+        silent: isSilent,
         // When the source is idle, say so explicitly rather than just
         // showing V/A (which can look like the device is broken).
-        sub: w > 0 ? subParts.join(" · ") : (subParts.length ? `${subParts.join(" · ")} · idle` : "idle"),
+        sub: silentSub
+             || (w > 0 ? subParts.join(" · ")
+                       : (subParts.length ? `${subParts.join(" · ")} · idle` : "idle")),
       });
     }
     // Loads: keep the onlyIf filter — the Rover's load output really is
@@ -907,8 +932,8 @@ function buildFlowModel() {
     // not signal. Inferred bus-loads are still surfaced separately below.
     for (const lo of mapping.loads || []) {
       if (lo.onlyIf && !lo.onlyIf(l)) continue;
-      const w = +l[lo.metric] || 0;
-      if (w <= 0 && !lo.onlyIf) continue;
+      const w = isSilent ? 0 : (+l[lo.metric] || 0);
+      if (w <= 0 && !lo.onlyIf && !isSilent) continue;
       loads.push({
         id: `${dev.label}.${lo.id}`,
         label: lo.label,
@@ -917,6 +942,7 @@ function buildFlowModel() {
         icon: lo.icon || COLOR_TO_ICON[lo.color],
         power: w,
         active: w > 1,
+        silent: isSilent,
         sub: [
           typeof l[lo.vMetric] === "number" ? `${l[lo.vMetric].toFixed(1)} V` : null,
           typeof l[lo.aMetric] === "number" ? `${l[lo.aMetric].toFixed(2)} A` : null,
@@ -1131,6 +1157,7 @@ function makeFlowTile(t, muted = false) {
   if (muted) classes.push("muted");
   if (t.active) classes.push("is-active");
   if (t.inferred) classes.push("inferred");
+  if (t.silent) classes.push("is-silent");
   div.className = classes.join(" ");
 
   const iconKey = t.icon || COLOR_TO_ICON[t.color] || "unknown";

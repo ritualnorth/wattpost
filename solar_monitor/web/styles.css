@@ -1142,6 +1142,16 @@ main {
   color: var(--text-2);
 }
 
+/* Silent device — Victron BLE driver reports advertisement_age_s > 60.
+ * The tile is still shown (the device is configured) but visually muted
+ * so the user knows "we have nothing live here" rather than reading
+ * the frozen wattage as real. See #171. */
+.flow-tile.is-silent {
+  opacity: .5;
+  filter: grayscale(.6);
+}
+.flow-tile.is-silent .flow-tile-val { color: var(--text-3); }
+
 .flow-tile {
   border-radius: var(--r);
   padding: .9rem 1rem;
