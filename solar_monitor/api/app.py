@@ -908,6 +908,11 @@ def build_app(
         )
         await backup_svc.start()
         app.state["backup_service"] = backup_svc
+        # Make the BackupService reachable from CloudService so the
+        # cloud-triggered `backup_now` command (#165) can call
+        # snapshot_now() through the same code path as the scheduled
+        # weekly backup — same naming, same upload, same prune.
+        setattr(scheduler, "backup_service", backup_svc)
 
     async def on_shutdown(app: Litestar) -> None:
         svc = app.state.get("backup_service")
