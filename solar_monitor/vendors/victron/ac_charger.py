@@ -39,10 +39,11 @@ class VictronAcCharger(DeviceDriver):
         if not hasattr(transport, "get_latest"):
             result["_errors"] = ["wrong transport type — requires ble_victron_advertise"]
             return result
+        from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()
         if parsed is None:
-            result["_errors"] = ["no advertisement received yet (or stale)"]
-            return result
+            return mark_silent(result, transport)
+        stamp_advertisement_age(result, transport)
         class_name = getattr(transport, "get_device_class_name", lambda: None)()
         if class_name and class_name not in EXPECTED_DEVICE_CLASSES:
             result["_errors"] = [
@@ -81,7 +82,4 @@ class VictronAcCharger(DeviceDriver):
             if v is not None and i is not None:
                 result[f"output_{n}_power_w"] = round(v * i, 1)
 
-        latest_at = getattr(transport, "_latest_at", None)
-        if latest_at:
-            result["advertisement_age_s"] = max(0, int(time.time() - latest_at))
         return result

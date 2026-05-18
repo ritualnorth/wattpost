@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.11] — 2026-05-18
+
+### Fixed — Stale Victron BLE data shown as live (#171)
+When a Victron BLE device (AC charger, MPPT, SmartShunt, Orion XS,
+etc.) stops broadcasting — output switched off, dongle out of
+range, charger unplugged from mains — the transport's
+`get_latest()` correctly starts returning None after 60 s. But the
+driver's early-return path only stamped an `_errors` string and no
+numeric fields, so the `latest` table kept serving the *previous*
+successful row indefinitely. `/api/devices` reported a frozen
+`advertisement_age_s: 27` plus 15 A bulk-state forever, even
+2 hours after the charger had actually gone silent. Discovered
+when Ritual North asked why his History chart was empty for an AC
+charger that "the dashboard still showed running".
+
+Fix:
+- `BleVictronAdvertiseTransport.last_advertisement_age_s()` returns
+  the real-time age in seconds (ticks up while silent), unlike
+  `get_latest()` which gates on the 60 s threshold.
+- New `vendors/victron/_silent.py` helper that every Victron
+  driver routes its stale-path through. Stamps the always-fresh
+  age + a descriptive _errors entry; no payload fields so the
+  dashboard knows we have nothing live.
+- Dashboard device card detects `advertisement_age_s > 60` and:
+  - greys out the tile (.dev-card-silent, opacity .55)
+  - shows a "Silent — last heard X min ago" badge
+
+All 8 Victron drivers updated: SmartShunt, SmartSolar, Orion XS,
+DC-DC, SmartBatteryProtect, AcCharger, SmartLithium, LynxSmartBMS.
+
+CACHE_VERSION bumped to v73-app163-css106.
+
 ## [0.1.10] — 2026-05-18
 
 ### Added — Per-device settings panel (#111 phase 1, read-only)

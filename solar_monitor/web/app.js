@@ -2069,6 +2069,25 @@ function renderDeviceCards() {
     sub.textContent = `${dev.vendor} · ${dev.kind}${fw ? " · fw " + fw : ""}${l.model ? " · " + l.model : ""}`;
     card.appendChild(sub);
 
+    // Silent-device indicator (#171). Victron BLE drivers stamp
+    // `advertisement_age_s` on every poll, ticking up while the
+    // device is broadcast-silent. If it crosses 60 s the transport
+    // already considers the snapshot stale; we surface that on the
+    // card so the customer doesn't read frozen 2-hour-old values
+    // as if they were live. Grey out the whole tile + show how
+    // long ago we last heard from it.
+    const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
+    if (ageS != null && ageS > 60) {
+      card.classList.add("dev-card-silent");
+      const silent = document.createElement("div");
+      silent.className = "dev-card-silent-badge";
+      const ageStr = ageS < 90 ? `${Math.round(ageS)} s`
+                  : ageS < 5400 ? `${Math.round(ageS / 60)} min`
+                  : `${(ageS / 3600).toFixed(1)} h`;
+      silent.textContent = `Silent — last heard ${ageStr} ago`;
+      card.appendChild(silent);
+    }
+
     // Lifetime stats strip for smart batteries — cycles + Ah throughput.
     // Fetched in the background; injected when ready.
     if (dev.kind === "smart_battery") {
