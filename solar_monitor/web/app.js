@@ -484,6 +484,18 @@ let pollingFallbackTimer = null;
 let _firstBootRedirected = false;
 function openStream() {
   if (eventStream) return;
+  // Broker-origin shortcut: never open SSE when loaded over the cloud
+  // broker hostname. Previously we let SSE open and closed it later
+  // once /api/system/auth-status resolved with origin=broker, but on
+  // iOS Safari that race already cost you: the moment the EventSource
+  // connection is in flight, Safari serialises its tiny per-host HTTP
+  // pool around it. Every /api/* fetch then queues behind an SSE
+  // that's about to close → white page. Skipping SSE entirely at the
+  // URL level dodges the trap. See memory: ios_safari_sse_tunnel.
+  if (IS_BROKER_VIEW) {
+    startPollingFallback();
+    return;
+  }
   try {
     eventStream = new EventSource("/api/stream");
   } catch (e) {

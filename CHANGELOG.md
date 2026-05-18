@@ -8,6 +8,42 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-05-18
+
+### Fixed — White page on iOS Safari broker view (root cause this time)
+The recurring white-page-on-remote-session bug has a confirmed
+root cause now, caught via live debugging: it's **not** the
+sso_secret drift (#148), it's the iOS Safari SSE + Cloudflare
+Tunnel trap.
+
+Sequence:
+  1. iPhone loads `<slug>.wattpost.cloud` (broker URL)
+  2. App.js immediately opens an `EventSource("/api/stream")`
+     so the dashboard updates live as the appliance polls.
+  3. iOS Safari serialises HTTP/2 connections in its tiny per-
+     host pool around long-lived bodies. The SSE in flight to
+     the appliance via the CF tunnel hogs the only slot.
+  4. Every other `/api/*` fetch the dashboard JS makes
+     immediately afterwards queues behind that SSE.
+  5. The dashboard sits at "Loading…" forever → white page.
+  6. After ~4 s the `/api/system/auth-status` request finally
+     resolves (it was queued behind the SSE), notices
+     `origin === "broker"`, and closes the SSE. By then the
+     race has already happened — Safari doesn't recover the
+     queued requests.
+
+Fix: never open SSE at all when `IS_BROKER_VIEW` is true (we
+know from the URL hostname, no need to wait for the API to
+confirm). Broker visitors poll every 5 s via the existing
+fallback timer, which dodges the trap entirely. Local LAN
+keeps SSE — works fine on a fresh connection without an
+intermediate tunnel.
+
+The Caddy access log surfaced this: every SSE attempt logged
+`error: "reading: context canceled"` because Safari aborted
+the in-flight EventSource almost immediately, but the damage
+to the connection pool was already done.
+
 ## [0.1.3] — 2026-05-18
 
 ### Added — Weather-aware tint on the Right now tile
