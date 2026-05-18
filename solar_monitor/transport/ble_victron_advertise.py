@@ -208,6 +208,17 @@ class BleVictronAdvertiseTransport(Transport):
             return None
         return self._latest
 
+    def last_advertisement_age_s(self) -> float | None:
+        """Real-time age of the last decoded advertisement. Unlike
+        `get_latest()`, this keeps growing past STALE_AFTER_SECONDS so
+        drivers can record exactly how silent a device has gone — the
+        dashboard surfaces this as "Silent for X min" + greys out the
+        device card (#171). Returns None if we've never seen an
+        advertisement from this device."""
+        if self._latest_at == 0.0:
+            return None
+        return max(0.0, time.time() - self._latest_at)
+
     def get_device_class_name(self) -> str | None:
         """Name of the victron-ble DeviceData subclass currently bound
         to this transport (e.g. "BatteryMonitor", "SolarCharger").

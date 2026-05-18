@@ -55,10 +55,11 @@ class VictronDcDc(DeviceDriver):
             ]
             return result
 
+        from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()
         if parsed is None:
-            result["_errors"] = ["no advertisement received yet (or stale)"]
-            return result
+            return mark_silent(result, transport)
+        stamp_advertisement_age(result, transport)
 
         class_name = getattr(transport, "get_device_class_name", lambda: None)()
         if class_name and class_name not in EXPECTED_DEVICE_CLASSES:
