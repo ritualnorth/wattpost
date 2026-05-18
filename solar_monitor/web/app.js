@@ -608,8 +608,20 @@ function renderStatus(run) {
 // object so the hero tile can render a quiet "shunt 65%, BMS 72%,
 // showing shunt — tap to investigate" hint.
 function aggregateBank() {
-  const shunt = devices.find(d => d.kind === "shunt");
-  const batts = devices.filter(d => d.kind === "smart_battery");
+  // Skip devices whose latest poll is stale (>90 s). Without this,
+  // an offline Renogy BT-2 keeps feeding the bank aggregate from a
+  // snapshot 50+ minutes old — the SoC donut and Net-power tile then
+  // claim "live 96.8 % · -80 W" when the truth is "we haven't heard
+  // from that BMS for an hour." Mirrors the buildFlowModel staleness
+  // check; same 90 s threshold (~1.5 poll cycles of grace).
+  const STALE_POLL_SECONDS = 90;
+  const nowSec = Date.now() / 1000;
+  const isFresh = (d) => {
+    const t = +(d.latest && d.latest._updated_at) || +(d.last_seen) || 0;
+    return t > 0 && (nowSec - t) <= STALE_POLL_SECONDS;
+  };
+  const shunt = devices.find(d => d.kind === "shunt" && isFresh(d));
+  const batts = devices.filter(d => d.kind === "smart_battery" && isFresh(d));
   if (!shunt && batts.length === 0) return null;
 
   // ---------- Cell layer (always BMS-sourced) ----------
@@ -897,6 +909,20 @@ function buildFlowModel() {
     // explains which kind of silent it is.
     const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
     const isStale = ageS != null && ageS > 60;
+    // Generic poll-freshness check — covers vendors that DON'T stamp
+    // their own advertisement_age_s (Renogy and JK BMS today). Every
+    // /api/devices entry carries `_updated_at` (Unix seconds) of the
+    // last successful poll. If that's older than ~90 s, the transport
+    // has been failing to reach the device and what we're rendering
+    // is a snapshot from however long ago. Without this check, an
+    // offline Renogy charge controller silently shows its last-known
+    // V/A/W as if they were live — same lie as the old v0.1.15 AC
+    // charger bug, just one vendor over.
+    const STALE_POLL_SECONDS = 90;
+    const updatedAt = +(l._updated_at) || +(dev.last_seen) || null;
+    const nowSec = Date.now() / 1000;
+    const pollAgeS = (updatedAt && nowSec > updatedAt) ? (nowSec - updatedAt) : null;
+    const isPollStale = pollAgeS != null && pollAgeS > STALE_POLL_SECONDS;
     // Idle-state strings that mean "not actively producing watts".
     // Victron's ChargerState enum: OFF / LOW_POWER / FAULT are all
     // "not charging right now"; everything else (BULK, ABS, FLOAT,
@@ -906,9 +932,17 @@ function buildFlowModel() {
       typeof l.charging_state === "string"
       && IDLE_CHARGE_STATES.has(l.charging_state.toLowerCase())
     );
-    const isSilent = isStale || isExplicitlyIdle;
+    const isSilent = isStale || isExplicitlyIdle || isPollStale;
     const silentSub = (() => {
       if (!isSilent) return null;
+      if (isPollStale && !isStale && !isExplicitlyIdle) {
+        // No fresh poll for ≥90s. Cover Renogy / JK BMS / any vendor
+        // that doesn't stamp advertisement_age_s itself. Wording mirrors
+        // the Victron stale messages so the dashboard reads consistently.
+        if (pollAgeS < 5400)  return `Stale — last poll ${Math.round(pollAgeS / 60)} min ago`;
+        if (pollAgeS < 86000) return `Stale — last poll ${(pollAgeS / 3600).toFixed(1)} h ago`;
+        return "Stale — no poll since restart";
+      }
       if (isExplicitlyIdle && !isStale) {
         // Fresh broadcast says "I'm off" — be specific rather than
         // pretending we haven't heard from it.
@@ -6913,8 +6947,8 @@ async function wizLoadTransports() {
     wizState.knownKeys = new Set(devices.map(d => wizKnownKey(d.transport, d.slave_id)));
     if (!transports.length) {
       host.innerHTML = `<div class="wiz-empty">
-        <p><strong>No transport configured.</strong></p>
-        <p>A "transport" is one dongle / adapter the daemon talks Modbus through. Pick how yours is connected:</p>
+        <p><strong>First time? Let's connect your gear.</strong></p>
+        <p>How is your charger / battery / shunt wired to the Pi? Most people use a Bluetooth dongle (Renogy BT-2). Choose one to start scanning:</p>
         <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
           <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M7 17L17 7M12 2v20M7 7l5-5 5 5M7 17l5 5 5-5"/></svg>
@@ -6927,7 +6961,10 @@ async function wizLoadTransports() {
           <span id="wiz-find-status" class="wiz-status"></span>
         </div>
         <p class="settings-foot" style="margin:.4rem 0 0">
-          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port — that port is RS-485, NOT Ethernet, so it does not plug into the Pi's network jack.
+          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port — that port is RS-485, NOT Ethernet, so it doesn't plug into the Pi's network jack.
+        </p>
+        <p class="settings-foot" style="margin:.4rem 0 0">
+          Victron and JK BMS devices broadcast over Bluetooth on their own — no dongle needed. Pick Bluetooth above and the wizard will find them.
         </p>
         <div id="wiz-find-results" class="wiz-results"></div>
       </div>`;
@@ -6947,7 +6984,7 @@ async function wizLoadTransports() {
             <span class="wiz-transport-id">${escHtml(t.id)}</span>
             <span class="wiz-transport-addr">${escHtml(kind)} · ${escHtml(addr)}</span>
           </div>
-          <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline · will reconnect on scan'}</span>
+          <span class="wiz-transport-state ${t.open ? 'on' : 'off'}" title="${t.open ? 'Transport is connected and polled every cycle.' : 'Daemon is auto-retrying every poll (~60 s). No action needed; it reconnects as soon as the device starts advertising again.'}">${t.open ? 'connected' : 'offline · retrying'}</span>
         </button>
         <button class="wiz-transport-del" data-edit-transport="${escHtml(t.id)}"
                 data-edit-type="${escHtml(t.type || '')}"
@@ -6964,11 +7001,11 @@ async function wizLoadTransports() {
       <div class="wiz-add-another">
         <button class="btn-action wiz-add-another-btn" id="wiz-add-another-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>Add another transport</span>
+          <span>Add another connection</span>
         </button>
         <div class="wiz-add-another-panel" id="wiz-add-another-panel" hidden>
           <p class="settings-foot" style="margin:.5rem 0">
-            BLE + USB-RS485 can run side by side on the same Pi —
+            Bluetooth + USB-RS485 can run side by side on the same Pi —
             e.g. a Renogy BT-2 for the MPPT and a USB dongle for a
             JK BMS. Pick the connection type for the next adapter:
           </p>
