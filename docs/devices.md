@@ -1,8 +1,9 @@
 # Adding devices
 
-WattPost reads telemetry from three kinds of Bluetooth source:
+WattPost reads telemetry from four kinds of source:
 
-- **Renogy** — Modbus over BLE via a [BT-1 or BT-2 dongle](/docs/supported-hardware) plugged into the device's comms port
+- **Renogy over Bluetooth** — Modbus via a [BT-1 or BT-2 dongle](/docs/supported-hardware) plugged into the device's comms port
+- **Renogy over USB-RS485** — same Modbus, wired straight from a USB adapter on the Pi to the device's RJ45 comms port; see [Wired setup](/docs/wired-setup) for cables + pinouts
 - **Victron** — passive **Instant Readout** BLE advertisements, one encryption key per device
 - **JK BMS** — its own advertised BLE service, no dongle, no key
 
