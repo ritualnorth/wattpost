@@ -93,6 +93,44 @@ class _SharedVictronScanner:
                 self._scanner = None
                 log.info("victron scanner stopped (no subscribers)")
 
+    async def pause(self) -> bool:
+        """Briefly stop the scanner so another transport can run its
+        own discovery on the same adapter. BlueZ only allows one
+        in-flight discovery session per HCI adapter — without this,
+        the Renogy BT-2 transport's `find_device_by_address` fights
+        the Victron passive scanner and loses with
+        `org.bluez.Error.InProgress`. Returns True if the scanner
+        was actually running and got paused (so the caller knows
+        to resume it). The lock is released between pause/resume
+        so the Victron transport can keep buffering messages — it
+        just won't see new ones for the duration."""
+        async with self._lock:
+            if self._scanner is None:
+                return False
+            try:
+                await self._scanner.stop()
+            except Exception:
+                log.exception("victron scanner pause: stop failed")
+            self._scanner = None
+            log.info("victron scanner paused (peer transport scanning)")
+            return True
+
+    async def resume(self) -> None:
+        """Counterpart to pause(). Restarts the scanner if there are
+        still subscribers — if every Victron transport closed during
+        the pause window, leave it stopped (unregister-equivalent)."""
+        async with self._lock:
+            if self._scanner is not None or not self._subscribers:
+                return
+            self._scanner = BleakScanner(detection_callback=self._on_detection)
+            try:
+                await self._scanner.start()
+                log.info("victron scanner resumed (subscribers=%d)",
+                         len(self._subscribers))
+            except Exception:
+                log.exception("victron scanner resume: start failed")
+                self._scanner = None
+
     def _on_detection(self, device, ad_data) -> None:
         # Cheap fast-path filter first — most advertisements on a
         # crowded RF environment have nothing to do with Victron.

@@ -102,8 +102,8 @@
       </div>
       <ul class="status-legend-list">
         <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No BLE transport configured yet — visit Settings → Setup and click "Find my dongle".</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Transport is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet — visit Settings → Setup and click "Find my dongle".</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Your Bluetooth connection is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
         <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes — usually a brief BLE wobble; clears on the next cycle.</li>
         <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
         <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes — check Bluetooth power / range to the dongle.</li>
@@ -513,16 +513,19 @@
             <span class="wiz-ble-label">Checking Bluetooth…</span>
           </div>
 
-          <!-- Step 1 — transport -->
+          <!-- Step 1 — Bluetooth connection (internally "transport"
+               — kept that word in IDs/CSS/APIs but the UX shows
+               plain English). -->
           <div class="wiz-step">
-            <div class="wiz-step-head"><span class="wiz-num">1</span><span>Pick a BLE transport</span></div>
-            <div id="wiz-transports" class="wiz-transports"><div class="wiz-empty">Loading transports…</div></div>
+            <div class="wiz-step-head"><span class="wiz-num">1</span><span>Your Bluetooth connection</span></div>
+            <p class="wiz-help">The dongle or adapter your solar gear is plugged into. Pick one to scan it for devices.</p>
+            <div id="wiz-transports" class="wiz-transports"><div class="wiz-empty">Loading…</div></div>
           </div>
 
           <!-- Step 2 — scan -->
           <div class="wiz-step" id="wiz-step-scan" hidden>
-            <div class="wiz-step-head"><span class="wiz-num">2</span><span>Scan for devices</span></div>
-            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected transport. The live poller stays running — scanning just shares the BLE link.</p>
+            <div class="wiz-step-head"><span class="wiz-num">2</span><span>Find your devices</span></div>
+            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running — scanning just shares the link.</p>
             <div class="wiz-controls">
               <button id="wiz-scan-btn" class="btn-action btn-action--primary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -876,6 +879,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=167"></script>
+  <script src="/web/app.js?v=168"></script>
 </body>
 </html>

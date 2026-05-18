@@ -2586,14 +2586,19 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
  * delete on the right. Clicking the trash disconnects the BT-2 and
  * removes the entry from config.yaml (cascades to its devices). */
 .wiz-transport-row {
-  display: flex; align-items: stretch; gap: .4rem;
+  display: flex; align-items: stretch; gap: .35rem;
   margin-bottom: .4rem;
+  min-width: 0;
 }
-.wiz-transport-row .wiz-transport { flex: 1 1 auto; margin: 0; }
+.wiz-transport-row .wiz-transport {
+  flex: 1 1 0;
+  margin: 0;
+  min-width: 0;
+}
 .wiz-transport-del {
   flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  width: 38px;
+  width: 36px;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -2607,6 +2612,15 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   background: rgba(248, 81, 73, 0.08);
 }
 .wiz-transport-del svg { width: 16px; height: 16px; }
+/* On narrow viewports the trash + pencil buttons crowd the
+ * status pill and force the row text to wrap. Tighten everything
+ * a notch so a 390 px iPhone still fits id + pill + 2 action
+ * buttons on one line. */
+@media (max-width: 420px) {
+  .wiz-transport-row { gap: .25rem; }
+  .wiz-transport-del { width: 32px; }
+  .wiz-transport-del svg { width: 14px; height: 14px; }
+}
 
 /* "Recently visible but missing" panel on the dongle-scan results.
  * Calls out devices we KNEW were broadcasting but aren't now,
@@ -2688,7 +2702,17 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
 .wiz-transport-id { font-weight: 600; }
 .wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
+/* Status pill on each transport row — one-line nowrap, ellipsis if
+ * something larger ever lands. Previous copy "offline · will
+ * reconnect on scan" was misleading (the daemon auto-retries every
+ * poll regardless of user action) AND wrapped across two lines
+ * inside the pill on iPhone widths. Shortened in JS to "offline ·
+ * retrying"; this keeps it visually tidy. */
 .wiz-transport-state {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
   font-size: 0.72rem; font-weight: 600;
   padding: 0.15rem 0.55rem; border-radius: 999px;
   text-transform: uppercase; letter-spacing: 0.06em;

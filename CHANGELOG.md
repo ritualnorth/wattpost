@@ -8,6 +8,95 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.18] — 2026-05-18
+
+A debugging marathon on Ritual North's appliance produced a long list of
+real fixes — almost all of them invisible until you hit them, then
+extremely visible. Grouped by area.
+
+### Fixed — Renogy BT-2 + Victron BLE coexistence on one HCI adapter
+BlueZ only allows one in-flight discovery per HCI adapter. When a
+Victron passive listener AND a Renogy BT-2 transport are both
+configured (the common multi-vendor case), they fight for the
+discovery slot. The losing one returns `org.bluez.Error.InProgress`
+every poll cycle, indefinitely. Ritual North's logs were spitting it
+every minute for hours.
+
+Three changes collaborate to fix it:
+
+1. **`_SharedVictronScanner.pause()` / `resume()`** — the singleton
+   scanner can now yield its discovery slot on demand and re-grab
+   it afterwards. Renogy and the wizard's manual BLE scan ask for
+   it before they do their own `BleakScanner.discover()`.
+2. **`HCI_DISCOVER_LOCK`** in `ble_modbus.py` — a module-level
+   `asyncio.Lock` serialises Renogy reconnects against the manual
+   `/api/setup/ble_scan` endpoint. Without this they competed
+   with each other (same InProgress error, different actors).
+3. **The wizard's `ble_scan`** acquires the same lock and pauses
+   Victron before running its scan. Returns Victron afterwards.
+
+Net result: three-way coexistence on one adapter. Log shows the
+ballet — `victron scanner paused (peer transport scanning)` →
+discovery → `victron scanner resumed`.
+
+### Fixed — clean BLE disconnect on shutdown (the BT-2-stuck root cause)
+The single most-reported Renogy BT-2 failure mode (cyrils/renogy-bt
+#97, #45, multiple Renogy-HA threads, even Renogy's own KB): the
+dongle accepts one BLE master at a time, and if the previous
+process exited WITHOUT issuing a clean GATT disconnect, the BT-2
+holds the phantom session in its own RAM and refuses every future
+scanner until physically replugged.
+
+`BleModbusTransport.close()` is now defensive on three counts:
+
+- `stop_notify(notify_char)` capped at 2 s
+- `client.disconnect()` capped at 5 s
+- ALWAYS follows with a subprocess `bluetoothctl disconnect <mac>`
+  as a belt-and-braces backstop, even when bleak reports OK. The
+  subprocess path drops the session at BlueZ level even when the
+  bleak Python object got wedged.
+
+Logs `close: bleak={ok|forced}, bluetoothctl=ok` at INFO so
+operators can verify clean exits via `journalctl`.
+
+Also bumped Docker stop_grace_period to 20 s on the new compose
+template — gives the daemon enough headroom for the worst-case
+close() path (12 s) without Docker SIGKILLing mid-disconnect.
+
+### Fixed — Renogy data shown as live when transport is stale
+v0.1.16 / v0.1.17 added "treat the device as silent when fresh
+broadcasts say it's off" for Victron — but Renogy doesn't stamp
+`advertisement_age_s`, so when the Renogy transport was offline
+the dashboard happily kept rendering the last-known V/A/W from 55
+minutes ago as if it were live (Solar 2 W · 22.5 V · 0.08 A,
+Battery 96.8%, Load 81.7 W estimated — all stale).
+
+Generic vendor-agnostic check added to `buildFlowModel` AND
+`aggregateBank`: if any device's `_updated_at` is more than 90 s
+old, treat as silent (power forced to 0, sub-label "Stale —
+last poll N min ago"). Renogy / JK BMS / any future vendor that
+doesn't stamp its own age now gets the same honest treatment.
+
+### Improved — wizard copy + status pill
+- "transport" is gone from every user-facing string in the setup
+  wizard. The internals (API endpoints, CSS classes, Python module
+  names) still say "transport" but the UI says "Bluetooth
+  connection" or just "connection". Step 1 → "Your Bluetooth
+  connection". Step 2 → "Find your devices".
+- First-time empty state leads with **"First time? Let's connect
+  your gear"** and a one-line explainer about which vendors need
+  dongles vs broadcast directly.
+- Offline status pill: was `offline · will reconnect on scan`
+  (misleading — daemon auto-retries every poll regardless of
+  user action). Now `offline · retrying`, with a tooltip on hover
+  explaining the auto-retry.
+- Trash + pencil action buttons on narrow viewports (iPhone-width)
+  no longer crowd the status pill off-screen.
+
+### Cache busters
+`app.js` 167 → 168, sw.js `CACHE_VERSION` →
+`wattpost-v78-app168-css109`.
+
 ## [0.1.17] — 2026-05-18
 
 ### Fixed — Donut centre disagreement hint overflowing on mobile

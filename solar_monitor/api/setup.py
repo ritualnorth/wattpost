@@ -311,24 +311,49 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="bleak not available")
 
     log.info("ble_scan: discover for %ds", secs)
-    try:
-        # `return_adv=True` makes BleakScanner give us each device's
-        # latest advertisement_data alongside the BLEDevice object.
-        # We need the manufacturer_data map to identify Victron Instant
-        # Readout broadcasts (#118) — their advertisements carry a
-        # payload under manufacturer ID 0x02E1.
-        devices_with_adv = await BleakScanner.discover(
-            timeout=secs, return_adv=True,
-        )
-    except Exception as e:
-        # Most failures here are bluez transport problems: adapter
-        # powered off, DBus passthrough broken in Docker, etc.
-        # Surface the message — it's the most useful debugging hint.
-        raise HTTPException(
-            status_code=500,
-            detail=f"BLE scan failed: {e}. Check the BLE adapter "
-                   f"status in step 0 of the wizard.",
-        )
+    # Two coexistence steps (same pattern as the Renogy transport's
+    # _open_once — see ble_modbus.HCI_DISCOVER_LOCK):
+    #
+    #   1. Acquire HCI_DISCOVER_LOCK so we don't collide with a
+    #      simultaneous Renogy reconnect (also a BleakScanner.discover).
+    #
+    #   2. Pause the Victron passive scanner so it yields its
+    #      discovery slot on the same HCI adapter. Resume it in
+    #      finally{} so the dashboard keeps getting fresh Victron
+    #      advertisements after the scan window ends.
+    from ..transport.ble_modbus import HCI_DISCOVER_LOCK
+    async with HCI_DISCOVER_LOCK:
+        victron_was_running = False
+        try:
+            from ..transport.ble_victron_advertise import _scanner as _victron_scanner
+            victron_was_running = await _victron_scanner().pause()
+        except Exception:
+            log.debug("ble_scan: victron scanner pause skipped (not in use)")
+        try:
+            # `return_adv=True` makes BleakScanner give us each device's
+            # latest advertisement_data alongside the BLEDevice object.
+            # We need the manufacturer_data map to identify Victron Instant
+            # Readout broadcasts (#118) — their advertisements carry a
+            # payload under manufacturer ID 0x02E1.
+            devices_with_adv = await BleakScanner.discover(
+                timeout=secs, return_adv=True,
+            )
+        except Exception as e:
+            # Most failures here are bluez transport problems: adapter
+            # powered off, DBus passthrough broken in Docker, etc.
+            # Surface the message — it's the most useful debugging hint.
+            raise HTTPException(
+                status_code=500,
+                detail=f"BLE scan failed: {e}. Check the BLE adapter "
+                       f"status in step 0 of the wizard.",
+            )
+        finally:
+            if victron_was_running:
+                try:
+                    from ..transport.ble_victron_advertise import _scanner as _victron_scanner
+                    await _victron_scanner().resume()
+                except Exception:
+                    log.warning("ble_scan: victron scanner resume failed")
     import time as _time
     now = int(_time.time())
     out = []
