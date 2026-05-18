@@ -127,6 +127,20 @@ cd "${PIGEN_DIR}"
 # build inside it. Stops + restarts cleanly between stages.
 # CONTAINER_NAME pinned so re-runs reuse the same docker container
 # (faster cached apt + debootstrap on re-builds).
+#
+# Pre-clean: pi-gen aborts hard if a previous `pigen-builder`
+# container still exists ("Container pigen-builder already exists
+# and you did not specify CONTINUE=1. Aborting."). That happens
+# whenever a previous run was cancelled (GH Actions concurrency
+# cancellation kills the wrapper but leaves Docker's container
+# alive — pi-gen does its own SIGTERM handling but the cleanup is
+# tied to the parent script we're calling). Force-remove any
+# leftover before we start so the rebuild is unblocked rather
+# than failing loudly. We don't pass CONTINUE=1 because that
+# resumes a partial build, which is unsafe across source/version
+# changes — we want a clean run each time.
+sudo docker rm -f -v pigen-builder >/dev/null 2>&1 || true
+
 sudo CONTAINER_NAME=pigen-builder -E ./build-docker.sh
 
 echo
