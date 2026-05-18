@@ -71,8 +71,9 @@ from .outputs import (
     delete_output_schedule,
 )
 from .system import (
-    auth_status, diagnostics_bundle, kiosk_status, rotate_kiosk_token,
-    system_info, tailscale_status, tailscale_up, tailscale_down,
+    auth_status, broker_auth_log, diagnostics_bundle, kiosk_status,
+    rotate_kiosk_token, system_info,
+    tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
 )
@@ -1041,10 +1042,12 @@ def build_app(
             # cookie is issued — broker traffic is stateless per
             # request.
             broker_header: bytes | None = None
+            _cf_ray: str | None = None
             for k, v in scope.get("headers", []):
                 if k == b"x-wp-broker-auth":
                     broker_header = v
-                    break
+                elif k == b"cf-ray":
+                    _cf_ray = v.decode("ascii", errors="ignore")
             if broker_header is not None:
                 # `config` is captured by closure from build_app's
                 # arguments. Its `.cloud` is mutated in place by the
@@ -1053,9 +1056,22 @@ def build_app(
                 _sso = (
                     config.cloud.sso_secret if config.cloud else ""
                 ) or ""
-                if _sso and _web_auth.verify_broker_auth(
+                # Verbose verdict path: records into diagnostics ring
+                # so /api/diagnostics/broker-auth can replay what
+                # happened during incidents. Costs effectively nothing
+                # (HMAC was going to run anyway).
+                from .. import diagnostics as _diag
+                _verdict, _age = _web_auth.verify_broker_auth_verdict(
                     broker_header.decode("latin-1", errors="ignore"), _sso,
-                ):
+                )
+                _diag.record_broker_auth(
+                    path=scope.get("path", "/"),
+                    method=scope.get("method", "GET"),
+                    verdict=_verdict,
+                    header_age_s=_age,
+                    cf_ray=_cf_ray,
+                )
+                if _verdict == "ok":
                     await self.app(scope, receive, send)
                     return
             # No password file = misconfigured install. Fail-closed
@@ -1177,6 +1193,7 @@ def build_app(
             system_info,
             auth_status,
             diagnostics_bundle,
+            broker_auth_log,
             kiosk_status,
             rotate_kiosk_token,
             update_state,

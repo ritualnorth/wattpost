@@ -260,6 +260,44 @@ def _gc_sessions() -> None:
         _SSO_NONCES_SEEN.pop(n, None)
 
 
+def verify_broker_auth_verdict(
+    header_value: str, sso_secret_hex: str,
+) -> tuple[str, float | None]:
+    """Same checks as `verify_broker_auth`, but returns a verdict
+    string + the header age in seconds (or None when un-computable).
+
+    Verdicts: "ok", "bad-format", "no-secret", "expired", "bad-mac".
+
+    The boolean wrapper below is kept for callers that only need
+    pass/fail; the diagnostic ring buffer wants the detail."""
+    import base64
+    import hashlib
+    import hmac
+    if not header_value or "." not in header_value:
+        return "bad-format", None
+    try:
+        ts_str, sig_b64 = header_value.split(".", 1)
+        ts = int(ts_str)
+        pad = lambda s: s + "=" * (-len(s) % 4)
+        sig = base64.urlsafe_b64decode(pad(sig_b64))
+    except (ValueError, TypeError):
+        return "bad-format", None
+    now = int(time.time())
+    age = float(now - ts)
+    if abs(age) > 30:
+        return "expired", age
+    if not sso_secret_hex:
+        return "no-secret", age
+    try:
+        key = bytes.fromhex(sso_secret_hex)
+    except ValueError:
+        return "no-secret", age
+    expected = hmac.new(key, ts_str.encode("ascii"), hashlib.sha256).digest()
+    if hmac.compare_digest(expected, sig):
+        return "ok", age
+    return "bad-mac", age
+
+
 def verify_broker_auth(header_value: str, sso_secret_hex: str) -> bool:
     """Verify the cloud-broker auth header (#139).
 
@@ -277,27 +315,8 @@ def verify_broker_auth(header_value: str, sso_secret_hex: str) -> bool:
     flows through is read-only telemetry or write-actions that
     the cloud session already authorised), and a 30s window keeps
     the surface tiny enough that practical replay isn't useful."""
-    import base64
-    import hashlib
-    import hmac
-    if not header_value or "." not in header_value:
-        return False
-    try:
-        ts_str, sig_b64 = header_value.split(".", 1)
-        ts = int(ts_str)
-        pad = lambda s: s + "=" * (-len(s) % 4)
-        sig = base64.urlsafe_b64decode(pad(sig_b64))
-    except (ValueError, TypeError):
-        return False
-    now = int(time.time())
-    if abs(now - ts) > 30:
-        return False
-    try:
-        key = bytes.fromhex(sso_secret_hex)
-    except ValueError:
-        return False
-    expected = hmac.new(key, ts_str.encode("ascii"), hashlib.sha256).digest()
-    return hmac.compare_digest(expected, sig)
+    verdict, _ = verify_broker_auth_verdict(header_value, sso_secret_hex)
+    return verdict == "ok"
 
 
 def consume_sso_token(token: str, sso_secret_hex: str) -> dict | None:
