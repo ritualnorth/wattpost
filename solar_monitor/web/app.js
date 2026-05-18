@@ -6634,6 +6634,13 @@ async function wizLoadTransports() {
           </div>
           <span class="wiz-transport-state ${t.open ? 'on' : 'off'}">${t.open ? 'connected' : 'offline · will reconnect on scan'}</span>
         </button>
+        <button class="wiz-transport-del" data-edit-transport="${escHtml(t.id)}"
+                data-edit-type="${escHtml(t.type || '')}"
+                data-edit-address="${escHtml(t.address || '')}"
+                data-edit-port="${escHtml(t.port || '')}"
+                title="Edit this transport's address / encryption key">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
         <button class="wiz-transport-del" data-del-transport="${escHtml(t.id)}" title="Disconnect + remove this transport">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
         </button>
@@ -6691,6 +6698,14 @@ async function wizLoadTransports() {
     });
     host.querySelectorAll("[data-del-transport]").forEach(btn => {
       btn.addEventListener("click", () => wizDeleteTransport(btn.dataset.delTransport));
+    });
+    host.querySelectorAll("[data-edit-transport]").forEach(btn => {
+      btn.addEventListener("click", () => wizEditTransport({
+        id:      btn.dataset.editTransport,
+        type:    btn.dataset.editType,
+        address: btn.dataset.editAddress,
+        port:    btn.dataset.editPort,
+      }));
     });
     // Auto-select when there's only one transport — there's no
     // meaningful "pick" to make, so making the user tap a row before
@@ -6894,6 +6909,66 @@ async function wizDeleteDevice(slaveId) {
   if (res.reload_error) {
     alert(`Device removed, but hot-reload failed: ${res.reload_error}\nRestart the daemon.`);
   }
+}
+
+// In-place edit: change a transport's address / encryption key / port
+// without the delete-and-recreate dance. The transport id stays the
+// same (history rows + MQTT topics + device references all key off
+// it), so all we're mutating is the credentials.
+async function wizEditTransport({ id, type, address, port }) {
+  let promptLabel, promptDefault, field, second = null;
+  if (type === "ble_modbus") {
+    promptLabel = "New BLE MAC for " + id + " (e.g. CC:45:A5:83:B7:42):";
+    promptDefault = address || "";
+    field = "address";
+  } else if (type === "ble_victron_advertise") {
+    promptLabel = "New BLE MAC for " + id + " (leave blank to keep):";
+    promptDefault = address || "";
+    field = "address";
+    second = {
+      label: "New encryption key (32 hex chars, leave blank to keep):",
+      field: "encryption_key",
+    };
+  } else if (type === "serial_modbus") {
+    promptLabel = "New serial port for " + id + " (e.g. /dev/ttyUSB0):";
+    promptDefault = port || "";
+    field = "port";
+  } else {
+    alert("Don't know how to edit a " + type + " transport here yet.");
+    return;
+  }
+  const v1 = window.prompt(promptLabel, promptDefault);
+  if (v1 === null) return;  // cancelled
+  const body = {};
+  if (v1.trim()) body[field] = v1.trim();
+  if (second) {
+    const v2 = window.prompt(second.label, "");
+    if (v2 === null) return;  // cancelled
+    if (v2.trim()) body[second.field] = v2.trim();
+  }
+  if (Object.keys(body).length === 0) {
+    // Nothing to update — let them know rather than silently no-op.
+    alert("Nothing changed.");
+    return;
+  }
+  try {
+    const r = await fetch(
+      `/api/setup/transports/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    alert("Couldn't update transport: " + (e.message || String(e)));
+    return;
+  }
+  await wizLoadTransports();
 }
 
 async function wizDeleteTransport(transportId) {
