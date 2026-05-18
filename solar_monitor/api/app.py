@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 from typing import Any, AsyncIterator
 
-from litestar import Litestar, Request, Response, get, post
+from litestar import Litestar, Request, Response, get, patch, post
 from litestar.config.cors import CORSConfig
 from litestar.datastructures import State
 from litestar.exceptions import NotFoundException
@@ -376,6 +376,29 @@ async def device_charger_stats(label: str, state: State) -> dict[str, Any]:
     return await store.charger_stats(label, power_metric, midnight, now)
 
 
+def _resolve_device_settings(state, label):
+    """Shared resolver: returns (cfg_dev, driver_instance, settings_list)
+    or raises NotFoundException. Used by both GET and PATCH so the
+    two endpoints stay in lockstep about what's editable."""
+    from ..vendors.registry import VENDORS
+    config = state.get("config") if hasattr(state, "get") else state["config"]
+    cfg_dev = None
+    for d in (getattr(config, "devices", None) or []):
+        if d.label == label:
+            cfg_dev = d
+            break
+    if cfg_dev is None:
+        raise NotFoundException(f"unknown device {label!r}")
+    vendor_reg = VENDORS.get(cfg_dev.vendor)
+    if vendor_reg is None:
+        return cfg_dev, None, []
+    driver_cls = vendor_reg.drivers.get(cfg_dev.kind)
+    if driver_cls is None:
+        return cfg_dev, None, []
+    inst = driver_cls(slave_id=cfg_dev.slave_id or 0, label=label)
+    return cfg_dev, inst, list(inst.writable_settings())
+
+
 @get("/api/devices/{label:str}/settings")
 async def device_settings(label: str, state: State) -> dict[str, Any]:
     """Per-device user-tunable settings (#111 phase 1).
@@ -392,25 +415,7 @@ async def device_settings(label: str, state: State) -> dict[str, Any]:
     are read-only forever per product scope, JK BMS write surface is
     a future phase, only Renogy Rover exposes settings today).
     """
-    from ..vendors.registry import VENDORS
-    config = state.get("config") if hasattr(state, "get") else state["config"]
-    cfg_dev = None
-    for d in (getattr(config, "devices", None) or []):
-        if d.label == label:
-            cfg_dev = d
-            break
-    if cfg_dev is None:
-        raise NotFoundException(f"unknown device {label!r}")
-    vendor_reg = VENDORS.get(cfg_dev.vendor)
-    if vendor_reg is None:
-        return {"label": label, "items": [], "reason": "vendor not registered"}
-    driver_cls = vendor_reg.drivers.get(cfg_dev.kind)
-    if driver_cls is None:
-        return {"label": label, "items": [], "reason": "no driver for kind"}
-    # Instantiate just for the descriptor list — slave_id doesn't
-    # matter at this point, we're not polling.
-    inst = driver_cls(slave_id=cfg_dev.slave_id or 0, label=label)
-    settings = inst.writable_settings()
+    cfg_dev, inst, settings = _resolve_device_settings(state, label)
     if not settings:
         return {"label": label, "items": []}
 
@@ -430,11 +435,153 @@ async def device_settings(label: str, state: State) -> dict[str, Any]:
             "step":       s.step,
             "help_text":  s.help_text,
             "current_value": current,
-            # Phase 1 ships read-only; UI greys out the edit button.
-            # Phase 2 will flip this true once the PATCH path lands.
-            "editable":   False,
+            "editable":   True,
         })
     return {"label": label, "items": items}
+
+
+@patch("/api/devices/{label:str}/settings/{key:str}", status_code=200)
+async def patch_device_setting(
+    label: str, key: str, request: Request, state: State,
+) -> dict[str, Any]:
+    """Apply a new value to one writable setting (#111 phase 2).
+
+    Body: {"value": <new value>}  (number or int per descriptor.kind)
+
+    Validates against the WritableSetting descriptor (enum choices,
+    min/max for numeric), applies the descriptor's scale to encode
+    the register value, then writes via FC06 with the same BT-2
+    ack-swallowing fallback the Rover load-output adapter uses.
+
+    On success returns the confirmed read-back value and the new
+    user-facing value. On clamp (device returned a different value
+    than we wrote) returns ok=False with the device's actual value
+    so the UI can render what landed.
+    """
+    cfg_dev, inst, settings = _resolve_device_settings(state, label)
+    setting = next((s for s in settings if s.key == key), None)
+    if setting is None:
+        raise NotFoundException(f"unknown setting {key!r} for device {label!r}")
+
+    body = await request.json()
+    if not isinstance(body, dict) or "value" not in body:
+        raise HTTPException(status_code=400, detail="missing `value` in body")
+    raw_value = body["value"]
+
+    # ---- validation by kind ----
+    if setting.kind == "enum":
+        try:
+            v_int = int(raw_value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400,
+                                detail=f"setting {key!r} is enum; value must be int")
+        valid = {c[0] for c in setting.choices}
+        if v_int not in valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"value {v_int} not in valid choices {sorted(valid)}",
+            )
+        register_value = v_int
+    elif setting.kind in ("float", "int"):
+        try:
+            v_num = float(raw_value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400,
+                                detail=f"setting {key!r} requires a number")
+        if setting.min is not None and v_num < setting.min:
+            raise HTTPException(
+                status_code=400,
+                detail=f"value {v_num} below minimum {setting.min}",
+            )
+        if setting.max is not None and v_num > setting.max:
+            raise HTTPException(
+                status_code=400,
+                detail=f"value {v_num} above maximum {setting.max}",
+            )
+        # Encode register value via scale. With scale=0.1 (e.g. 14.4 V
+        # in user-facing units), the register holds 144.
+        register_value = int(round(v_num / (setting.scale or 1.0)))
+        if not (0 <= register_value <= 0xFFFF):
+            raise HTTPException(
+                status_code=400,
+                detail=f"encoded value {register_value} out of FC06 range",
+            )
+    else:
+        raise HTTPException(
+            status_code=500,
+            detail=f"driver declared unknown setting kind {setting.kind!r}",
+        )
+
+    # ---- resolve transport ----
+    scheduler = state.get("scheduler") if hasattr(state, "get") else state["scheduler"]
+    transport = scheduler.get_transport(cfg_dev.transport) if scheduler else None
+    if transport is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"transport {cfg_dev.transport!r} not running — has the "
+                f"daemon finished its first poll cycle?"
+            ),
+        )
+    if not hasattr(transport, "request"):
+        # Passive transports (Victron BLE Instant Readout) can't write.
+        # Drivers behind them shouldn't declare WritableSettings, but
+        # if one does, refuse loudly rather than crash inside FC06.
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "this device's transport is read-only (BLE broadcast) — "
+                "writes aren't supported"
+            ),
+        )
+
+    # ---- write + audit log ----
+    from ..settings_write import write_setting_register
+    slave_id = cfg_dev.slave_id or 0
+    log.info(
+        "[settings] write %s.%s = %r (reg=0x%04X, encoded=%d) by user",
+        label, key, raw_value, setting.register, register_value,
+    )
+    result = await write_setting_register(
+        transport, slave_id, setting.register, register_value,
+    )
+
+    # ---- update store so UI sees the new value immediately ----
+    if result["ok"] and setting.read_from:
+        store: Store = state["store"]
+        applied_user_value = (
+            result["confirmed_value"] * (setting.scale or 1.0)
+            if result["confirmed_value"] is not None
+            else (register_value * (setting.scale or 1.0))
+        )
+        # Best-effort: push the new value into `latest` so the
+        # Settings panel reflects it before the next regular poll.
+        try:
+            await store.record_poll({
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime()),
+                "devices": {label: {
+                    "_vendor": cfg_dev.vendor,
+                    "_kind":   cfg_dev.kind,
+                    "_slave_id": slave_id,
+                    setting.read_from: applied_user_value,
+                }},
+                "errors": [],
+                "elapsed_seconds": 0.0,
+            })
+        except Exception:
+            log.exception("[settings] post-write store update failed")
+
+    return {
+        "label":             label,
+        "key":               key,
+        "ok":                bool(result["ok"]),
+        "register_value":    result["confirmed_value"],
+        "applied_value":     (
+            result["confirmed_value"] * (setting.scale or 1.0)
+            if result["confirmed_value"] is not None else None
+        ),
+        "detail":            result["detail"],
+    }
 
 
 @get("/api/devices/{label:str}/efficiency")
@@ -1240,6 +1387,7 @@ def build_app(
             device_efficiency,
             device_charger_stats,
             device_settings,
+            patch_device_setting,
             set_device_display_name,
             export_backup,
             import_backup,
