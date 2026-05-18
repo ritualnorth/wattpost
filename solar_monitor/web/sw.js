@@ -18,7 +18,7 @@
 // the inner cache-busters (?v=NN) don't help if the cached index.html
 // itself is what's stale. Suffix corresponds to the current app.js
 // version so future-me can see at a glance what's pinned.
-const CACHE_VERSION = 'wattpost-v69-app159-css104';
+const CACHE_VERSION = 'wattpost-v70-app160-css104';
 const SHELL = [
   '/',
   '/web/styles.css',
@@ -69,26 +69,43 @@ self.addEventListener('fetch', (event) => {
   // problem to surface; our cached UI handles the "Connecting…" state.
   if (url.pathname.startsWith('/api/')) return;
 
-  // Static shell: cache-first.
+  // Navigation requests: network-first. A cache-first navigation hands
+  // the browser the *previous* index.html, which references the
+  // *previous* app.js?v=N cache-buster, which is also still cached —
+  // so a stale shell self-perpetuates and any client-side fix (like
+  // the broker-view SSE skip) never reaches the device. Going to
+  // network first means an online client always gets the latest shell;
+  // the cached copy survives only as the offline fallback.
+  if (request.mode === 'navigate') {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_VERSION);
+      try {
+        const fresh = await fetch(request);
+        if (fresh.ok) cache.put(request, fresh.clone()).catch(() => {});
+        return fresh;
+      } catch (e) {
+        const index = await cache.match('/');
+        if (index) return index;
+        throw e;
+      }
+    })());
+    return;
+  }
+
+  // Static sub-resources (css, js, icons): cache-first is still right —
+  // they're version-keyed by the ?v= cache-buster in the shell, so a
+  // fresh shell brings a fresh app.js URL that misses the old cache.
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_VERSION);
     const cached = await cache.match(request);
     if (cached) return cached;
     try {
       const fresh = await fetch(request);
-      // Only cache successful same-origin GETs.
       if (request.method === 'GET' && fresh.ok) {
         cache.put(request, fresh.clone()).catch(() => {});
       }
       return fresh;
     } catch (e) {
-      // Offline. For navigation requests, fall back to the cached
-      // index.html — the SPA renders its own offline notice via the
-      // status pill.
-      if (request.mode === 'navigate') {
-        const index = await cache.match('/');
-        if (index) return index;
-      }
       throw e;
     }
   })());

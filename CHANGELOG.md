@@ -8,6 +8,57 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-05-18
+
+### Fixed — White page recurrence after v0.1.4 (stale-shell trap)
+Even after the v0.1.4 iOS Safari SSE+tunnel fix, Ritual North kept
+hitting the white page on broker view (8:13 this morning, with
+a transient "API error: 404" pill before refresh). Caddy logs
+confirmed the iPhone was *still* opening `/api/stream` against
+the broker host — meaning the v0.1.4 client code (`IS_BROKER_VIEW`
+SSE skip) had never reached the device. The appliance itself
+was serving the new app.js (`?v=159`, `IS_BROKER_VIEW` present)
+and new sw.js (`wattpost-v69-app159-css104`); the stuck piece
+was the iPhone's cached shell.
+
+Root cause: the service worker was **cache-first for navigation
+requests**. So:
+
+1. Old SW (cached when v0.1.3 shipped) controls the page.
+2. Navigation to `/` → cache hit → old `index.html` served.
+3. Old `index.html` requests `/web/app.js?v=158` → cache hit →
+   old `app.js` served.
+4. Old `app.js` knows nothing about `IS_BROKER_VIEW`, opens
+   SSE, white page.
+5. `?v=159` never reaches the device because the *shell* asking
+   for it is itself stale. The cache-buster strategy only works
+   if a fresh shell hands it out — and the SW never lets a
+   fresh shell through.
+
+A stale shell self-perpetuates forever, regardless of how many
+fixes ship server-side.
+
+Fix: flip the SW to **network-first for navigation**, cache-first
+for everything else.
+
+- Online clients always get the latest `index.html` (and thus
+  the latest `?v=` cache-buster, which pulls the latest app.js).
+  Any future client-side fix self-heals on the next page load.
+- Sub-resources (CSS, JS, icons) stay cache-first — they're
+  already version-keyed by `?v=`, so a fresh shell brings a
+  fresh URL that misses the old cache anyway.
+- Offline navigation still falls back to the cached shell, so
+  install-to-home-screen launch on plane mode still boots.
+
+This is the same pattern Home Assistant, GitHub, and most major
+PWAs use — pure cache-first navigation is only safe if you never
+need client-side code to evolve, which is never the case in
+practice.
+
+Bumped `CACHE_VERSION` to `wattpost-v70-app160-css104` and
+shell cache-buster to `?v=160` so this rollout itself evicts
+the bad shell on every existing device.
+
 ## [0.1.5] — 2026-05-18
 
 ### Added — Setup wizard: edit existing transport (#159)
