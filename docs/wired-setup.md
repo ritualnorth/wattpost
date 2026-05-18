@@ -4,6 +4,30 @@ The default WattPost install talks Modbus over Bluetooth via a Renogy
 BT-1 / BT-2 dongle. That's the fastest path to "it works", but it's
 not the only option. Three setups are worth knowing about.
 
+## Cable shopping list (read this first)
+
+If you've decided to skip the BT-2 and run wired, pick one of these
+before you order anything else:
+
+| Option | Approx cost | Wiring effort | Reliability |
+| - | - | - | - |
+| **Renogy "RS485-to-USB" cable** (pre-wired RJ45 → USB) | £15-20 | None | Best — Renogy-spec, no crimping |
+| **DSD TECH SH-U10** (FTDI FT232 USB-RS485) + Cat5e patch cable | ~£12 | One end of the patch cable: strip pins 3 + 4, screw-terminal them into A + B on the adapter | Excellent — FTDI is the gold-standard chip on Linux |
+| **Generic USB-to-RJ45 RS485 console cable** | ~£12-18 | Plug-and-play | Mixed — usually CH340 chip; pinout sometimes A↔B reversed |
+
+**Rule of thumb:** if you're testing WattPost for the first time, buy
+the **Renogy pre-wired cable** — zero variables, RJ45 plugs straight
+in. Move to the DSD/FTDI adapter once you're confident in the
+software path and want longer runs (Cat5e is good to ~30 m, far
+better than BLE through walls).
+
+**Whichever you pick, the chip matters more than the brand.** FTDI
+(FT232) and CP2102 chipsets work out of the box on every Linux distro
+WattPost runs on. CH340 also works but needs `ch341` in the kernel
+(present on Pi OS Bookworm and Debian 12+, occasionally missing on
+older builds). When the wizard's `Find USB` step shows the adapter as
+`/dev/ttyUSB0` with chip name FTDI / CP210x / CH341, you're good.
+
 ## 1. The default: Renogy BT-2 (BLE)
 
 The BT-2 plugs into your MPPT's RJ45 (Cat5-style) communication port

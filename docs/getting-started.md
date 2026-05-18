@@ -53,6 +53,37 @@ two volumes, one `docker compose up -d`. Open
 Both paths land in the same place: the WattPost dashboard, ready to
 pair gear.
 
+## Path C — USB-RS485 (wired, no Bluetooth)
+
+Skip the BT-2 dongle entirely and run a wire from the Pi to your
+Renogy gear's RJ45 comms port. Bullet-proof on long runs, immune
+to BLE interference, no pairing state to clear.
+
+What you need:
+
+- A USB-RS485 adapter. Recommended: the **Renogy "RS485-to-USB" cable** (pre-wired RJ45 → USB, ~£15-20) for zero-fuss setup, OR a **DSD TECH SH-U10** (FTDI FT232 chip) + Cat5e patch cable if you want a longer / cleaner run. Full shopping list at [Wired setup](/docs/wired-setup#cable-shopping-list-read-this-first).
+- The Renogy comms port is RJ45 but **carries RS-485, not Ethernet**. It does not plug into the Pi's network jack.
+
+Then:
+
+1. Plug the adapter's USB end into the Pi. It enumerates as
+   `/dev/ttyUSB0` (or `ttyUSB1` if you already have another USB-serial
+   adapter attached, e.g. GPS).
+2. Plug the RJ45 end into your Renogy device's comms port.
+3. In the dashboard: **Settings → Setup → Add another connection →
+   Wired (USB-RS485 adapter)**. The wizard scans `/dev/ttyUSB*` and
+   shows what's attached + the chip type. Pick yours, save.
+4. Hit **Scan for devices** on that connection. Same Renogy slave-ID
+   sweep as the BT-2 path, just over the wire.
+
+USB-RS485 and a BT-2 can run side by side on the same Pi — useful if
+you have multiple Renogy units in different cabinets / van bays.
+See [Wired setup](/docs/wired-setup) for the full reference.
+
+Note: this path is for **Renogy** today (the only vendor where USB-RS485 is
+a real-world install). Victron and JK BMS broadcast over Bluetooth
+directly — no dongle, no wire — so they don't need this option.
+
 ## Pair your first device
 
 In the dashboard:

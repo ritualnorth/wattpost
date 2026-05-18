@@ -1,8 +1,21 @@
 # Supported hardware
 
-WattPost polls battery management systems, charge controllers, shunts and inverter-chargers over **Bluetooth**. Most installs reuse dongles you already own.
+WattPost polls battery management systems, charge controllers, shunts and inverter-chargers over **Bluetooth** or **USB-RS485** (wired). Most installs reuse dongles you already own.
 
 Missing your kit? Email [support@wattpost.io](mailto:support@wattpost.io) with the device name + protocol details — if the BLE protocol is publicly documented (or we can borrow a sniffer), it usually ships in a release or two.
+
+## Connection types at a glance
+
+| Vendor | BT-2 dongle | USB-RS485 (wired) | Direct BLE (no dongle) |
+| --- | :---: | :---: | :---: |
+| **Renogy** | ✓ (default) | ✓ (recommended for long runs / metal vans) | — |
+| **Victron** | — | — | ✓ (Instant Readout broadcasts) |
+| **JK BMS** | — | — | ✓ (BLE service broadcasts) |
+
+The wizard's "Add another connection" step lets you mix and match —
+e.g. a BT-2 to a Renogy MPPT in the garage **and** a USB-RS485 wired
+straight to a Renogy DCC50S in the van conversion. See
+[Wired setup](/docs/wired-setup) for the full cable / pinout reference.
 
 ## Renogy
 
