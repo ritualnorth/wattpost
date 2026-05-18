@@ -2841,6 +2841,31 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   color: var(--text-3);
   margin: .5rem 0 0;
 }
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.settings-table td {
+  padding: .55rem .65rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-row-label {
+  font-weight: 500;
+  color: var(--text-1);
+}
+.settings-row-help {
+  font-size: .74rem;
+  color: var(--text-3);
+  margin-top: .15rem;
+}
+.settings-row-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-align: right;
+}
 .alerts-sub-head {
   display: flex; align-items: center; justify-content: space-between;
   margin: .85rem 0 .35rem;

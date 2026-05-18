@@ -43,6 +43,45 @@ class VendorInfo(msgspec.Struct, frozen=True):
     description: str = ""
 
 
+class WritableSetting(msgspec.Struct, frozen=True):
+    """A device-side setting the user can read (and, phase-2, change).
+
+    Drivers declare these from `writable_settings()`; the daemon
+    surfaces them via `/api/devices/{label}/settings` so the UI can
+    render a Settings panel on the device detail page without
+    hard-coding any vendor knowledge.
+
+    Fields:
+      key            stable id, used in API paths + UI form names.
+      label          human-readable name ("Battery type", "Float voltage").
+      kind           "enum" | "float" | "int". Drives UI input shape.
+      register       Modbus holding register the write hits (FC06).
+      read_from      snapshot field name to pull the current value from
+                     the latest poll. None when the value isn't already
+                     in the bulk read — phase 2 will add an explicit
+                     read for those.
+      units          display-only ("V", "A", "°C", ""), no scaling.
+      choices        for kind="enum": (value, label) pairs.
+      min / max      for kind="float" / "int": validation clamps.
+      step           UI hint for numeric inputs.
+      scale          register-int ↔ user-facing value. 0.1 means
+                     user enters 14.4 → register holds 144.
+      help_text      one-liner under the input. Keep it short.
+    """
+    key: str
+    label: str
+    kind: str
+    register: int
+    read_from: str | None = None
+    units: str = ""
+    choices: tuple[tuple[int, str], ...] = ()
+    min: float | None = None
+    max: float | None = None
+    step: float = 1.0
+    scale: float = 1.0
+    help_text: str = ""
+
+
 class DeviceDriver(abc.ABC):
     """Abstract base for one device type within a vendor."""
 
@@ -60,6 +99,15 @@ class DeviceDriver(abc.ABC):
     @abc.abstractmethod
     def sections(self) -> Sequence[Section]:
         """The Modbus reads this driver issues to fully sample a device."""
+
+    def writable_settings(self) -> Sequence["WritableSetting"]:
+        """Device-side settings the user can view (and phase-2 change).
+
+        Default empty — drivers that don't have a write story or
+        haven't been audited for safe ranges shouldn't expose any.
+        Renogy + JK BMS implement this; Victron stays read-only
+        forever (separate product-scope decision)."""
+        return ()
 
     async def poll(self, transport: Transport) -> dict:
         """Default poll: run each Section sequentially, merge parsed dicts.
