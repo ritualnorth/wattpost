@@ -19,12 +19,29 @@ from __future__ import annotations
 from typing import Any
 
 
+# Sentinel age written when the transport has never received an
+# advertisement (`_latest_at == 0`). We don't know the true age but
+# the dashboard's threshold is just `> 60 s`, and we need *some*
+# numeric value to overwrite any stale row from the previous daemon
+# run that might still be in the `latest` table. 24 h reads as
+# "Silent — last heard a day ago" which is honest given we have no
+# better measurement.
+NEVER_SEEN_SENTINEL_S = 86400
+
+
 def stamp_advertisement_age(result: dict[str, Any], transport: Any) -> None:
     """Add `advertisement_age_s` to `result` based on the transport's
     last_advertisement_age_s() — works whether the device is currently
     fresh or has gone silent. Drivers should call this on every poll
     cycle (fresh and stale paths) so the latest table reflects current
-    silence-age rather than the last fresh-decode age."""
+    silence-age rather than the last fresh-decode age.
+
+    Critical: even when the transport reports None (no advert seen
+    since daemon start), write the sentinel — otherwise the previous
+    daemon's frozen `advertisement_age_s` from the `latest` table is
+    never overwritten, and the dashboard keeps showing the device as
+    fresh-but-old. See the post-restart edge case the original fix
+    missed."""
     fn = getattr(transport, "last_advertisement_age_s", None)
     if fn is None:
         return
@@ -33,6 +50,7 @@ def stamp_advertisement_age(result: dict[str, Any], transport: Any) -> None:
     except Exception:
         return
     if age is None:
+        result["advertisement_age_s"] = NEVER_SEEN_SENTINEL_S
         return
     result["advertisement_age_s"] = int(age)
 
