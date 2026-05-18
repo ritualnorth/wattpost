@@ -824,13 +824,20 @@ function renderHero() {
   if (dis) {
     if (bank.disagreement) {
       const d = bank.disagreement;
-      const sourceLabel = d.showing === "shunt" ? "shunt" : "BMS";
-      dis.textContent = `BMS ${d.bmsSoc.toFixed(0)}% · shunt ${d.shuntSoc.toFixed(0)}% — showing ${sourceLabel}`;
+      // Compact one-line format so the hint fits inside the donut on
+      // narrow viewports. Active source first (that's what the donut
+      // is showing), other source second. The "we picked the shunt
+      // because…" explanation lives in the title tooltip.
+      const activeLabel = d.showing === "shunt" ? "shunt" : "BMS";
+      const otherLabel  = d.showing === "shunt" ? "BMS"   : "shunt";
+      const activeSoc   = d.showing === "shunt" ? d.shuntSoc : d.bmsSoc;
+      const otherSoc    = d.showing === "shunt" ? d.bmsSoc   : d.shuntSoc;
+      dis.textContent = `${activeLabel} ${activeSoc.toFixed(0)}% · ${otherLabel} ${otherSoc.toFixed(0)}%`;
       dis.hidden = false;
-      dis.title = "Your BMS and shunt disagree by more than 5%. " +
-        "WattPost is showing the more reliable source for the " +
-        "metric (shunt for SoC by default). Pick a forced source " +
-        "in Settings → Power source if you trust one over the other.";
+      dis.title = `Showing ${activeLabel} reading. Your BMS and shunt ` +
+        "disagree by more than 5%. WattPost shows the more reliable " +
+        "source for SoC (shunt by default). Override in Settings → " +
+        "Power source if you trust one over the other.";
     } else {
       dis.hidden = true;
       dis.textContent = "";

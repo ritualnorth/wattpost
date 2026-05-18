@@ -8,6 +8,32 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.17] — 2026-05-18
+
+### Fixed — Donut centre disagreement hint overflowing on mobile
+The SoC donut on the dashboard renders SoC + label + flow pill +
+(optionally) a "BMS X% · shunt Y% — showing shunt" disagreement
+hint. On narrow viewports (390 px iPhone) the hint wrapped to
+two lines via `max-width: 12rem` and pushed past the bottom of
+the green ring, looking like the donut had spilled.
+
+Two fixes:
+- Compact JS format: `${activeSource} ${activeSoc}% ·
+  ${otherSource} ${otherSoc}%`. Active source first (the one
+  the donut is displaying), other source second, drop the
+  "— showing X" suffix since the active source comes first in
+  the order itself. ~14 chars total vs ~30 before.
+- CSS clamp: `.donut-disagreement` now `white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis`. Guards against
+  future overflow if a four-digit shunt count or longer source
+  label ever appears.
+
+Tooltip on hover/long-press still carries the full "we're showing
+the shunt because…" explanation.
+
+`app.js` 166→167, `styles.css` 108→109, sw.js CACHE_VERSION
+bumped to `wattpost-v77-app167-css109`.
+
 ## [0.1.16] — 2026-05-18
 
 ### Fixed — AC charger Power Flow tile: also treat "explicitly off" as silent

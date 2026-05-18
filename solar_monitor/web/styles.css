@@ -3537,9 +3537,16 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   font-family: var(--mono);
   color: var(--text-3);
   letter-spacing: 0.02em;
-  max-width: 12rem;
+  /* Single-line clamp so the hint never pushes content past the
+   * bottom of the donut ring on narrow viewports. The compact JS
+   * format ("shunt 94% · BMS 0%") fits well under 12rem; the
+   * ellipsis is a last-resort guard. */
+  max-width: 13rem;
   line-height: 1.2;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------------- controllable outputs (#104) ---------------- */
