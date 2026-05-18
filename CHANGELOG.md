@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.14] — 2026-05-18
+
+### Fixed — Migration v1 crashloop on partially-migrated DBs
+Caught the demo container in a crashloop: `sqlite3.OperationalError:
+duplicate column name: display_name`. The v1 schema migration ran
+ALTER TABLE on a DB that already had the column (a prior daemon
+must have ALTERed but crashed before the `PRAGMA user_version`
+bump landed). Every reboot then re-tried the migration, hit the
+duplicate, and exited with `Application startup failed`.
+
+Fix: rewrote v1 as an idempotent callable that reads
+`pragma_table_info` first and only adds the column when missing.
+The migration framework already supported callables (line 274
+in storage/sqlite.py); v1 was just the only entry that used a
+plain SQL string. Future schema additions should follow the
+same pattern.
+
+The demo container will self-heal on the next image pull.
+
 ## [0.1.13] — 2026-05-18
 
 ### Added — Editable device settings (#111 phase 2)

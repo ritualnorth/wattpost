@@ -240,10 +240,30 @@ PRAGMAS = (
 # Migrations are for ALTERing tables that already exist.
 SCHEMA_VERSION = 2
 
-MIGRATIONS: list[tuple[int, str, str]] = [
-    # (version, description, SQL).
-    (1, "device_meta: add display_name column",
-     "ALTER TABLE device_meta ADD COLUMN display_name TEXT"),
+async def _v1_add_display_name(db) -> None:
+    """Idempotent ALTER TABLE ADD COLUMN — SQLite has no
+    `ADD COLUMN IF NOT EXISTS`, so we check pragma_table_info first.
+
+    Why idempotency matters: the demo container's DB ended up with the
+    column already present but `user_version` still at 0 — a previous
+    daemon must have ALTERed before the user_version bump landed, then
+    crashed before committing the version. Every subsequent boot then
+    re-tried the migration and hit `duplicate column name` until we
+    made it tolerate the already-applied state.
+    """
+    async with db.execute("PRAGMA table_info(device_meta)") as cur:
+        cols = {row[1] for row in await cur.fetchall()}
+    if "display_name" not in cols:
+        await db.execute(
+            "ALTER TABLE device_meta ADD COLUMN display_name TEXT"
+        )
+
+
+MIGRATIONS: list[tuple[int, str, Any]] = [
+    # (version, description, SQL string OR async callable).
+    # Callables run when SQLite's own DDL idempotency primitives
+    # don't cover a case (ADD COLUMN, INDEX rebuilds, etc.).
+    (1, "device_meta: add display_name column", _v1_add_display_name),
 ]
 
 
