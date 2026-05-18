@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-05-18
+
+### Added — Weather-aware tint on the Right now tile
+The Right now panel now picks a subtle background gradient + border
+colour from the current WMO weather code so a sunny day reads
+warm-yellow, an overcast day reads neutral grey, rain reads slate
+blue, snow reads icy pale blue, and a thunderstorm reads deep
+purple. Clear conditions also branch on `is_day` (golden during
+the day, indigo at night).
+
+Mood lighting only — all variants cap at &lt;=10% alpha so the
+panel still reads as part of the dashboard's tinted-tile family
+and doesn't fight the actual numbers. New `wx-bg-*` classes
+swap with an 800 ms CSS transition so the tint shifts gracefully
+when the weather changes between polls.
+
 ## [0.1.2] — 2026-05-17
 
 ### Security — cyber backlog clear-down

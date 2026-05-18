@@ -1334,12 +1334,35 @@ const WMO = {
   },
 };
 
+// Map a WMO weather_code + is_day flag to a panel-tint class.
+// Kept narrow — six daytime moods + clear-night + partly-night.
+// Everything else falls back to a neutral "cloudy" tint rather
+// than guess; the tile is meant to whisper, not shout.
+function weatherTintClass(code, isDay) {
+  if (code == null) return "wx-bg-cloudy";
+  if (code === 0) return isDay === false ? "wx-bg-clear-night" : "wx-bg-clear-day";
+  if (code === 1 || code === 2) return isDay === false ? "wx-bg-partly-night" : "wx-bg-partly-day";
+  if (code === 3) return "wx-bg-cloudy";
+  if (code === 45 || code === 48) return "wx-bg-fog";
+  if (code >= 51 && code <= 57) return "wx-bg-drizzle";
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return "wx-bg-rain";
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "wx-bg-snow";
+  if (code >= 95) return "wx-bg-thunder";
+  return "wx-bg-cloudy";
+}
+
 function renderWeather() {
   const panel = $("#weather-panel");
   if (!panel) return;
   ensureWeather().then(w => {
     if (!w) { panel.hidden = true; return; }
     panel.hidden = false;
+    // Apply the weather-aware tint as a class so CSS handles the
+    // gradient transition (no inline-style churn each refresh).
+    panel.classList.forEach((c) => {
+      if (c.startsWith("wx-bg-")) panel.classList.remove(c);
+    });
+    panel.classList.add(weatherTintClass(w.weather_code, w.is_day));
     $("#weather-icon").innerHTML = WMO.iconSvg(w.weather_code, w.is_day);
     $("#weather-temp").textContent = w.temperature_c == null ? "—" : Math.round(w.temperature_c);
     $("#weather-cond").textContent = WMO.describe(w.weather_code, w.is_day);
