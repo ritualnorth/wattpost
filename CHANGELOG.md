@@ -8,6 +8,41 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.19] — 2026-05-19
+
+### Added — #170 writable-settings fan-out (phase 3, Renogy DCC50S/30S)
+
+The per-device settings work started in phase 1 (Rover MPPT) and
+phase 2 (PATCH endpoint + confirm modal + FC06 with BT-2 ack-
+swallowing fallback) now covers the second Renogy charger family.
+
+The DCC50S / DCC30S are the same charging silicon as the Rover with
+an alternator front-end bolted on — Renogy reuses the
+`0xE004 / 0xE008..0xE00C` register block across both products, so
+the same five settings work identically:
+
+- **Battery type** — flooded / sealed / gel / lithium / custom
+- **Absorption (boost) voltage** — 12.0–16.0 V
+- **Float voltage** — 12.0–15.0 V
+- **Low-voltage disconnect** — 10.0–12.8 V
+- **Low-voltage reconnect** — 10.5–13.5 V
+
+Read-back comes from a new `charge_voltages` Section (registers
+`0xE008..0xE00D`, 6 words) added to the DCC50S poll cycle so the
+confirm modal can show the current value before each change.
+
+### Held back for hardware validation
+
+Renogy inverter-chargers + smart shunts have a writable surface
+documented in cyril/renogy-bt and Renogy's public Modbus PDF, but
+their write-register addresses aren't in our codebase yet and a
+wrong guess could brick a customer's 3 kW inverter or scramble a
+shunt's SoC tracking. Tracked as follow-up tasks (#185, #186);
+will ship once we have a unit in the Proxmox lab or a brave
+customer to test against. Smart lithium batteries don't expose a
+documented user-writable surface — read-only is the right answer
+there indefinitely.
+
 ## [0.1.18] — 2026-05-18
 
 A debugging marathon on Ritual North's appliance produced a long list of

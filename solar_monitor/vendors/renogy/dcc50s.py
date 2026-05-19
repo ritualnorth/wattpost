@@ -24,7 +24,7 @@ already understands.
 """
 from __future__ import annotations
 
-from ..base import DeviceDriver, Section
+from ..base import DeviceDriver, Section, WritableSetting
 from ._util import bytes_to_int, parse_byte_temperature_c
 
 # Charging state byte. The DCC50S adds value 8 ("alternator direct")
@@ -128,6 +128,28 @@ def _parse_battery_type(bs: bytes) -> dict:
     return {"battery_type": BATTERY_TYPE.get(int(bytes_to_int(bs, 3, 2)))}
 
 
+def _parse_charge_voltages(bs: bytes) -> dict:
+    """Registers 0xE008..0xE00D (6 words) — the charger's voltage
+    thresholds. Same layout as the Rover MPPT family (the DCC50S is
+    the same charging silicon, just with an alternator front-end), so
+    we reuse the field names the dashboard already understands.
+
+    Word order from cyril/renogy-bt's DCChargerClient + Renogy's
+    Modbus PDF. Values are register-int × 0.1 = volts. The LVR (low-
+    voltage reconnect) register exists on the DCC50S but is rarely
+    user-tuned — DCC50S is a charger, not a controller with a load
+    terminal, so the disconnect/reconnect pair governs auto-recovery
+    after the bank crashes rather than load-output behaviour."""
+    return {
+        "boost_voltage_v":             bytes_to_int(bs, 3,  2, scale=0.1),
+        "float_voltage_v":             bytes_to_int(bs, 5,  2, scale=0.1),
+        "boost_recovery_voltage_v":    bytes_to_int(bs, 7,  2, scale=0.1),
+        "low_voltage_disconnect_v":    bytes_to_int(bs, 9,  2, scale=0.1),
+        "low_voltage_reconnect_v":     bytes_to_int(bs, 11, 2, scale=0.1),
+        "equalization_voltage_v":      bytes_to_int(bs, 13, 2, scale=0.1),
+    }
+
+
 class RenogyDcc(DeviceDriver):
     """Renogy DCC50S / DCC30S DC-DC + MPPT combo charger."""
     vendor_id = "renogy"
@@ -141,4 +163,91 @@ class RenogyDcc(DeviceDriver):
             Section(register=256,   word_count=30, parser=_parse_charging_info,  name="charging_info"),
             Section(register=288,   word_count=3,  parser=_parse_state,          name="state"),
             Section(register=57348, word_count=1,  parser=_parse_battery_type,   name="battery_type"),
+            Section(register=0xE008, word_count=6, parser=_parse_charge_voltages, name="charge_voltages"),
+        ]
+
+    def writable_settings(self) -> list[WritableSetting]:
+        """The DCC50S is the same charger silicon as the Rover MPPT
+        family with an alternator front-end bolted on. Renogy reuses
+        the 0xE004 / 0xE008..0xE00C register block across both — so
+        the descriptors here mirror the Rover's exactly. Read-back
+        comes from the new `charge_voltages` Section above.
+
+        Conservative ranges (same logic as Rover): a notch tighter
+        than the absolute vendor spec, so a typo'd entry doesn't
+        cycle the bank to death."""
+        return [
+            WritableSetting(
+                key="battery_type",
+                label="Battery type",
+                kind="enum",
+                register=57348,    # 0xE004 — shared with Rover
+                read_from="battery_type",
+                choices=(
+                    (1, "Flooded / open lead-acid"),
+                    (2, "Sealed lead-acid (AGM)"),
+                    (3, "Gel"),
+                    (4, "Lithium"),
+                    (5, "Custom"),
+                ),
+                help_text=(
+                    "Picks the default charge profile. Set to "
+                    "Lithium for any LFP / Li-ion bank — open-lead "
+                    "defaults will under-charge it."
+                ),
+            ),
+            WritableSetting(
+                key="boost_voltage",
+                label="Absorption (boost) voltage",
+                kind="float",
+                register=0xE008,
+                read_from="boost_voltage_v",
+                units="V",
+                min=12.0, max=16.0, step=0.1, scale=0.1,
+                help_text=(
+                    "Target voltage during the absorption stage. "
+                    "Typical LFP: 14.2–14.4 V. Lead-acid: 14.4–14.8 V."
+                ),
+            ),
+            WritableSetting(
+                key="float_voltage",
+                label="Float voltage",
+                kind="float",
+                register=0xE009,
+                read_from="float_voltage_v",
+                units="V",
+                min=12.0, max=15.0, step=0.1, scale=0.1,
+                help_text=(
+                    "Voltage the charger holds at after absorption "
+                    "completes. LFP: 13.5 V. Lead-acid: 13.6–13.8 V."
+                ),
+            ),
+            WritableSetting(
+                key="low_voltage_disconnect",
+                label="Low-voltage disconnect",
+                kind="float",
+                register=0xE00B,
+                read_from="low_voltage_disconnect_v",
+                units="V",
+                min=10.0, max=12.8, step=0.1, scale=0.1,
+                help_text=(
+                    "Charger pauses when the bank falls below this. "
+                    "11.0 V is a safe lower bound on lead-acid; LFP "
+                    "BMSes have their own cutoff so this is belt-"
+                    "and-braces only."
+                ),
+            ),
+            WritableSetting(
+                key="low_voltage_reconnect",
+                label="Low-voltage reconnect",
+                kind="float",
+                register=0xE00C,
+                read_from="low_voltage_reconnect_v",
+                units="V",
+                min=10.5, max=13.5, step=0.1, scale=0.1,
+                help_text=(
+                    "Charger resumes once the bank recovers to "
+                    "this voltage. Must be above the disconnect."
+                ),
+            ),
         ]

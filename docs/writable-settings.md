@@ -29,27 +29,33 @@ mature write path via VictronConnect / Cerbo.
 
 ### Renogy Rover / Wanderer MPPT
 
-- **Battery type** — gel / flooded / sealed / lithium / user-defined
-- **Boost / equalize / float voltage** (user-defined type only)
-- **Load output** — on / off (covered separately in [Renogy load output](/docs/devices))
-- **Low-voltage disconnect** + reconnect voltage
+- **Battery type** — flooded / sealed / gel / lithium / custom
+- **Absorption (boost) voltage** — 12.0–16.0 V
+- **Float voltage** — 12.0–15.0 V
+- **Low-voltage disconnect** — 10.0–12.8 V
+- **Low-voltage reconnect** — 10.5–13.5 V
+- **Load output** — on / off (covered separately in [Adding devices](/docs/devices))
 
 ### Renogy DCC50S / DCC30S DC-DC
 
-- **Battery type** + custom voltages
-- **DC-input cut-off** (engine-running detect threshold)
-- **Charge current limit** — A
+The DCC50S shares charger silicon with the Rover family — Renogy
+reuses the same `0xE004 / 0xE008..0xE00C` register block across
+both products, so the writable settings are identical:
 
-### Renogy inverter-chargers
+- **Battery type** — flooded / sealed / gel / lithium / custom
+- **Absorption (boost) voltage** — 12.0–16.0 V
+- **Float voltage** — 12.0–15.0 V
+- **Low-voltage disconnect / reconnect** — same ranges as the Rover
 
-- **AC charger** — enabled / disabled
-- **Eco mode** — on / off
-- **Output voltage / frequency** (where the model exposes them)
+## Pending hardware validation
 
-### Renogy smart shunt
+These drivers ship today as read-only and will pick up writable
+settings once they've been verified against real hardware in the
+lab (no register guessing — too easy to brick a customer's gear):
 
-- **Battery capacity** (Ah)
-- **Full-charge voltage** + zero-current threshold for SoC sync
+- **Renogy inverter-chargers** (1000 W / 2000 W / 3000 W) — AC charger enable, eco mode, output V/Hz
+- **Renogy smart shunt** (RBM-S100 / S300 / S500) — battery capacity, full-charge voltage threshold for SoC sync
+- **Renogy smart lithium batteries** — most parameters are BMS-side only, no documented user-writable surface
 
 ## The confirm modal
 
