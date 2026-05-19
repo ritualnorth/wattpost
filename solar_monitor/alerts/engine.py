@@ -113,6 +113,13 @@ class AlertEngine:
         # ends. Tuple of (event, transport_ids) so we re-dispatch to the
         # same targets the rule would have hit.
         self._pending: list[tuple[AlertEvent, list[str]]] = []
+        # Ring buffer of every event we've fired, in chronological order,
+        # capped to the most recent N. The cloud-heartbeat reads from
+        # here and ships any with ts > last seen so the cloud inbox
+        # (#206) gets every alert without per-heartbeat state on the
+        # appliance side — dedup is done by the cloud via a UNIQUE
+        # constraint on (appliance_id, rule_id, ts).
+        self._event_history: list[AlertEvent] = []
         # Tracks the quiet-hours state across evaluate() calls so we
         # detect the falling edge (was in, now out) and flush. None
         # until the first evaluate() so an existing in-window startup
@@ -146,6 +153,21 @@ class AlertEngine:
             except Exception:
                 log.exception("alert transport %s stop failed", t.id)
         self._transports.clear()
+
+    def recent_events_since(self, ts: int, limit: int = 20) -> list[AlertEvent]:
+        """Events from the ring buffer fired strictly after `ts`.
+        Newest-first up to `limit`. Used by the cloud heartbeat to
+        ship the inbox feed without per-heartbeat state on the
+        appliance side; dedup happens cloud-side via a UNIQUE
+        constraint."""
+        out: list[AlertEvent] = []
+        for ev in reversed(self._event_history):
+            if ev.ts <= ts:
+                break
+            out.append(ev)
+            if len(out) >= limit:
+                break
+        return list(reversed(out))  # chronological in the payload
 
     def reload_rules(self, rules: list[AlertRule]) -> None:
         """Hot-swap the rule list without restarting the daemon. Keeps
@@ -210,6 +232,12 @@ class AlertEngine:
                 op=rule.op, ts=now,
             )
             self._last_event[rule.id] = event
+            self._event_history.append(event)
+            # Cap the buffer. 200 entries at a 60s poll = ~3 hours of
+            # alert activity worst-case (one fire per cycle), plenty
+            # of headroom against the cloud's 5-min heartbeat tick.
+            if len(self._event_history) > 200:
+                del self._event_history[:-200]
             fired.append(event)
             if in_quiet and rule.severity != "alarm":
                 # Buffer; flushes when the quiet-hours window ends.
