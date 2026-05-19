@@ -66,9 +66,15 @@ async def write_setting_register(
                 "through to read-back", e,
             )
     except TransportTimeout:
+        # Ack timeout has two distinct causes:
+        #   1. BT-2 firmware 3.x silently swallows FC06 acks on Rover
+        #      writes (the original reason this fallback exists).
+        #   2. A real RS-485 read-back timeout on a noisy bus.
+        # Both resolve the same way: try the FC03 read-back below.
+        # Used to log "BT-2 quirk" unconditionally which misled
+        # USB-RS485 users in support tickets (#116).
         log.info(
-            "settings_write: FC06 ack timed out — BT-2 quirk; "
-            "verifying via read-back"
+            "settings_write: FC06 ack timed out, falling through to read-back"
         )
     except Exception as e:
         log.warning("settings_write: FC06 send failed: %s", e)

@@ -4,9 +4,11 @@ For users who plug a USB-to-RS-485 adapter into the Pi and wire it to the
 Renogy Hub / charge controller / inverter directly. Same Modbus frames as
 the BLE transport — drivers don't know the difference.
 
-This is wired up but unvalidated until we have hardware in front of it. The
-interface is locked in; the body will get exercised the day we ship a serial
-cable to a tester.
+Read path is exercised in production by every customer running USB-RS485.
+Write path (FC06 via settings_write.write_setting_register) is verified
+against a loopback Modbus slave in scripts/verify_fc06_serial.py (#116);
+re-run that script after any change to this module or settings_write.py
+to confirm the round-trip still works.
 """
 from __future__ import annotations
 
