@@ -830,7 +830,49 @@ def _sniff_serial_protocol(port: str) -> str:
     for line in text.splitlines():
         if line.startswith(("$GP", "$GN", "$GL", "$GA", "$GB", "$BD")):
             return "nmea_gps"
+
+    # Got bytes but no NMEA pattern — could be a Victron VE.Direct
+    # device emitting at 19200 baud (we were reading at 9600 so any
+    # frames came out as garbled symbols). Re-sniff at 19200 looking
+    # for the VE.Direct frame signature (`\r\nPID\t` or `Checksum\t`).
+    if _looks_like_ve_direct(port):
+        return "ve_direct"
     return "unknown"
+
+
+def _looks_like_ve_direct(port: str) -> bool:
+    """Second-pass sniff at 19200 baud for Victron VE.Direct frames.
+    Cheap; ~500 ms read window. Looks for the literal substrings
+    that bracket every text frame so noise can't trigger a false
+    positive."""
+    try:
+        import serial as _serial
+    except ImportError:
+        return False
+    try:
+        ser = _serial.Serial(
+            port=port, baudrate=19200,
+            bytesize=8, parity="N", stopbits=1, timeout=0.5,
+        )
+    except Exception:
+        return False
+    try:
+        import time as _time
+        deadline = _time.monotonic() + 1.2
+        buf = bytearray()
+        while _time.monotonic() < deadline and len(buf) < 1024:
+            chunk = ser.read(256)
+            if not chunk:
+                continue
+            buf.extend(chunk)
+            if b"PID\t" in buf or b"Checksum\t" in buf:
+                return True
+    finally:
+        try:
+            ser.close()
+        except Exception:
+            pass
+    return False
 
 
 def _own_route_ip() -> str | None:
@@ -1103,6 +1145,44 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         }
         default_label = f"Victron {mac[-5:]}"
 
+    elif data.type == "ve_direct":
+        # Victron VE.Direct text protocol over a USB-TTL cable. The
+        # Victron-branded "VE.Direct to USB" cable shows up as a
+        # /dev/ttyUSB* (FTDI or SiLabs chip inside); the same path
+        # works for a DIY FTDI/CP2102 + JST pigtail rig. One cable
+        # per Victron device; no slave concept here, so the device
+        # row uses slave_id=0 as a placeholder.
+        port = (data.port or "").strip()
+        if not port or not port.startswith("/dev/"):
+            raise HTTPException(
+                status_code=400,
+                detail="port must be a serial-device path like /dev/ttyUSB0",
+            )
+        baud = int(data.baudrate or 19200)
+        if baud != 19200:
+            # VE.Direct devices are fixed at 19200 baud. Reject silently
+            # rather than letting a fat-fingered config produce confusing
+            # silence on the dashboard.
+            raise HTTPException(
+                status_code=400,
+                detail="VE.Direct devices are fixed at 19200 baud",
+            )
+        for t in current_transports:
+            if (t.get("port") or "") == port and t.get("type") == "ve_direct":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"port {port} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        leaf = port.rsplit("/", 1)[-1] or "serial"
+        new_id = f"vedirect_{leaf}"
+        block = {
+            "type":     "ve_direct",
+            "port":     port,
+            "baudrate": baud,
+        }
+        default_label = f"Victron VE.Direct {leaf}"
+
     elif data.type == "serial_modbus":
         port = (data.port or "").strip()
         # Tolerant validation: accept any /dev/* path; pyserial will
@@ -1144,8 +1224,8 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         raise HTTPException(
             status_code=400,
             detail=f"unsupported transport type {data.type!r} — wizard "
-                   f"currently supports 'ble_modbus', 'serial_modbus', "
-                   f"and 'ble_victron_advertise'",
+                   f"supports 'ble_modbus', 'serial_modbus', "
+                   f"'ble_victron_advertise' and 've_direct'",
         )
 
     # Bump id if collision (rare — different MAC, same tail).

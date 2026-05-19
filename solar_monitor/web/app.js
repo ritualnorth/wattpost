@@ -7325,7 +7325,9 @@ async function wizLoadTransports() {
       // Serial transports carry `port` (/dev/ttyUSB0); BLE carry
       // `address` (MAC). Either reads as the transport's identity.
       const addr = t.address || t.port || '';
-      const kind = t.type === 'serial_modbus' ? 'USB-RS485' : 'Bluetooth';
+      const kind = t.type === 'serial_modbus' ? 'USB-RS485'
+                 : t.type === 've_direct'     ? 'Victron VE.Direct'
+                 : 'Bluetooth';
       return `
       <div class="wiz-transport-row">
         <button class="wiz-transport ${t.id === wizState.transport ? 'active' : ''}" data-id="${escHtml(t.id)}">
@@ -8142,6 +8144,7 @@ async function wizFindUsb() {
     // Brief read-back classification from the backend:
     //   modbus_rtu — silent serial, hint Modbus (the dominant case).
     //   nmea_gps   — emitted GPS sentences during the sniff window.
+    //   ve_direct  — Victron VE.Direct text frames at 19200 baud.
     //   unknown    — port opens but bytes don't match anything we know.
     //   busy       — port held by another process (probably us).
     const proto = a.protocol || "unknown";
@@ -8149,7 +8152,18 @@ async function wizFindUsb() {
     let action = `<button class="btn-action btn-action--primary"
                 data-use-port="${escHtml(a.port)}"
                 data-use-label="${escHtml(a.product || a.port)}">Use as Modbus</button>`;
-    if (proto === "nmea_gps") {
+    if (proto === "ve_direct") {
+      badge = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Victron VE.Direct</span>`;
+      // Wire the VE.Direct path directly — only sensible action for
+      // a port emitting Victron frames is to add it as a ve_direct
+      // transport. The device-kind selection (shunt vs MPPT vs Phoenix
+      // inverter) happens in the next wizard step.
+      action = `<button class="btn-action btn-action--primary"
+                  data-use-vedirect-port="${escHtml(a.port)}"
+                  data-use-vedirect-label="${escHtml(a.product || a.port)}">
+                  Add Victron (VE.Direct)
+                </button>`;
+    } else if (proto === "nmea_gps") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--gps">NMEA GPS</span>`;
       // GPS receiver path lands with #125. Until then we surface the
       // detection but block the wrong action — adding a GPS as a
@@ -8180,6 +8194,53 @@ async function wizFindUsb() {
   list.querySelectorAll("[data-use-port]").forEach(b => {
     b.addEventListener("click", () => wizAddTransportFromPort(b.dataset.usePort, b.dataset.useLabel));
   });
+  list.querySelectorAll("[data-use-vedirect-port]").forEach(b => {
+    b.addEventListener("click", () => wizAddVeDirectFromPort(
+      b.dataset.useVedirectPort, b.dataset.useVedirectLabel,
+    ));
+  });
+}
+
+// VE.Direct add-transport flow (#199). The USB-scan sniff already
+// confirmed this port is emitting VE.Direct text frames; we just
+// hand the port to the same /api/setup/transports/add endpoint
+// with type=ve_direct. The user picks the device kind (shunt /
+// charge_controller / inverter) in the existing Add-device step
+// that runs after every successful Add-transport.
+async function wizAddVeDirectFromPort(port, label) {
+  const stat = document.getElementById("wiz-find-status");
+  stat.textContent = `Adding ${port} as VE.Direct…`;
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type:     "ve_direct",
+        port:     port,
+        label:    label || null,
+        baudrate: 19200,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    stat.textContent = "";
+    alert("Couldn't add VE.Direct transport: " + (e.message || String(e)));
+    return;
+  }
+  if (res.reloaded) {
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now.`;
+  } else if (res.reload_error) {
+    stat.textContent = `Added ${res.label}, but hot-reload failed: ${res.reload_error}. Restart the daemon to apply.`;
+  } else {
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Restart the daemon to start polling.`;
+  }
+  await new Promise(r => setTimeout(r, 1500));
+  await wizLoadTransports();
 }
 
 async function wizAddTransportFromPort(port, label) {
