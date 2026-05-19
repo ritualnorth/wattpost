@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.28] · 2026-05-19
+
+### Added · #208 Admin oversight (release / billing / support actions)
+
+Third of the SaaS polish trio (after the alerts inbox #206 and
+the energy analytics page #207). The admin portal gets:
+
+- **Overview tab** — release adoption (% of fleet on each daemon
+  version, sourced from `appliance.appliance_version` which
+  heartbeat ingest already keeps fresh) plus a billing block
+  (tier breakdown, subscription-state breakdown, estimated MRR
+  from the local DB, recent cancels in last 30 days).
+- **Reset 2FA** button per user. Clears `totp_secret` +
+  `totp_enabled_at` so the user can re-enrol on next login.
+  Doesn't drop `require_2fa` — losing your phone isn't a get-
+  out-of-policy card. Audit-logged.
+- **Comp month** button per appliance. Pushes
+  `subscription_current_period_end` out by 30 days without
+  touching Stripe; the local-DB override for goodwill gestures
+  during support. Audit-logged.
+
+Four new endpoints under `/api/staff`:
+`release_adoption`, `billing`,
+`users/{id}/reset_2fa`, `appliances/{id}/comp_month`.
+
 ## [0.1.27] · 2026-05-19
 
 ### Added · #207 Cloud energy analytics + savings page
