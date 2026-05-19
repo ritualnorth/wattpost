@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=111" />
+  <link rel="stylesheet" href="/web/styles.css?v=112" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -870,6 +870,37 @@
             </div>
             <pre id="diag-log" class="diag-log">Loading…</pre>
           </div>
+          <div class="settings-block settings-block--danger" id="settings-reset-block">
+            <h3>Reset to defaults</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Wipes all configured transports, devices, exporters, alerts
+              and smart-scene rules so this appliance behaves like a
+              freshly installed one. Your SQLite history, web password
+              and (by default) cloud pairing are kept. A timestamped
+              <code>config.yaml.bak</code> is written first so you can
+              restore from disk if you change your mind.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+              <label class="alerts-checkbox">
+                <input type="checkbox" id="reset-keep-cloud" checked />
+                Stay paired with the cloud
+              </label>
+            </div>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;align-items:center">
+              <label for="reset-confirm-input" class="settings-foot" style="margin:0">
+                Type <strong>RESET</strong> to enable the button:
+              </label>
+              <input id="reset-confirm-input" type="text" autocomplete="off"
+                     spellcheck="false" placeholder="RESET"
+                     style="max-width:8rem" />
+              <button id="reset-go" type="button" class="alerts-add-btn"
+                      disabled
+                      title="Wipes configuration and returns to first-boot state.">
+                Wipe configuration
+              </button>
+              <span class="settings-foot" id="reset-msg"></span>
+            </div>
+          </div>
         </div>
       </section>
     </section>
@@ -928,6 +959,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=171"></script>
+  <script src="/web/app.js?v=172"></script>
 </body>
 </html>

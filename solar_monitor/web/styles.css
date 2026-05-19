@@ -3203,6 +3203,27 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 
 /* ---------------- diagnostics (Settings → Diagnostics) ---------------- */
 .settings-block--diagnostics { grid-column: 1 / -1; }
+.settings-block--danger {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(220, 38, 38, .45);
+  background: rgba(220, 38, 38, .04);
+  border-radius: 12px;
+  padding: .85rem 1rem;
+}
+.settings-block--danger h3 {
+  color: #b91c1c;
+  margin-top: 0;
+}
+.settings-block--danger #reset-go:not([disabled]) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.settings-block--danger #reset-confirm-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
 .diag-controls {
   display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
   margin-bottom: .45rem;

@@ -78,6 +78,7 @@ from .system import (
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
     get_history_settings, patch_history_settings,
+    reset_to_defaults,
 )
 from .backup import (
     export_backup, import_backup,
@@ -1444,6 +1445,7 @@ def build_app(
             kiosk_status,
             get_history_settings,
             patch_history_settings,
+            reset_to_defaults,
             rotate_kiosk_token,
             update_state,
             update_check_now,
