@@ -134,6 +134,14 @@ class CloudService:
             self._maybe_persist_sso_secret(body.get("sso_secret"))
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
+        # Promote the pending alerts-uploaded cursor now that the
+        # heartbeat write succeeded. On failure we leave it alone so
+        # the next heartbeat re-ships the same events (cloud dedupes
+        # via UNIQUE constraint).
+        pending = getattr(self, "_alerts_pending_ts", None)
+        if pending is not None:
+            self._alerts_uploaded_ts = pending
+            self._alerts_pending_ts = None
         return True
 
     def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
@@ -498,6 +506,35 @@ class CloudService:
             extras["alert_count"] = alert_count
         except Exception:
             pass
+        # Cloud alerts inbox (#206): ship recent events from the engine's
+        # ring buffer so the cloud can render a per-account feed across
+        # every site. Cap to last 20 since the previous successful
+        # heartbeat; dedup is cloud-side via UNIQUE(appliance_id,
+        # rule_id, ts) so retransmits on a flaky link are a no-op.
+        try:
+            engine = getattr(self.scheduler, "_alerts", None)
+            since_ts = int(getattr(self, "_alerts_uploaded_ts", 0))
+            if engine is not None and hasattr(engine, "recent_events_since"):
+                events = engine.recent_events_since(since_ts, limit=20)
+                if events:
+                    extras["recent_alerts"] = [
+                        {
+                            "rule_id":   e.rule_id,
+                            "name":      e.name,
+                            "severity":  e.severity,
+                            "metric":    e.metric,
+                            "value":     e.value,
+                            "threshold": e.threshold,
+                            "op":        e.op,
+                            "ts":        e.ts,
+                        }
+                        for e in events
+                    ]
+                    # Will be promoted to _alerts_uploaded_ts on
+                    # successful POST response (see below).
+                    self._alerts_pending_ts = max(e.ts for e in events)
+        except Exception:
+            log.exception("cloud heartbeat: recent_alerts collection failed")
         # Today's energy aggregates — surface on the cloud card so the
         # user can see "RV: 1.4 kWh in, 0.6 kWh out today" without
         # opening the local site. One DB read per heartbeat (~5 min)

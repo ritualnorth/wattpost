@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.26] · 2026-05-19
+
+### Added · #206 Cloud alerts inbox (cross-site feed)
+
+New `/app/alerts` page in the cloud SaaS — chronological feed of
+every alert fired by any appliance the signed-in user owns.
+Filter by site, severity, read/unread. Mark-as-read individually
+or in bulk. Topbar gets an "Alerts" link with an unread-count
+badge.
+
+How it's wired:
+
+- **Appliance side.** `AlertEngine` now keeps a 200-entry ring
+  buffer of fired events. The cloud-heartbeat reads from it via
+  `recent_events_since(ts)` and ships up to 20 events per
+  heartbeat in `extras.recent_alerts`. No per-heartbeat state on
+  the appliance.
+- **Cloud side.** New `cloud_alerts` table (migration 0032) with
+  a UNIQUE constraint on `(appliance_id, rule_id, fired_at_ts)`
+  so retransmits on a flaky link are no-ops. The heartbeat
+  handler INSERTs ON CONFLICT DO NOTHING. New `CloudAlert`
+  SQLAlchemy model.
+- **API.** `GET /api/alerts` (cursor pagination + filter by
+  site / severity / unread), `POST /api/alerts/{id}/ack`,
+  `POST /api/alerts/ack_all`. Owner-scoped via a join on
+  `appliances.owner_user_id` so no cross-account leakage.
+- **UI.** `alerts.html.jinja` page with filters, infinite-scroll
+  "Load more", per-row + bulk ack. Topbar badge reads
+  `unread_count` from the API.
+
+Highest installer-tier impact: managing N sites no longer means
+clicking through N local dashboards to see "what alarmed last
+night".
+
 ## [0.1.25] · 2026-05-19
 
 ### Added · #201–#205 Tier 1 + Tier 2 driver batch
