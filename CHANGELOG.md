@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.23] · 2026-05-19
+
+### Added · #197 VE.Direct wired transport for Victron read
+
+A second read path for Victron alongside BLE Instant Readout, for
+metal-van installs and dense-RF environments where BLE isn't
+reliable. Three device-kind drivers:
+
+- **VictronVeDirectShunt** — SmartShunt + BMV-700 / 702 / 712
+- **VictronVeDirectMppt** — SmartSolar MPPT (every model with a
+  VE.Direct port)
+- **VictronVeDirectPhoenix** — Phoenix Inverter VE.Direct (the
+  small pure-sine line; MultiPlus / Quattro need VE.Bus + MK3
+  and stay out of scope)
+
+Same dashboard fields as the BLE drivers, so the flow strip and
+bank aggregation render identically regardless of transport.
+Registered under a sibling vendor id `victron_vedirect` so the
+config-yaml entry distinguishes BLE from wired explicitly.
+
+Cable: Victron's "VE.Direct to USB interface" (~£25), or a DIY
+JST + FTDI rig for ~£12. See `docs/wired-setup.md` for the
+pinout and config-yaml example.
+
+Read-only by design. VE.Direct doesn't expose writes for normal
+settings (VictronConnect / VRM / Cerbo only), and our Victron
+scope memo keeps writes off the table regardless.
+
+End-to-end smoke test in `scripts/verify_ve_direct.py`. Uses
+pty.openpty + a thread emitting canned text frames to exercise
+the transport + each driver round-trip without hardware. Wires
+into CI later.
+
 ## [0.1.22] · 2026-05-19
 
 ### Added · #163 followup, smart-plug output adapter

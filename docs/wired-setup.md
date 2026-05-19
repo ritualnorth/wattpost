@@ -148,6 +148,64 @@ In the wizard's BLE scan, Victron devices show with their model
 name and a "Victron Instant Readout" hint. Pick **Use this**, paste
 the encryption key, save. No daemon restart needed.
 
+## Victron over cable (VE.Direct)
+
+Most installs read Victron via BLE Instant Readout (broadcast,
+no pairing). For metal-van builds, dense RF environments, or
+when you'd rather not deal with per-device encryption keys,
+Victron's wired protocol works too.
+
+**Cable:** Victron's "VE.Direct to USB interface" cable. ~£25-30.
+JST PH 2.0mm plug → USB-A with the USB-serial chip built in.
+Plug into the device's VE.Direct port (small 4-pin socket on
+SmartShunt, SmartSolar MPPT, Phoenix Inverter VE.Direct), plug
+into the Pi.
+
+**DIY alternative:** ~£12. A 4-pin JST PH 2.0mm pigtail (~£3 on
+Amazon) wired to an FTDI or CP2102 USB-TTL adapter. Wires are:
+
+```
+Victron VE.Direct (looking into the device socket, key down):
+  pin 1  GND  ── GND on adapter
+  pin 2  RX   ── adapter TX
+  pin 3  TX   ── adapter RX
+  pin 4  +5V  ── leave disconnected (do NOT power the Pi from this)
+```
+
+**Config:**
+
+```yaml
+transports:
+  - id: vedirect_shunt
+    type: ve_direct
+    port: /dev/ttyUSB0
+
+devices:
+  - id: smartshunt
+    transport: vedirect_shunt
+    vendor: victron_vedirect
+    kind: shunt
+    slave_id: 0       # VE.Direct has no slave concept; 0 is fine
+    label: "Smart shunt"
+```
+
+One transport per cable; each cable carries exactly one device.
+Run the setup wizard's USB scan to find the right `/dev/ttyUSB*`
+path. The dashboard tile and the bank-aggregation logic render
+the same as the BLE driver — same fields, same units.
+
+Read-only. VE.Direct doesn't expose writes for normal settings
+(VictronConnect / VRM / Cerbo only), and our scope keeps Victron
+read-only regardless.
+
+Covered device kinds:
+
+- `shunt` — SmartShunt, BMV-700 / 702 / 712
+- `charge_controller` — SmartSolar MPPT (every model with a
+  VE.Direct port)
+- `inverter` — Phoenix Inverter VE.Direct (small pure-sine line;
+  MultiPlus / Quattro need VE.Bus, which is out of scope)
+
 ## Mixing transports
 
 You can run any combination of the above on one Pi. A typical
