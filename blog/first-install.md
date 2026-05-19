@@ -35,7 +35,7 @@ You need the following physical items:
 About 15 minutes of attention. Roughly 5 of those are watching
 progress bars.
 
-## Step 1 — Download the SD card image
+## Step 1: Download the SD card image
 
 Open [wattpost.cloud/download](https://wattpost.cloud/download)
 on your laptop. The page detects the latest release and shows
@@ -56,7 +56,7 @@ shasum -a 256 wattpost-*.img.xz
 Compare to the published value. They should match exactly. If
 they do not, redownload before flashing.
 
-## Step 2 — Flash the SD card with Raspberry Pi Imager
+## Step 2: Flash the SD card with Raspberry Pi Imager
 
 Install **Raspberry Pi Imager** from
 [raspberrypi.com/software](https://www.raspberrypi.com/software/)
@@ -79,7 +79,7 @@ Open Raspberry Pi Imager.
 There is no Wi-Fi setup or password screen to fill in. The
 WattPost image handles all of that on first boot.
 
-## Step 3 — First boot
+## Step 3: First boot
 
 Pop the SD card into the Pi. Plug in your Bluetooth dongle (if
 you are using one) or your USB-RS485 cable (if you went wired).
@@ -97,7 +97,7 @@ the first-boot password. If you are running headless, do not
 worry; both of those are also available over SSH and from the
 dashboard's first-time sign-in screen.
 
-## Step 4 — Find the appliance on your LAN
+## Step 4: Find the appliance on your LAN
 
 Open your laptop's browser and go to:
 
@@ -115,7 +115,7 @@ use that IP directly: `http://192.168.x.x:8000`. The local
 network is the only place that URL responds; nothing on it is
 exposed to the internet.
 
-## Step 5 — Sign in with the first-boot password
+## Step 5: Sign in with the first-boot password
 
 The first time you visit the dashboard, the appliance asks for a
 password. It is a random `wattpost-<5 hex>` string generated on
@@ -132,7 +132,7 @@ You can rotate the password any time by SSHing in, running
 `wattpost-config`, and picking the **Set / reset web password**
 option from the menu.
 
-## Step 6 — Pair your first device
+## Step 6: Pair your first device
 
 The dashboard greets a fresh install with a setup wizard. The
 goal of this step is to get one piece of hardware reporting
@@ -167,7 +167,7 @@ If the scan finds nothing, the wizard tells you why specifically
 blocked by another process). Each error has a link to the right
 troubleshooting page in the docs.
 
-## Step 7 — Watch the first reading land
+## Step 7: Watch the first reading land
 
 WattPost polls each paired device on its own cadence (Renogy
 every 10 seconds over BT-2; Victron whenever an advertisement
@@ -187,7 +187,7 @@ SoC keeps trending the way it is, and any alerts you have set.
 This is the dashboard. Bookmark it. The URL is stable; nothing
 about it depends on the cloud.
 
-## Step 8 — Add the dashboard to your phone
+## Step 8: Add the dashboard to your phone
 
 The dashboard is a Progressive Web App. On a phone you can pin
 it to the home screen and it opens as a full-screen app with
@@ -206,7 +206,7 @@ menu, tap **Add to Home Screen**. Same outcome.
 The mobile layout is the same dashboard, rearranged for a tall
 narrow screen. The same data, the same controls.
 
-## Step 9 — Pair to wattpost.cloud (optional)
+## Step 9: Pair to wattpost.cloud (optional)
 
 Everything you have done so far works without any internet
 account. The local appliance polls, stores history, drives

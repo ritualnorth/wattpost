@@ -10,10 +10,10 @@
       "hero": null
     },
     {
-      "slug": "bt2-silent-on-lan",
-      "title": "How a laptop on the same network made our Renogy BT-2 dongle invisible",
-      "summary": "We lost a day to a BT-2 that refused to advertise. The fix was three words on a different host. Here's the debugging story and the wizard hint we shipped so the next person catches it in minutes.",
-      "published_at": "2026-05-19",
+      "slug": "home-assistant",
+      "title": "How to add WattPost to Home Assistant in five minutes",
+      "summary": "WattPost ships MQTT auto-discovery out of the box. Point Home Assistant at your appliance, flip one toggle, and every battery, charger, and shunt shows up as a discovered device. No YAML, no helper scripts.",
+      "published_at": "2026-05-12",
       "author": "Ritual North",
       "hero": null
     },
@@ -21,7 +21,7 @@
       "slug": "first-install",
       "title": "How to set up WattPost on a Raspberry Pi from scratch",
       "summary": "Blank SD card to a live solar dashboard in one sitting. Download, flash, boot, pair your first Renogy or Victron device, and (optionally) link to the cloud for remote access.",
-      "published_at": "2026-05-19",
+      "published_at": "2026-05-05",
       "author": "Ritual North",
       "hero": "/static/img/blog/first-install/hero.png"
     },
@@ -29,7 +29,15 @@
       "slug": "welcome",
       "title": "Welcome to the WattPost blog",
       "summary": "Building a local-first off-grid solar monitor in public. Tutorials, release notes, customer stories, and the occasional debugging war story.",
-      "published_at": "2026-05-19",
+      "published_at": "2026-04-28",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "bt2-silent-on-lan",
+      "title": "How a laptop on the same network made our Renogy BT-2 dongle invisible",
+      "summary": "We lost a day to a BT-2 that refused to advertise. The fix was three words on a different host. Here's the debugging story and the wizard hint we shipped so the next person catches it in minutes.",
+      "published_at": "2026-04-21",
       "author": "Ritual North",
       "hero": null
     }
