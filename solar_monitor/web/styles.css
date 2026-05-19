@@ -2571,6 +2571,25 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .wiz-ble-warn-text { color: #d29922; }
 .wiz-ble-status code { background: transparent; padding: 0; font-size: .85em; }
 
+/* BLE diagnostic widget (#158). Sits below the status pill, expands
+ * into a counts + verdict box when the user clicks Run diagnostics.
+ * Colour tracks the verdict similar to the status pill. */
+.wiz-ble-diag-row { margin: -.4rem 0 .85rem .25rem; display: flex; align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
+.wiz-ble-diag-row .btn-sm { font-size: .78rem; padding: .2rem .6rem; }
+.wiz-ble-diag-out {
+  flex: 1 1 240px; min-width: 240px;
+  font-size: .85rem; line-height: 1.35;
+  padding: .55rem .75rem; border: 1px solid var(--surface-3);
+  border-radius: 8px; background: var(--surface-1);
+}
+.wiz-ble-diag-counts { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.wiz-ble-diag-suggest { margin-top: .4rem; opacity: .85; }
+.wiz-ble-diag-err { color: #f85149; }
+.wiz-ble-diag-running { color: var(--text-muted); }
+.wiz-ble-diag-ok   { border-color: rgba(63, 185, 80, 0.4);  background: rgba(63, 185, 80, 0.06); }
+.wiz-ble-diag-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
+.wiz-ble-diag-bad  { border-color: rgba(248, 81, 73, 0.4);  background: rgba(248, 81, 73, 0.06); }
+
 /* "Find my dongle" result rows. Each is a flex card with the device
  * name + MAC on the left and a "Use this" button on the right. */
 .wiz-result-row {

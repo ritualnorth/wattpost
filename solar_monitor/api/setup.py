@@ -267,6 +267,150 @@ async def ble_status() -> dict[str, Any]:
     }
 
 
+@get("/api/setup/ble_diagnose")
+async def ble_diagnose() -> dict[str, Any]:
+    """Side-by-side bleak vs bluetoothctl scan to catch the
+    Realtek+BlueZ 5.72 silent-failure case (#158).
+
+    The failure mode: `bluetoothctl --timeout N scan on` exits 0
+    with no errors but emits zero `[NEW] Device` lines, even when
+    a phone running the same kind of scan a metre away picks up
+    plenty. Bleak talks DBus directly and tends to keep working
+    when bluetoothctl is in this state.
+
+    Returns counts from both scanners + a verdict the wizard can
+    render directly. The endpoint is intentionally synchronous from
+    the user's POV — they pressed "Run diagnostics" and expect a
+    result, not a stream. Total time budget ~8 seconds: 3s bleak,
+    3s bluetoothctl, plus a bit of subprocess startup.
+    """
+    import asyncio as _asyncio
+    bleak_count: int | None = None
+    bleak_err: str | None = None
+    bctl_count: int | None = None
+    bctl_err: str | None = None
+
+    # 1. Bleak scan — same coexistence guards as the regular wizard
+    #    scan so a running Victron passive scanner doesn't make us
+    #    look broken when actually the radio is shared.
+    try:
+        from bleak import BleakScanner
+        from ..transport.ble_modbus import HCI_DISCOVER_LOCK
+        async with HCI_DISCOVER_LOCK:
+            victron_was_running = False
+            try:
+                from ..transport.ble_victron_advertise import _scanner as _vs
+                victron_was_running = await _vs().pause()
+            except Exception:
+                pass
+            try:
+                devs = await BleakScanner.discover(timeout=3)
+                bleak_count = len(devs or [])
+            finally:
+                if victron_was_running:
+                    try:
+                        from ..transport.ble_victron_advertise import _scanner as _vs
+                        await _vs().resume()
+                    except Exception:
+                        pass
+    except ImportError:
+        bleak_err = "bleak not installed"
+    except Exception as e:
+        bleak_err = str(e)
+
+    # 2. bluetoothctl scan. The `--timeout N scan on` form is the
+    #    only way to do a non-interactive bounded scan. Anything
+    #    older needs `echo scan on; sleep N; echo scan off` piped
+    #    in, which is dodgier. Count `[NEW] Device …` lines in
+    #    stdout. Filter out the controller's own MAC.
+    bctl = shutil.which("bluetoothctl")
+    if bctl is None:
+        bctl_err = "bluetoothctl not installed"
+    else:
+        try:
+            proc = await _asyncio.create_subprocess_exec(
+                bctl, "--timeout", "3", "scan", "on",
+                stdout=_asyncio.subprocess.PIPE,
+                stderr=_asyncio.subprocess.PIPE,
+            )
+            out, err = await _asyncio.wait_for(
+                proc.communicate(), timeout=8,
+            )
+            text = out.decode("utf-8", errors="replace")
+            macs: set[str] = set()
+            for line in text.splitlines():
+                m = re.search(
+                    r"\[NEW\] Device ([0-9A-Fa-f:]{17})", line,
+                )
+                if m:
+                    macs.add(m.group(1).upper())
+            bctl_count = len(macs)
+        except _asyncio.TimeoutError:
+            bctl_err = "bluetoothctl scan timed out"
+        except Exception as e:
+            bctl_err = str(e)
+
+    # 3. Verdict. The interesting cases are the divergent ones.
+    verdict = "ok"
+    suggestion = None
+    if bleak_count is None and bctl_count is None:
+        verdict = "no_scanner_available"
+        suggestion = (
+            "Neither bleak nor bluetoothctl could run. Check the "
+            "BLE adapter is connected and not held by another "
+            "process. Reboot the Pi if the adapter status pill "
+            "shows no controllers."
+        )
+    elif bleak_count is None:
+        verdict = "bleak_failed"
+        suggestion = (
+            f"Bleak scan failed ({bleak_err}). The daemon uses bleak "
+            f"for every poll, so this is the failure path to fix. "
+            f"Check `dmesg | tail` for HCI errors."
+        )
+    elif bctl_count is None:
+        verdict = "bluetoothctl_failed"
+        suggestion = (
+            "bluetoothctl could not run. This usually means bluez "
+            "is not installed in the container. Bleak still works "
+            "for normal polling, so this is informational."
+        )
+    elif bleak_count > 0 and bctl_count == 0:
+        verdict = "scan_silent_failure"
+        suggestion = (
+            "Bleak finds devices but bluetoothctl returns zero. "
+            "This is a known bug on Realtek BLE chips with BlueZ "
+            "5.72 (the bluetoothctl D-Bus session loses scan "
+            "events). It does NOT affect WattPost polling, which "
+            "uses bleak directly. If you also see issues from the "
+            "main wizard scan, the dongle is probably held by "
+            "another host on the LAN."
+        )
+    elif bleak_count == 0 and bctl_count > 0:
+        verdict = "bleak_silent_failure"
+        suggestion = (
+            "bluetoothctl finds devices but bleak returns zero. "
+            "Most likely a stale BleakScanner instance is holding "
+            "the discovery slot. Restart the daemon: "
+            "`docker compose restart wattpost` or `sudo systemctl "
+            "restart wattpost`."
+        )
+    elif bleak_count == 0 and bctl_count == 0:
+        verdict = "no_devices_seen"
+        suggestion = (
+            "Neither scanner found anything. Either no BLE devices "
+            "are advertising in range, OR another host on your LAN "
+            "is holding all the dongles. The setup wizard's main "
+            "scan checks for that case automatically."
+        )
+    return {
+        "bleak":         {"count": bleak_count, "error": bleak_err},
+        "bluetoothctl":  {"count": bctl_count,  "error": bctl_err},
+        "verdict":       verdict,
+        "suggestion":    suggestion,
+    }
+
+
 class BleScanRequest(msgspec.Struct):
     seconds: int = 8
 

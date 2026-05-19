@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=109" />
+  <link rel="stylesheet" href="/web/styles.css?v=110" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -512,6 +512,15 @@
             <span class="wiz-ble-dot"></span>
             <span class="wiz-ble-label">Checking Bluetooth…</span>
           </div>
+          <!-- Deeper diagnostics on demand. Runs bleak and bluetoothctl
+               side by side and reports the divergence; catches the
+               Realtek+BlueZ 5.72 silent-scan case where bluetoothctl
+               returns 0 devices while bleak finds plenty (#158). -->
+          <div class="wiz-ble-diag-row">
+            <button id="wiz-ble-diagnose-btn" type="button"
+                    class="btn btn-ghost btn-sm">Run BLE diagnostics</button>
+            <div id="wiz-ble-diag-out" class="wiz-ble-diag-out" hidden></div>
+          </div>
 
           <!-- Step 1 — Bluetooth connection (internally "transport"
                — kept that word in IDs/CSS/APIs but the UX shows
@@ -879,6 +888,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=169"></script>
+  <script src="/web/app.js?v=170"></script>
 </body>
 </html>
