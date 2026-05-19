@@ -239,6 +239,11 @@ let chart = null;
 let currentRange = "24h";
 let lastRun = null;
 let todayAggregate = null;  // /api/today result, refreshed alongside devices
+// Per-frame cache for derived views the hero + flow + alerts all share
+// (#162). applySnapshot() resets these every tick; consumer functions
+// reuse the cached value within the same frame so all tiles agree on
+// staleness boundaries and bank.netW.
+const _frame = { nowSec: 0, bank: null, flowModel: null };
 
 // ---------- demo-mode banner (one-shot, runs at boot) ----------
 // /api/system/info exposes `demo: true|false` from the WATTPOST_DEMO=1
@@ -416,10 +421,23 @@ async function api(path) {
 // Shared apply path: REST fallback and the SSE stream both flow through
 // here. The frame shape (devices / poll_run / today) is the same in both
 // directions so this stays a one-liner per renderer.
+//
+// Snapshot lock (#162): every renderer derived from `devices` — hero,
+// flow tile, alerts — used to call aggregateBank() independently, each
+// recomputing its own staleness floor against a freshly-read Date.now().
+// On the 90 s boundary that meant the hero could include a battery the
+// flow tile had just classed as silent, leaving the two tiles in visible
+// disagreement. We now stamp the frame's "now" once and memoise the
+// bank + flow model so every consumer sees the same view of the world.
 function applySnapshot(frame) {
   devices = frame.devices || [];
   lastRun = frame.poll_run?.last_run || null;
   todayAggregate = frame.today || null;
+  // Frame-scoped cache. Reset on every apply so a stale value from the
+  // previous tick can't leak into the next render.
+  _frame.nowSec = Date.now() / 1000;
+  _frame.bank = null;
+  _frame.flowModel = null;
   renderStatus(frame.poll_run || {});
   renderHero();
   renderFlow();
@@ -455,18 +473,37 @@ function applySnapshot(frame) {
 }
 
 async function refresh() {
+  // One-fetch path (#162): /api/snapshot returns devices + poll_run +
+  // today from a single store read so the polling-fallback frame is as
+  // atomic as the SSE one. The old three-fetch path could let the
+  // server complete a new poll between calls, leaving e.g. devices
+  // from cycle N+1 paired with today from cycle N.
   try {
-    const [devs, run, today] = await Promise.all([
-      api("/api/devices"),
-      api("/api/poll_run"),
-      api("/api/today").catch(() => null),
-    ]);
+    const frame = await api("/api/snapshot");
     applySnapshot({
-      devices: devs.devices || [],
-      poll_run: run,
-      today: today,
+      devices: frame.devices || [],
+      poll_run: frame.poll_run || {},
+      today: frame.today || null,
     });
   } catch (e) {
+    // Older builds (Docker users who haven't pulled :latest yet) won't
+    // have /api/snapshot. Fall back to the three-fetch form so a stale
+    // server doesn't break the dashboard outright.
+    if (`${e.message || e}`.includes("404")) {
+      try {
+        const [devs, run, today] = await Promise.all([
+          api("/api/devices"),
+          api("/api/poll_run"),
+          api("/api/today").catch(() => null),
+        ]);
+        applySnapshot({
+          devices: devs.devices || [],
+          poll_run: run,
+          today: today,
+        });
+        return;
+      } catch (inner) { e = inner; }
+    }
     setStatus("err", "API error: " + e.message);
   }
 }
@@ -608,6 +645,11 @@ function renderStatus(run) {
 // object so the hero tile can render a quiet "shunt 65%, BMS 72%,
 // showing shunt — tap to investigate" hint.
 function aggregateBank() {
+  // Return the cached frame value if applySnapshot already computed one
+  // (#162). Without this, hero + flow + alerts each re-derive their own
+  // view of "fresh" against drifting Date.now() reads, leading to visible
+  // disagreement on the 90 s staleness boundary.
+  if (_frame.bank !== null) return _frame.bank;
   // Skip devices whose latest poll is stale (>90 s). Without this,
   // an offline Renogy BT-2 keeps feeding the bank aggregate from a
   // snapshot 50+ minutes old — the SoC donut and Net-power tile then
@@ -615,14 +657,17 @@ function aggregateBank() {
   // from that BMS for an hour." Mirrors the buildFlowModel staleness
   // check; same 90 s threshold (~1.5 poll cycles of grace).
   const STALE_POLL_SECONDS = 90;
-  const nowSec = Date.now() / 1000;
+  // Use the frame-stamped "now" so every consumer in a frame agrees on
+  // the staleness floor. Falls back to wall-clock for callers outside
+  // an applySnapshot (e.g. ad-hoc renders mid-test).
+  const nowSec = _frame.nowSec || (Date.now() / 1000);
   const isFresh = (d) => {
     const t = +(d.latest && d.latest._updated_at) || +(d.last_seen) || 0;
     return t > 0 && (nowSec - t) <= STALE_POLL_SECONDS;
   };
   const shunt = devices.find(d => d.kind === "shunt" && isFresh(d));
   const batts = devices.filter(d => d.kind === "smart_battery" && isFresh(d));
-  if (!shunt && batts.length === 0) return null;
+  if (!shunt && batts.length === 0) { _frame.bank = null; return null; }
 
   // ---------- Cell layer (always BMS-sourced) ----------
   let cellMin = null, cellMax = null, worstDrift = 0;
@@ -697,7 +742,7 @@ function aggregateBank() {
     }
   }
 
-  return {
+  const result = {
     ...chosen,
     packs: batts.length,
     cellMinV: cellMin,
@@ -705,6 +750,8 @@ function aggregateBank() {
     worstDriftV: cellMin === null ? null : worstDrift,
     disagreement,
   };
+  _frame.bank = result;
+  return result;
 }
 
 function computeRemaining(bank) {
@@ -880,6 +927,11 @@ function renderHero() {
 
 // ---------- POWER FLOW ----------
 function buildFlowModel() {
+  // Frame-cache: applySnapshot resets _frame.flowModel every tick.
+  // The dashboard renderFlow and the kiosk renderFlow both call us in
+  // the same frame; without the cache we'd recompute identical state
+  // and risk picking up a different staleness window on the boundary.
+  if (_frame.flowModel !== null) return _frame.flowModel;
   const sources = [];
   const loads   = [];
   let batteryNetW = 0;
@@ -920,7 +972,9 @@ function buildFlowModel() {
     // charger bug, just one vendor over.
     const STALE_POLL_SECONDS = 90;
     const updatedAt = +(l._updated_at) || +(dev.last_seen) || null;
-    const nowSec = Date.now() / 1000;
+    // Frame-stamped "now" so the staleness floor matches what
+    // aggregateBank used for the same frame (#162).
+    const nowSec = _frame.nowSec || (Date.now() / 1000);
     const pollAgeS = (updatedAt && nowSec > updatedAt) ? (nowSec - updatedAt) : null;
     const isPollStale = pollAgeS != null && pollAgeS > STALE_POLL_SECONDS;
     // Idle-state strings that mean "not actively producing watts".
@@ -1089,7 +1143,9 @@ function buildFlowModel() {
     }
   }
 
-  return { sources, loads, batteryNetW, bank };
+  const model = { sources, loads, batteryNetW, bank };
+  _frame.flowModel = model;
+  return model;
 }
 
 function renderFlow(targetHost) {
