@@ -1,0 +1,13 @@
+{
+  "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
+  "posts": [
+    {
+      "slug": "welcome",
+      "title": "Welcome to the WattPost blog",
+      "summary": "Building a local-first off-grid solar monitor in public. Tutorials, release notes, customer stories — and the occasional debugging war story.",
+      "published_at": "2026-05-19",
+      "author": "Ritual North",
+      "hero": null
+    }
+  ]
+}
