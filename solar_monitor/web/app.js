@@ -3248,7 +3248,122 @@ function renderSettings() {
   refreshCloudBackups();
   refreshDiscoveryToggle();
   refreshHistorySettings();  // #172 — editable poll interval + retention
+  refreshSolarPauseSettings();  // #163 — solar-aware charger pause
   wireResetToDefaults();     // #138 — Danger zone
+}
+
+// Solar-pause panel (#163). Pulls /api/outputs/solar_pause for the live
+// rule state + the controller's most recent decision, fills the form,
+// and wires the Save button. Outputs come from /api/outputs filtered to
+// charge-output kinds so the dropdown only shows things the user can
+// reasonably auto-pause (not, say, a Renogy DC load output).
+async function refreshSolarPauseSettings() {
+  const block = document.getElementById("settings-solar-pause-block");
+  if (!block) return;
+  let cfg, outputs;
+  try {
+    [cfg, outputs] = await Promise.all([
+      api("/api/outputs/solar_pause"),
+      api("/api/outputs"),
+    ]);
+  } catch (e) {
+    const s = document.getElementById("sp-status");
+    if (s) s.textContent = `Couldn't load: ${e.message || e}`;
+    return;
+  }
+  const sel = document.getElementById("sp-output");
+  if (sel) {
+    sel.innerHTML = "";
+    // Only AC-charger-ish outputs are sensible targets. Renogy inverter
+    // models expose `ac_charger`; Renogy Rover's `load` output isn't
+    // the right thing to put on this rule, so we omit it.
+    const ok = (outputs.outputs || []).filter(o =>
+      (o.kind || "").toLowerCase().includes("charger") ||
+      (o.kind || "").toLowerCase().includes("ac"));
+    if (!ok.length) {
+      const opt = document.createElement("option");
+      opt.textContent = "No AC charger output configured";
+      opt.value = "";
+      sel.appendChild(opt);
+      sel.disabled = true;
+    } else {
+      sel.disabled = false;
+      for (const o of ok) {
+        const opt = document.createElement("option");
+        opt.value = o.id;
+        opt.textContent = `${o.name || o.id} (${o.device_label})`;
+        sel.appendChild(opt);
+      }
+    }
+  }
+  const setVal = (id, v) => { const el = document.getElementById(id); if (el && v != null) el.value = v; };
+  document.getElementById("sp-enabled").checked = !!cfg.enabled;
+  if (sel && cfg.charger_output_id) sel.value = cfg.charger_output_id;
+  setVal("sp-target",   cfg.target_soc);
+  setVal("sp-recover",  cfg.recover_soc);
+  setVal("sp-floor",    cfg.hard_floor_soc);
+  setVal("sp-pv",       cfg.pv_surplus_w);
+  setVal("sp-cooldown", cfg.cooldown_minutes);
+  const status = cfg.status || {};
+  document.getElementById("sp-decision").textContent =
+    status.decision ? `${status.decision}${status.applied ? " (applied)" : ""}`
+                    : "·";
+  document.getElementById("sp-reason").textContent = status.reason || "·";
+
+  const btn = document.getElementById("sp-save");
+  if (btn && !btn.dataset.bound) {
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", saveSolarPauseSettings);
+  }
+}
+
+async function saveSolarPauseSettings() {
+  const status = document.getElementById("sp-status");
+  const btn = document.getElementById("sp-save");
+  if (!btn) return;
+  btn.disabled = true;
+  const orig = btn.textContent; btn.textContent = "Saving…";
+  if (status) { status.textContent = ""; status.className = "settings-foot hist-status"; }
+  const num = (id) => {
+    const el = document.getElementById(id);
+    if (!el || el.value === "") return null;
+    const n = parseFloat(el.value);
+    return Number.isFinite(n) ? n : null;
+  };
+  const body = {
+    enabled:           document.getElementById("sp-enabled").checked,
+    charger_output_id: document.getElementById("sp-output").value || null,
+    target_soc:        num("sp-target"),
+    recover_soc:       num("sp-recover"),
+    hard_floor_soc:    num("sp-floor"),
+    pv_surplus_w:      num("sp-pv"),
+    cooldown_minutes:  num("sp-cooldown"),
+  };
+  try {
+    const r = await fetch("/api/outputs/solar_pause", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    if (status) {
+      status.classList.add("hist-status--ok");
+      status.textContent = "Saved. Next poll cycle applies the new rule.";
+    }
+    // Refresh so the live-decision line reflects the new config.
+    setTimeout(refreshSolarPauseSettings, 800);
+  } catch (e) {
+    if (status) {
+      status.classList.add("hist-status--err");
+      status.textContent = `Save failed: ${e.message || e}`;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
 }
 
 function wireResetToDefaults() {

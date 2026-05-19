@@ -259,6 +259,22 @@ class DiscoveryCfg(msgspec.Struct, kw_only=True):
     enabled: bool = False
 
 
+class SolarPauseCfg(msgspec.Struct, kw_only=True):
+    """Solar-aware AC charger pause rule (#163). Off by default.
+
+    When enabled, the daemon evaluates the bank + PV + charger state
+    on every poll cycle and may toggle the named output through the
+    same write path the dashboard uses. See outputs/solar_pause.py
+    for the full decision tree."""
+    enabled: bool = False
+    charger_output_id: str | None = None
+    target_soc:       float = 80.0
+    recover_soc:      float = 50.0
+    hard_floor_soc:   float = 30.0
+    pv_surplus_w:     float = 50.0
+    cooldown_minutes: int   = 30
+
+
 class HistoryCfg(msgspec.Struct, kw_only=True):
     """Polling cadence + how long each retention tier keeps data.
 
@@ -302,6 +318,7 @@ class Config(msgspec.Struct, kw_only=True):
     backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
     discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)
     history: HistoryCfg | None = None    # optional — poll cadence + retention (#172)
+    solar_pause: SolarPauseCfg | None = None  # optional — auto-pause AC charger when PV covers (#163)
 
 
 def load_config(path: str | Path) -> Config:

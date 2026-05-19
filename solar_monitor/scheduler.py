@@ -423,6 +423,10 @@ class PollScheduler:
                     # trigger landed since the last tick. Tolerant of
                     # crash; no schedules configured = cheap no-op.
                     await self.outputs.fire_schedules_if_due()
+                    # Solar-pause controller (#163) — auto-pause the AC
+                    # charger when PV is covering. Off by default; cheap
+                    # when disabled (one config check).
+                    await self.outputs.evaluate_solar_pause()
                 except Exception:
                     log.exception("outputs service hook failed")
                 # Fan out to exporters. Each exporter is non-blocking; if it

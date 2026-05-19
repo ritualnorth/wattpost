@@ -70,6 +70,8 @@ from .outputs import (
     create_output_schedule,
     update_output_schedule,
     delete_output_schedule,
+    get_solar_pause,
+    patch_solar_pause,
 )
 from .system import (
     auth_status, broker_auth_log, diagnostics_bundle, kiosk_status,
@@ -1515,6 +1517,8 @@ def build_app(
             create_output_schedule,
             update_output_schedule,
             delete_output_schedule,
+            get_solar_pause,
+            patch_solar_pause,
             index,
             kiosk_index,
             login_page,

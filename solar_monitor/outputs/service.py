@@ -21,11 +21,13 @@ import logging
 import time
 from typing import Any
 
-from ..config import Config
+import json
+from ..config import Config, SolarPauseCfg
 from ..storage import Store
 from .base import ControllableOutput, OutputAdapter, WriteResult
 from .registry import discover_outputs_for_device, get_adapter_for
 from . import schedules as _schedules
+from . import solar_pause as _solar_pause
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +85,135 @@ class OutputsService:
             if state is None:
                 continue
             await self.store.update_output_state(output_id, state, now)
+
+    async def evaluate_solar_pause(self) -> dict[str, Any]:
+        """Tick the solar-pause controller (#163). Returns a dict with
+        the decision + reason + applied flag, suitable for direct JSON
+        response. No-op + cheap when the rule is disabled."""
+        cfg: SolarPauseCfg | None = getattr(self.config, "solar_pause", None)
+        if cfg is None or not cfg.enabled or not cfg.charger_output_id:
+            return {"applied": False, "decision": "unchanged",
+                    "reason": "rule disabled or no charger configured"}
+        err = cfg.validate() if hasattr(cfg, "validate") else None
+        if err:
+            return {"applied": False, "decision": "unchanged",
+                    "reason": f"config invalid: {err}"}
+
+        bank = await self._read_bank_snapshot()
+        if bank is None:
+            return {"applied": False, "decision": "unchanged",
+                    "reason": "no bank reading yet"}
+        charger = await self._read_charger_snapshot(cfg.charger_output_id)
+        if charger is None:
+            return {"applied": False, "decision": "unchanged",
+                    "reason": f"unknown output {cfg.charger_output_id!r}"}
+
+        # The pure controller lives in solar_pause; pass the typed
+        # config so the dataclass keeps the contract narrow.
+        rule_cfg = _solar_pause.PauseCfg(
+            enabled=cfg.enabled, charger_output_id=cfg.charger_output_id,
+            target_soc=cfg.target_soc, recover_soc=cfg.recover_soc,
+            hard_floor_soc=cfg.hard_floor_soc,
+            pv_surplus_w=cfg.pv_surplus_w,
+            cooldown_minutes=cfg.cooldown_minutes,
+        )
+        decision = _solar_pause.decide(
+            rule_cfg, bank, charger, now_ts=int(time.time()),
+        )
+        out: dict[str, Any] = {
+            "applied": False,
+            "decision": decision.action,
+            "reason": decision.reason,
+            "bank_soc_pct": bank.soc_pct,
+            "bank_net_w":   bank.net_w,
+            "pv_w":         bank.pv_active_w,
+            "charger_on":   charger.on,
+        }
+        if decision.action in ("force_on", "force_off"):
+            try:
+                result = await self.toggle(
+                    cfg.charger_output_id,
+                    on=(decision.action == "force_on"),
+                    by="auto:solar_pause",
+                )
+                out["applied"] = bool(result.get("ok"))
+                out["write_detail"] = result.get("detail")
+            except Exception as e:
+                log.exception("solar_pause: toggle crashed")
+                out["applied"] = False
+                out["write_detail"] = f"{type(e).__name__}: {e}"
+        return out
+
+    async def _read_bank_snapshot(self) -> "_solar_pause.BankSnapshot | None":
+        """Reduce the latest device snapshot to (soc, net_w, pv_w).
+        Mirrors the JS aggregateBank() reconciliation: shunt wins
+        over BMS for system metrics; PV sums every charge_controller
+        plus dcdc on the input side."""
+        latest = await self.store.get_latest()
+        if not latest:
+            return None
+        # Find a shunt first; fall back to summing the BMS pack snapshots.
+        shunt = next((s for s in latest.values()
+                      if s.get("_kind") == "shunt"), None)
+        soc = None
+        net_w = 0.0
+        if shunt is not None:
+            soc = shunt.get("soc_pct")
+            v = float(shunt.get("voltage_v") or 0)
+            i = float(shunt.get("current_a") or 0)
+            net_w = (shunt.get("power_w") if shunt.get("power_w") is not None
+                     else v * i)
+        else:
+            batts = [s for s in latest.values()
+                     if s.get("_kind") == "smart_battery"]
+            if not batts:
+                return None
+            cap = sum(float(b.get("capacity_ah") or 0) for b in batts)
+            rem = sum(float(b.get("remaining_charge_ah") or 0) for b in batts)
+            soc = (rem / cap * 100) if cap > 0 else None
+            mean_v = sum(float(b.get("voltage_v") or 0) for b in batts) / len(batts)
+            sum_i  = sum(float(b.get("current_a") or 0) for b in batts)
+            net_w = mean_v * sum_i
+        if soc is None:
+            return None
+        # PV input across MPPTs + DC-DC chargers' solar-side power.
+        pv_w = 0.0
+        for snap in latest.values():
+            if snap.get("_kind") in ("charge_controller", "dcdc"):
+                pv_w += float(snap.get("pv_power_w") or snap.get("power_w") or 0)
+        return _solar_pause.BankSnapshot(
+            soc_pct=float(soc), net_w=float(net_w), pv_active_w=float(pv_w),
+        )
+
+    async def _read_charger_snapshot(
+        self, output_id: str,
+    ) -> "_solar_pause.ChargerSnapshot | None":
+        """Pull the most recent state + command record off the output
+        row. last_command_json carries `at` + `by`; we partition it
+        into the auto / manual timestamps the controller needs."""
+        row = await self.store.get_output(output_id)
+        if row is None:
+            return None
+        on = bool(row.get("state"))
+        last_auto = 0
+        last_manual = 0
+        cmd = row.get("last_command_json")
+        if cmd:
+            try:
+                cmd = json.loads(cmd) if isinstance(cmd, str) else cmd
+                ts = int(cmd.get("at") or 0)
+                by = cmd.get("by") or ""
+                if by.startswith("auto"):
+                    last_auto = ts
+                else:
+                    last_manual = ts
+            except Exception:
+                pass
+        return _solar_pause.ChargerSnapshot(
+            on=on,
+            last_auto_change_at=last_auto,
+            last_manual_toggle_at=last_manual,
+        )
 
     async def fire_schedules_if_due(self) -> int:
         """Tick the schedule engine. Called by the scheduler on every
