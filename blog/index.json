@@ -10,10 +10,42 @@
       "hero": null
     },
     {
+      "slug": "ha-vs-vrm",
+      "title": "WattPost vs Victron VRM in Home Assistant",
+      "summary": "Honest head-to-head for anyone on a Victron stack with VRM today, considering whether to switch. Pure-Victron with a Cerbo: stay on VRM. Mixed-stack or no Cerbo: WattPost is cheaper and faster.",
+      "published_at": "2026-05-12",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "ha-energy-dashboard",
+      "title": "Add WattPost to Home Assistant's Energy dashboard",
+      "summary": "HA ships a built-in Energy dashboard. Three clicks and the right sensors and you get daily / monthly / yearly solar production charts, source-vs-use breakdown, and long-term aggregation, all from your WattPost MQTT feed.",
+      "published_at": "2026-05-05",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "ha-low-soc-alerts",
+      "title": "Low-SoC alerts via Home Assistant",
+      "summary": "Two automations, ten minutes of work, never wake up to a dead battery again. Includes a recovered notification and a quieter belt-and-braces version that uses WattPost's own alert engine for redundancy.",
+      "published_at": "2026-04-28",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "ha-dashboards",
+      "title": "Home Assistant Lovelace dashboards for off-grid solar",
+      "summary": "Copy-paste YAML for three useful Lovelace views: a daily-driver overview, a today-vs-yesterday energy summary, and a deep-dive battery dashboard. Stock Home Assistant cards only, no HACS required.",
+      "published_at": "2026-04-21",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "home-assistant",
       "title": "How to add WattPost to Home Assistant in five minutes",
       "summary": "WattPost ships MQTT auto-discovery out of the box. Point Home Assistant at your appliance, flip one toggle, and every battery, charger, and shunt shows up as a discovered device. No YAML, no helper scripts.",
-      "published_at": "2026-05-12",
+      "published_at": "2026-04-14",
       "author": "Ritual North",
       "hero": null
     },
@@ -21,23 +53,23 @@
       "slug": "first-install",
       "title": "How to set up WattPost on a Raspberry Pi from scratch",
       "summary": "Blank SD card to a live solar dashboard in one sitting. Download, flash, boot, pair your first Renogy or Victron device, and (optionally) link to the cloud for remote access.",
-      "published_at": "2026-05-05",
+      "published_at": "2026-04-07",
       "author": "Ritual North",
       "hero": "/static/img/blog/first-install/hero.png"
-    },
-    {
-      "slug": "welcome",
-      "title": "Welcome to the WattPost blog",
-      "summary": "Building a local-first off-grid solar monitor in public. Tutorials, release notes, customer stories, and the occasional debugging war story.",
-      "published_at": "2026-04-28",
-      "author": "Ritual North",
-      "hero": null
     },
     {
       "slug": "bt2-silent-on-lan",
       "title": "How a laptop on the same network made our Renogy BT-2 dongle invisible",
       "summary": "We lost a day to a BT-2 that refused to advertise. The fix was three words on a different host. Here's the debugging story and the wizard hint we shipped so the next person catches it in minutes.",
-      "published_at": "2026-04-21",
+      "published_at": "2026-03-31",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "welcome",
+      "title": "Welcome to the WattPost blog",
+      "summary": "Building a local-first off-grid solar monitor in public. Tutorials, release notes, customer stories, and the occasional debugging war story.",
+      "published_at": "2026-03-24",
       "author": "Ritual North",
       "hero": null
     }
