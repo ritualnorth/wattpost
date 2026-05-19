@@ -8,6 +8,58 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.21] · 2026-05-19
+
+### Added · #138 Reset-to-defaults for Docker parity
+
+Settings → Diagnostics → Reset wipes transports, devices,
+exporters, alerts, output schedules and rules back to first-boot
+state. Web password, SQLite history, branding and (by default)
+cloud pairing are preserved. Atomic config.yaml replace with a
+`.bak` for manual recovery. Type-to-confirm gate; danger-zone
+styling. Closes the last wattpost-config TUI gap for Docker
+users.
+
+### Added · #163 Solar-aware AC charger pause (Pro)
+
+New rule that pauses the AC charger when PV is covering the
+load and wakes it before the bank drops too low. Four safety
+gates: hard SoC floor that beats every forecast, configurable
+cooldown to stop relay flap, "respect manual override" when
+the user just toggled the charger themselves, and a per-rule
+validator that blocks misconfigurations from landing in
+config.yaml. Settings → Solar-aware charger pause; off by
+default. Renogy AC chargers only at v1 (Victron is read-only
+by design).
+
+### Added · `/api/snapshot`
+
+One-shot REST endpoint mirroring the SSE first frame. Returns
+devices + poll_run + today atomically read from the store, so
+the polling fallback (used through the cloud broker on iOS
+Safari) can't straddle a poll cycle the way the old three-fetch
+form could.
+
+### Fixed · #162 Hero / Flow snapshot disagreement
+
+The hero, flow strip and alerts panel each derived their own
+freshness floor against a freshly-read `Date.now()`. On the 90 s
+boundary a battery could be counted by one tile and excluded by
+another, leaving the dashboard visibly inconsistent. Bank +
+flow model are now memoised per-frame with one stamped
+`nowSec`.
+
+### Docs
+
+- New strategic doc `docs/coverage-roadmap.md` with the
+  prioritised driver queue (Tier 1 JBD / Daly / EPEVER,
+  Tier 2 AiLi / Junctek / Battle Born, Tier 3 MPP Solar /
+  Sterling / REDARC) plus the explicit out-of-scope list.
+  Linked from `adding-a-vendor.md`.
+- New blog post `ha-mqtt-external-broker`: how to connect
+  WattPost to Home Assistant when you can't use the Mosquitto
+  add-on (HA Container, Core, or a standalone broker).
+
 ## [0.1.20] · 2026-05-19
 
 ### Added · #184 wizard hint for "BT-2 held by another LAN host"
