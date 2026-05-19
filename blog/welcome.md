@@ -1,11 +1,49 @@
 # Welcome to the WattPost blog
 
-WattPost is a local-first solar monitor for the rigs that don't fit any one vendor's app — a Raspberry Pi (or any Linux box) talking Modbus to your Renogy gear, listening to Victron BLE Instant Readout broadcasts, and decoding JK BMS adverts, all on one dashboard. We started building it because every off-grid setup we've seen ends up running 2–4 vendor apps, none of which speak to each other, and most of which require a cloud account just to read your own battery.
+WattPost is a local-first solar monitor for off-grid rigs that
+don't fit any one vendor's app. The product is a Raspberry Pi (or
+any Linux box) that talks Modbus to Renogy gear, decodes Victron
+BLE Instant Readout broadcasts, and reads JK BMS adverts. One
+dashboard. No cloud account required.
 
-This blog will cover three things: **release notes** (what shipped + why), **tutorials** (end-to-end walkthroughs — first install, wiring options, integrations), and **the occasional debugging war story** (last week we lost most of a day to a BT-2 dongle that turned out to be paired to a laptop on the same network — a one-master-at-a-time gotcha worth writing up properly).
+We started building it because every off-grid setup we've seen
+runs two or three separate vendor apps, none of which talk to
+each other. Most of those apps insist on a cloud account before
+they show you your own battery. That's not the world we want to
+build for.
 
-We're not going to do build-in-public for its own sake. Posts here will earn their place by being useful — to somebody flashing their first SD card, somebody comparing monitoring options, or somebody debugging the same problem we already solved. If you want product news in your inbox, the monthly energy-summary email also carries release notes; if you want everything as it lands, this page + the RSS feed will be it.
+This blog covers three kinds of post.
 
-First proper tutorial is in the oven now: **flashing the SD card, first-boot, pairing your gear, your first reading on the dashboard — end to end with video at every step.** That's the kind of content the install path deserves, and it's the kind of content we wished was on every other monitor's site when we evaluated them.
+**Release notes.** Plain English summaries of what shipped in
+each version and why. Cross-linked to the canonical changelog.
 
-Until then — if you've got a setup you're curious about, or a vendor you wish was supported, the [supported hardware page](/docs/supported-hardware) lists everything we ship today and what's still in the queue. Email [support@wattpost.io](mailto:support@wattpost.io) and we'll usually have something to say within a day.
+**Tutorials.** End-to-end walkthroughs. First install, wiring
+options, integrations with Home Assistant or Grafana, smart-scene
+rules. Each one is written so you can flash an SD card on a
+Thursday evening and have live battery telemetry on the dashboard
+before bed.
+
+**Debugging write-ups.** When we get stuck and figure something
+out, we write it down. Last week we lost most of a day to a BT-2
+dongle that was paired to a laptop on the same network. The
+software side was clean. The fix was physical. That kind of story
+saves the next person a day.
+
+Posts here earn their place by being useful to somebody flashing
+their first SD card, comparing off-grid monitors, or debugging the
+same problem we already solved. We are not going to write filler
+for the sake of cadence.
+
+The first proper tutorial is in production now. Working title:
+*From blank SD card to live dashboard, in one sitting*. Video at
+every step, screenshots where they help, no skipped detail. It is
+the kind of content the install path deserves and the kind of
+content we wished was on every other monitor's site when we
+evaluated them.
+
+Until then, the [supported hardware](/docs/supported-hardware)
+page lists everything WattPost talks to today plus what is in the
+queue. If you've got a setup that isn't covered, or a vendor you
+wish was supported, email
+[support@wattpost.io](mailto:support@wattpost.io). We usually
+reply within a day.
