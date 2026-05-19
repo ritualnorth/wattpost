@@ -12,7 +12,7 @@ before you order anything else:
 | Option | Approx cost | Wiring effort | Reliability |
 | - | - | - | - |
 | **Renogy "RS485-to-USB" cable** (pre-wired RJ45 → USB) | £15-20 | None | Best. Renogy-spec, no crimping |
-| **DSD TECH SH-U10** (FTDI FT232 USB-RS485) + Cat5e patch cable | ~£12 | One end of the patch cable: strip pins 3 + 4, screw-terminal them into A + B on the adapter | Excellent. FTDI is the gold-standard chip on Linux |
+| **DSD TECH SH-U11** (FTDI FT232R USB-RS485) + Cat5e patch cable | ~£13 | One end of the patch cable: strip pins 3 + 4, screw-terminal them into A + B on the adapter | Excellent. FTDI is the gold-standard chip on Linux. The cheaper SH-U10 in the same range uses a Silicon Labs CP2102 instead — also works fine, just not quite as bulletproof. |
 | **Generic USB-to-RJ45 RS485 console cable** | ~£12-18 | Plug-and-play | Mixed. Usually CH340 chip; pinout sometimes A↔B reversed |
 
 **Rule of thumb:** if you're testing WattPost for the first time, buy
