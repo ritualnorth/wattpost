@@ -478,10 +478,26 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     for rec in out:
         for k in ("_mfr_id", "_mfr_prefix_hex", "_service_uuids"):
             rec.pop(k, None)
+
+    # LAN peer hint (#184). Only fire when this scan turned up zero
+    # Renogy devices — that's the symptom of "BT-2 held by another
+    # host". If Renogy gear is already advertising at us, the
+    # single-master collision isn't happening and a network probe is
+    # just noise. Same /24 + same default WattPost port; see
+    # `_scan_lan_for_wattpost_peers` for the trade-offs.
+    found_renogy = any(d.get("vendor") == "renogy" for d in out)
+    lan_peers: list[dict[str, Any]] = []
+    if not found_renogy:
+        try:
+            lan_peers = await _scan_lan_for_wattpost_peers()
+        except Exception:
+            log.debug("lan_peer_scan failed", exc_info=True)
+
     return {
         "devices": out,
         "scanned_seconds": secs,
         "seen_recently_missing": seen_recently_missing,
+        "lan_peers": lan_peers,
     }
 
 
@@ -671,6 +687,151 @@ def _sniff_serial_protocol(port: str) -> str:
         if line.startswith(("$GP", "$GN", "$GL", "$GA", "$GB", "$BD")):
             return "nmea_gps"
     return "unknown"
+
+
+def _own_route_ip() -> str | None:
+    """The single IP the kernel would route outbound traffic through.
+
+    This is the IP a peer on the same LAN would see when we connect
+    to them, which makes it the right anchor for "what's my subnet".
+    Distinct from `_own_lan_ips()` (below) because that returns ALL
+    of our NIC IPs — including the docker0 bridge `172.17.0.1` when
+    we're in a host-network container, which would wrongly anchor
+    the subnet scan to the docker bridge instead of the LAN.
+    """
+    import socket as _socket
+    for target in ("8.8.8.8", "1.1.1.1"):
+        try:
+            s = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+            s.settimeout(0.2)
+            s.connect((target, 53))
+            ip = s.getsockname()[0]
+            s.close()
+            if ip and not ip.startswith("127."):
+                return ip
+        except Exception:
+            pass
+    return None
+
+
+def _own_lan_ips() -> set[str]:
+    """ALL of the host's own IPv4 addresses, for self-exclusion.
+
+    Includes the docker bridge (`172.17.0.1`), secondary NICs, and
+    whatever else the kernel knows about. Don't use this to pick the
+    subnet anchor — that's what `_own_route_ip()` is for. This is
+    only for "don't probe ourselves".
+    """
+    import socket as _socket
+    ips: set[str] = set()
+    # The route-out IP belongs here too, of course.
+    route_ip = _own_route_ip()
+    if route_ip:
+        ips.add(route_ip)
+    # Hostname lookup. Catches localhost variants + secondary NICs.
+    try:
+        hn = _socket.gethostname()
+        for info in _socket.getaddrinfo(hn, None, _socket.AF_INET):
+            addr = info[4][0]
+            if addr and not addr.startswith("127."):
+                ips.add(addr)
+    except Exception:
+        pass
+    return ips
+
+
+async def _scan_lan_for_wattpost_peers(
+    web_port: int = 8000, timeout: float = 0.4,
+) -> list[dict[str, Any]]:
+    """Concurrent TCP probe of the local /24 looking for other WattPost
+    appliances on the same web port.
+
+    Used by the setup wizard when a BLE scan finds no Renogy devices:
+    if there's another WattPost on the LAN it's quite possibly holding
+    the BT-2 dongle's single BLE master slot, which makes the dongle
+    invisible to us. Surfacing that to the user is the #1 thing we
+    learned debugging issue #184 (laptop appliance holding the BT-2
+    across the network).
+
+    Trade-offs deliberately accepted:
+      * Only scans a /24 around our own IP. A /16 or bridged-AP
+        network would miss peers; that's fine — the wizard hint is a
+        speculative cause, not a guarantee.
+      * Probes the *default* WattPost port. A peer on a non-default
+        port (the wattpost-config TUI can change it) won't be found.
+      * Identification is via our own `/api/health` returning
+        `{"service": "wattpost"}`. A peer running an older version
+        without that field will be skipped silently — also fine.
+
+    Returns a list of `{ip, version}` for confirmed peers, EXCLUDING
+    this host's own IPs. Never raises; on any failure returns [].
+    """
+    import socket as _socket
+    own = _own_lan_ips()
+    # Anchor on the route-out IP, NOT just "first non-loopback own
+    # IP". In a host-network docker container, gethostname()
+    # surfaces `172.17.0.1` (docker0) alongside the real LAN IP,
+    # and we want the LAN one to derive the subnet from.
+    anchor = _own_route_ip()
+    if not anchor:
+        return []
+    parts = anchor.split(".")
+    if len(parts) != 4:
+        return []
+    subnet_prefix = ".".join(parts[:3]) + "."
+    candidates = [
+        f"{subnet_prefix}{i}" for i in range(1, 255)
+        if f"{subnet_prefix}{i}" not in own
+    ]
+
+    async def _probe(ip: str) -> dict[str, Any] | None:
+        # Two-stage: 1) connect on the WattPost port, 2) GET /api/health
+        # and check `service == "wattpost"`. Both stages clamp tight so
+        # the whole subnet sweep completes inside the wizard's UX window.
+        try:
+            r, w = await asyncio.wait_for(
+                asyncio.open_connection(ip, web_port), timeout=timeout,
+            )
+        except Exception:
+            return None
+        try:
+            req = (
+                f"GET /api/health HTTP/1.1\r\n"
+                f"Host: {ip}\r\n"
+                f"Connection: close\r\n\r\n"
+            ).encode()
+            w.write(req)
+            await asyncio.wait_for(w.drain(), timeout=timeout)
+            data = await asyncio.wait_for(r.read(2048), timeout=timeout)
+        except Exception:
+            return None
+        finally:
+            try:
+                w.close()
+                await w.wait_closed()
+            except Exception:
+                pass
+        if b'"service":"wattpost"' not in data and b'"service": "wattpost"' not in data:
+            return None
+        # Extract version if present.
+        version = None
+        try:
+            body = data.split(b"\r\n\r\n", 1)[1]
+            j = json.loads(body)
+            version = j.get("version")
+        except Exception:
+            pass
+        return {"ip": ip, "version": version}
+
+    log.info("lan_peer_scan: probing %s0/24 (excluding own %s)",
+             subnet_prefix, sorted(own))
+    results = await asyncio.gather(
+        *(_probe(ip) for ip in candidates), return_exceptions=True,
+    )
+    peers = [r for r in results
+             if isinstance(r, dict) and r is not None]
+    log.info("lan_peer_scan: %d peer(s) found", len(peers))
+    return peers
 
 
 def _classify_disappearance(name: str | None) -> str | None:
