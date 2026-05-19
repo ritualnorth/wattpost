@@ -22,6 +22,7 @@ import msgspec
 
 from ..modbus import (
     build_read_holding,
+    build_read_input,
     expected_read_response_len,
     verify_response,
 )
@@ -29,12 +30,18 @@ from ..transport import Transport, TransportError
 
 
 class Section(msgspec.Struct, frozen=True):
-    """One Modbus read + parser."""
+    """One Modbus read + parser.
+
+    `function_code` selects FC03 (read holding registers, default —
+    Renogy + most vendors) or FC04 (read input registers — EPEVER and
+    the Tracer family use FC04 for live state). Other values are
+    rejected at poll time."""
 
     register: int
     word_count: int
     parser: Callable[[bytes], dict]
     name: str = ""  # for log/debug; optional
+    function_code: int = 3
 
 
 class VendorInfo(msgspec.Struct, frozen=True):
@@ -122,11 +129,18 @@ class DeviceDriver(abc.ABC):
             "_slave_id": self.slave_id,
         }
         for section in self.sections:
-            frame = build_read_holding(self.slave_id, section.register, section.word_count)
+            fc = section.function_code
+            if fc == 4:
+                frame = build_read_input(self.slave_id, section.register, section.word_count)
+            else:
+                # Default FC03; any unrecognised value falls back to
+                # holding-register reads (matches every existing
+                # vendor before the function_code field landed).
+                frame = build_read_holding(self.slave_id, section.register, section.word_count)
             expected = expected_read_response_len(section.word_count)
             try:
                 resp = await transport.request(frame, expected, timeout=5.0)
-                verify_response(resp, self.slave_id)
+                verify_response(resp, self.slave_id, expected_fc=fc)
                 result.update(section.parser(resp))
             except (TransportError, ValueError) as e:
                 result.setdefault("_errors", []).append(
