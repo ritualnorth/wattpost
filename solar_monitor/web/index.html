@@ -670,6 +670,72 @@
             <div class="settings-row" style="margin-top:.65rem"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
             <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
+          <div class="settings-block" id="settings-solar-pause-block">
+            <h3>Solar-aware charger pause <span class="settings-foot" style="font-weight:normal">· Pro</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Pause your AC charger when solar is covering the load.
+              The daemon re-enables it before the bank drops too low.
+              Cooldown + a hard SoC floor protect against weather
+              forecast errors. Off by default. Manual toggles always
+              win; the rule won't override a charger you just turned on
+              or off yourself.
+            </p>
+            <div class="sp-form">
+              <label class="hist-row">
+                <span>Enabled</span>
+                <span class="hist-input">
+                  <input id="sp-enabled" type="checkbox"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Charger output</span>
+                <span class="hist-input">
+                  <select id="sp-output"></select>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Pause above SoC</span>
+                <span class="hist-input">
+                  <input id="sp-target" type="number" min="50" max="100" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Resume below SoC</span>
+                <span class="hist-input">
+                  <input id="sp-recover" type="number" min="20" max="90" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Hard floor (force on)</span>
+                <span class="hist-input">
+                  <input id="sp-floor" type="number" min="5" max="60" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>PV surplus threshold</span>
+                <span class="hist-input">
+                  <input id="sp-pv" type="number" min="0" max="2000" step="10"/>
+                  <span class="hist-unit">W</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Cooldown between changes</span>
+                <span class="hist-input">
+                  <input id="sp-cooldown" type="number" min="5" max="240" step="1"/>
+                  <span class="hist-unit">min</span>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="sp-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <span id="sp-status" class="settings-foot hist-status"></span>
+              </div>
+              <div class="settings-row" style="margin-top:.5rem"><span>Live decision</span><span class="v" id="sp-decision">·</span></div>
+              <div class="settings-row"><span>Reason</span><span class="v" id="sp-reason">·</span></div>
+            </div>
+          </div>
           <div class="settings-block">
             <h3>Retention</h3>
             <div class="settings-row"><span>Raw samples</span><span class="v">7 days</span></div>
@@ -959,6 +1025,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=173"></script>
+  <script src="/web/app.js?v=174"></script>
 </body>
 </html>

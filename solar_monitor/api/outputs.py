@@ -207,3 +207,98 @@ async def delete_output_schedule(
     await store.delete_schedule(schedule_id)
     log.info("schedules: deleted %d", schedule_id)
     return {"ok": True, "deleted": schedule_id}
+
+
+# ---------- solar-aware pause (#163) ----------
+
+class SolarPausePatch(msgspec.Struct):
+    enabled:           bool | None  = None
+    charger_output_id: str  | None  = None
+    target_soc:        float | None = None
+    recover_soc:       float | None = None
+    hard_floor_soc:    float | None = None
+    pv_surplus_w:      float | None = None
+    cooldown_minutes:  int  | None  = None
+
+
+@get("/api/outputs/solar_pause")
+async def get_solar_pause(state: State) -> dict[str, Any]:
+    scheduler: PollScheduler = state["scheduler"]
+    cfg = getattr(scheduler.config, "solar_pause", None)
+    out = {
+        "enabled":           getattr(cfg, "enabled", False),
+        "charger_output_id": getattr(cfg, "charger_output_id", None),
+        "target_soc":        getattr(cfg, "target_soc", 80.0),
+        "recover_soc":       getattr(cfg, "recover_soc", 50.0),
+        "hard_floor_soc":    getattr(cfg, "hard_floor_soc", 30.0),
+        "pv_surplus_w":      getattr(cfg, "pv_surplus_w", 50.0),
+        "cooldown_minutes":  getattr(cfg, "cooldown_minutes", 30),
+    }
+    out["status"] = await scheduler.outputs.evaluate_solar_pause()
+    out["status"].setdefault("applied", False)
+    return out
+
+
+@put("/api/outputs/solar_pause")
+async def patch_solar_pause(
+    data: SolarPausePatch, state: State,
+) -> dict[str, Any]:
+    """Persist + hot-apply solar-pause settings (#163).
+
+    Validates the threshold ordering before touching disk so an
+    inconsistent payload never lands in config.yaml — a partial
+    write here previously locked users into a config that the
+    daemon refused to load."""
+    import yaml as _yaml
+    from pathlib import Path as _Path
+    from ..config import SolarPauseCfg
+
+    scheduler: PollScheduler = state["scheduler"]
+    existing = getattr(scheduler.config, "solar_pause", None)
+    merged_kwargs: dict[str, Any] = {
+        "enabled":           getattr(existing, "enabled", False),
+        "charger_output_id": getattr(existing, "charger_output_id", None),
+        "target_soc":        getattr(existing, "target_soc", 80.0),
+        "recover_soc":       getattr(existing, "recover_soc", 50.0),
+        "hard_floor_soc":    getattr(existing, "hard_floor_soc", 30.0),
+        "pv_surplus_w":      getattr(existing, "pv_surplus_w", 50.0),
+        "cooldown_minutes":  getattr(existing, "cooldown_minutes", 30),
+    }
+    if data.enabled           is not None: merged_kwargs["enabled"]           = data.enabled
+    if data.charger_output_id is not None: merged_kwargs["charger_output_id"] = data.charger_output_id
+    if data.target_soc        is not None: merged_kwargs["target_soc"]        = data.target_soc
+    if data.recover_soc       is not None: merged_kwargs["recover_soc"]       = data.recover_soc
+    if data.hard_floor_soc    is not None: merged_kwargs["hard_floor_soc"]    = data.hard_floor_soc
+    if data.pv_surplus_w      is not None: merged_kwargs["pv_surplus_w"]      = data.pv_surplus_w
+    if data.cooldown_minutes  is not None: merged_kwargs["cooldown_minutes"]  = data.cooldown_minutes
+
+    new_cfg = SolarPauseCfg(**merged_kwargs)
+    # Re-use the controller's own validator so the daemon and the API
+    # agree on what's acceptable. Disabled rules skip validation so
+    # users can park half-finished configs without 400s.
+    if merged_kwargs["enabled"]:
+        from ..outputs import solar_pause as _sp
+        rule_cfg = _sp.PauseCfg(**merged_kwargs)
+        err = rule_cfg.validate()
+        if err:
+            raise HTTPException(status_code=400, detail=err)
+
+    config_path: str = state.get("config_path", "config.yaml")
+    path = _Path(config_path)
+    raw = _yaml.safe_load(path.read_text()) or {}
+    raw["solar_pause"] = {
+        "enabled":           new_cfg.enabled,
+        "charger_output_id": new_cfg.charger_output_id,
+        "target_soc":        new_cfg.target_soc,
+        "recover_soc":       new_cfg.recover_soc,
+        "hard_floor_soc":    new_cfg.hard_floor_soc,
+        "pv_surplus_w":      new_cfg.pv_surplus_w,
+        "cooldown_minutes":  new_cfg.cooldown_minutes,
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    scheduler.config.solar_pause = new_cfg
+    log.info("solar_pause: settings updated (enabled=%s, target=%s, recover=%s)",
+             new_cfg.enabled, new_cfg.target_soc, new_cfg.recover_soc)
+    return await get_solar_pause(state)
