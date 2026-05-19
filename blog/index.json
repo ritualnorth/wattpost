@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "ha-mqtt-external-broker",
+      "title": "Connect WattPost to Home Assistant without the Mosquitto add-on",
+      "summary": "If you're on Home Assistant Container, Core, or you already have a standalone Mosquitto broker running for the rest of your house, the add-on shortcut doesn't apply. Stand up your own broker in Docker, point both WattPost and HA at it, and get the same MQTT auto-discovery experience.",
+      "published_at": "2026-05-26",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "v0-1-20-release",
       "title": "What shipped in WattPost v0.1.20",
       "summary": "Three customer-facing changes: a wizard hint for the Bluetooth ownership conflict we lost a day to, deeper BLE diagnostics for the Realtek+BlueZ silent-scan bug, and editable polling cadence + history retention in Settings.",
