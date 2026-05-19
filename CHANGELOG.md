@@ -8,6 +8,45 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.25] · 2026-05-19
+
+### Added · #201–#205 Tier 1 + Tier 2 driver batch
+
+Five new vendor drivers shipped from public protocol docs +
+community reverse engineering. All marked **pending community
+validation** — first customer report against real hardware
+becomes the real-world confirmation. Synthetic-frame smoke
+tests in `scripts/verify_new_drivers.py` lock the parse + field
+mapping in place so any regression shows up before customers
+see it.
+
+- **#201 JBD / Overkill Solar BMS.** Highest-impact unlock —
+  covers the BMS inside most cheap LFP packs (Battle Born,
+  LiTime, Power Queen, many Eco-Worthy SKUs, anything sold
+  rebranded with a "Smart BMS" app sticker). BLE GATT, FF00
+  service, commands 0x03 + 0x04.
+- **#202 Daly Smart BMS.** Second-most-common BMS in budget
+  packs. BLE, 13-byte fixed-length frames on FFF0 service.
+- **#203 EPEVER / EPSolar Tracer MPPT.** #1 budget MPPT in
+  DIY van + cabin builds. Modbus RTU over USB-RS485 with
+  FC04 (input registers) for live state. Slots into the
+  existing `serial_modbus` transport.
+- **#204 AiLi smart shunt.** Sub-£40 BLE shunt; the first
+  piece of telemetry most DIY van builders buy.
+- **#205 Junctek KH-F / KG-F shunt.** ASCII-framed BLE shunt.
+
+### Added · `Section.function_code` (FC03 / FC04)
+
+The Section descriptor used by Modbus-style drivers now picks
+the function code at read time. Default FC03 (matches every
+existing Renogy driver). EPEVER uses FC04 for live state and is
+the first user of the new path. Drivers that don't set it
+behave identically to before.
+
+### Added · `modbus.build_read_input`
+
+FC04 frame builder for the new Section path.
+
 ## [0.1.24] · 2026-05-19
 
 ### Added · #199 Setup wizard support for VE.Direct

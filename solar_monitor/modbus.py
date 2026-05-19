@@ -27,6 +27,21 @@ def build_read_holding(slave_id: int, register: int, count: int) -> bytes:
     return head + crc16(head)
 
 
+def build_read_input(slave_id: int, register: int, count: int) -> bytes:
+    """Build a Modbus 'Read Input Registers' (function 4) request frame.
+
+    Distinct from FC03 (holding registers). EPEVER Tracer-family MPPTs
+    use FC04 for live state (V/I/W) and FC03 only for setpoints, while
+    Renogy uses FC03 for everything. expected_read_response_len() and
+    verify_response(expected_fc=4) finish the round-trip."""
+    head = bytes([
+        slave_id, 4,
+        (register >> 8) & 0xFF, register & 0xFF,
+        (count >> 8) & 0xFF, count & 0xFF,
+    ])
+    return head + crc16(head)
+
+
 def build_write_single(slave_id: int, register: int, value: int) -> bytes:
     """Build a Modbus 'Write Single Register' (function 6) request frame.
 

@@ -11,6 +11,11 @@ Missing your kit? Email [support@wattpost.io](mailto:support@wattpost.io) with t
 | **Renogy** | ✓ (default) | ✓ (recommended for long runs / metal vans) | · |
 | **Victron** | · | ✓ (VE.Direct, on models with the port) | ✓ (Instant Readout broadcasts, default) |
 | **JK BMS** | · | · | ✓ (BLE service broadcasts) |
+| **JBD / Overkill** | · | · | ✓ (FF00 service) |
+| **Daly** | · | · | ✓ (FFF0 service) |
+| **EPEVER** | · | ✓ (USB-RS485, FC04) | · |
+| **AiLi shunt** | · | · | ✓ (FFE0 service) |
+| **Junctek shunt** | · | · | ✓ (FFE0 service) |
 
 The wizard's "Add another connection" step lets you mix and match ·
 e.g. a BT-2 to a Renogy MPPT in the garage **and** a USB-RS485 wired
@@ -52,6 +57,53 @@ For metal-van installs and dense-RF environments where BLE struggles, WattPost a
 ## JK BMS
 
 JK B-series (BD6A20S, B1A24S, B2A24S, etc.) advertise their own Bluetooth service. No separate dongle, no encryption keys. The wizard's BLE scan picks them up automatically with a "JK BMS" hint badge. Read-only.
+
+## JBD / Overkill Solar BMS
+
+The BMS family inside most sub-£500 LFP packs. **Pending community validation** — the driver is shipped on protocol docs + open-source reverse engineering (Overkill Solar's reference client). Customer reports against real hardware will catch any remaining field-mapping quirks.
+
+- **Overkill Solar** (US-branded JBD)
+- **Battle Born**, **LiTime**, **Power Queen**, many **Eco-Worthy** SKUs — these are JBD-rebranded packs, so the same driver covers them
+- **Vatrer** and other AliExpress-direct LFP packs with the BD/JBD-style smart-app sticker
+
+Service UUID `0xFF00`. Read-only. Configure with the pack's BLE MAC.
+
+## Daly Smart BMS
+
+Second-most-common BMS in budget LFP packs after JBD. **Pending community validation.**
+
+- **Daly** B-series (smart variant — the dumb 4S/8S/16S BMS without Bluetooth isn't covered)
+- Anything advertising as `DL-…` or `BMS-…` and pairing with the "Smart BMS" Android app
+
+Read-only. BLE service UUID `0xFFF0`.
+
+## EPEVER MPPT
+
+The Tracer family is the #1 budget MPPT in DIY van and cabin builds. **Pending community validation.**
+
+- **Tracer-AN** / **Tracer-BN** charge controllers (every wattage)
+- **Triron** and **BN-DR** variants
+- **eTracer** (legacy)
+
+USB-RS485 wired, same as Renogy. Slave ID 1 by default. Use the wizard's USB scan; pick `Use as Modbus`, then set `vendor: epever` and `kind: charge_controller` in the device step. Live state arrives over FC04 (input registers) rather than FC03; the driver handles that automatically.
+
+## AiLi smart shunt
+
+Sub-£40 BLE shunt. The first piece of telemetry most DIY van builders buy. **Pending community validation.**
+
+- **AiLi** Battery Monitor with single-display unit
+- Various rebrands that ship with the same "Battery Monitor" Android app
+
+Service UUID `0xFFE0`, read-only. No encryption key needed.
+
+## Junctek shunt
+
+Second-most-common cheap shunt after AiLi. **Pending community validation.**
+
+- **Junctek KH-F** (BLE + UART variants)
+- **Junctek KG-F** (BLE only)
+
+ASCII-framed protocol on the FFE1 characteristic. Read-only.
 
 ## On the roadmap
 

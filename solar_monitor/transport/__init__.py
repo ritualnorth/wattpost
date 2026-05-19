@@ -30,6 +30,22 @@ try:
     from . import ve_direct  # noqa: F401
 except ImportError:
     pass
+try:
+    from . import ble_jbd  # noqa: F401
+except ImportError:
+    pass
+try:
+    from . import ble_daly  # noqa: F401
+except ImportError:
+    pass
+try:
+    from . import ble_aili  # noqa: F401
+except ImportError:
+    pass
+try:
+    from . import ble_junctek  # noqa: F401
+except ImportError:
+    pass
 
 __all__ = [
     "Transport",

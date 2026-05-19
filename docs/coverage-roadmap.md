@@ -68,31 +68,32 @@ the mixed-stack van builder; Persona B is the budget upgrader who
 bought a cheap shunt as their first piece of telemetry. Both are
 already paying personas in our pricing model.
 
-### Tier 1 — paying-persona unlocks
+### Tier 1 — paying-persona unlocks (shipped in v0.1.25)
 
-1. **JBD / Overkill Solar BMS**. The BMS inside most sub-£500
-   LFP packs (Eco-Worthy, LiTime, Power Queen, many Vatrer SKUs,
-   the JBD-direct-from-AliExpress crowd). Bluetooth, one
-   well-documented protocol family covers many rebrands.
-   Single-driver, massive coverage gain.
-2. **Daly Smart BMS**. Second-most-common BMS in budget LFP
-   packs, distinct protocol from JBD. Some models BLE, some
-   RS-485, some both.
-3. **EPEVER / EPSolar Tracer MPPT**. The #1 budget MPPT in DIY
-   van and cabin builds. Modbus RTU over USB-RS485, our existing
-   `serial_modbus` transport works as-is — driver is the only
-   missing piece.
+1. ✅ **JBD / Overkill Solar BMS** (#201). The BMS inside most
+   sub-£500 LFP packs (Eco-Worthy, LiTime, Power Queen, many
+   Vatrer SKUs, the JBD-direct-from-AliExpress crowd). Bluetooth,
+   one well-documented protocol covers many rebrands. **Pending
+   community validation.**
+2. ✅ **Daly Smart BMS** (#202). Second-most-common BMS in
+   budget LFP packs. BLE first; UART variant can follow when a
+   customer asks. **Pending community validation.**
+3. ✅ **EPEVER / EPSolar Tracer MPPT** (#203). The #1 budget
+   MPPT in DIY van and cabin builds. Modbus RTU over USB-RS485
+   with FC04 for live state. **Pending community validation.**
 
-### Tier 2 — validates the cheap-shunt wedge
+### Tier 2 — cheap-shunt wedge (shipped in v0.1.25)
 
-4. **AiLi shunt**. The cheap shunt that ships in thousands of
-   first-time DIY installs. Bluetooth, single-display unit.
-   Persona B's first purchase.
-5. **Junctek KH-F / KG-F shunt**. Second-most-common cheap
-   shunt. BLE, related but distinct from AiLi.
-6. **Battle Born / LiTime / Power Queen LFP**. Passive
-   identification via the underlying JBD BMS read (#1 above).
-   Once #1 lands, these are SKU-label changes, not new drivers.
+4. ✅ **AiLi shunt** (#204). Sub-£40 BLE shunt; the cheap
+   shunt that ships in thousands of first-time DIY installs.
+   **Pending community validation.**
+5. ✅ **Junctek KH-F / KG-F shunt** (#205). Second-most-common
+   cheap shunt. ASCII protocol over BLE; merges r50 / r51 / r53
+   responses into one canonical shunt-shaped output. **Pending
+   community validation.**
+6. ✅ **Battle Born / LiTime / Power Queen LFP**. Covered
+   automatically by the JBD driver — they're JBD-rebranded
+   inside. No additional code.
 
 ### Tier 3 — Persona A "I have a generator"
 
