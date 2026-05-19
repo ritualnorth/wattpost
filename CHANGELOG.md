@@ -8,6 +8,35 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.27] · 2026-05-19
+
+### Added · #207 Cloud energy analytics + savings page
+
+New `/app/energy` page that aggregates every appliance's daily
+PV-in and load-out totals into one cross-site view. Three summary
+tiles (PV generated, load consumed, optional savings vs grid) +
+a stacked daily bar chart with hover tooltips. Range selector
+covers last 7 / 30 / 90 / 365 days; per-site filter selector.
+
+Plumbing:
+
+- New `GET /api/energy/aggregate?days=N&site_id=...` endpoint.
+  Buckets heartbeats by UTC calendar day, takes the day's `max()`
+  of each `today_wh` field (the appliance counter is monotonic
+  within a day before midnight reset). Returns per-day totals
+  across the account plus per-site breakdowns.
+- Per-account grid tariff column on users (migration 0033) +
+  `PATCH /api/account/tariff` to set it. NULL = no savings line;
+  any integer in pence = "Saved £X this month" tile lights up.
+- Topbar gets an "Energy" link.
+
+### Fixed
+
+- Cloud alerts API was using `Appliance.owner_user_id` (the field
+  doesn't exist — the correct column is `owner_id`). Would have
+  500'd every request to the inbox; corrected before any traffic
+  hit it.
+
 ## [0.1.26] · 2026-05-19
 
 ### Added · #206 Cloud alerts inbox (cross-site feed)
