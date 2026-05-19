@@ -677,8 +677,12 @@
               The daemon re-enables it before the bank drops too low.
               Cooldown + a hard SoC floor protect against weather
               forecast errors. Off by default. Manual toggles always
-              win; the rule won't override a charger you just turned on
-              or off yourself.
+              win; the rule won't override an output you just turned
+              on or off yourself. The recommended control point is a
+              <strong>Shelly Plug S Gen2</strong> or Tasmota plug on
+              the mains lead going into your AC charger. Add one
+              under <code>smart_plugs:</code> in config.yaml; the
+              dropdown picks it up automatically.
             </p>
             <div class="sp-form">
               <label class="hist-row">
@@ -688,7 +692,7 @@
                 </span>
               </label>
               <label class="hist-row">
-                <span>Charger output</span>
+                <span>Output to control</span>
                 <span class="hist-input">
                   <select id="sp-output"></select>
                 </span>
@@ -1025,6 +1029,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=175"></script>
+  <script src="/web/app.js?v=176"></script>
 </body>
 </html>

@@ -259,6 +259,23 @@ class DiscoveryCfg(msgspec.Struct, kw_only=True):
     enabled: bool = False
 
 
+class SmartPlugCfg(msgspec.Struct, kw_only=True):
+    """One smart plug entry. WattPost talks to it over local HTTP —
+    no broker, no cloud, no Home Assistant required.
+
+    `kind` selects the protocol: `shelly_gen2` for any Shelly Plus /
+    Pro / Plug S running stock firmware; `tasmota` for any
+    Tasmota-flashed plug. `host` is the device's LAN address or
+    hostname. `name` shows up in the dashboard's Settings dropdown
+    when the user picks which plug the solar-pause rule controls.
+    """
+    name: str
+    kind: str   # "shelly_gen2" | "tasmota"
+    host: str
+    user:     str | None = None
+    password: str | None = None
+
+
 class SolarPauseCfg(msgspec.Struct, kw_only=True):
     """Solar-aware AC charger pause rule (#163). Off by default.
 
@@ -319,6 +336,7 @@ class Config(msgspec.Struct, kw_only=True):
     discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)
     history: HistoryCfg | None = None    # optional — poll cadence + retention (#172)
     solar_pause: SolarPauseCfg | None = None  # optional — auto-pause AC charger when PV covers (#163)
+    smart_plugs: list[SmartPlugCfg] = []      # optional — LAN-attached smart plugs for solar-pause to drive
 
 
 def load_config(path: str | Path) -> Config:

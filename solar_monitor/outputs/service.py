@@ -28,6 +28,7 @@ from .base import ControllableOutput, OutputAdapter, WriteResult
 from .registry import discover_outputs_for_device, get_adapter_for
 from . import schedules as _schedules
 from . import solar_pause as _solar_pause
+from . import smart_plug as _smart_plug
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +47,12 @@ class OutputsService:
     async def discover_all(self) -> None:
         """Walk the current device snapshot and register every output
         any adapter wants to expose. Idempotent — re-discovery
-        preserves runtime state via the storage layer's UPSERT."""
+        preserves runtime state via the storage layer's UPSERT.
+
+        Smart plugs (#163 followup) are registered alongside Modbus-
+        discovered outputs. Their adapters live outside the device-
+        snapshot model because plugs aren't devices we poll; we read
+        them directly from config.smart_plugs."""
         latest = await self.store.get_latest()
         discovered: dict[str, tuple[OutputAdapter, ControllableOutput]] = {}
         for device_label, snap in latest.items():
@@ -66,18 +72,68 @@ class OutputsService:
                     kind=output.kind,
                     capabilities=list(output.capabilities),
                 )
+        # Smart plugs. Each config entry becomes one ControllableOutput
+        # with id "plug.<slug>". Slugs are derived from the name; if
+        # two plugs share a name the second one's id is auto-suffixed.
+        seen_slugs: set[str] = set()
+        for plug_cfg in getattr(self.config, "smart_plugs", []) or []:
+            try:
+                adapter = _smart_plug.build_adapter({
+                    "kind":     plug_cfg.kind,
+                    "host":     plug_cfg.host,
+                    "name":     plug_cfg.name,
+                    "user":     plug_cfg.user,
+                    "password": plug_cfg.password,
+                })
+            except ValueError as e:
+                log.warning("outputs: skipping smart_plug %r: %s",
+                            plug_cfg.name, e)
+                continue
+            base = _slugify(plug_cfg.name) or "plug"
+            slug = base
+            i = 2
+            while slug in seen_slugs:
+                slug = f"{base}{i}"
+                i += 1
+            seen_slugs.add(slug)
+            output_id = f"plug.{slug}"
+            output = adapter.build_output(output_id)
+            discovered[output_id] = (adapter, output)
+            await self.store.upsert_output(
+                id=output.id,
+                device_label=output.device_label,
+                name=output.name,
+                kind=output.kind,
+                capabilities=list(output.capabilities),
+            )
         self._known = discovered
         log.info("outputs: discovered %d controllable output(s): %s",
                  len(discovered), sorted(discovered.keys()) or "(none)")
 
     async def apply_snapshot(self) -> None:
         """Refresh each output's state from the latest device snapshot.
-        Called by the scheduler after every poll cycle."""
+        Called by the scheduler after every poll cycle.
+
+        Smart plugs aren't in the snapshot so we read them out-of-band
+        via the adapter's own HTTP probe. Best-effort: a plug that's
+        offline keeps its last-known state until the next tick."""
         if not self._known:
             return
         latest = await self.store.get_latest()
         now = int(time.time())
         for output_id, (adapter, output) in self._known.items():
+            if output.kind == "smart_plug":
+                # Direct HTTP read against the plug. ~3 s timeout on
+                # the urlopen so a dead plug doesn't stall the
+                # service-tick for every other output.
+                state = None
+                try:
+                    state = await adapter.read_state()
+                except Exception:
+                    log.exception("outputs: read_state failed for %s", output_id)
+                if state is not None:
+                    await self.store.update_output_state(output_id, state, now)
+                continue
             snap = latest.get(output.device_label)
             if snap is None:
                 continue
@@ -242,15 +298,24 @@ class OutputsService:
                 raise KeyError(f"unknown output {output_id!r}")
         adapter, output = self._known[output_id]
 
-        # Resolve the transport + slave_id from live config so we hit
-        # the same BLE link the poller uses (shared lock).
-        transport_id, slave_id = self._resolve_device(output.device_label)
-        transport = self.scheduler.get_transport(transport_id)
-        if transport is None:
-            raise RuntimeError(
-                f"transport {transport_id!r} not running — has the daemon "
-                f"finished its first poll cycle?"
-            )
+        # Smart plugs talk HTTP directly to a LAN host. They share the
+        # same toggle() entry point as Modbus outputs but skip the
+        # transport-resolution dance — there's no shared BLE link, no
+        # slave id; the adapter knows its own host.
+        is_plug = output.kind == "smart_plug"
+        if is_plug:
+            transport = None
+            slave_id = 0
+        else:
+            # Resolve the transport + slave_id from live config so we
+            # hit the same BLE link the poller uses (shared lock).
+            transport_id, slave_id = self._resolve_device(output.device_label)
+            transport = self.scheduler.get_transport(transport_id)
+            if transport is None:
+                raise RuntimeError(
+                    f"transport {transport_id!r} not running — has the daemon "
+                    f"finished its first poll cycle?"
+                )
 
         action = "on" if on else "off"
         now = int(time.time())
@@ -287,3 +352,21 @@ class OutputsService:
             if d.label == device_label:
                 return d.transport, d.slave_id
         raise KeyError(f"device {device_label!r} not found in config")
+
+
+def _slugify(s: str) -> str:
+    """Lowercase + ASCII-only + hyphen-separated slug for use as the
+    second half of a `plug.<slug>` output id. Drops anything outside
+    [a-z0-9-]; collapses repeats. Empty string in -> empty string out
+    (caller falls back to "plug")."""
+    out = []
+    prev_dash = True
+    for ch in s.lower():
+        if ch.isalnum():
+            out.append(ch)
+            prev_dash = False
+        elif not prev_dash:
+            out.append("-")
+            prev_dash = True
+    s2 = "".join(out).strip("-")
+    return s2

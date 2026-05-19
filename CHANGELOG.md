@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.22] · 2026-05-19
+
+### Added · #163 followup, smart-plug output adapter
+
+The solar-pause rule from v0.1.21 had no actual output it could
+drive. v0.1.22 adds two local-HTTP smart-plug adapters that
+WattPost talks to directly, no MQTT broker, no Home Assistant,
+no cloud:
+
+- **Shelly Gen2** (Plug S, Plus, Pro). JSON-RPC at
+  `/rpc/Switch.Set` + `/rpc/Switch.GetStatus`. Basic-auth
+  optional. The recommended option for new installs.
+- **Tasmota**. `/cm?cmnd=Power...` on any flashed Sonoff / Athom
+  / similar.
+
+Configure via a new `smart_plugs:` block in config.yaml; each
+entry becomes one controllable output and shows up in the
+solar-pause dropdown under Settings → Solar-aware charger pause.
+
+The rule's "respect manual override" gate works the same way it
+does for Modbus outputs: toggle the plug yourself from the
+dashboard or its own app and the rule backs off.
+
+### Fixed · v0.1.21 release notes called it "Renogy AC charger only"
+
+The original v0.1.21 changelog and release-notes blog implied
+Renogy AC chargers were the supported solar-pause target. They
+weren't (Renogy doesn't publish a verified write map for the
+AC-charger side, and writing to a guessed register is the kind
+of thing that bricks customers' gear). Corrected here and in
+the blog post.
+
 ## [0.1.21] · 2026-05-19
 
 ### Added · #138 Reset-to-defaults for Docker parity
@@ -22,15 +54,16 @@ users.
 
 ### Added · #163 Solar-aware AC charger pause (Pro)
 
-New rule that pauses the AC charger when PV is covering the
+New rule that pauses an AC charger when PV is covering the
 load and wakes it before the bank drops too low. Four safety
 gates: hard SoC floor that beats every forecast, configurable
 cooldown to stop relay flap, "respect manual override" when
-the user just toggled the charger themselves, and a per-rule
+the user just toggled the output themselves, and a per-rule
 validator that blocks misconfigurations from landing in
 config.yaml. Settings → Solar-aware charger pause; off by
-default. Renogy AC chargers only at v1 (Victron is read-only
-by design).
+default. v0.1.21 ships the controller engine + Settings UI;
+the smart-plug output adapter that wires it to real hardware
+lands in v0.1.22.
 
 ### Added · `/api/snapshot`
 
