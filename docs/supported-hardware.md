@@ -9,7 +9,7 @@ Missing your kit? Email [support@wattpost.io](mailto:support@wattpost.io) with t
 | Vendor | BT-2 dongle | USB-RS485 (wired) | Direct BLE (no dongle) |
 | --- | :---: | :---: | :---: |
 | **Renogy** | ✓ (default) | ✓ (recommended for long runs / metal vans) | · |
-| **Victron** | · | · | ✓ (Instant Readout broadcasts) |
+| **Victron** | · | ✓ (VE.Direct, on models with the port) | ✓ (Instant Readout broadcasts, default) |
 | **JK BMS** | · | · | ✓ (BLE service broadcasts) |
 
 The wizard's "Add another connection" step lets you mix and match ·
@@ -41,8 +41,13 @@ Reads **Instant Readout** BLE advertisements. Victron's Smart-series devices bro
 - **SmartLithium** batteries
 - **LynxSmartBMS**
 - **SmartBatteryProtect**. Load-disconnect status + voltage thresholds
+- **Phoenix Inverter VE.Direct**. The small pure-sine line that exposes a VE.Direct port. Read via cable, not BLE.
 
 Read-only by design. We don't expose Cerbo/VRM-style write control. Heavy-Victron users keep using VRM for that.
+
+### Wired alternative: VE.Direct over cable
+
+For metal-van installs and dense-RF environments where BLE struggles, WattPost also reads SmartShunt / SmartSolar MPPT / Phoenix Inverter over Victron's **VE.Direct** wired protocol. ~£25 Victron-branded VE.Direct-to-USB cable, or a ~£12 DIY JST-to-FTDI rig. See [Wired setup](/docs/wired-setup) for the pinout and config. Read-only on this path too — VE.Direct doesn't expose writes.
 
 ## JK BMS
 
@@ -52,9 +57,9 @@ JK B-series (BD6A20S, B1A24S, B2A24S, etc.) advertise their own Bluetooth servic
 
 No commit dates yet. If you want one of these sooner, email [support@wattpost.io](mailto:support@wattpost.io).
 
-- **Phoenix inverters** via VE.Direct USB
 - **Hybrid inverters**. EG4, Sol-Ark
 - **Sub-metering**. Shelly EM, IoTaWatt
+- **JBD / Overkill Solar BMS, Daly BMS, EPEVER MPPT**. Top of the coverage-roadmap queue. See [coverage-roadmap.md](/docs/coverage-roadmap).
 
 ## Hardware we won't add
 
