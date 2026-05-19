@@ -3305,15 +3305,18 @@ async function refreshSolarPauseSettings() {
   const sel = document.getElementById("sp-output");
   if (sel) {
     sel.innerHTML = "";
-    // Only AC-charger-ish outputs are sensible targets. Renogy inverter
-    // models expose `ac_charger`; Renogy Rover's `load` output isn't
-    // the right thing to put on this rule, so we omit it.
-    const ok = (outputs.outputs || []).filter(o =>
-      (o.kind || "").toLowerCase().includes("charger") ||
-      (o.kind || "").toLowerCase().includes("ac"));
+    // Sensible targets: smart plugs (the recommended path — they cut
+    // mains upstream of the AC charger and work regardless of charger
+    // vendor) plus any future native AC-charger writes. We deliberately
+    // skip the Renogy Rover's DC load output here — it's not the right
+    // thing to put on this rule.
+    const ok = (outputs.outputs || []).filter(o => {
+      const k = (o.kind || "").toLowerCase();
+      return k === "smart_plug" || k.includes("ac_charger") || k.includes("charger");
+    });
     if (!ok.length) {
       const opt = document.createElement("option");
-      opt.textContent = "No AC charger output configured";
+      opt.textContent = "No smart plug or AC charger output configured";
       opt.value = "";
       sel.appendChild(opt);
       sel.disabled = true;
@@ -3322,7 +3325,8 @@ async function refreshSolarPauseSettings() {
       for (const o of ok) {
         const opt = document.createElement("option");
         opt.value = o.id;
-        opt.textContent = `${o.name || o.id} (${o.device_label})`;
+        const tag = (o.kind || "").toLowerCase() === "smart_plug" ? "plug" : "charger";
+        opt.textContent = `${o.name || o.id} (${tag})`;
         sel.appendChild(opt);
       }
     }

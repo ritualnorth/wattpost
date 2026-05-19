@@ -2,9 +2,25 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "v0-1-22-release",
+      "title": "What shipped in WattPost v0.1.22",
+      "summary": "The smart-plug output adapter the solar-pause rule was missing. Shelly Gen2 and Tasmota over local HTTP, no broker, no Home Assistant, no cloud. Plus a correction to last week's v0.1.21 notes.",
+      "published_at": "2026-06-09",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
+      "slug": "solar-pause-smart-plug",
+      "title": "Pause your AC charger with a smart plug when the sun is doing the work",
+      "summary": "Step-by-step setup for the solar-pause rule with a Shelly Plug S Gen2 sitting between the wall and your AC charger. Off-grid friendly, no broker, no Home Assistant required.",
+      "published_at": "2026-06-09",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "v0-1-21-release",
       "title": "What shipped in WattPost v0.1.21",
-      "summary": "Reset-to-defaults for Docker users, the new solar-aware AC charger pause rule (Pro tier), a dashboard snapshot-lock fix that stops the hero and flow tiles disagreeing with each other, plus a strategic coverage roadmap that finally writes down which drivers come next.",
+      "summary": "Reset-to-defaults for Docker users, the new solar-aware charger pause rule engine (Pro tier), a dashboard snapshot-lock fix that stops the hero and flow tiles disagreeing with each other, plus a strategic coverage roadmap that finally writes down which drivers come next.",
       "published_at": "2026-06-02",
       "author": "Ritual North",
       "hero": null

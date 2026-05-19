@@ -59,10 +59,14 @@ toggle the charger yourself, the rule stops touching it.
 Whatever you just did, you knew something we didn't.
 
 This is a Pro tier feature and it's off by default. The
-Renogy 1000W / 2000W / 3000W pure-sine inverter-chargers are
-the supported target at v1. Victron AC chargers stay read-only,
-which is a deliberate scope decision we wrote down in our
-coverage doc.
+**control point is a smart plug upstream of the charger**, not
+the charger itself. We don't write to charger Modbus registers
+for the AC-charger side (Renogy doesn't publish a verified
+write map, and Victron is read-only by design). The output
+adapter ships in **v0.1.22** with first-class support for
+Shelly Plug S Gen2 and Tasmota-flashed plugs over local HTTP,
+no MQTT broker or Home Assistant required. Both work fully
+off-grid on your LAN.
 
 ## Hero / Flow snapshot lock (#162)
 
