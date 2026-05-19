@@ -806,6 +806,16 @@ async def stream(state: State) -> Stream:
     )
 
 
+@get("/api/snapshot")
+async def snapshot(state: State) -> dict[str, Any]:
+    # Frame-locked REST view: devices + poll_run + today read in one
+    # atomic pass via the scheduler. Replaces three separate fetches in
+    # the SPA's polling fallback so the hero and flow tiles can never
+    # disagree about which poll cycle they're rendering (#162).
+    scheduler: PollScheduler = state["scheduler"]
+    return await scheduler.build_snapshot()
+
+
 @get("/api/devices/{label:str}/history.csv")
 async def device_history_csv(
     label: str,
@@ -1434,6 +1444,7 @@ def build_app(
             runtime_forecast,
             load_heatmap,
             stream,
+            snapshot,
             list_alerts,
             test_alert,
             restart_daemon,
