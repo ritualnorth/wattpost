@@ -140,6 +140,9 @@ class PollScheduler:
         # Tracks whether we've performed the post-first-poll discovery.
         # Re-discover whenever new devices appear (count change).
         self._outputs_last_device_count = -1
+        # Last solar-pause decision (#163) so build_snapshot can surface
+        # it on the dashboard without re-evaluating per request.
+        self._last_solar_pause: dict[str, Any] | None = None
 
         # USB GPS (#125). Optional; off entirely when config.gps is
         # absent. On significant movement we mutate the weather +
@@ -277,6 +280,10 @@ class PollScheduler:
                 },
             },
             "today": today,
+            # Last solar-pause decision (#163). None when the rule has
+            # never evaluated or is disabled. The dashboard reads this
+            # to tag the AC charger tile in the flow strip.
+            "solar_pause": self._last_solar_pause,
         }
 
     async def start(self) -> None:
@@ -425,8 +432,10 @@ class PollScheduler:
                     await self.outputs.fire_schedules_if_due()
                     # Solar-pause controller (#163) — auto-pause the AC
                     # charger when PV is covering. Off by default; cheap
-                    # when disabled (one config check).
-                    await self.outputs.evaluate_solar_pause()
+                    # when disabled (one config check). Last decision
+                    # is cached on the scheduler so build_snapshot can
+                    # surface it to the dashboard without re-evaluating.
+                    self._last_solar_pause = await self.outputs.evaluate_solar_pause()
                 except Exception:
                     log.exception("outputs service hook failed")
                 # Fan out to exporters. Each exporter is non-blocking; if it
