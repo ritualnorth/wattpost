@@ -239,6 +239,11 @@ let chart = null;
 let currentRange = "24h";
 let lastRun = null;
 let todayAggregate = null;  // /api/today result, refreshed alongside devices
+// Last solar-pause decision from the daemon (#163). The Flow strip reads
+// this to add a "Paused, solar covering" sub-label to the AC-charger
+// tile so the rule's effect is visible from the dashboard, not just
+// from Settings.
+let solarPauseStatus = null;
 // Per-frame cache for derived views the hero + flow + alerts all share
 // (#162). applySnapshot() resets these every tick; consumer functions
 // reuse the cached value within the same frame so all tiles agree on
@@ -433,6 +438,7 @@ function applySnapshot(frame) {
   devices = frame.devices || [];
   lastRun = frame.poll_run?.last_run || null;
   todayAggregate = frame.today || null;
+  solarPauseStatus = frame.solar_pause || null;
   // Frame-scoped cache. Reset on every apply so a stale value from the
   // previous tick can't leak into the next render.
   _frame.nowSec = Date.now() / 1000;
@@ -1025,6 +1031,25 @@ function buildFlowModel() {
     // A user who's set up an MPPT wants to see it on the dashboard at all
     // times — "0 W idle" is informative; hiding the tile makes the system
     // look misconfigured.
+    //
+    // Solar-pause overlay (#163): when the daemon's solar-pause rule
+    // has just told this charger to go off (or is keeping it off), the
+    // tile's sub-label says so explicitly instead of the bare "idle".
+    // Without this hint the user sees an inverted-by-default charger
+    // tile with no obvious reason.
+    const acPausedByRule = (() => {
+      if (!solarPauseStatus || dev.kind !== "ac_charger") return false;
+      const sp = solarPauseStatus;
+      if (!sp.charger_on === false) {
+        // sp.charger_on is the most recent observed state; we use a
+        // pause indicator when the rule's last decision was force_off
+        // OR when it explicitly says the charger is currently paused
+        // and SoC sits above the recover threshold.
+        if (sp.decision === "force_off") return true;
+        if (!sp.charger_on && sp.applied !== true && /paused/i.test(sp.reason || "")) return true;
+      }
+      return false;
+    })();
     for (const s of mapping.sources || []) {
       if (s.onlyIf && !s.onlyIf(l)) continue;
       const w = isSilent ? 0 : (+l[s.metric] || 0);
@@ -1032,6 +1057,9 @@ function buildFlowModel() {
         typeof l[s.vMetric] === "number" ? `${l[s.vMetric].toFixed(1)} V` : null,
         typeof l[s.aMetric] === "number" ? `${l[s.aMetric].toFixed(2)} A` : null,
       ].filter(Boolean);
+      const subFromState = silentSub
+             || (w > 0 ? subParts.join(" · ")
+                       : (subParts.length ? `${subParts.join(" · ")} · idle` : "idle"));
       sources.push({
         id: `${dev.label}.${s.id}`,
         label: s.label,
@@ -1041,11 +1069,14 @@ function buildFlowModel() {
         power: w,
         active: w > 1,
         silent: isSilent,
-        // When the source is idle, say so explicitly rather than just
-        // showing V/A (which can look like the device is broken).
-        sub: silentSub
-             || (w > 0 ? subParts.join(" · ")
-                       : (subParts.length ? `${subParts.join(" · ")} · idle` : "idle")),
+        // The solar-pause overlay only overrides the sub-label when
+        // the charger is genuinely off (silent / idle). If the
+        // charger is actively producing despite the rule saying
+        // "force_off", keep showing the real V/A so the user can
+        // tell the write hasn't landed yet.
+        sub: (acPausedByRule && (isSilent || w <= 1))
+             ? "Paused · solar covering"
+             : subFromState,
       });
     }
     // Loads: keep the onlyIf filter — the Rover's load output really is
