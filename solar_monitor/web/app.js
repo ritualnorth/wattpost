@@ -7936,6 +7936,66 @@ async function wizCheckBleStatus() {
   host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth ready</strong> · ${list}</span>`;
 }
 
+// Deeper BLE diagnostic. Click handler for #wiz-ble-diagnose-btn.
+// Hits /api/setup/ble_diagnose which runs bleak and bluetoothctl
+// side by side and returns a verdict. Surfaces the Realtek+BlueZ
+// silent-failure case (#158) so users on those chips know the
+// dashboard polling still works even when bluetoothctl looks dead.
+async function wizRunBleDiagnose() {
+  const btn = $("#wiz-ble-diagnose-btn");
+  const out = $("#wiz-ble-diag-out");
+  if (!btn || !out) return;
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = "Running…";
+  out.hidden = false;
+  out.className = "wiz-ble-diag-out wiz-ble-diag-running";
+  out.textContent = "Scanning with bleak (3 s) and bluetoothctl (3 s)…";
+  let data;
+  try {
+    data = await api("/api/setup/ble_diagnose");
+  } catch (e) {
+    out.className = "wiz-ble-diag-out wiz-ble-diag-bad";
+    out.textContent = `Diagnostic failed: ${e.message || e}`;
+    btn.disabled = false;
+    btn.textContent = origLabel;
+    return;
+  }
+  const fmtCount = (c, err) => {
+    if (err) return `<span class="wiz-ble-diag-err">error: ${escHtml(err)}</span>`;
+    if (c == null) return "·";
+    return `<strong>${c}</strong> device${c === 1 ? "" : "s"}`;
+  };
+  const verdictCls = {
+    ok: "wiz-ble-diag-ok",
+    scan_silent_failure: "wiz-ble-diag-warn",
+    bleak_silent_failure: "wiz-ble-diag-warn",
+    bleak_failed: "wiz-ble-diag-bad",
+    bluetoothctl_failed: "wiz-ble-diag-warn",
+    no_scanner_available: "wiz-ble-diag-bad",
+    no_devices_seen: "wiz-ble-diag-warn",
+  }[data.verdict] || "wiz-ble-diag-warn";
+  out.className = `wiz-ble-diag-out ${verdictCls}`;
+  const sug = data.suggestion
+    ? `<div class="wiz-ble-diag-suggest">${escHtml(data.suggestion)}</div>`
+    : "";
+  out.innerHTML = `
+    <div class="wiz-ble-diag-counts">
+      <span>bleak: ${fmtCount(data.bleak?.count, data.bleak?.error)}</span>
+      <span>·</span>
+      <span>bluetoothctl: ${fmtCount(data.bluetoothctl?.count, data.bluetoothctl?.error)}</span>
+    </div>
+    ${sug}
+  `;
+  btn.disabled = false;
+  btn.textContent = origLabel;
+}
+document.addEventListener("click", (e) => {
+  if (e.target && e.target.id === "wiz-ble-diagnose-btn") {
+    wizRunBleDiagnose();
+  }
+});
+
 // ---------- diagnostics (log tail) ----------
 let diagTimer = null;
 const DIAG_REFRESH_MS = 4000;
