@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "first-install",
+      "title": "How to set up WattPost on a Raspberry Pi from scratch",
+      "summary": "Blank SD card to a live solar dashboard in one sitting. Download, flash, boot, pair your first Renogy or Victron device, and (optionally) link to the cloud for remote access.",
+      "published_at": "2026-05-19",
+      "author": "Ritual North",
+      "hero": "/static/img/blog/first-install/hero.png"
+    },
+    {
       "slug": "welcome",
       "title": "Welcome to the WattPost blog",
       "summary": "Building a local-first off-grid solar monitor in public. Tutorials, release notes, customer stories, and the occasional debugging war story.",
