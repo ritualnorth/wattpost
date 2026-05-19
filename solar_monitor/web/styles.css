@@ -847,6 +847,11 @@ main {
   gap: .5rem;
   min-width: 160px;
   flex: 1;
+  /* Centre tiles vertically within the column so a single-tile
+   * column (Battery, Load) lines up against the middle of a multi-
+   * tile column (Sources stack: AC Charger + Solar) instead of
+   * top-aligning to the first source tile. */
+  justify-content: center;
 }
 .flow-conn {
   flex: 0 0 auto;
