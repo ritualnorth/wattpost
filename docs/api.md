@@ -52,7 +52,7 @@ Every appliance the token's owner has paired.
   "sites": [
     {
       "id": 42,
-      "label": "RV — rooftop",
+      "label": "RV rooftop",
       "slug": "ax4mn3uo01",
       "tunnel_url": "https://ax4mn3uo01.wattpost.io/",
       "online": true,
@@ -70,7 +70,7 @@ Latest snapshot for one site.
 ```json
 {
   "id": 42,
-  "label": "RV — rooftop",
+  "label": "RV rooftop",
   "online": true,
   "last_seen": "2026-05-14T13:47:01Z",
   "latest": {
@@ -162,7 +162,7 @@ Use the [JSON API datasource](https://grafana.github.io/grafana-json-datasource/
 
 ### Google Sheets
 
-`=IMPORTDATA("https://wattpost.cloud/api/v1/sites/42")` doesn't pass auth headers — wrap with [an Apps Script](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app) that adds `Authorization`.
+`=IMPORTDATA("https://wattpost.cloud/api/v1/sites/42")` doesn't pass auth headers. Wrap with [an Apps Script](https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app) that adds `Authorization`.
 
 ## Coming in v2
 
@@ -170,4 +170,4 @@ Use the [JSON API datasource](https://grafana.github.io/grafana-json-datasource/
 - Live streaming over SSE
 - Per-token rate limit enforcement (currently reported but not enforced)
 
-Have ideas or hit a problem? Email [support@wattpost.io](mailto:support@wattpost.io) — the v2 backlog is operator-driven and we'd rather build what you need than guess.
+Have ideas or hit a problem? Email [support@wattpost.io](mailto:support@wattpost.io). The v2 backlog is operator-driven and we'd rather build what you need than guess.

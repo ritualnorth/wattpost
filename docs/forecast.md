@@ -12,12 +12,12 @@ It's **opt-in**. No forecast is fetched until you supply credentials.
 
 ## Why your own key (not ours)
 
-Solcast's terms require one key per end-user — we can't legally proxy
+Solcast's terms require one key per end-user. We can't legally proxy
 forecasts through a shared key. The upside: nothing about your forecast
 goes through anything we operate. Your daemon talks to Solcast directly
 over HTTPS.
 
-The hobbyist tier is **free for personal residential use** — two sites
+The hobbyist tier is **free for personal residential use**. Two sites
 per account, 10 API calls/day, 30-min resolution, 7-day window. That's
 more than enough for one or two appliances.
 
@@ -26,21 +26,21 @@ more than enough for one or two appliances.
 1. **Register at Solcast**:
    [solcast.com/free-rooftop-solar-forecasting](https://solcast.com/free-rooftop-solar-forecasting).
    They'll ask for your panel array's:
-   - **Latitude/longitude** (or postcode — they'll geocode it)
-   - **Capacity** — total array size in kW (e.g. 0.4 for 4× 100 W panels)
+   - **Latitude/longitude** (or postcode. They'll geocode it)
+   - **Capacity**. Total array size in kW (e.g. 0.4 for 4× 100 W panels)
    - **Tilt** in degrees from horizontal (often the same as your roof pitch;
      for portable / RV panels, the tilt when deployed)
-   - **Azimuth** — 0° = north, 90° = east, 180° = south, 270° = west.
+   - **Azimuth** · 0° = north, 90° = east, 180° = south, 270° = west.
      Southern hemisphere users will typically face their panels toward
      the equator.
 
 2. **Copy two values** from your Solcast account:
-   - **API key** — under *Account → API key* (~36 characters)
-   - **Resource ID** — under *My Sites* — the UUID of the rooftop site
+   - **API key**. Under *Account → API key* (~36 characters)
+   - **Resource ID**. Under *My Sites*. The UUID of the rooftop site
      you just registered
 
 3. **Paste into WattPost**: Settings → Integrations → *Configure*.
-   - Click **Test** before saving — you'll see "✓ N forecast points,
+   - Click **Test** before saving. You'll see "✓ N forecast points,
      next peak X.X kW at HH:MM" if the credentials are valid.
    - Click **Save**.
 
@@ -64,7 +64,7 @@ polling means the forecast won't update as the day rolls forward.
 
 The most recent forecast is cached in WattPost's SQLite DB under the
 key `forecast:pv`. The cache survives daemon restarts so the dashboard
-isn't blank for the next 3 hours after a reboot — the previous fetch
+isn't blank for the next 3 hours after a reboot. The previous fetch
 is served until the next poll lands.
 
 Disabling the integration (Settings → Integrations → Edit → *Disable*)
@@ -83,31 +83,31 @@ Solcast returns three power values per 30-minute slice:
 
 Today's UI shows the median as a dashed line on the History chart
 (when viewing `pv_power_w`) and fills the area between P10 and P90
-with translucent amber — a wide band means the model isn't sure
+with translucent amber. A wide band means the model isn't sure
 (weather front coming through, dawn/dusk transitions), a narrow band
 means high confidence. The Tomorrow tile and 7-day outlook strip
 both use the median for their kWh figures.
 
 ## Troubleshooting
 
-**"401 Unauthorized" on Test** — the API key is wrong or has been
+**"401 Unauthorized" on Test**. The API key is wrong or has been
 rotated in your Solcast account. Re-copy from *Account → API key* and
 try again.
 
-**"404 Not Found" on Test** — the Resource ID doesn't match this
+**"404 Not Found" on Test**. The Resource ID doesn't match this
 account, or the rooftop site was deleted. Find your UUID at
 your [Solcast toolkit](https://toolkit.solcast.com.au) account.
 
-**"429 Rate-limited"** — the daemon (or some other process using the
+**"429 Rate-limited"**. The daemon (or some other process using the
 same key) blew through 10 calls today. Wait 24 h or lower the poll
 cadence.
 
-**Forecast curve looks too low / too high vs reality** — your array
+**Forecast curve looks too low / too high vs reality**. Your array
 parameters in Solcast (capacity, tilt, azimuth, shading) are off.
-Edit the site in your Solcast dashboard, no WattPost change needed —
+Edit the site in your Solcast dashboard, no WattPost change needed ·
 the next poll picks up the new model.
 
-**Forecast tile on the dashboard didn't appear** — Solcast returned
+**Forecast tile on the dashboard didn't appear**. Solcast returned
 zero useful future points (the daemon may not have polled yet, or
 the polled window doesn't cover tomorrow). Wait for the next 3-hour
 poll, or use Test in Settings to force one.

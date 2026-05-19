@@ -9,7 +9,7 @@ expected** for a local-only appliance.
 Modern browsers label any page served over plain HTTP (not HTTPS) as
 "Not Secure" because the connection isn't encrypted. On the public
 internet that warning is a real risk. On your home / cabin / boat
-LAN it's a label, not a danger — there's nobody on the wire between
+LAN it's a label, not a danger. There's nobody on the wire between
 your phone and the Pi.
 
 The same applies to **Pi-hole**, **OctoPrint**, **Plex**, **Home
@@ -25,12 +25,12 @@ Three ways, in order of difficulty:
    Once your tailnet is up, Settings → Network → **Enable HTTPS via
    Tailscale Serve**. Tailscale auto-provisions a Let's Encrypt cert
    for `*.<your-tailnet>.ts.net`. From there, open
-   `https://wattpost.<your-tailnet>.ts.net/` — green padlock, no
+   `https://wattpost.<your-tailnet>.ts.net/`. Green padlock, no
    warning, no install. Works both at home and remotely.
 
 2. **WattPost cloud**.
    Managed remote access at `https://<slug>.wattpost.io/` via
-   Cloudflare Tunnel. Real cert maintained by us. From £3/mo —
+   Cloudflare Tunnel. Real cert maintained by us. From £3/mo ·
    see [Remote access](/docs/remote-access).
 
 3. **Browser exceptions**.
@@ -45,5 +45,5 @@ Three ways, in order of difficulty:
   warning than "Not Secure", trains users to dismiss security
   warnings, and breaks the PWA install path. Don't do this.
 - **A real cert for an internal IP / `.local` hostname**. Doesn't
-  exist — Let's Encrypt and the public CAs only issue for public
+  exist. Let's Encrypt and the public CAs only issue for public
   DNS names.

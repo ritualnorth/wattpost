@@ -102,11 +102,11 @@
       </div>
       <ul class="status-legend-list">
         <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet — visit Settings → Setup and click "Find my dongle".</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet. Visit Settings → Setup and click "Find my dongle".</li>
         <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Your Bluetooth connection is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes — usually a brief BLE wobble; clears on the next cycle.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes. Usually a brief BLE wobble; clears on the next cycle.</li>
         <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
-        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes — check Bluetooth power / range to the dongle.</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes. Check Bluetooth power / range to the dongle.</li>
         <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Visit Settings → System → Restart daemon.</li>
       </ul>
       <a class="status-legend-link" href="#/settings">Open Settings → Diagnostics for live logs</a>
@@ -162,9 +162,9 @@
                     transform="rotate(-90 100 100)" />
           </svg>
           <div class="donut-center">
-            <div class="donut-pct"><span id="bank-soc">—</span><span class="donut-pct-unit">%</span></div>
+            <div class="donut-pct"><span id="bank-soc">·</span><span class="donut-pct-unit">%</span></div>
             <div class="donut-label">State of charge</div>
-            <div class="donut-flow" id="donut-flow"><span class="donut-flow-arrow"></span><span class="donut-flow-text">—</span></div>
+            <div class="donut-flow" id="donut-flow"><span class="donut-flow-arrow"></span><span class="donut-flow-text">·</span></div>
             <!-- #121: surfaced when shunt + BMS SoC disagree by >5pp.
                  Empty / hidden in the common case. -->
             <div class="donut-disagreement" id="donut-disagreement" hidden></div>
@@ -174,30 +174,30 @@
         <div class="hero-stats">
           <div class="hero-stat hero-stat--big" id="bank-power-tile">
             <div class="meta-k">Net power</div>
-            <div class="hero-stat-val"><span id="bank-power">—</span><span class="hero-stat-unit">W</span></div>
-            <div class="hero-stat-sub" id="bank-power-sub">—</div>
+            <div class="hero-stat-val"><span id="bank-power">·</span><span class="hero-stat-unit">W</span></div>
+            <div class="hero-stat-sub" id="bank-power-sub">·</div>
           </div>
           <div class="hero-stat hero-stat--big" id="bank-time-tile">
             <div class="meta-k">Remaining</div>
-            <div class="hero-stat-val"><span id="bank-time">—</span></div>
-            <div class="hero-stat-sub" id="bank-time-sub">—</div>
-            <div class="hero-stat-forecast" id="bank-time-forecast" hidden>—</div>
+            <div class="hero-stat-val"><span id="bank-time">·</span></div>
+            <div class="hero-stat-sub" id="bank-time-sub">·</div>
+            <div class="hero-stat-forecast" id="bank-time-forecast" hidden>·</div>
           </div>
           <div class="hero-stat">
             <div class="meta-k">Voltage</div>
-            <div class="hero-stat-val"><span id="bank-voltage">—</span><span class="hero-stat-unit">V</span></div>
+            <div class="hero-stat-val"><span id="bank-voltage">·</span><span class="hero-stat-unit">V</span></div>
           </div>
           <div class="hero-stat">
             <div class="meta-k">Capacity</div>
-            <div class="hero-stat-val"><span id="bank-capacity">—</span><span class="hero-stat-unit">Ah</span></div>
+            <div class="hero-stat-val"><span id="bank-capacity">·</span><span class="hero-stat-unit">Ah</span></div>
           </div>
           <div class="hero-stat">
             <div class="meta-k">Remaining</div>
-            <div class="hero-stat-val"><span id="bank-remaining">—</span><span class="hero-stat-unit">Ah</span></div>
+            <div class="hero-stat-val"><span id="bank-remaining">·</span><span class="hero-stat-unit">Ah</span></div>
           </div>
           <div class="hero-stat">
             <div class="meta-k">Bank</div>
-            <div class="hero-stat-val"><span id="bank-meta">—</span></div>
+            <div class="hero-stat-val"><span id="bank-meta">·</span></div>
           </div>
         </div>
       </section>
@@ -211,7 +211,7 @@
             </svg>
             Power flow
           </h2>
-          <div class="panel-sub" id="flow-sub">—</div>
+          <div class="panel-sub" id="flow-sub">·</div>
         </div>
         <div id="flow" class="flow"></div>
       </section>
@@ -233,13 +233,13 @@
         </div>
         <div class="today-grid">
           <div class="today-hero">
-            <div class="today-hero-val"><span id="today-pv">—</span></div>
+            <div class="today-hero-val"><span id="today-pv">·</span></div>
             <div class="today-hero-cells">
-              <div class="today-cell"><span class="meta-k">Charged</span><span class="today-v" id="today-charged">—</span></div>
-              <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">—</span></div>
-              <div class="today-cell"><span class="meta-k">Load</span><span class="today-v" id="today-load">—</span></div>
-              <div class="today-cell"><span class="meta-k">Stored</span><span class="today-v" id="today-stored">—</span></div>
-              <div class="today-cell"><span class="meta-k">SoC today</span><span class="today-v" id="today-soc-env">—</span></div>
+              <div class="today-cell"><span class="meta-k">Charged</span><span class="today-v" id="today-charged">·</span></div>
+              <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">·</span></div>
+              <div class="today-cell"><span class="meta-k">Load</span><span class="today-v" id="today-load">·</span></div>
+              <div class="today-cell"><span class="meta-k">Stored</span><span class="today-v" id="today-stored">·</span></div>
+              <div class="today-cell"><span class="meta-k">SoC today</span><span class="today-v" id="today-soc-env">·</span></div>
             </div>
           </div>
           <div class="today-spark" id="today-spark" aria-hidden="true"></div>
@@ -248,11 +248,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
           </svg>
-          <span id="today-tomorrow-text">—</span>
+          <span id="today-tomorrow-text">·</span>
         </div>
         <div class="forecast-accuracy" id="forecast-accuracy" hidden>
           <span class="meta-k">Yesterday</span>
-          <span class="forecast-accuracy-line" id="forecast-accuracy-line">—</span>
+          <span class="forecast-accuracy-line" id="forecast-accuracy-line">·</span>
         </div>
       </section>
 
@@ -266,23 +266,23 @@
             </svg>
             Right now
           </h2>
-          <div class="panel-sub" id="weather-sub">—</div>
+          <div class="panel-sub" id="weather-sub">·</div>
         </div>
         <div class="weather-strip" id="weather-strip">
           <div class="weather-hero">
             <div class="weather-icon" id="weather-icon"></div>
             <div class="weather-temp">
-              <span class="weather-temp-v" id="weather-temp">—</span>
+              <span class="weather-temp-v" id="weather-temp">·</span>
               <span class="weather-temp-unit">°C</span>
             </div>
-            <div class="weather-cond" id="weather-cond">—</div>
+            <div class="weather-cond" id="weather-cond">·</div>
           </div>
           <div class="weather-meta">
-            <div class="weather-cell"><span class="meta-k">Cloud</span><span class="weather-v" id="weather-cloud">—</span></div>
-            <div class="weather-cell"><span class="meta-k">Wind</span><span class="weather-v" id="weather-wind">—</span></div>
-            <div class="weather-cell"><span class="meta-k">Humidity</span><span class="weather-v" id="weather-humidity">—</span></div>
-            <div class="weather-cell"><span class="meta-k">Sunrise</span><span class="weather-v" id="weather-sunrise">—</span></div>
-            <div class="weather-cell"><span class="meta-k">Sunset</span><span class="weather-v" id="weather-sunset">—</span></div>
+            <div class="weather-cell"><span class="meta-k">Cloud</span><span class="weather-v" id="weather-cloud">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Wind</span><span class="weather-v" id="weather-wind">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Humidity</span><span class="weather-v" id="weather-humidity">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunrise</span><span class="weather-v" id="weather-sunrise">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunset</span><span class="weather-v" id="weather-sunset">·</span></div>
           </div>
           <div class="weather-hourly" id="weather-hourly" hidden></div>
         </div>
@@ -298,7 +298,7 @@
             </svg>
             <span id="week-title">Daily outlook</span>
           </h2>
-          <div class="panel-sub" id="week-sub">—</div>
+          <div class="panel-sub" id="week-sub">·</div>
         </div>
         <div class="week-strip" id="week-strip"></div>
       </section>
@@ -338,25 +338,25 @@
         <div class="bhealth-stats">
           <div class="bhealth-stat">
             <span class="bhealth-k">Cycles (BMS)</span>
-            <span class="bhealth-v" id="bhealth-cycles">—</span>
+            <span class="bhealth-v" id="bhealth-cycles">·</span>
           </div>
           <div class="bhealth-stat">
             <span class="bhealth-k">Lifetime energy</span>
-            <span class="bhealth-v" id="bhealth-lifetime">—</span>
+            <span class="bhealth-v" id="bhealth-lifetime">·</span>
           </div>
           <div class="bhealth-stat">
             <span class="bhealth-k">Window cycles</span>
-            <span class="bhealth-v" id="bhealth-window-cycles">—</span>
+            <span class="bhealth-v" id="bhealth-window-cycles">·</span>
           </div>
           <div class="bhealth-stat">
             <span class="bhealth-k">Days online</span>
-            <span class="bhealth-v" id="bhealth-days">—</span>
+            <span class="bhealth-v" id="bhealth-days">·</span>
           </div>
         </div>
         <div class="bhealth-residency">
           <div class="bhealth-residency-head">
-            <span class="meta-k">Where the battery lives — SoC residency</span>
-            <span class="bhealth-residency-stat" id="bhealth-residency-stat">—</span>
+            <span class="meta-k">Where the battery lives. SoC residency</span>
+            <span class="bhealth-residency-stat" id="bhealth-residency-stat">·</span>
           </div>
           <div class="bhealth-bars" id="bhealth-bars"></div>
           <div class="bhealth-bars-axis">
@@ -374,13 +374,13 @@
             </svg>
             Cell balance
           </h2>
-          <div class="panel-sub" id="cells-summary">—</div>
+          <div class="panel-sub" id="cells-summary">·</div>
         </div>
         <div class="cells-grid" id="cells-grid"></div>
         <div class="cell-drift-trend">
           <div class="cell-drift-trend-head">
             <span class="meta-k">Drift trend · last 24h (max across packs)</span>
-            <span class="cell-drift-trend-stat" id="cell-drift-stat">—</span>
+            <span class="cell-drift-trend-stat" id="cell-drift-stat">·</span>
           </div>
           <div id="cell-drift-spark"></div>
         </div>
@@ -426,12 +426,12 @@
         </div>
 
         <div class="chart-statstrip" id="chart-stats">
-          <div class="cs-cell cs-cell--now"><span class="cs-k">Now</span><span class="cs-v" id="cs-now">—</span></div>
-          <div class="cs-cell"><span class="cs-k">Min</span><span class="cs-v" id="cs-min">—</span></div>
-          <div class="cs-cell"><span class="cs-k">Avg</span><span class="cs-v" id="cs-avg">—</span></div>
-          <div class="cs-cell"><span class="cs-k">Max</span><span class="cs-v" id="cs-max">—</span></div>
-          <div class="cs-cell"><span class="cs-k">Range</span><span class="cs-v" id="cs-range">—</span></div>
-          <div class="cs-cell cs-cell--res"><span class="cs-k">Resolution</span><span class="cs-v" id="cs-res">—</span></div>
+          <div class="cs-cell cs-cell--now"><span class="cs-k">Now</span><span class="cs-v" id="cs-now">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Min</span><span class="cs-v" id="cs-min">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Avg</span><span class="cs-v" id="cs-avg">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Max</span><span class="cs-v" id="cs-max">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Range</span><span class="cs-v" id="cs-range">·</span></div>
+          <div class="cs-cell cs-cell--res"><span class="cs-k">Resolution</span><span class="cs-v" id="cs-res">·</span></div>
         </div>
 
         <div id="chart" class="chart-host"></div>
@@ -469,7 +469,7 @@
             <a class="btn-action" href="#/setup">+ Add device</a>
           </div>
         </div>
-        <div class="panel-sub" id="devices-meta" style="margin-bottom:.75rem">—</div>
+        <div class="panel-sub" id="devices-meta" style="margin-bottom:.75rem">·</div>
         <div id="device-cards" class="device-cards"></div>
       </section>
     </section>
@@ -525,7 +525,7 @@
           <!-- Step 2 — scan -->
           <div class="wiz-step" id="wiz-step-scan" hidden>
             <div class="wiz-step-head"><span class="wiz-num">2</span><span>Find your devices</span></div>
-            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running — scanning just shares the link.</p>
+            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running. Scanning just shares the link.</p>
             <div class="wiz-controls">
               <button id="wiz-scan-btn" class="btn-action btn-action--primary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -562,7 +562,7 @@
             <h3>Session &amp; system</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Restart the daemon to apply pending changes (new transports,
-              devices, exporters). The UI reconnects automatically — takes
+              devices, exporters). The UI reconnects automatically. Takes
               ~5 seconds.
             </p>
             <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -618,8 +618,8 @@
           <div class="settings-block">
             <h3>Polling</h3>
             <div class="settings-row"><span>Interval</span><span class="v">60 s</span></div>
-            <div class="settings-row"><span>Last poll</span><span class="v" id="settings-last-poll">—</span></div>
-            <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">—</span></div>
+            <div class="settings-row"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
+            <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
           <div class="settings-block">
             <h3>Retention</h3>
@@ -641,7 +641,7 @@
           <div class="settings-block">
             <h3>Integrations</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
-              Third-party data sources. Each one needs your own free credentials —
+              Third-party data sources. Each one needs your own free credentials ·
               we don't proxy or store anything for you.
             </p>
             <div id="settings-integrations" class="integrations-block">
@@ -650,11 +650,11 @@
           </div>
           <div class="settings-block">
             <h3>About</h3>
-            <div class="settings-row"><span>Version</span><span class="v" id="settings-version">—</span></div>
+            <div class="settings-row"><span>Version</span><span class="v" id="settings-version">·</span></div>
             <div class="settings-row" id="settings-update-row" hidden>
               <span>Latest available</span>
               <span class="v">
-                <span id="settings-update-latest">—</span>
+                <span id="settings-update-latest">·</span>
                 <a id="settings-update-link" href="#" hidden>Release notes →</a>
                 <button id="settings-update-apply" class="alerts-add-btn" type="button" hidden style="margin-left:.5rem">Update now</button>
               </span>
@@ -662,7 +662,7 @@
             <div class="settings-row" id="settings-update-docker-row" hidden>
               <span>Updates</span>
               <span class="v settings-foot" style="font-size:.85em;line-height:1.4">
-                Docker install — apply updates with <code>docker compose pull &amp;&amp; docker compose up -d</code> on the host.
+                Docker install. Apply updates with <code>docker compose pull &amp;&amp; docker compose up -d</code> on the host.
               </span>
             </div>
             <div class="settings-row" id="settings-update-progress-row" hidden>
@@ -671,13 +671,13 @@
                 <pre id="settings-update-progress" style="margin:0;padding:.4rem .55rem;background:var(--surface-2);border-radius:6px;font-size:.75rem;max-height:160px;overflow:auto;text-align:left;white-space:pre-wrap;word-break:break-all">waiting…</pre>
               </span>
             </div>
-            <div class="settings-row"><span>Daemon</span><span class="v" id="settings-daemon">—</span></div>
-            <div class="settings-row"><span>Uptime</span><span class="v" id="settings-uptime">—</span></div>
-            <div class="settings-row"><span>Python</span><span class="v" id="settings-python">—</span></div>
-            <div class="settings-row"><span>Disk (root)</span><span class="v" id="settings-disk">—</span></div>
+            <div class="settings-row"><span>Daemon</span><span class="v" id="settings-daemon">·</span></div>
+            <div class="settings-row"><span>Uptime</span><span class="v" id="settings-uptime">·</span></div>
+            <div class="settings-row"><span>Python</span><span class="v" id="settings-python">·</span></div>
+            <div class="settings-row"><span>Disk (root)</span><span class="v" id="settings-disk">·</span></div>
             <div class="settings-row"><span>Update check</span>
               <span class="v">
-                <span id="settings-update-checked">—</span>
+                <span id="settings-update-checked">·</span>
                 <button id="settings-update-now" class="alerts-add-btn" type="button">Check now</button>
               </span>
             </div>
@@ -689,7 +689,7 @@
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               The local password protects writes from the LAN. Rotate it
               if you've forgotten yours, or if you suspect it's been
-              shared. The new password is shown to you once — save it
+              shared. The new password is shown to you once. Save it
               right then.
             </p>
             <button id="rotate-pw-btn" class="btn-action">
@@ -708,7 +708,7 @@
             </p>
             <div class="kiosk-url-row">
               <input id="kiosk-url" type="text" readonly class="kiosk-url-input"
-                     placeholder="No cloud tunnel — pair the appliance to enable sharing"/>
+                     placeholder="No cloud tunnel. Pair the appliance to enable sharing"/>
               <button id="kiosk-copy-btn" class="btn-action" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 <span>Copy</span>
@@ -793,7 +793,7 @@
               appliance sends a fingerprint of anything our drivers
               don't recognise to wattpost.cloud, so we know which
               hardware to support next. <strong>Off by default.</strong>
-              No full MAC, no IP, no account info — just OUI, advertised
+              No full MAC, no IP, no account info. Just OUI, advertised
               name, and a few bytes of manufacturer data.
             </p>
             <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
@@ -817,7 +817,7 @@
                  title="Download a single JSON bundle (version, redacted config, recent logs, scheduler state) suitable for attaching to a support ticket.">
                 Download bundle
               </a>
-              <span class="settings-foot" id="diag-meta">—</span>
+              <span class="settings-foot" id="diag-meta">·</span>
             </div>
             <pre id="diag-log" class="diag-log">Loading…</pre>
           </div>
@@ -863,9 +863,9 @@
                     stroke-dasharray="6 94" transform="rotate(-90 100 100)"/>
           </svg>
           <div class="donut-center">
-            <div class="donut-pct"><span id="kiosk-soc">—</span><span class="donut-pct-unit">%</span></div>
+            <div class="donut-pct"><span id="kiosk-soc">·</span><span class="donut-pct-unit">%</span></div>
             <div class="donut-label">state of charge</div>
-            <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">—</span></div>
+            <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">·</span></div>
           </div>
         </div>
         <div class="kiosk-flow" id="kiosk-flow"></div>

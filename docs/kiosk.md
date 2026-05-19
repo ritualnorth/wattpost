@@ -1,6 +1,6 @@
 # Kiosk view
 
-Kiosk is the **chrome-free, read-only** version of the dashboard — a giant SoC donut + power-flow visualisation, no menus, no settings buttons. Designed for permanent wall-mount or fridge-magnet displays.
+Kiosk is the **chrome-free, read-only** version of the dashboard. A giant SoC donut + power-flow visualisation, no menus, no settings buttons. Designed for permanent wall-mount or fridge-magnet displays.
 
 ## URLs
 
@@ -9,7 +9,7 @@ Kiosk is the **chrome-free, read-only** version of the dashboard — a giant SoC
 | LAN (same network as Pi) | `http://wattpost.local/kiosk` |
 | Through the cloud tunnel | `https://<slug>.wattpost.io/kiosk` |
 
-The `/kiosk` route is **always anonymous** — never gated by the local web password, even when one is set. So an old tablet stuck to the wall can boot, open the bookmark, and live there.
+The `/kiosk` route is **always anonymous**. Never gated by the local web password, even when one is set. So an old tablet stuck to the wall can boot, open the bookmark, and live there.
 
 ## Auto-launching on a device
 
@@ -24,7 +24,7 @@ On `wattpost.cloud`, every paired appliance card has a **Kiosk link** button. Cl
 
 ## What kiosk shows
 
-- State of charge as a donut (big — visible across a room)
+- State of charge as a donut (big. Visible across a room)
 - Real-time power flow: solar → bank → load with arrows + watt readings
 - Net watts indicator
 - Auto-refreshing every poll (~60 s)

@@ -1,6 +1,6 @@
 # History & CSV export
 
-WattPost stores every poll forever — but **rolls it up** so the
+WattPost stores every poll forever. But **rolls it up** so the
 database stays small. The History tab can chart any device's metric
 over any range.
 
@@ -20,7 +20,7 @@ in the stat strip tells you which one's being shown.
 ## Picking a range
 
 The buttons (1h / 6h / 24h / 7d / 30d) auto-pick the right rollup
-table + bucket. **Custom** opens a from/to date picker — bucket is
+table + bucket. **Custom** opens a from/to date picker. Bucket is
 computed to keep the chart around 300 points so it stays readable
 even over a year.
 
@@ -36,11 +36,11 @@ timestamp,epoch,value,min,max
 …
 ```
 
-- **timestamp**: ISO-8601 with timezone — Excel / Numbers parse it.
+- **timestamp**: ISO-8601 with timezone. Excel / Numbers parse it.
 - **epoch**: Unix seconds for arithmetic.
 - **value**: the metric.
 - **min, max**: present when the underlying rollup has them (1-min
-  and longer). Raw samples don't have a band — just one value.
+  and longer). Raw samples don't have a band. Just one value.
 
 Filename pattern: `<label>_<metric>_<since>_<until>.csv`.
 

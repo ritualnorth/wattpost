@@ -182,7 +182,7 @@ const $ = (sel) => document.querySelector(sel);
 
 const fmt = {
   num(v, digits = 2) {
-    if (v === null || v === undefined || typeof v !== "number") return "—";
+    if (v === null || v === undefined || typeof v !== "number") return "·";
     const abs = Math.abs(v);
     if (abs >= 10000) return (v / 1000).toFixed(1) + "k";
     if (abs >= 100)   return v.toFixed(0);
@@ -190,16 +190,16 @@ const fmt = {
     return v.toFixed(digits);
   },
   wh(v) {
-    if (v == null) return "—";
+    if (v == null) return "·";
     if (Math.abs(v) >= 1000) return (v / 1000).toFixed(2) + " kWh";
     return v.toFixed(0) + " Wh";
   },
   ah(v, d = 1) {
-    if (v == null) return "—";
+    if (v == null) return "·";
     return v.toFixed(d);
   },
   signed(v, digits = 0) {
-    if (v == null) return "—";
+    if (v == null) return "·";
     return (v > 0 ? "+" : "") + v.toFixed(digits);
   },
   ago(unixTs) {
@@ -209,7 +209,7 @@ const fmt = {
     return Math.floor(s / 3600) + "h ago";
   },
   duration(hours) {
-    if (hours == null || !isFinite(hours)) return "—";
+    if (hours == null || !isFinite(hours)) return "·";
     if (hours < 1)   return Math.round(hours * 60) + " m";
     if (hours < 48)  return `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`;
     const days = hours / 24;
@@ -2472,7 +2472,7 @@ function drawCompareChart(metric, datasets) {
       stroke: color,
       width: 2,
       points: { show: ts.length < 60, size: 4, fill: color, stroke: color },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+      value: (_u, v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
     });
     dataCols.push(col);
   });
@@ -2511,12 +2511,12 @@ function drawCompareChart(metric, datasets) {
 function updateStatStrip(metric, data) {
   const unit = unitFromKey(metric);
   const s = data?.stats || {};
-  const fmtV = (v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`;
+  const fmtV = (v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`;
   $("#cs-now").textContent   = fmtV(s.now);
   $("#cs-min").textContent   = fmtV(s.min);
   $("#cs-avg").textContent   = fmtV(s.avg);
   $("#cs-max").textContent   = fmtV(s.max);
-  $("#cs-range").textContent = s.range == null ? "—" : `${(+s.range).toFixed(2)}${unit ? " " + unit : ""}`;
+  $("#cs-range").textContent = s.range == null ? "·" : `${(+s.range).toFixed(2)}${unit ? " " + unit : ""}`;
 
   // Resolution = bucket / table info: tell the user how dense the data is
   const tableLabel = {
@@ -2524,7 +2524,7 @@ function updateStatStrip(metric, data) {
     samples_1min: "1-min avg",
     samples_1hour: "1-hour avg",
     samples_1day: "1-day avg",
-  }[data?.table] || "—";
+  }[data?.table] || "·";
   $("#cs-res").textContent = `${s.count ?? 0} pts · ${tableLabel}`;
 }
 
@@ -2579,11 +2579,11 @@ function drawChart(label, metric, data, forecast = null) {
   if (hasBand) {
     series.push({
       label: "min", stroke: "transparent", width: 0, points: { show: false },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+      value: (_u, v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
     });
     series.push({
       label: "max", stroke: "transparent", width: 0, points: { show: false },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+      value: (_u, v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
     });
     dataCols.push(data.min, data.max);
     // Fill between max (series 2) and min (series 1).
@@ -2597,7 +2597,7 @@ function drawChart(label, metric, data, forecast = null) {
     width: 2,
     fill: pal.accentFill,
     points: { show: ts.length < 60, size: 4, fill: pal.accent, stroke: pal.accent },
-    value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+    value: (_u, v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
   });
   dataCols.push(vals);
 
@@ -2638,12 +2638,12 @@ function drawChart(label, metric, data, forecast = null) {
       const p10Idx = series.length;
       series.push({
         label: "p10", stroke: "transparent", width: 0, points: { show: false },
-        value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+        value: (_u, v) => v == null ? "·" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
       });
       const p90Idx = series.length;
       series.push({
         label: "p90", stroke: "transparent", width: 0, points: { show: false },
-        value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+        value: (_u, v) => v == null ? "·" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
       });
       dataCols.push(p10Col, p90Col);
       bands = bands.concat([{ series: [p90Idx, p10Idx], fill: "rgba(210,153,34,0.13)" }]);
@@ -2654,7 +2654,7 @@ function drawChart(label, metric, data, forecast = null) {
       width: 2,
       dash: [6, 4],
       points: { show: false },
-      value: (_u, v) => v == null ? "—" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
+      value: (_u, v) => v == null ? "·" : `${(+v).toFixed(0)}${unit ? " " + unit : ""}`,
     });
     dataCols.push(forecastCol);
     dataCols[0] = combinedTs;
@@ -2771,7 +2771,7 @@ async function refreshDriftSparkline() {
   if (data?.stats?.max != null && data.stats.now != null) {
     stat.textContent = `now ${(+data.stats.now*1000).toFixed(0)} mV · max ${(+data.stats.max*1000).toFixed(0)} mV (${target})`;
   } else {
-    stat.textContent = "—";
+    stat.textContent = "·";
   }
   // Tiny sparkline using uPlot
   if (driftSpark) { driftSpark.destroy(); driftSpark = null; }
@@ -2906,9 +2906,9 @@ async function refreshBatteryHealth() {
   if (cy) {
     if (bms.cycle_count != null) {
       cy.textContent = Math.round(bms.cycle_count).toLocaleString();
-      cy.title = "Reported by the BMS — typically increments per full discharge-then-charge.";
+      cy.title = "Reported by the BMS. Typically increments per full discharge-then-charge.";
     } else {
-      cy.textContent = "—";
+      cy.textContent = "·";
       cy.title = "Add a BMS to track cycles. (Equivalent cycles from current integration shown below.)";
     }
   }
@@ -2919,7 +2919,7 @@ async function refreshBatteryHealth() {
                                   : `${v.toFixed(1)} kWh`;
       lf.title = "Lifetime energy moved through the bank (BMS-reported).";
     } else {
-      lf.textContent = "—";
+      lf.textContent = "·";
       lf.title = "BMS-required. Connect a JK / Lynx BMS to track lifetime throughput.";
     }
   }
@@ -2929,11 +2929,11 @@ async function refreshBatteryHealth() {
       wc.textContent = ec.toFixed(1);
       wc.title = `Computed: discharged kWh in window ÷ bank capacity. Works without a BMS.`;
     } else {
-      wc.textContent = "—";
+      wc.textContent = "·";
     }
   }
   if (dy) {
-    dy.textContent = data.days_online != null ? `${data.days_online}` : "—";
+    dy.textContent = data.days_online != null ? `${data.days_online}` : "·";
   }
 
   // Residency histogram — 10 bars, % time in each 10% SoC band. A
@@ -2947,7 +2947,7 @@ async function refreshBatteryHealth() {
       const peak = resid.reduce((p, c) => (c.pct > p.pct ? c : p), { pct: -1 });
       rs.textContent = peak.pct > 0
         ? `mostly ${peak.range} (${peak.pct.toFixed(0)}% of the time)`
-        : "—";
+        : "·";
     } else {
       rs.textContent = "collecting…";
     }
@@ -3205,7 +3205,7 @@ async function refreshDiscoveryToggle() {
     state = await api("/api/system/discovery");
   } catch (_) {
     btn.hidden = true;
-    msg.textContent = "—";
+    msg.textContent = "·";
     return;
   }
   btn.hidden = false;
@@ -3217,8 +3217,8 @@ async function refreshDiscoveryToggle() {
   } else {
     btn.disabled = false;
     msg.textContent = state.enabled
-      ? "On — unknown devices in scans send anonymous fingerprints."
-      : "Off — no data leaves this appliance.";
+      ? "On. Unknown devices in scans send anonymous fingerprints."
+      : "Off. No data leaves this appliance.";
   }
   if (btn.dataset.wired === "1") return;
   btn.dataset.wired = "1";
@@ -3311,7 +3311,7 @@ async function refreshBackupSchedule() {
     list.innerHTML = `<div class="settings-empty">No snapshots.</div>`;
     return;
   }
-  const next = s.next_run_ts ? fmt.ago(s.next_run_ts) : "—";
+  const next = s.next_run_ts ? fmt.ago(s.next_run_ts) : "·";
   const last = s.last_run_ts ? fmt.ago(s.last_run_ts) : "never";
   const intervalH = s.interval_hours;
   const intervalLabel = intervalH % 24 === 0
@@ -3497,7 +3497,7 @@ async function refreshCloudBackups() {
   if (notYetAvailable) {
     list.innerHTML = `<div class="settings-empty">
       Cloud account is on an older build that doesn't accept backup
-      uploads yet. The next cloud deploy will enable this — your
+      uploads yet. The next cloud deploy will enable this. Your
       local snapshots are unaffected.
     </div>`;
     return;
@@ -3533,12 +3533,12 @@ async function refreshCloudBackups() {
       <tbody>
         ${data.backups.map(b => {
           const sizeMb = (b.size_bytes / (1024 * 1024)).toFixed(1);
-          const uploaded = b.uploaded_at ? fmt.ago(new Date(b.uploaded_at).getTime() / 1000) : "—";
+          const uploaded = b.uploaded_at ? fmt.ago(new Date(b.uploaded_at).getTime() / 1000) : "·";
           return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
             <td style="padding:.35rem .4rem .35rem 0"><code>${b.filename}</code></td>
             <td style="padding:.35rem .4rem .35rem 0">${sizeMb} MB</td>
             <td style="padding:.35rem .4rem .35rem 0">${uploaded}</td>
-            <td style="padding:.35rem .4rem .35rem 0">${b.manifest_version || "—"}</td>
+            <td style="padding:.35rem .4rem .35rem 0">${b.manifest_version || "·"}</td>
             <td style="padding:.35rem 0;text-align:right">
               <button class="btn-action" style="padding:.15rem .5rem" type="button"
                       data-cloud-restore="${b.id}" data-cloud-name="${b.filename}">Restore</button>
@@ -3594,14 +3594,14 @@ async function pollUntilHealthyThenReload() {
 
 // ---------- system info (About block) ----------
 function fmtBytes(b) {
-  if (b == null) return "—";
+  if (b == null) return "·";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let n = b, i = 0;
   while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
   return `${n.toFixed(n >= 10 ? 0 : 1)} ${units[i]}`;
 }
 function fmtDuration(s) {
-  if (s == null) return "—";
+  if (s == null) return "·";
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
@@ -3625,12 +3625,12 @@ async function refreshSystemInfo() {
   const d = info.disk || {};
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set("#settings-uptime", fmtDuration(info.uptime_seconds));
-  set("#settings-python", info.python || "—");
+  set("#settings-python", info.python || "·");
   set(
     "#settings-disk",
     d.total
       ? `${fmtBytes(d.used)} / ${fmtBytes(d.total)} · ${d.percent}% used`
-      : "—",
+      : "·",
   );
   refreshUpdateState();
 }
@@ -3768,7 +3768,7 @@ document.getElementById("settings-update-apply")?.addEventListener("click", asyn
       if (consecutive502 > 40) {
         // ~80s of unreachable daemon — give up auto-polling and let
         // the user refresh manually.
-        if (out) out.textContent += `\n[connection lost — refresh the page once the daemon is back]`;
+        if (out) out.textContent += `\n[connection lost. Refresh the page once the daemon is back]`;
         btn.disabled = false; btn.textContent = "Update now";
         return;
       }
@@ -3909,10 +3909,10 @@ async function tailscaleConnect() {
           <span class="ts-auth-title">Log in to your tailnet to finish</span>
           <a href="${data.auth_url}" target="_blank" rel="noopener">${data.auth_url}</a>
           <span class="settings-foot"><strong>Keep this link private.</strong> Anyone who opens it adds this appliance to <em>their</em> tailnet. It expires in ~10 minutes either way.</span>
-          <span class="settings-foot">After authorising, refresh — this page should flip to "Connected · &lt;hostname&gt;".</span>
+          <span class="settings-foot">After authorising, refresh. This page should flip to "Connected · &lt;hostname&gt;".</span>
         </div>
         <div class="ts-actions">
-          <button id="ts-refresh" class="alerts-add-btn">I've authorised — refresh</button>
+          <button id="ts-refresh" class="alerts-add-btn">I've authorised. Refresh</button>
         </div>`;
       $("#ts-refresh")?.addEventListener("click", refreshTailscale);
       return;
@@ -4008,7 +4008,7 @@ function renderIntegrationsPanel() {
         </div>
         <div class="integration-row-sub">
           ${forecastConfigured
-            ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "—"}…`
+            ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "·"}…`
             : `Sign up at <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">solcast.com</a> for a free hobbyist API key.`
           }
         </div>
@@ -4030,7 +4030,7 @@ function renderIntegrationsPanel() {
         <div class="integration-row-sub">
           ${weatherConfigured
             ? `Polling every ${wc.poll_minutes}m · ${wc.lat?.toFixed(3)}, ${wc.lon?.toFixed(3)}`
-            : `Current conditions (temp, cloud, sunrise/sunset). No API key — free public service.`
+            : `Current conditions (temp, cloud, sunrise/sunset). No API key. Free public service.`
           }
         </div>
       </div>
@@ -4050,7 +4050,7 @@ function renderIntegrationsPanel() {
         </div>
         <div class="integration-row-sub">
           ${cloudConfigured
-            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "—"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
+            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
                 // Used to display the raw CF Tunnel hostname here
                 // (humnb7h4n6.wattpost.io). Removed because (a) the
                 // tunnel URL is for cloud → appliance plumbing, not
@@ -4063,7 +4063,7 @@ function renderIntegrationsPanel() {
                 // wattpost.cloud" page, not access). Keep the "no
                 // tunnel" warning since that IS actionable diagnostic.
                 integrationsState.cloud.tunnel_enabled === false
-                  ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel — re-pair to enable remote access</span>`
+                  ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel. Re-pair to enable remote access</span>`
                   : ""
               }`
             : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`
@@ -4153,7 +4153,7 @@ function renderMqttForm(mc) {
         <label class="alerts-checkbox"><input type="checkbox" name="ha_discovery" ${mc.ha_discovery ? "checked" : ""}/> Home Assistant MQTT discovery (auto-create sensors)</label>
       </div>
       <details class="alerts-repair">
-        <summary>Advanced — HA discovery options</summary>
+        <summary>Advanced. HA discovery options</summary>
         <div class="alerts-form-grid">
           <label>Discovery prefix
             <input type="text" name="ha_discovery_prefix" value="${v("ha_discovery_prefix", "homeassistant")}"/>
@@ -4275,7 +4275,7 @@ function renderCloudForm(cc) {
       </div>
       ${paired ? `
         <p class="settings-foot">
-          Paired as <strong>${cc.label || "—"}</strong>${cc.appliance_id ? ` (#${cc.appliance_id})` : ""}.
+          Paired as <strong>${cc.label || "·"}</strong>${cc.appliance_id ? ` (#${cc.appliance_id})` : ""}.
           Save changes the endpoint or cadence; Send heartbeat now to confirm
           the cloud sees this appliance; Disable to unpair.
         </p>
@@ -4290,7 +4290,7 @@ function renderCloudForm(cc) {
           <summary>Pair with a different account…</summary>
           <p class="settings-foot">
             Paste a pairing code from the (new) wattpost.cloud account. Submitting will
-            replace the existing pairing — this appliance's old row stays on the
+            replace the existing pairing. This appliance's old row stays on the
             previous account until that user removes it.
           </p>
           <label class="alerts-field-wide">New pairing code
@@ -4360,8 +4360,8 @@ async function repairCloud(form) {
     // restart needed. The old hardcoded "Restart daemon" copy was a
     // regression that re-broke a documented UX gotcha.
     status.textContent = d.restart_required
-      ? `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Restart the daemon to switch over.`
-      : `✓ Paired with new account (${d.label || "—"} #${d.appliance_id}). Heartbeats are live now.`;
+      ? `✓ Paired with new account (${d.label || "·"} #${d.appliance_id}). Restart the daemon to switch over.`
+      : `✓ Paired with new account (${d.label || "·"} #${d.appliance_id}). Heartbeats are live now.`;
     status.classList.add("ok");
     setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 2000);
   } catch (e) {
@@ -4386,8 +4386,8 @@ async function pairCloud(form) {
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
     // See note above — hot-start makes the daemon live immediately.
     status.textContent = d.restart_required
-      ? `✓ Paired (${d.label || "—"} #${d.appliance_id}). Restart the daemon to start heartbeats.`
-      : `✓ Paired (${d.label || "—"} #${d.appliance_id}). Heartbeats are live now.`;
+      ? `✓ Paired (${d.label || "·"} #${d.appliance_id}). Restart the daemon to start heartbeats.`
+      : `✓ Paired (${d.label || "·"} #${d.appliance_id}). Heartbeats are live now.`;
     status.classList.add("ok");
     setTimeout(() => { integrationsState.editing = null; refreshIntegrationsPanel(); }, 1500);
   } catch (e) {
@@ -4426,7 +4426,7 @@ async function testCloudHeartbeat(form) {
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
     if (d.ok) { status.textContent = "✓ Heartbeat accepted"; status.classList.add("ok"); }
-    else      { status.textContent = "Cloud rejected the heartbeat — check the daemon log"; status.classList.add("err"); }
+    else      { status.textContent = "Cloud rejected the heartbeat. Check the daemon log"; status.classList.add("err"); }
   } catch (e) { status.textContent = e.message; status.classList.add("err"); }
 }
 
@@ -4461,7 +4461,7 @@ function renderWeatherForm(wc) {
         </label>
       </div>
       <p class="settings-foot">
-        No API key needed — Open-Meteo's public endpoint is free for hobbyist use.
+        No API key needed. Open-Meteo's public endpoint is free for hobbyist use.
         If you already wired up Solcast, paste the same lat/lon from your registered site.
       </p>
       <div class="alerts-form-actions">
@@ -4625,7 +4625,7 @@ function renderForecastForm(fc) {
         Best quality for fixed-roof installs.
       </p>
       <p class="settings-foot" data-provider-help="openmeteo" ${provider === "openmeteo" ? "" : "hidden"}>
-        Free, unlimited, lat/lon-based — no account needed. PV estimate is
+        Free, unlimited, lat/lon-based. No account needed. PV estimate is
         derived from solar irradiance + your array geometry. Less accurate
         than Solcast for fixed roofs (no site-specific calibration) but works
         for moving installs (vans/RVs) and as a no-setup default.
@@ -4785,15 +4785,15 @@ const METRIC_SUGGESTIONS = [
                                         label: "Shunt-vs-BMS SoC delta (%)" },
   // Common per-device metrics (use the device label your wizard set).
   { value: "devices.charge_controller.pv_power_w",
-                                        label: "PV power in (W) — charge_controller" },
+                                        label: "PV power in (W). Charge_controller" },
   { value: "devices.charge_controller.battery_temperature_c",
-                                        label: "Battery temp (°C) — charge_controller" },
+                                        label: "Battery temp (°C). Charge_controller" },
   { value: "devices.charge_controller.controller_temperature_c",
-                                        label: "Controller temp (°C) — charge_controller" },
+                                        label: "Controller temp (°C). Charge_controller" },
   { value: "devices.charge_controller.load_status",
-                                        label: "Load output state (on/off) — charge_controller" },
+                                        label: "Load output state (on/off). Charge_controller" },
   // Legacy aggregate metric retained for upgraders who already used it.
-  { value: "aggregate.max_cell_drift_v",label: "Max cell drift (V) — legacy alias" },
+  { value: "aggregate.max_cell_drift_v",label: "Max cell drift (V). Legacy alias" },
 ];
 
 // One-tap rule templates. Each entry pre-fills the add-rule form with
@@ -4974,7 +4974,7 @@ function renderRuleForm(r, transportIds) {
         <label>Metric
           <select name="metric">
             ${METRIC_SUGGESTIONS.map(m =>
-              `<option value="${m.value}" ${m.value === metric ? "selected" : ""}>${m.label} — ${m.value}</option>`).join("")}
+              `<option value="${m.value}" ${m.value === metric ? "selected" : ""}>${m.label} · ${m.value}</option>`).join("")}
             <option value="__custom__" ${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : "selected"}>Custom…</option>
           </select>
           <input type="text" name="metric_custom" value="${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : metric}" placeholder="e.g. devices.battery_0.cell_drift_v" />
@@ -5001,7 +5001,7 @@ function renderRuleForm(r, transportIds) {
       <fieldset class="alerts-form-transports">
         <legend>Send via</legend>
         ${transportIds.length === 0
-          ? `<p class="settings-foot">No transports configured yet — add one below first.</p>`
+          ? `<p class="settings-foot">No transports configured yet. Add one below first.</p>`
           : transportIds.map(tid =>
               `<label class="alerts-checkbox"><input type="checkbox" name="transport" value="${tid}" ${ts.has(tid) ? "checked" : ""}/>${tid}</label>`).join("")}
       </fieldset>
@@ -5060,7 +5060,7 @@ function renderQuietHoursForm(qh) {
         </label>
       </div>
       <p class="settings-foot">
-        Hours are in local time (0-23). Overnight windows work — set
+        Hours are in local time (0-23). Overnight windows work. Set
         start &gt; end (e.g. 22 → 7) for a "from 10pm to 7am" buffer.
         Alarm-severity alerts always page through, even inside the
         window. Changes apply on next daemon restart.
@@ -5505,7 +5505,7 @@ if (rotatePwBtn) {
       if (out) {
         out.hidden = false;
         out.innerHTML = `
-          <div class="rotate-pw-label">New password — save it now:</div>
+          <div class="rotate-pw-label">New password. Save it now:</div>
           <code class="rotate-pw-code">${j.password.replace(/[<&>]/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[c]))}</code>
           <button class="rotate-pw-copy" type="button">Copy</button>
           <div class="rotate-pw-foot">
@@ -5539,7 +5539,7 @@ if (rotatePwBtn) {
       await fetch("/api/logout", {
         method: "POST", credentials: "same-origin",
       });
-    } catch (_) { /* network error — still reload */ }
+    } catch (_) { /* network error. Still reload */ }
     // Land on the dashboard (read-only anonymous). If the user
     // re-opens Settings the auth gate will bounce them to /login.
     window.location.href = "/";
@@ -5598,7 +5598,7 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
   async function load() {
     try {
       const r = await fetch("/api/system/kiosk", { credentials: "same-origin" });
-      if (!r.ok) return;  // unauthed user — Settings tab gate will redirect anyway
+      if (!r.ok) return;  // unauthed user. Settings tab gate will redirect anyway
       const data = await r.json();
       block.hidden = false;
       if (data.share_url) {
@@ -5606,10 +5606,10 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
         copyBtn.disabled = false;
       } else {
         input.value = "";
-        input.placeholder = "No cloud tunnel — pair the appliance first";
+        input.placeholder = "No cloud tunnel. Pair the appliance first";
         copyBtn.disabled = true;
       }
-    } catch (_) { /* network error — leave block hidden */ }
+    } catch (_) { /* network error. Leave block hidden */ }
   }
 
   copyBtn.addEventListener("click", async () => {
@@ -5643,7 +5643,7 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
         input.value = data.share_url;
         copyBtn.disabled = false;
       }
-      msg.textContent = "Rotated ✓ — old URL is dead";
+      msg.textContent = "Rotated ✓. Old URL is dead";
       setTimeout(() => { msg.textContent = ""; }, 3000);
     } catch (e) {
       msg.textContent = `Rotate failed: ${e.message}`;
@@ -5888,12 +5888,12 @@ async function renderDeviceSettings(label) {
   try {
     data = await api(`/api/devices/${encodeURIComponent(label)}/settings`);
   } catch (_) {
-    return; // 404 or network — leave the host empty.
+    return; // 404 or network. Leave the host empty.
   }
   const items = (data && data.items) || [];
   if (!items.length) return;
   const rows = items.map((s) => {
-    let cur = "—";
+    let cur = "·";
     if (s.current_value != null) {
       if (s.kind === "enum") {
         const match = (s.choices || []).find((c) => c.value === s.current_value);
@@ -5907,7 +5907,7 @@ async function renderDeviceSettings(label) {
     }
     const editAttrs = s.editable
       ? `data-setting-key="${esc(s.key)}" data-setting-label="${esc(label)}"`
-      : `disabled title="Read-only — driver hasn't declared a write path"`;
+      : `disabled title="Read-only. Driver hasn't declared a write path"`;
     return `
       <tr>
         <td>
@@ -5976,7 +5976,7 @@ function openSettingsEditModal(deviceLabel, setting) {
   }
 
   const curStr = (() => {
-    if (setting.current_value == null) return "—";
+    if (setting.current_value == null) return "·";
     if (setting.kind === "enum") {
       const m = (setting.choices || []).find((c) => c.value === setting.current_value);
       return m ? m.label : String(setting.current_value);
@@ -6084,7 +6084,7 @@ function renderOutputPanelHtml(o) {
   const stateLabel =
     o.state === 1 ? `<span class="output-state-pill output-on">●  ON</span>` :
     o.state === 0 ? `<span class="output-state-pill output-off">○  OFF</span>` :
-    `<span class="output-state-pill output-unknown">— unknown</span>`;
+    `<span class="output-state-pill output-unknown">· unknown</span>`;
   const lastCmd = o.last_command;
   const lastLine = lastCmd
     ? `Last command: <strong>${lastCmd.action}</strong> · ${fmt.ago(lastCmd.at)} · by ${lastCmd.by} · ${lastCmd.result}`
@@ -6095,7 +6095,7 @@ function renderOutputPanelHtml(o) {
       charger that switches the load terminal. If anything is wired to it,
       that thing will turn off or on. Continue?
       <button class="btn-action btn-action--primary" data-output-confirm="${o.id}">
-        I understand — enable controls
+        I understand. Enable controls
       </button>
     </div>`;
   const controls = o.safety_confirmed ? `
@@ -6260,7 +6260,7 @@ async function renderSchedulesList(outputId) {
 
   const rows = schedules.map(s => `
     <div class="schedule-row" data-schedule-id="${s.id}">
-      <label class="schedule-enabled" title="${s.enabled ? 'Enabled — uncheck to pause' : 'Disabled'}">
+      <label class="schedule-enabled" title="${s.enabled ? 'Enabled. Uncheck to pause' : 'Disabled'}">
         <input type="checkbox" data-schedule-toggle="${s.id}" ${s.enabled ? "checked" : ""}/>
       </label>
       <div class="schedule-info">
@@ -6275,7 +6275,7 @@ async function renderSchedulesList(outputId) {
     </div>`).join("");
 
   host.innerHTML = `
-    ${rows || '<div class="settings-empty">No schedules yet — add one below.</div>'}
+    ${rows || '<div class="settings-empty">No schedules yet. Add one below.</div>'}
     <div class="schedule-add-host" data-schedule-add-host="${outputId}">
       <button class="btn-action" data-schedule-add-show="${outputId}">+ Add schedule</button>
     </div>`;
@@ -6442,7 +6442,7 @@ function buildSmartBatteryDetail(dev) {
     const t = l[`temperature_${j}_c`];
     if (typeof t === "number") temps.push(t);
   }
-  const meanTemp = temps.length ? (temps.reduce((a, c) => a + c, 0) / temps.length).toFixed(1) : "—";
+  const meanTemp = temps.length ? (temps.reduce((a, c) => a + c, 0) / temps.length).toFixed(1) : "·";
 
   return `
     <section class="hero-v2 soc-${pct < 20 ? "low" : pct < 50 ? "mid" : "high"}">
@@ -6474,7 +6474,7 @@ function buildSmartBatteryDetail(dev) {
       <div class="panel-header">
         <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="10" rx="1.5"/><path d="M17 10v4"/><path d="M6 9v6M10 9v6M14 9v6"/></svg> Cells</h2>
         <div class="panel-sub">
-          <span class="pill ${driftCls}"><span class="pill-dot"></span>spread ${spread.toFixed(2)} V · min ${cellMin ? cellMin.toFixed(2) : "—"} · max ${cellMax ? cellMax.toFixed(2) : "—"}</span>
+          <span class="pill ${driftCls}"><span class="pill-dot"></span>spread ${spread.toFixed(2)} V · min ${cellMin ? cellMin.toFixed(2) : "·"} · max ${cellMax ? cellMax.toFixed(2) : "·"}</span>
         </div>
       </div>
       <div class="cell-row-cells" style="margin-top:.5rem">
@@ -6483,7 +6483,7 @@ function buildSmartBatteryDetail(dev) {
           if (cv === cellMin && spread > 0.01) cls += " is-min";
           if (cv === cellMax && spread > 0.01) cls += " is-max";
           if (cv > 3.65) cls += " is-high";
-          return `<div class="${cls}"><span class="cell-chip-k">cell ${ci+1}</span><span class="cell-chip-v">${cv != null ? cv.toFixed(2) + " V" : "—"}</span></div>`;
+          return `<div class="${cls}"><span class="cell-chip-k">cell ${ci+1}</span><span class="cell-chip-v">${cv != null ? cv.toFixed(2) + " V" : "·"}</span></div>`;
         }).join("")}
       </div>
     </section>
@@ -6536,7 +6536,7 @@ function buildControllerDetail(dev) {
     <section class="panel">
       <div class="panel-header">
         <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M3.5 12H6M18 12h2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/></svg> Charging</h2>
-        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "—"}</span></div>
+        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "·"}</span></div>
       </div>
       <div class="today-strip" style="margin-top:.4rem">
         <div class="today-cell"><span class="meta-k">PV input</span><span class="today-v">${fmt.num(l.pv_power_w, 0)} W</span></div>
@@ -6574,7 +6574,7 @@ function buildAcChargerDetail(dev) {
     <section class="panel">
       <div class="panel-header">
         <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v4M15 3v4"/><rect x="6" y="7" width="12" height="9" rx="2"/><path d="M12 16v5"/></svg> AC Charger</h2>
-        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "—"}</span></div>
+        <div class="panel-sub"><span class="pill green"><span class="pill-dot"></span>${l.charging_state || "·"}</span></div>
       </div>
       <div class="today-strip" style="margin-top:.4rem">
         ${l.ac_input_current_a != null ? `<div class="today-cell"><span class="meta-k">AC input</span><span class="today-v">${fmt.num(l.ac_input_current_a, 2)} A</span></div>` : ""}
@@ -6653,7 +6653,7 @@ async function wireChargerStats(dev) {
   if (ribbonHost) {
     const segs = stats.state_ribbon || [];
     if (!segs.length) {
-      ribbonHost.innerHTML = `<div class="settings-empty" style="padding:.6rem">No state history yet — wait for the next poll cycle.</div>`;
+      ribbonHost.innerHTML = `<div class="settings-empty" style="padding:.6rem">No state history yet. Wait for the next poll cycle.</div>`;
     } else {
       const total = segs[segs.length - 1].end_ts - segs[0].start_ts;
       const parts = segs.map(s => {
@@ -6754,13 +6754,13 @@ function buildLifetimeBlock(dev) {
         <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg> Lifetime</h2>
       </div>
       <div class="dev-card-lifetime" style="margin-top:.25rem">
-        <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">—</span></div>
-        <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">—</span></div>
-        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">—</span></div>
+        <div class="lt-cell"><span class="meta-k">Cycles</span><span class="lt-v" data-lt="cycles">·</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah in</span><span class="lt-v" data-lt="ah_in">·</span></div>
+        <div class="lt-cell"><span class="meta-k">Ah out</span><span class="lt-v" data-lt="ah_out">·</span></div>
         <div class="lt-cell" data-lt-eff
              title="Coulombic charge efficiency, SoC-corrected. Healthy LFP is 95-99%. Dropping below ~93% over months hints at pack degradation.">
-          <span class="meta-k">η <span class="lt-eff-win">—</span></span>
-          <span class="lt-v" data-lt="eff">—</span>
+          <span class="meta-k">η <span class="lt-eff-win">·</span></span>
+          <span class="lt-v" data-lt="eff">·</span>
         </div>
       </div>
       <div class="dev-efficiency-detail" id="dd-eff-${dev.label}" hidden>
@@ -6847,7 +6847,7 @@ function wireDeviceDetailChart(dev) {
             stroke: pal.accent,
             width: 2,
             fill: pal.accentFill,
-            value: (_u, v) => v == null ? "—" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
+            value: (_u, v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`,
           },
         ],
         axes: [
@@ -6884,7 +6884,7 @@ function wireDeviceDetailChart(dev) {
       if (!lt) return;
       const block = document.querySelector(`#dd-lifetime-${dev.label}`);
       if (!block) return;
-      block.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "—";
+      block.querySelector('[data-lt="cycles"]').textContent = lt.cycles?.toFixed(2) ?? "·";
       block.querySelector('[data-lt="ah_in"]').textContent = `${(+lt.ah_in).toFixed(1)} Ah`;
       block.querySelector('[data-lt="ah_out"]').textContent = `${(+lt.ah_out).toFixed(1)} Ah`;
     });
@@ -6912,11 +6912,11 @@ function wireDeviceDetailChart(dev) {
         if (!w) return "";
         const v = w.efficiency_pct;
         const cls = w.reliable ? "" : " eff-cell--unreliable";
-        const txt = v == null ? "—" : `${v.toFixed(1)} %`;
+        const txt = v == null ? "·" : `${v.toFixed(1)} %`;
         return `<div class="eff-cell${cls}">
           <span class="meta-k">${k}</span>
           <span class="eff-cell-val">${txt}</span>
-          <span class="eff-cell-foot">${w.cycle_equivalents?.toFixed(2) ?? "—"} cyc</span>
+          <span class="eff-cell-foot">${w.cycle_equivalents?.toFixed(2) ?? "·"} cyc</span>
         </div>`;
       }).join("");
       detail.hidden = false;
@@ -6961,10 +6961,10 @@ async function wizLoadTransports() {
           <span id="wiz-find-status" class="wiz-status"></span>
         </div>
         <p class="settings-foot" style="margin:.4rem 0 0">
-          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port — that port is RS-485, NOT Ethernet, so it doesn't plug into the Pi's network jack.
+          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port. That port is RS-485, NOT Ethernet, so it doesn't plug into the Pi's network jack.
         </p>
         <p class="settings-foot" style="margin:.4rem 0 0">
-          Victron and JK BMS devices broadcast over Bluetooth on their own — no dongle needed. Pick Bluetooth above and the wizard will find them.
+          Victron and JK BMS devices broadcast over Bluetooth on their own. No dongle needed. Pick Bluetooth above and the wizard will find them.
         </p>
         <div id="wiz-find-results" class="wiz-results"></div>
       </div>`;
@@ -7005,7 +7005,7 @@ async function wizLoadTransports() {
         </button>
         <div class="wiz-add-another-panel" id="wiz-add-another-panel" hidden>
           <p class="settings-foot" style="margin:.5rem 0">
-            Bluetooth + USB-RS485 can run side by side on the same Pi —
+            Bluetooth + USB-RS485 can run side by side on the same Pi ·
             e.g. a Renogy BT-2 for the MPPT and a USB dongle for a
             JK BMS. Pick the connection type for the next adapter:
           </p>
@@ -7163,7 +7163,7 @@ async function wizScan() {
     // so they know the scan paused, didn't crash.
     if ((wizState.saveInFlight || 0) > 0) {
       status.textContent = alive.length
-        ? `Scan paused — ${alive.length} device(s) found so far. Click Scan to continue.`
+        ? `Scan paused · ${alive.length} device(s) found so far. Click Scan to continue.`
         : `Scan paused while adding a device. Click Scan to continue.`;
       renderScanResults(alive, /*partial*/ false);
     } else {
@@ -7194,7 +7194,7 @@ function renderScanResults(alive, partial = false) {
         <li><strong>The BT-2 isn't plugged into a powered Renogy device.</strong> Push it firmly into the RJ45 / RJ12 comms port on a charge controller or battery; that device needs power (solar panel connected for an MPPT, or a battery being load-tested).</li>
         <li><strong>The Renogy device is asleep.</strong> DCC chargers / some BMS units go to sleep with no solar input. Cover the panels with a cloth and shine a torch on them, or attach a small load to wake them.</li>
         <li><strong>Non-standard slave ID.</strong> We probe 1, 16, 32–36, 48–55, 96, 97 (Renogy factory defaults). If you've reconfigured a device's slave ID via the Renogy app, you'll need to add the device manually for now.</li>
-        <li><strong>Cold BLE link.</strong> If the BT-2 only just connected, try Scan one more time — first round-trip is occasionally slow enough to time out.</li>
+        <li><strong>Cold BLE link.</strong> If the BT-2 only just connected, try Scan one more time. First round-trip is occasionally slow enough to time out.</li>
       </ol>
       <p class="settings-foot">Diagnostics tab in Settings has live daemon logs if you want to see what each probe is doing.</p>
     </div>`;
@@ -7208,7 +7208,7 @@ function renderScanResults(alive, partial = false) {
         <div class="wiz-row-main">
           <div class="wiz-row-title">
             <span class="wiz-row-slave">#${r.slave_id}</span>
-            <span class="wiz-row-model">${r.model || '—'}</span>
+            <span class="wiz-row-model">${r.model || '·'}</span>
           </div>
           <div class="wiz-row-meta">
             <span class="wiz-tag">${r.vendor || 'unknown vendor'}</span>
@@ -7515,7 +7515,7 @@ async function wizFindDongle() {
     const nameStr = d.name
       ? `<strong>${escHtml(d.name)}</strong>`
       : `<em class="settings-foot">(no name)</em>`;
-    const rssi = d.rssi != null ? `${d.rssi} dBm` : "—";
+    const rssi = d.rssi != null ? `${d.rssi} dBm` : "·";
 
     // Vendor-specific hint badge + action button.
     const vendor = d.vendor || "unknown";
@@ -7570,7 +7570,7 @@ async function wizFindDongle() {
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">JK BMS</span>`;
       // JK BMS wizard support isn't built yet (driver shipped in v0.0.21);
       // surface the device + the manual-config workaround.
-      actionHtml = `<button class="btn-action" disabled title="JK BMS wizard support is on the roadmap. For now, add the transport manually via config.yaml (type: ble_jkbms).">JK BMS — manual config needed</button>`;
+      actionHtml = `<button class="btn-action" disabled title="JK BMS wizard support is on the roadmap. For now, add the transport manually via config.yaml (type: ble_jkbms).">JK BMS. Manual config needed</button>`;
     } else {
       hintHtml = "";
       actionHtml = `<button class="btn-action btn-action--primary" data-use-mac="${escHtml(d.address)}" data-use-name="${escHtml(d.name || '')}">Use as Modbus</button>`;
@@ -7662,7 +7662,7 @@ function renderMissingPanel(missing) {
       <div class="wiz-missing-row">
         <div>
           ${m.name ? `<strong>${escHtml(m.name)}</strong>` : `<em class="settings-foot">(no name)</em>`}
-          <div class="settings-foot">${escHtml(m.address)} · last RSSI ${m.last_rssi ?? "—"} dBm · ${ago(m.seconds_ago)}</div>
+          <div class="settings-foot">${escHtml(m.address)} · last RSSI ${m.last_rssi ?? "·"} dBm · ${ago(m.seconds_ago)}</div>
         </div>
         <div class="wiz-missing-cause">${escHtml(m.likely_cause || "")}</div>
       </div>
@@ -7739,7 +7739,7 @@ async function wizFindUsb() {
   if (!adapters.length) {
     list.innerHTML = `<div class="wiz-empty">
       <strong>No USB serial adapters detected.</strong>
-      Plug a USB-RS485 dongle into the Pi (FTDI or CH340 chip — ~£10 from any electronics supplier). The Pi should see it as <code>/dev/ttyUSB0</code> within a few seconds. Reload this page and try again. If nothing shows up, run <code>lsusb</code> on the Pi to confirm it's enumerating.
+      Plug a USB-RS485 dongle into the Pi (FTDI or CH340 chip · ~£10 from any electronics supplier). The Pi should see it as <code>/dev/ttyUSB0</code> within a few seconds. Reload this page and try again. If nothing shows up, run <code>lsusb</code> on the Pi to confirm it's enumerating.
     </div>`;
     return;
   }
@@ -7767,13 +7767,13 @@ async function wizFindUsb() {
       // detection but block the wrong action — adding a GPS as a
       // Modbus transport would just sit there failing every poll.
       action = `<button class="btn-action" disabled
-                  title="GPS support is on the roadmap (#125) — coming soon">
+                  title="GPS support is on the roadmap (#125). Coming soon">
                   GPS support coming soon
                 </button>`;
     } else if (proto === "busy") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">port busy</span>`;
       action = `<button class="btn-action" disabled
-                  title="Port couldn't be opened — already in use by another process (often the daemon itself if you've already added this transport)">
+                  title="Port couldn't be opened. Already in use by another process (often the daemon itself if you've already added this transport)">
                   port busy
                 </button>`;
     } else if (proto === "unknown") {
@@ -7820,11 +7820,11 @@ async function wizAddTransportFromPort(port, label) {
     return;
   }
   if (res.reloaded) {
-    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now — give it ~5 s.`;
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now. Give it ~5 s.`;
   } else if (res.reload_error) {
     stat.textContent = `Added ${res.label}, but hot-reload failed: ${res.reload_error}. Restart the daemon to apply.`;
   } else {
-    stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Restart the daemon to start polling.`;
   }
   await new Promise(r => setTimeout(r, 1500));
   await wizLoadTransports();
@@ -7855,11 +7855,11 @@ async function wizAddTransportFromMac(mac, name) {
     return;
   }
   if (res.reloaded) {
-    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now — give it ~10 s.`;
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Polling now. Give it ~10 s.`;
   } else if (res.reload_error) {
     stat.textContent = `Added ${res.label}, but hot-reload failed: ${res.reload_error}. Restart the daemon to apply.`;
   } else {
-    stat.textContent = `Added ${res.label} (id: ${res.id}) — restart the daemon to start polling.`;
+    stat.textContent = `Added ${res.label} (id: ${res.id}). Restart the daemon to start polling.`;
   }
   // Give the new scheduler a moment to open the transport, then
   // refresh the list so the open=true state shows up.
@@ -7884,7 +7884,7 @@ async function wizCheckBleStatus() {
   if (!data.available || !data.adapters?.length) {
     host.className = "wiz-ble-status wiz-ble-bad";
     const reason = data.reason || "no Bluetooth controllers found";
-    host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth not reachable</strong> — ${escHtml(reason)}. Check your USB BLE dongle is plugged in${" "}${navigator.userAgent.includes("Docker") ? "" : "(if running in Docker, confirm network_mode: host + /var/run/dbus is bind-mounted)"}.</span>`;
+    host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth not reachable</strong> · ${escHtml(reason)}. Check your USB BLE dongle is plugged in${" "}${navigator.userAgent.includes("Docker") ? "" : "(if running in Docker, confirm network_mode: host + /var/run/dbus is bind-mounted)"}.</span>`;
     return;
   }
   const list = data.adapters.map(a => {
@@ -7894,7 +7894,7 @@ async function wizCheckBleStatus() {
     return `<code>${escHtml(a.name)}</code> ${escHtml(a.address)}${def}${power}`;
   }).join(" · ");
   host.className = "wiz-ble-status wiz-ble-ok";
-  host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth ready</strong> — ${list}</span>`;
+  host.innerHTML = `<span class="wiz-ble-dot"></span><span class="wiz-ble-label"><strong>Bluetooth ready</strong> · ${list}</span>`;
 }
 
 // ---------- diagnostics (log tail) ----------
@@ -7924,7 +7924,7 @@ async function refreshDiagLog() {
   const meta = $("#diag-meta");
   if (meta) meta.textContent = `${lines.length} line${lines.length === 1 ? "" : "s"}`;
   if (!lines.length) {
-    host.textContent = "(no log lines captured yet — daemon just started)";
+    host.textContent = "(no log lines captured yet. Daemon just started)";
     return;
   }
   // Escape HTML — log lines may contain < > & from tracebacks etc.

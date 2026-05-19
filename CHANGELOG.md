@@ -8,24 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
-## [0.1.19] — 2026-05-19
+## [0.1.19] · 2026-05-19
 
-### Added — #170 writable-settings fan-out (phase 3, Renogy DCC50S/30S)
+### Added · #170 writable-settings fan-out (phase 3, Renogy DCC50S/30S)
 
 The per-device settings work started in phase 1 (Rover MPPT) and
 phase 2 (PATCH endpoint + confirm modal + FC06 with BT-2 ack-
 swallowing fallback) now covers the second Renogy charger family.
 
 The DCC50S / DCC30S are the same charging silicon as the Rover with
-an alternator front-end bolted on — Renogy reuses the
+an alternator front-end bolted on. Renogy reuses the
 `0xE004 / 0xE008..0xE00C` register block across both products, so
 the same five settings work identically:
 
-- **Battery type** — flooded / sealed / gel / lithium / custom
-- **Absorption (boost) voltage** — 12.0–16.0 V
-- **Float voltage** — 12.0–15.0 V
-- **Low-voltage disconnect** — 10.0–12.8 V
-- **Low-voltage reconnect** — 10.5–13.5 V
+- **Battery type**. Flooded / sealed / gel / lithium / custom
+- **Absorption (boost) voltage** · 12.0–16.0 V
+- **Float voltage** · 12.0–15.0 V
+- **Low-voltage disconnect** · 10.0–12.8 V
+- **Low-voltage reconnect** · 10.5–13.5 V
 
 Read-back comes from a new `charge_voltages` Section (registers
 `0xE008..0xE00D`, 6 words) added to the DCC50S poll cycle so the
@@ -40,16 +40,16 @@ wrong guess could brick a customer's 3 kW inverter or scramble a
 shunt's SoC tracking. Tracked as follow-up tasks (#185, #186);
 will ship once we have a unit in the Proxmox lab or a brave
 customer to test against. Smart lithium batteries don't expose a
-documented user-writable surface — read-only is the right answer
+documented user-writable surface. Read-only is the right answer
 there indefinitely.
 
-## [0.1.18] — 2026-05-18
+## [0.1.18] · 2026-05-18
 
 A debugging marathon on Ritual North's appliance produced a long list of
-real fixes — almost all of them invisible until you hit them, then
+real fixes. Almost all of them invisible until you hit them, then
 extremely visible. Grouped by area.
 
-### Fixed — Renogy BT-2 + Victron BLE coexistence on one HCI adapter
+### Fixed. Renogy BT-2 + Victron BLE coexistence on one HCI adapter
 BlueZ only allows one in-flight discovery per HCI adapter. When a
 Victron passive listener AND a Renogy BT-2 transport are both
 configured (the common multi-vendor case), they fight for the
@@ -59,11 +59,11 @@ every minute for hours.
 
 Three changes collaborate to fix it:
 
-1. **`_SharedVictronScanner.pause()` / `resume()`** — the singleton
+1. **`_SharedVictronScanner.pause()` / `resume()`**. The singleton
    scanner can now yield its discovery slot on demand and re-grab
    it afterwards. Renogy and the wizard's manual BLE scan ask for
    it before they do their own `BleakScanner.discover()`.
-2. **`HCI_DISCOVER_LOCK`** in `ble_modbus.py` — a module-level
+2. **`HCI_DISCOVER_LOCK`** in `ble_modbus.py`. A module-level
    `asyncio.Lock` serialises Renogy reconnects against the manual
    `/api/setup/ble_scan` endpoint. Without this they competed
    with each other (same InProgress error, different actors).
@@ -71,10 +71,10 @@ Three changes collaborate to fix it:
    Victron before running its scan. Returns Victron afterwards.
 
 Net result: three-way coexistence on one adapter. Log shows the
-ballet — `victron scanner paused (peer transport scanning)` →
+ballet · `victron scanner paused (peer transport scanning)` →
 discovery → `victron scanner resumed`.
 
-### Fixed — clean BLE disconnect on shutdown (the BT-2-stuck root cause)
+### Fixed. Clean BLE disconnect on shutdown (the BT-2-stuck root cause)
 The single most-reported Renogy BT-2 failure mode (cyrils/renogy-bt
 #97, #45, multiple Renogy-HA threads, even Renogy's own KB): the
 dongle accepts one BLE master at a time, and if the previous
@@ -95,24 +95,24 @@ Logs `close: bleak={ok|forced}, bluetoothctl=ok` at INFO so
 operators can verify clean exits via `journalctl`.
 
 Also bumped Docker stop_grace_period to 20 s on the new compose
-template — gives the daemon enough headroom for the worst-case
+template. Gives the daemon enough headroom for the worst-case
 close() path (12 s) without Docker SIGKILLing mid-disconnect.
 
-### Fixed — Renogy data shown as live when transport is stale
+### Fixed. Renogy data shown as live when transport is stale
 v0.1.16 / v0.1.17 added "treat the device as silent when fresh
-broadcasts say it's off" for Victron — but Renogy doesn't stamp
+broadcasts say it's off" for Victron. But Renogy doesn't stamp
 `advertisement_age_s`, so when the Renogy transport was offline
 the dashboard happily kept rendering the last-known V/A/W from 55
 minutes ago as if it were live (Solar 2 W · 22.5 V · 0.08 A,
-Battery 96.8%, Load 81.7 W estimated — all stale).
+Battery 96.8%, Load 81.7 W estimated. All stale).
 
 Generic vendor-agnostic check added to `buildFlowModel` AND
 `aggregateBank`: if any device's `_updated_at` is more than 90 s
-old, treat as silent (power forced to 0, sub-label "Stale —
+old, treat as silent (power forced to 0, sub-label "Stale ·
 last poll N min ago"). Renogy / JK BMS / any future vendor that
 doesn't stamp its own age now gets the same honest treatment.
 
-### Improved — wizard copy + status pill
+### Improved. Wizard copy + status pill
 - "transport" is gone from every user-facing string in the setup
   wizard. The internals (API endpoints, CSS classes, Python module
   names) still say "transport" but the UI says "Bluetooth
@@ -122,7 +122,7 @@ doesn't stamp its own age now gets the same honest treatment.
   your gear"** and a one-line explainer about which vendors need
   dongles vs broadcast directly.
 - Offline status pill: was `offline · will reconnect on scan`
-  (misleading — daemon auto-retries every poll regardless of
+  (misleading. Daemon auto-retries every poll regardless of
   user action). Now `offline · retrying`, with a tooltip on hover
   explaining the auto-retry.
 - Trash + pencil action buttons on narrow viewports (iPhone-width)
@@ -132,11 +132,11 @@ doesn't stamp its own age now gets the same honest treatment.
 `app.js` 167 → 168, sw.js `CACHE_VERSION` →
 `wattpost-v78-app168-css109`.
 
-## [0.1.17] — 2026-05-18
+## [0.1.17] · 2026-05-18
 
-### Fixed — Donut centre disagreement hint overflowing on mobile
+### Fixed. Donut centre disagreement hint overflowing on mobile
 The SoC donut on the dashboard renders SoC + label + flow pill +
-(optionally) a "BMS X% · shunt Y% — showing shunt" disagreement
+(optionally) a "BMS X% · shunt Y%. Showing shunt" disagreement
 hint. On narrow viewports (390 px iPhone) the hint wrapped to
 two lines via `max-width: 12rem` and pushed past the bottom of
 the green ring, looking like the donut had spilled.
@@ -145,7 +145,7 @@ Two fixes:
 - Compact JS format: `${activeSource} ${activeSoc}% ·
   ${otherSource} ${otherSoc}%`. Active source first (the one
   the donut is displaying), other source second, drop the
-  "— showing X" suffix since the active source comes first in
+  "· showing X" suffix since the active source comes first in
   the order itself. ~14 chars total vs ~30 before.
 - CSS clamp: `.donut-disagreement` now `white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis`. Guards against
@@ -158,9 +158,9 @@ the shunt because…" explanation.
 `app.js` 166→167, `styles.css` 108→109, sw.js CACHE_VERSION
 bumped to `wattpost-v77-app167-css109`.
 
-## [0.1.16] — 2026-05-18
+## [0.1.16] · 2026-05-18
 
-### Fixed — AC charger Power Flow tile: also treat "explicitly off" as silent
+### Fixed. AC charger Power Flow tile: also treat "explicitly off" as silent
 v0.1.15 caught the stale-broadcast case (no advert in 60 s →
 power forced to 0, Silent badge). It missed the related case
 where the device IS still broadcasting fresh adverts but the
@@ -176,43 +176,43 @@ rendering 13.7 V · 15.00 A · 206 W indefinitely.
 Fix in `buildFlowModel` (app.js): collapse "stale broadcast" and
 "explicitly idle" into one `isSilent` branch. The idle check
 treats Victron `ChargerState` values `OFF` / `LOW_POWER` /
-`FAULT` as not-actively-producing — everything else (BULK, ABS,
+`FAULT` as not-actively-producing. Everything else (BULK, ABS,
 FLOAT, STORAGE, EQUALIZE, INVERTING, POWER_SUPPLY) stays active.
 When idle, the tile sub-label becomes "Off" / "Standby (low
-power)" / "Fault — not producing" instead of the misleading
-"Silent — last heard X s ago" (because the device is talking,
+power)" / "Fault. Not producing" instead of the misleading
+"Silent. Last heard X s ago" (because the device is talking,
 just not producing).
 
 `app.js` cache buster 165 → 166, sw.js CACHE_VERSION
 `wattpost-v75-app165-css108` → `wattpost-v76-app166-css108` so
 browsers re-fetch the new logic.
 
-## [0.1.15] — 2026-05-18
+## [0.1.15] · 2026-05-18
 
-### Fixed — Power Flow tile rendering stale silent-device watts (#171 follow-on)
+### Fixed. Power Flow tile rendering stale silent-device watts (#171 follow-on)
 Backend was correctly stamping `advertisement_age_s` past 60 s when
 a Victron BLE device stopped broadcasting (v0.1.11 + the 86400
 sentinel in v0.1.12), and the Devices-tab cards were greying out
 properly. But the Dashboard's Power Flow tile was reading
 `output_1_power_w` straight from the latest snapshot and rendering
-it as live — so Ritual North's screen showed "AC Charger 206 W · 13.7 V ·
+it as live. So Ritual North's screen showed "AC Charger 206 W · 13.7 V ·
 15.00 A" for a charger he'd had switched off for hours, with the
 fake watts inflating Source totals + Load estimate downstream.
 
 Fix: `buildFlowModel` in app.js now checks each device's
 `advertisement_age_s` before contributing to sources / loads /
 battery. Stale devices (> 60 s) get `power: 0`, a `silent: true`
-flag, and a "Silent — last heard X ago" sub-label. The tile still
+flag, and a "Silent. Last heard X ago" sub-label. The tile still
 renders (the device is configured; hiding it would be confusing)
-but visually mutes via `.flow-tile.is-silent` — opacity .5,
+but visually mutes via `.flow-tile.is-silent`. Opacity .5,
 greyscale .6, sub-label switched to the age. Source totals and
 the bank's Load estimate no longer include the phantom watts.
 
 CACHE_VERSION bumped to v75-app165-css108.
 
-## [0.1.14] — 2026-05-18
+## [0.1.14] · 2026-05-18
 
-### Fixed — Migration v1 crashloop on partially-migrated DBs
+### Fixed. Migration v1 crashloop on partially-migrated DBs
 Caught the demo container in a crashloop: `sqlite3.OperationalError:
 duplicate column name: display_name`. The v1 schema migration ran
 ALTER TABLE on a DB that already had the column (a prior daemon
@@ -229,15 +229,15 @@ same pattern.
 
 The demo container will self-heal on the next image pull.
 
-## [0.1.13] — 2026-05-18
+## [0.1.13] · 2026-05-18
 
-### Added — Editable device settings (#111 phase 2)
+### Added. Editable device settings (#111 phase 2)
 The disabled "Edit" buttons on the device-detail Settings panel
 are now live. Click → modal opens with the current value, the
 right input shape for the descriptor (select for enum, number with
 min/max/step for numeric) + the help text. Apply hits FC06 via the
 same code path the Rover load-output adapter has used in
-production since #104 — write, optional read-back to confirm,
+production since #104. Write, optional read-back to confirm,
 BT-2 ack-swallowing tolerated.
 
 Customers running Renogy Rover charge controllers can now edit
@@ -248,7 +248,7 @@ validates client- AND server-side against the descriptor's
 range / choice list before issuing the write.
 
 Path:
-- New `solar_monitor/settings_write.py` — reusable FC06 helper
+- New `solar_monitor/settings_write.py`. Reusable FC06 helper
   with the same ack-swallowing fallback the load-output uses.
 - `PATCH /api/devices/{label}/settings/{key}` validates body
   `{value: ...}` against the descriptor, encodes via scale,
@@ -256,7 +256,7 @@ Path:
   pushes the new value into the `latest` store so the UI
   reflects it before the next regular poll cycle.
 - Transports that don't support `request()` (Victron BLE
-  broadcast-only) return 409 — the descriptors don't exist on
+  broadcast-only) return 409. The descriptors don't exist on
   Victron drivers per scope, but defence-in-depth.
 
 Phase 3 (#170) will fan the descriptor catalog out across the
@@ -265,18 +265,18 @@ discharge MOS, cell-balance).
 
 CACHE_VERSION bumped to v74-app164-css107.
 
-### Note — v0.1.12 was a hot-patch
+### Note. V0.1.12 was a hot-patch
 Sentinel-age fix for the never-seen Victron device case (the
 86400 sentinel that makes the dashboard grey out tiles correctly
 even on first-poll after a daemon restart). Shipped without a
 `__version__` bump by accident; v0.1.13 corrects the label.
 
-## [0.1.11] — 2026-05-18
+## [0.1.11] · 2026-05-18
 
-### Fixed — Stale Victron BLE data shown as live (#171)
+### Fixed. Stale Victron BLE data shown as live (#171)
 When a Victron BLE device (AC charger, MPPT, SmartShunt, Orion XS,
-etc.) stops broadcasting — output switched off, dongle out of
-range, charger unplugged from mains — the transport's
+etc.) stops broadcasting. Output switched off, dongle out of
+range, charger unplugged from mains. The transport's
 `get_latest()` correctly starts returning None after 60 s. But the
 driver's early-return path only stamped an `_errors` string and no
 numeric fields, so the `latest` table kept serving the *previous*
@@ -296,24 +296,24 @@ Fix:
   dashboard knows we have nothing live.
 - Dashboard device card detects `advertisement_age_s > 60` and:
   - greys out the tile (.dev-card-silent, opacity .55)
-  - shows a "Silent — last heard X min ago" badge
+  - shows a "Silent. Last heard X min ago" badge
 
 All 8 Victron drivers updated: SmartShunt, SmartSolar, Orion XS,
 DC-DC, SmartBatteryProtect, AcCharger, SmartLithium, LynxSmartBMS.
 
 CACHE_VERSION bumped to v73-app163-css106.
 
-## [0.1.10] — 2026-05-18
+## [0.1.10] · 2026-05-18
 
-### Added — Per-device settings panel (#111 phase 1, read-only)
+### Added. Per-device settings panel (#111 phase 1, read-only)
 First phase of the per-device write-back story. The device-detail
 page now renders a "Settings" card showing the user-tunable
-parameters the driver declares — current battery type, absorption
+parameters the driver declares. Current battery type, absorption
 / float voltages, low-voltage disconnect / reconnect thresholds
 for Renogy Rover today, more drivers + edit support to follow.
 
 Framework:
-- `WritableSetting` descriptor added to `vendors/base.py` —
+- `WritableSetting` descriptor added to `vendors/base.py` ·
   drivers declare key / label / kind (enum|float|int) / register /
   scale / min / max / step / choices / help_text / read_from.
   Defaults to `()` so existing read-only drivers are unaffected.
@@ -322,7 +322,7 @@ Framework:
 - `GET /api/devices/{label}/settings` surfaces the descriptors
   paired with the current value pulled from the latest poll
   snapshot. Empty `items` for any device whose driver hasn't
-  opted in (Victron — read-only forever per product scope —
+  opted in (Victron. Read-only forever per product scope ·
   JK BMS + the rest of Renogy will opt in over subsequent
   phases).
 
@@ -337,14 +337,14 @@ descriptor catalog out across the Renogy line + JK BMS.
 
 CACHE_VERSION bumped to v72-app162-css105.
 
-## [0.1.9] — 2026-05-18
+## [0.1.9] · 2026-05-18
 
-### Added — Cloud "Restore from cloud" rescue flow (#166)
+### Added. Cloud "Restore from cloud" rescue flow (#166)
 Closes the backup arc started in #146 (local backup/restore),
 extended in #164 (cloud-side view of uploaded backups) and #165
 ("Take backup now"). Owners on Pro+ can now restore any cloud-
 stored backup onto the originating appliance via a button on
-`/app/site/{id}` — same heartbeat command-queue plumbing as the
+`/app/site/{id}`. Same heartbeat command-queue plumbing as the
 other appliance-side actions.
 
 Sequence:
@@ -357,30 +357,30 @@ Sequence:
    same `_stage_and_swap` + verify path the local restore button
    uses, PATCHes the command to `success`, then re-execs the daemon
    so the new SQLite + config load fresh.
-4. Pairing survives the restore — `_stage_and_swap` preserves the
+4. Pairing survives the restore · `_stage_and_swap` preserves the
    live `cloud.bearer_token` / `sso_secret` / `tunnel_token` (the
    #146-phase-2 fix). The appliance comes back online still linked
    to this account.
 
 Cloud-side: Hobby tier 402, target_backup_id required, backup
 must belong to this appliance (cross-appliance restore is a
-separate v2 — would let "rebuild on new SD card" customers pull
+separate v2. Would let "rebuild on new SD card" customers pull
 a previous appliance's backup, but adds a layer of "which one is
 this" UX). Migration 0031 adds `appliance_commands.target_backup_id`
 as a nullable FK with ON DELETE SET NULL so deleting a backup
 doesn't cascade-kill the command audit trail.
 
-## [0.1.8] — 2026-05-18
+## [0.1.8] · 2026-05-18
 
-### Added — Renogy Battery Monitor + Shunt driver (#113)
+### Added. Renogy Battery Monitor + Shunt driver (#113)
 The RBM-S100 / S300 / S500 Battery Monitor with Shunt is the
 budget-upgrade entry point for "I just want to know my real bank
-state" — single clamp on the negative terminal, no BMS required.
+state". Single clamp on the negative terminal, no BMS required.
 Persona B unlock per the target-customer notes: someone buying
 their first shunt to get visibility.
 
 Driver speaks Modbus FC03 over the same BT-1 / BT-2 / USB-RS485
-transports the rest of the Renogy line uses — no new transport
+transports the rest of the Renogy line uses. No new transport
 work. Surfaces voltage, current, SoC, temperature, remaining /
 full capacity (Ah), cumulative charge + discharge (Ah), and
 time-to-empty / time-to-full so the hero donut, flow strip,
@@ -397,12 +397,12 @@ Register map is from cyril/renogy-bt's `BatteryMonitorClient.py`
 customer's unit is verified. Discovery telemetry (#129) will flag
 any field-decoding mismatches.
 
-Same bank-aggregation logic as the Victron SmartShunt (#112) —
+Same bank-aggregation logic as the Victron SmartShunt (#112) ·
 mix-and-match is automatic via shared `device_kind = "shunt"`.
 
-## [0.1.7] — 2026-05-18
+## [0.1.7] · 2026-05-18
 
-### Added — Broker-auth diagnostic ring buffer (#167)
+### Added. Broker-auth diagnostic ring buffer (#167)
 Every request that arrives at the appliance bearing an
 `X-WP-Broker-Auth` header now lands in an in-memory ring (last 200).
 Each entry records the verdict (ok / no-secret / bad-format /
@@ -417,7 +417,7 @@ flood of `expired` = clock drift, `bad-mac` = sso_secret drift
 (#148-class), `ok` for the failing path = bug post-auth. No more
 SSH-into-Caddy-and-grep-JSON during incidents.
 
-### Added — "Take backup now" button on cloud appliance detail (#165)
+### Added · "Take backup now" button on cloud appliance detail (#165)
 Pro-tier owners can request an immediate cloud-stored snapshot from
 `/app/site/{id}` instead of waiting for the weekly tick. Reuses the
 existing heartbeat command-queue: cloud queues a `backup_now`
@@ -431,17 +431,17 @@ Cloud rejects `backup_now` for Hobby tier with 402; appliance
 takes the local snapshot whether or not cloud_upload is enabled,
 so clicking the button is never a silent no-op.
 
-### Added — Anonymous device-discovery telemetry (#129)
+### Added. Anonymous device-discovery telemetry (#129)
 Off-by-default opt-in (Settings → Discovery telemetry on the
 appliance). When enabled, the appliance posts fingerprints of
 unrecognised BLE devices its setup-wizard scan picks up to the
-cloud — OUI only (never full MAC), advertised local name, first
+cloud. OUI only (never full MAC), advertised local name, first
 manufacturer ID + leading 4 bytes, service UUIDs. Nothing
 identifying: no FK back to appliance, no owner, no IP.
 
 Cloud rolls observations up by fingerprint hash in
 `discovery_observations` and exposes a staff-only roll-up at
-`/app/admin/discovery` — the next-driver pipeline reads the top of
+`/app/admin/discovery`. The next-driver pipeline reads the top of
 that list when prioritising work. Migration 0030 creates the
 table; pg_insert ON CONFLICT bumps observation_count + last_seen
 on repeats so a popular dongle becomes more visible the more it's
@@ -449,14 +449,14 @@ seen, not noisier.
 
 CACHE_VERSION bumped to v71-app161; shell cache-buster ?v=161.
 
-## [0.1.6] — 2026-05-18
+## [0.1.6] · 2026-05-18
 
-### Fixed — White page recurrence after v0.1.4 (stale-shell trap)
+### Fixed. White page recurrence after v0.1.4 (stale-shell trap)
 Even after the v0.1.4 iOS Safari SSE+tunnel fix, Ritual North kept
 hitting the white page on broker view (8:13 this morning, with
 a transient "API error: 404" pill before refresh). Caddy logs
 confirmed the iPhone was *still* opening `/api/stream` against
-the broker host — meaning the v0.1.4 client code (`IS_BROKER_VIEW`
+the broker host. Meaning the v0.1.4 client code (`IS_BROKER_VIEW`
 SSE skip) had never reached the device. The appliance itself
 was serving the new app.js (`?v=159`, `IS_BROKER_VIEW` present)
 and new sw.js (`wattpost-v69-app159-css104`); the stuck piece
@@ -473,7 +473,7 @@ requests**. So:
    SSE, white page.
 5. `?v=159` never reaches the device because the *shell* asking
    for it is itself stale. The cache-buster strategy only works
-   if a fresh shell hands it out — and the SW never lets a
+   if a fresh shell hands it out. And the SW never lets a
    fresh shell through.
 
 A stale shell self-perpetuates forever, regardless of how many
@@ -485,14 +485,14 @@ for everything else.
 - Online clients always get the latest `index.html` (and thus
   the latest `?v=` cache-buster, which pulls the latest app.js).
   Any future client-side fix self-heals on the next page load.
-- Sub-resources (CSS, JS, icons) stay cache-first — they're
+- Sub-resources (CSS, JS, icons) stay cache-first. They're
   already version-keyed by `?v=`, so a fresh shell brings a
   fresh URL that misses the old cache anyway.
 - Offline navigation still falls back to the cached shell, so
   install-to-home-screen launch on plane mode still boots.
 
 This is the same pattern Home Assistant, GitHub, and most major
-PWAs use — pure cache-first navigation is only safe if you never
+PWAs use. Pure cache-first navigation is only safe if you never
 need client-side code to evolve, which is never the case in
 practice.
 
@@ -500,9 +500,9 @@ Bumped `CACHE_VERSION` to `wattpost-v70-app160-css104` and
 shell cache-buster to `?v=160` so this rollout itself evicts
 the bad shell on every existing device.
 
-## [0.1.5] — 2026-05-18
+## [0.1.5] · 2026-05-18
 
-### Added — Setup wizard: edit existing transport (#159)
+### Added. Setup wizard: edit existing transport (#159)
 Customers can now change a transport's BLE MAC, Victron
 encryption key, or serial port path without the
 delete-and-recreate dance every time Victron rotates the key
@@ -512,7 +512,7 @@ USB-RS485 adapter moves to a different tty.
 - New `PATCH /api/setup/transports/{id}` endpoint with the same
   validation rules as the add path (MAC format, key length,
   /dev/... prefix). Transport `id` is the stable handle and is
-  never renamed — devices and history reference it.
+  never renamed. Devices and history reference it.
 - Pencil-icon button on every transport row in the setup wizard.
   Click → window.prompt for the new value(s) → PATCH → hot-reload.
   Empty answers keep the existing value; Cancel exits cleanly
@@ -521,18 +521,18 @@ USB-RS485 adapter moves to a different tty.
   BLE connection re-opens with the new credentials without a
   daemon restart.
 
-### Closed without action — #161 AC charger / DC-DC "today" totals
+### Closed without action · #161 AC charger / DC-DC "today" totals
 The victron-ble Instant Readout protocol doesn't surface daily
 energy counters for `AcCharger` or `DcDcConverter` device types
-(verified directly against the appliance's installed library —
+(verified directly against the appliance's installed library ·
 only `get_temperature`, `get_charge_state`, output V/A are
 exposed). Trapezoid integration over power samples is the best
 we can do upstream-side. Re-open if Victron adds the fields in a
 future firmware/protocol revision.
 
-## [0.1.4] — 2026-05-18
+## [0.1.4] · 2026-05-18
 
-### Fixed — White page on iOS Safari broker view (root cause this time)
+### Fixed. White page on iOS Safari broker view (root cause this time)
 The recurring white-page-on-remote-session bug has a confirmed
 root cause now, caught via live debugging: it's **not** the
 sso_secret drift (#148), it's the iOS Safari SSE + Cloudflare
@@ -551,14 +551,14 @@ Sequence:
   6. After ~4 s the `/api/system/auth-status` request finally
      resolves (it was queued behind the SSE), notices
      `origin === "broker"`, and closes the SSE. By then the
-     race has already happened — Safari doesn't recover the
+     race has already happened. Safari doesn't recover the
      queued requests.
 
 Fix: never open SSE at all when `IS_BROKER_VIEW` is true (we
 know from the URL hostname, no need to wait for the API to
 confirm). Broker visitors poll every 5 s via the existing
 fallback timer, which dodges the trap entirely. Local LAN
-keeps SSE — works fine on a fresh connection without an
+keeps SSE. Works fine on a fresh connection without an
 intermediate tunnel.
 
 The Caddy access log surfaced this: every SSE attempt logged
@@ -566,9 +566,9 @@ The Caddy access log surfaced this: every SSE attempt logged
 the in-flight EventSource almost immediately, but the damage
 to the connection pool was already done.
 
-## [0.1.3] — 2026-05-18
+## [0.1.3] · 2026-05-18
 
-### Added — Weather-aware tint on the Right now tile
+### Added. Weather-aware tint on the Right now tile
 The Right now panel now picks a subtle background gradient + border
 colour from the current WMO weather code so a sunny day reads
 warm-yellow, an overcast day reads neutral grey, rain reads slate
@@ -576,23 +576,23 @@ blue, snow reads icy pale blue, and a thunderstorm reads deep
 purple. Clear conditions also branch on `is_day` (golden during
 the day, indigo at night).
 
-Mood lighting only — all variants cap at &lt;=10% alpha so the
+Mood lighting only. All variants cap at &lt;=10% alpha so the
 panel still reads as part of the dashboard's tinted-tile family
 and doesn't fight the actual numbers. New `wx-bg-*` classes
 swap with an 800 ms CSS transition so the tint shifts gracefully
 when the weather changes between polls.
 
-## [0.1.2] — 2026-05-17
+## [0.1.2] · 2026-05-17
 
-### Security — cyber backlog clear-down
+### Security. Cyber backlog clear-down
 
 Three security tickets boxed off in one ship.
 
-**#148 — Fixed: sso_secret in-memory drift after Settings save.**
+**#148. Fixed: sso_secret in-memory drift after Settings save.**
 CloudService cached `self.cfg = cfg` (a CloudCfg reference) at
 construction. When the Settings → Cloud → Save handler did
 `config.cloud = new_c`, it reassigned the parent's pointer to a
-freshly-built CloudCfg — but CloudService still held the OLD
+freshly-built CloudCfg. But CloudService still held the OLD
 reference. Heartbeats firing after a save would mutate and
 persist the stale object while `/sso` + broker forward-auth read
 the new one, drifting the in-memory SSO secret away from what
@@ -602,12 +602,12 @@ Fix: CloudService now holds the parent `Config` and accesses
 `self.cfg` via a property that resolves through `config.cloud`
 on every read. Same call site change in both the scheduler and
 the post-pair hot-start. Legacy callers passing a bare CloudCfg
-still work — the property falls back to a direct reference.
+still work. The property falls back to a direct reference.
 
-**#145 — Added: broker DDoS hardening.**
+**#145. Added: broker DDoS hardening.**
 Two layers added on top of the existing 600/min/IP cap on
 forward-auth:
-- Per-IP cap tightened to 300/min (5/s — still plenty for
+- Per-IP cap tightened to 300/min (5/s. Still plenty for
   legit users with many tabs, halves the headroom a single
   attacker has to play with).
 - Per-slug cap of 1200/min added (20/s/appliance). One
@@ -619,7 +619,7 @@ forward-auth:
   range; cloud-backup upload uses a different host so its
   500 MB ceiling isn't constrained.
 
-**#143 — Added: sso_secret encrypted at rest cloud-side.**
+**#143. Added: sso_secret encrypted at rest cloud-side.**
 New `secrets_kek` module wraps appliances.sso_secret in
 AES-GCM, key derived from `SESSION_SECRET` via HKDF with a
 purpose-specific `info` salt. Encrypted values carry a `v1:`
@@ -633,7 +633,7 @@ Three read sites updated to decrypt before HMAC operations:
 heartbeat response, /api/sites/{id}/sso mint, /api/internal/
 can-access broker forward-auth signature. Pair-exchange decrypts
 before returning to the appliance (which still stores plaintext
-hex in its local config.yaml — encryption is cloud-side only).
+hex in its local config.yaml. Encryption is cloud-side only).
 
 What this protects against: a future cloud Postgres move to
 managed hosting (RDS / Aiven / Neon) where operators on the
@@ -647,9 +647,9 @@ running cloud container). The KEK lives next to its ciphertext;
 this is a step toward proper KMS-backed encryption, not the end
 state.
 
-## [0.1.1] — 2026-05-17
+## [0.1.1] · 2026-05-17
 
-### Fixed — Hourly weather strip ran dry after early evening
+### Fixed. Hourly weather strip ran dry after early evening
 The Open-Meteo provider requested `forecast_days: 1`, meaning the
 hourly array only contained timestamps within the current local
 calendar day. By ~18:00 the rolling 12-hour preview was already
@@ -658,12 +658,12 @@ the cutoff filter also rejected the just-passed hour). Result:
 the Right-now tile's hourly strip looked broken late in the day.
 
 Bumped to `forecast_days: 2` so the API returns the next 48 hours
-of forecast — _HOURLY_KEEP=12 still caps what we render. ~50
+of forecast · _HOURLY_KEEP=12 still caps what we render. ~50
 hourly rows on the wire (vs ~24) is negligible payload growth.
 
-## [0.1.0] — 2026-05-17
+## [0.1.0] · 2026-05-17
 
-### Milestone release — what shipped today
+### Milestone release. What shipped today
 
 A long single-day burst rolled together as the first 0.1
 milestone. No new code beyond the v0.0.99 tag; this is a
@@ -680,11 +680,11 @@ the awkward 0.0.100. The patch-tag chain below is the summary.
   hide empty fields, NO_ERROR case-insensitive (v0.0.87)
 - Rename devices from the UI (display-name override; original
   label stays as the immutable storage key) (v0.0.88)
-- One-click backup &amp; restore on Settings — full SQLite +
+- One-click backup &amp; restore on Settings. Full SQLite +
   config + password tarball (v0.0.89)
 - Weekly local rotating snapshots (default-on; keep last 4)
   (v0.0.90)
-- Cloud backup upload + restore — Pro/Installer tier only
+- Cloud backup upload + restore. Pro/Installer tier only
   (v0.0.91), with UI fixes to stop letting customers enable
   it without paying (v0.0.92, v0.0.93) and a pairing-preserve
   fix so restore-from-cloud on a fresh box doesn't clobber
@@ -710,53 +710,53 @@ the awkward 0.0.100. The patch-tag chain below is the summary.
 
 **Infrastructure**
 - CI concurrency on all tag-fired workflows so back-to-back
-  tags coalesce cleanly — no more pi-gen container collisions
+  tags coalesce cleanly. No more pi-gen container collisions
   and the stream of failure emails that came with them
 - Stuck `pigen-builder` Docker container cleared from the
   self-hosted runner; v0.0.94 was the first run to pick up
   the fix
 
-## [0.0.99] — 2026-05-17
+## [0.0.99] · 2026-05-17
 
-### Added — Appliance Today tile: Stored + SoC envelope
+### Added. Appliance Today tile: Stored + SoC envelope
 Bringing two of the new cloud-card cells home to the local
 dashboard, where the same questions matter just as much:
 
-- **Stored** — bank net today (`↑ 1.84 kWh` or `↓ 500 Wh`).
+- **Stored**. Bank net today (`↑ 1.84 kWh` or `↓ 500 Wh`).
   Uses `today_aggregate.bank_net_today_wh` when present;
   falls back to (sources − load) on older builds.
-- **SoC today** — today's min – max envelope
+- **SoC today**. Today's min – max envelope
   (`28.4 – 70.1 %`). Powered by a new
   `GET /api/today/soc-envelope` endpoint that wraps the
   `bank_soc_minmax` method shipped in v0.0.98 for cloud
   heartbeats.
 
 Both render alongside Charged / Peak / Load in the existing
-Today tile — no new screen real-estate needed.
+Today tile. No new screen real-estate needed.
 
-## [0.0.98] — 2026-05-17
+## [0.0.98] · 2026-05-17
 
-### Added — Cloud dashboard cards: SoC envelope, ETA, charger pill, forecast
+### Added. Cloud dashboard cards: SoC envelope, ETA, charger pill, forecast
 Five small data surfaces I previously had on the deferred list,
 shipped together:
 
-1. **Today's SoC envelope** — small grey subline under the SoC cell:
+1. **Today's SoC envelope**. Small grey subline under the SoC cell:
    "today: 65.2 – 70.1%". Answers "did the bank get critically low
    overnight?" without opening History.
-2. **Time-to-empty / time-to-full** — subline under Net now:
+2. **Time-to-empty / time-to-full**. Subline under Net now:
    `~ 8h 20m to empty` when discharging, `~ 3h 15m to full` when
    charging. Powered by the same rolling-hour load average as the
    local /api/runtime_forecast so the two are consistent. Hidden
    when bank is idle (-5 .. +5 W).
-3. **Charger state pill** — coloured chip in the card head: orange
+3. **Charger state pill**. Coloured chip in the card head: orange
    `bulk`, yellow `absorption`, green `float`, red `equalize`, grey
    `storage`. Tells you whether the system is actively pushing or
    just trickling.
-4. **Tomorrow's PV forecast** — already shipped in extras, already
+4. **Tomorrow's PV forecast**. Already shipped in extras, already
    rendered when present; no UI change required (rendered as
    "Tomorrow X.X kWh" in the existing weather row once Solcast or
    Open-Meteo forecast is available).
-5. **Active alerts** — already rendered as a chip when alert_count
+5. **Active alerts**. Already rendered as a chip when alert_count
    > 0; no change.
 
 Three new heartbeat extras fields ship from the appliance:
@@ -764,20 +764,20 @@ Three new heartbeat extras fields ship from the appliance:
   - `soc_max_today_pct`
   - `time_to_empty_min` (when discharging > 5 W)
   - `time_to_full_min`  (when charging > 5 W)
-  - `charger_state`     (first device that reports one — typically
+  - `charger_state`     (first device that reports one. Typically
     the MPPT or AC charger)
 
 New `Store.bank_soc_minmax(since, until)` to power the envelope.
-All backwards compatible — older cloud builds ignore the new
+All backwards compatible. Older cloud builds ignore the new
 fields, older appliances just hide the new UI bits.
 
-## [0.0.97] — 2026-05-17
+## [0.0.97] · 2026-05-17
 
-### Added — Cloud dashboard: "Stored today" + per-source breakdown
+### Added. Cloud dashboard: "Stored today" + per-source breakdown
 Two follow-ons to v0.0.96's sources_today_wh fix, both surfacing
 information the appliance already had but the cloud didn't show:
 
-1. **Stored today** — new third cell on each per-site card and on
+1. **Stored today**. New third cell on each per-site card and on
    the fleet summary strip. Signed: `↑ +1.84 kWh` (bank gained
    today) or `↓ 0.5 kWh` (bank depleted). The "did my system win
    today?" headline you previously had to compute by subtracting
@@ -786,10 +786,10 @@ information the appliance already had but the cloud didn't show:
    back to (in − out), the fleet aggregate suppresses the cell
    entirely to avoid misleading zeros.
 
-2. **Source mix subline** — Today in now shows a small grey
+2. **Source mix subline**. Today in now shows a small grey
    second line like "1.7 PV · 0.9 AC" when more than one source
    contributed today. PV-only installs are unchanged. Tells you
-   at a glance whether solar or mains topped you up — the
+   at a glance whether solar or mains topped you up. The
    difference between a great solar day and a quiet one carried
    by the AC charger.
 
@@ -801,15 +801,15 @@ Three new heartbeat extras fields ship from the appliance:
 (`pv_today_wh` and `load_today_wh` are unchanged; everything is
 backwards-compatible with older cloud builds.)
 
-## [0.0.96] — 2026-05-17
+## [0.0.96] · 2026-05-17
 
-### Fixed — Cloud "Today in" silently excluded AC charger + DC-DC contributions
+### Fixed. Cloud "Today in" silently excluded AC charger + DC-DC contributions
 The cloud-side dashboard (multi-site summary + per-site card) was
 reading `pv_today_wh` from heartbeat extras and labelling the
 total as "Today in". For PV-only installs that's correct, but on
 multi-source installs (Victron Blue Smart AC charger, Orion DC-DC
 alternator charger) the AC charger and DC-DC contributions were
-invisible — a bench appliance showing 1.7 PV + 0.9 AC = 2.6 kWh
+invisible. A bench appliance showing 1.7 PV + 0.9 AC = 2.6 kWh
 actually delivered today rendered as "1.7 kWh" on the cloud tile.
 
 Now the appliance also ships `sources_today_wh` (all sources
@@ -818,30 +818,30 @@ but wasn't surfaced over heartbeat). Cloud dashboards prefer it
 and fall back to `pv_today_wh` for appliances on older builds,
 so no upgrade ordering hazard.
 
-## [0.0.95] — 2026-05-17
+## [0.0.95] · 2026-05-17
 
-### Fixed — Kiosk "Exit" button breaks out of broker view into full chrome
+### Fixed. Kiosk "Exit" button breaks out of broker view into full chrome
 Follow-on to #150. That fix hid Exit for anonymous kiosk-token
 visitors but the button was still available on cloud-broker
 sessions (`xyz.wattpost.cloud`), which let an authed customer
 exit out of the SoC kiosk into the full Settings / Devices /
-Setup chrome — chrome that's owned by app.wattpost.cloud, not by
+Setup chrome. Chrome that's owned by app.wattpost.cloud, not by
 the appliance's broker hostname.
 
 Now: hide Exit + neutralise its click when the page is loaded
 over a `*.wattpost.cloud` or `*.wattpost.io` hostname (the
 broker pattern). Direct local access (LAN IP, wattpost.local)
-keeps the button — van/cabin operators legitimately need to
+keeps the button. Van/cabin operators legitimately need to
 swap between kiosk and dashboard from a single device.
 
 New `IS_BROKER_VIEW` constant in app.js for any future UI bits
 that should be broker-aware.
 
-## [0.0.94] — 2026-05-17
+## [0.0.94] · 2026-05-17
 
-### Fixed — Restore now preserves the appliance's pairing
+### Fixed. Restore now preserves the appliance's pairing
 Before this fix, restoring a backup taken on a different install
-(the actual rescue scenario — SD card died, fresh box paired to
+(the actual rescue scenario. SD card died, fresh box paired to
 same account, restore the old DB) would clobber the fresh pair's
 `cloud.bearer_token`, `cloud.sso_secret`, `cloud.tunnel_*` etc.
 with the dead appliance's. Result: 401 on next heartbeat, SSO
@@ -852,7 +852,7 @@ current config.yaml BEFORE applying the swap and re-injects it
 on top of the restored config. Same-appliance rollback is
 unaffected (the preserved values match what was in the backup
 anyway). The local-UI password files are also no longer
-overwritten when one already exists on disk — operator's
+overwritten when one already exists on disk. Operator's
 current password on the fresh box wins over an old one they may
 not remember.
 
@@ -864,15 +864,15 @@ Three new backlog items for the cloud-side backup story:
   - #166 Cloud UI: "Restore from cloud" for fresh-appliance
     rescue (queues restore_from_cloud:{id} ApplianceCommand)
 
-## [0.0.93] — 2026-05-17
+## [0.0.93] · 2026-05-17
 
-### Fixed — Cloud-upload toggle ignored tier
+### Fixed. Cloud-upload toggle ignored tier
 Toggle let Hobby-tier (and unpaired) accounts flip cloud_upload to
 true even though every subsequent upload would 402. Now:
 
 - Cloud-toggle endpoint pre-flights against the cloud and rejects
   enable with explicit 402 / 503 / 401 when the account isn't
-  eligible. Defence in depth — UI can't bypass via curl.
+  eligible. Defence in depth. UI can't bypass via curl.
 - Settings UI always probes `/cloud-list` on render, so even before
   the toggle is touched the button reflects reality: greyed out and
   labelled "Upgrade to enable" for Hobby, "Pair to wattpost.cloud
@@ -880,9 +880,9 @@ true even though every subsequent upload would 402. Now:
   is on an older build. Clicking the Hobby variant jumps straight
   to the upgrade page.
 
-## [0.0.92] — 2026-05-17
+## [0.0.92] · 2026-05-17
 
-### Fixed — Cloud backups UI was customer-hostile
+### Fixed. Cloud backups UI was customer-hostile
 Two papercuts from v0.0.91:
 
 1. The cloud-backups blurb told customers to edit `config.yaml`
@@ -899,9 +899,9 @@ Two papercuts from v0.0.91:
 
 New endpoint: `POST /api/system/backup/cloud-toggle {enabled: bool}`.
 
-## [0.0.91] — 2026-05-17
+## [0.0.91] · 2026-05-17
 
-### Added — Cloud backup upload + restore (Pro/Installer tier)
+### Added. Cloud backup upload + restore (Pro/Installer tier)
 Phase 2 of the backup story (#146). When `backup.cloud_upload: true`
 in config.yaml on a paired Pro/Installer appliance, every scheduled
 local snapshot is also pushed to wattpost.cloud and retained per
@@ -921,13 +921,13 @@ Cloud side (new):
     backups per appliance regardless of customer request
 
 Appliance side (new):
-  - `solar_monitor/backup/cloud_uploader.py` — HMAC-bearer POST to
+  - `solar_monitor/backup/cloud_uploader.py`. HMAC-bearer POST to
     cloud after each successful local snapshot
   - Wired automatically as the BackupService's `cloud_uploader`
     hook when both `cloud_upload: true` and the appliance is paired
-  - `GET /api/system/backup/cloud-list` — proxy showing the
+  - `GET /api/system/backup/cloud-list`. Proxy showing the
     appliance's cloud-side rows
-  - `POST /api/system/backup/cloud-restore/{id}` — downloads from
+  - `POST /api/system/backup/cloud-restore/{id}`. Downloads from
     cloud + feeds straight into the local restore swap
 
 Settings UI: "Cloud backups (Pro)" subsection mirrors the local
@@ -939,9 +939,9 @@ table with per-row Restore buttons that fetch from cloud + apply.
   `sudo mkdir -p /srv/wattpost-cloud-backups`.
 - Migration 0028 runs automatically on container start.
 
-## [0.0.90] — 2026-05-17
+## [0.0.90] · 2026-05-17
 
-### Added — Scheduled local backups (Settings → Backup &amp; restore)
+### Added. Scheduled local backups (Settings → Backup &amp; restore)
 A weekly rotating snapshot loop now runs alongside the on-demand
 download added in v0.0.89:
 
@@ -962,13 +962,13 @@ ETA, plus a table of on-disk snapshots with per-row Download /
 Delete and a "Run backup now" button.
 
 New endpoints, behind the same session-cookie auth:
-  - `GET    /api/system/backup/schedule`    — status + listing
-  - `POST   /api/system/backup/run-now`     — manual trigger
-  - `GET    /api/system/backup/file/{name}` — download one
-  - `DELETE /api/system/backup/file/{name}` — operator cleanup
+  - `GET    /api/system/backup/schedule`   . Status + listing
+  - `POST   /api/system/backup/run-now`    . Manual trigger
+  - `GET    /api/system/backup/file/{name}`. Download one
+  - `DELETE /api/system/backup/file/{name}`. Operator cleanup
 
 New optional config block (defaults preserve the previous
-"no-scheduled-backup" behaviour iff you explicitly disable it —
+"no-scheduled-backup" behaviour iff you explicitly disable it ·
 default is enabled at weekly):
 ```yaml
 backup:
@@ -976,23 +976,23 @@ backup:
   interval_hours: 168      # weekly
   keep_count: 4
   dir: ""                  # "" → <db_dir>/backups
-  cloud_upload: false      # Pro/Installer tier — see next release
+  cloud_upload: false      # Pro/Installer tier, see next release
   cloud_keep_count: 4
 ```
 
 ### Coming next
-Phase 2 of this work — pushing each new local snapshot to
+Phase 2 of this work. Pushing each new local snapshot to
 `wattpost.cloud` for Pro/Installer customers so it survives an
-SD-card death — lands in a separate release. The `cloud_upload`
+SD-card death. Lands in a separate release. The `cloud_upload`
 config field is staged but the appliance-side uploader is a no-op
 stub until the cloud-side ingest endpoint lands.
 
-## [0.0.89] — 2026-05-17
+## [0.0.89] · 2026-05-17
 
-### Added — Backup &amp; restore (Settings → Backup &amp; restore)
+### Added. Backup &amp; restore (Settings → Backup &amp; restore)
 One-click download of a tar.gz containing:
   - the full SQLite database (history, samples, devices, alerts,
-    kiosk tokens, web sessions) — taken via SQLite's online-backup
+    kiosk tokens, web sessions). Taken via SQLite's online-backup
     API so it's safe to download mid-poll without locking writers
   - `config.yaml` (devices, transports, alert rules, schedules)
   - `web-password.hash` (local-UI password)
@@ -1010,31 +1010,31 @@ the rest of Settings:
   - `POST /api/system/restore` → accepts the raw `.tar.gz` body
 
 UI lives next to the existing Diagnostics block on the Settings
-page — Download / Restore-from-file… buttons + a destructive-action
+page. Download / Restore-from-file… buttons + a destructive-action
 confirm before any swap, and the dashboard auto-reloads once
 `/api/health` comes back after the restart.
 
-## [0.0.88] — 2026-05-17
+## [0.0.88] · 2026-05-17
 
-### Added — Rename devices from the UI
+### Added. Rename devices from the UI
 Open a device from Devices → click the pencil next to the title →
 type a new display name → save. The original label is still the
 storage key (history, samples, alerts, exporters all reference it)
-so renaming is non-destructive — no migration, no orphaned data,
+so renaming is non-destructive. No migration, no orphaned data,
 clear the name and you're back to the original. The detail-page
 meta line shows the real underlying label as a chip when a custom
 name is in use, so you can always see what's what.
 
 - New `POST /api/devices/{label}/display-name` endpoint (body
-  `{display_name: "…"}` — pass empty or null to reset).
+  `{display_name: "…"}`. Pass empty or null to reset).
 - New `device_meta.display_name` column (schema migration v1).
 - Device cards on the Devices page now show the display name.
 - BLE-only devices (no Modbus slave) no longer show `slave null`
-  in the device card — show the vendor name instead.
+  in the device card. Show the vendor name instead.
 
-## [0.0.87] — 2026-05-17
+## [0.0.87] · 2026-05-17
 
-### Fixed — Victron AC charger device page rendering
+### Fixed. Victron AC charger device page rendering
 - Header showed `slave null` for BLE-only devices (no Modbus slave).
   Hide the slave segment when `slave_id` is unset.
 - The "?" question-mark icon next to the device title now resolves
@@ -1042,15 +1042,15 @@ name is in use, so you can always see what's what.
   and `load_disconnect` kinds (KIND_ICON entries were missing).
 - Hide the AC INPUT and TEMP cells when the BLE advertisement
   doesn't carry those fields (Blue Smart IP22 doesn't report AC
-  input current or temperature) — they were rendering as bare
-  "— A" / "— °C" rows.
+  input current or temperature). They were rendering as bare
+  "· A" / "· °C" rows.
 - Hide the ERROR cell when `charger_error` is `"NO_ERROR"`
-  (case-insensitive — Victron returns it uppercase, the old check
+  (case-insensitive. Victron returns it uppercase, the old check
   only matched lowercase).
 
-## [0.0.86] — 2026-05-17
+## [0.0.86] · 2026-05-17
 
-### Fixed — Hard refresh on a #/device/<label> page lost the device
+### Fixed. Hard refresh on a #/device/<label> page lost the device
 On a cold load (hard refresh or paste-the-URL), the router fired
 `renderDeviceDetail()` before the first snapshot had populated the
 `devices` array, so the page stuck on "No device named …" until you
@@ -1058,9 +1058,9 @@ clicked Back. `applySnapshot()` now re-renders the device-detail
 route if the placeholder is showing and the requested device has
 since arrived.
 
-## [0.0.85] — 2026-05-17
+## [0.0.85] · 2026-05-17
 
-### Added — Charger value-add stats on the device-detail page
+### Added. Charger value-add stats on the device-detail page
 Open a Victron AC Charger or any MPPT/charge-controller from
 Devices and the new **Charger stats** panel appears below the
 hero strip:
@@ -1068,13 +1068,13 @@ hero strip:
 - **Lifetime delivered (kWh)** + **today delivered** odometer
   tiles. Integrated from the device's stored power samples since
   first poll.
-- **Active today** — total seconds today the charger was
+- **Active today**. Total seconds today the charger was
   meaningfully on (power > 5 W, so sleep ticks don't pad it).
-- **24-hour charging-state ribbon** — single horizontal bar
+- **24-hour charging-state ribbon**. Single horizontal bar
   showing the day's progression through bulk (orange) →
   absorption (yellow) → float (green), with hover tooltips that
   call out each segment's duration.
-- **Per-state breakdown legend** — "Today: 45m bulk, 2h abs,
+- **Per-state breakdown legend** · "Today: 45m bulk, 2h abs,
   5h float" so you can see at a glance what a full charge cycle
   looked like and whether the charger ever made it to float.
 
@@ -1085,16 +1085,16 @@ device's latest fields (`output_1_power_w` for AC chargers,
 
 Dedicated `buildAcChargerDetail` renders Victron AC chargers
 with all three output channels surfaced (Blue Smart IP65 3-bank
-models — engine / aux / start) plus AC input current, temperature
+models. Engine / aux / start) plus AC input current, temperature
 and any active charger error.
 
-## [0.0.81] — 2026-05-17
+## [0.0.81] · 2026-05-17
 
-### Fixed — Today's LOAD always showed 0 Wh on multi-source installs
+### Fixed. Today's LOAD always showed 0 Wh on multi-source installs
 `today_aggregate` had two bugs that conspired to hide load:
 
 1. PV "today" came from a hardcoded `device = 'rover_mppt'` SQL
-   query — but the actual MPPT device label varies (most installs
+   query. But the actual MPPT device label varies (most installs
    it's just `charge_controller`). For everyone except a vanishing
    subset of legacy installs, `pv_today_wh` was always 0.
 
@@ -1116,19 +1116,19 @@ integrated (good enough for "is the load real" sanity, less
 accurate than the device counter for big totals).
 
 New `/api/today` fields:
-  - `sources_today_wh` — total energy into the bus today
-  - `ac_charger_today_wh`, `dcdc_today_wh` — per-source breakdown
-  - `pv_today_wh` — unchanged name, now correct
+  - `sources_today_wh`. Total energy into the bus today
+  - `ac_charger_today_wh`, `dcdc_today_wh`. Per-source breakdown
+  - `pv_today_wh`. Unchanged name, now correct
 
 The "Today" headline kWh on the dashboard now uses
-`sources_today_wh` instead of just PV — a Victron-only or
+`sources_today_wh` instead of just PV. A Victron-only or
 AC-charger-only install reads correctly instead of "0.0 kWh".
 
 Verified on Ritual North's install: was showing 0 Wh load, now shows
-338 Wh — matches the ~100 W background draw over the hours
+338 Wh. Matches the ~100 W background draw over the hours
 his Victron has been online.
 
-### Known minor — Hero vs Flow 12 W sampling skew
+### Known minor. Hero vs Flow 12 W sampling skew
 The hero "Net power" tile and the flow strip's "Battery bank"
 read from the same `devices` array but render on slightly
 different ticks. A live install that's actively MPPT-tracking
@@ -1137,15 +1137,15 @@ tiles for a poll cycle. Cosmetic; both numbers are correct for
 the snapshot they were taken from. Future task to lock both
 renders to a single snapshot.
 
-## [0.0.80] — 2026-05-17
+## [0.0.80] · 2026-05-17
 
-### Fixed — Victron AC charger labelled "Other source" in flow strip
+### Fixed. Victron AC charger labelled "Other source" in flow strip
 The dashboard's Power-Flow strip mapped device kinds to source/load
 tiles via the `FLOW_MAPPING` table. None of the Victron-specific
 kinds shipped in #112/#118 (ac_charger, dcdc_xs, bms,
 load_disconnect) were in that table, so the Victron's real
 output_1_power_w reading was ignored and the energy-balance
-inference kicked in instead — showing "Other source · estimated"
+inference kicked in instead. Showing "Other source · estimated"
 for the wattage gap. Ritual North saw 232 W Solar + 104 W "Other source"
 adding to the 336 W charging his bank, while the Victron driver
 was actually reading 202 W → the missing ~100 W was load draw
@@ -1160,16 +1160,16 @@ Added flow mappings for:
 
 Result: the Victron now appears as its own correctly-named source
 tile with real wattage. The inferred "Other source" only fires
-when there's a GENUINE energy gap we can't measure — which is
+when there's a GENUINE energy gap we can't measure. Which is
 its actual job.
 
 Multi-output AC chargers (output_2 / output_3 in addition to
 output_1) only render output 1 right now. Rare in van/cabin
 installs; expand if a customer requests it.
 
-## [0.0.79] — 2026-05-17
+## [0.0.79] · 2026-05-17
 
-### Fixed — Victron transports left no device polled
+### Fixed. Victron transports left no device polled
 "Pair Victron" added a transport row to config.yaml but never the
 corresponding device row. The transport happily decoded
 advertisements but the poller had nothing to bind the data to, so
@@ -1193,20 +1193,20 @@ Three coordinated changes:
     Save handler passes it through.
 
 Customer impact: adding a Victron via the wizard is now actually
-one-click — Pair → key → Save → data flowing. No second config
+one-click. Pair → key → Save → data flowing. No second config
 edit needed. Existing customers who paired before this release
 need to add a device row manually OR delete + re-pair via the
 new wizard flow.
 
 Hit by Ritual North pairing his BSC IP22 12/15 on the new VM appliance.
 
-## [0.0.78] — 2026-05-17
+## [0.0.78] · 2026-05-17
 
-### Fixed — Victron transport perpetually reported OFFLINE
+### Fixed. Victron transport perpetually reported OFFLINE
 The `/api/setup/transports` endpoint determined "open" state by
 checking `transport._client.is_connected`, which only Modbus-style
 transports have. The passive Victron transport
-(`ble_victron_advertise`) has no GATT client to "open" — it just
+(`ble_victron_advertise`) has no GATT client to "open". It just
 registers a listener with the shared scanner and waits for
 broadcasts. So a perfectly healthy Victron transport that was
 actively decoding the customer's device showed OFFLINE in the
@@ -1219,9 +1219,9 @@ transports keep the old `_client.is_connected` path. Both branches
 documented inline; a future Transport.is_connected property on the
 base class would let us drop the per-class switch.
 
-## [0.0.77] — 2026-05-17
+## [0.0.77] · 2026-05-17
 
-### Fixed — Victron encryption-key form unusable on mobile
+### Fixed. Victron encryption-key form unusable on mobile
 The "Pair Victron" form had its key input + label in a horizontal
 flex row with the label at `min-width:7rem`. On a phone-sized
 viewport that left maybe 3cm for the input field, with no easy way
@@ -1248,18 +1248,18 @@ Rewrite of the form:
 
 ### Known limitation
 There's still no way to edit an existing Victron transport's key
-from the transport list — if you added it with the wrong key (or no
+from the transport list. If you added it with the wrong key (or no
 key), trash-icon-delete + rescan + re-add. PATCH endpoint on
 existing transports is a backlog task.
 
-## [0.0.76] — 2026-05-17
+## [0.0.76] · 2026-05-17
 
-### Security — kiosk-share URL no longer leaks dashboard chrome (#150)
+### Security. Kiosk-share URL no longer leaks dashboard chrome (#150)
 The public kiosk URL (`/kiosk?key=<token>`) captured the token into
 KIOSK_KEY_PARAM in memory, then the "Exit Kiosk" button just changed
 the SPA hash to `#/`. Token stayed in memory, every subsequent api()
 call appended `?key=`, the Caddy @kiosk_open bypass + appliance
-kiosk allow-list happily served data — so a kiosk-share visitor
+kiosk allow-list happily served data. So a kiosk-share visitor
 could exit into the dashboard chrome and see all the panels that
 the kiosk allow-list happens to cover. Mutations + Settings + sensitive
 endpoints were still gated, but the "share this link and they see the
@@ -1275,7 +1275,7 @@ Fix:
 
 Found in the pre-launch pentest, Ritual North spotted it manually.
 
-### Security — cloud-side hardening (#155, #156)
+### Security. Cloud-side hardening (#155, #156)
 Ship in the cloud (auto-deploys to wattpost.cloud on push), documented
 here for visibility:
   - #155: /healthz/deep no longer leaks raw user / appliance counts.
@@ -1285,14 +1285,14 @@ here for visibility:
     appliances heartbeat 1/5min so this is 60× headroom; brute-force
     against bearer tokens hits a wall quickly.
 
-## [0.0.75] — 2026-05-17
+## [0.0.75] · 2026-05-17
 
-### Fixed — Appliance sessions wipe on container restart (#149)
+### Fixed. Appliance sessions wipe on container restart (#149)
 The local-auth session dict lived in process memory only, so every
 restart (Update now, Settings → Restart daemon, customer power-cycle)
 silently logged everyone out. The SPA's cached "you're authed" state
 then disagreed with the empty server-side store and any state-changing
-API call returned "login required" — surfaced via a customer reporting
+API call returned "login required". Surfaced via a customer reporting
 that "Send heartbeat" failed even though Settings was open.
 
 Sessions now persist to /etc/wattpost/sessions.json (same config dir
@@ -1301,13 +1301,13 @@ the dict to disk via atomic write-temp-then-rename. Module-import
 loads the file back, expired entries dropped on load. Storage cost
 is trivial (a typical install holds a handful of sessions, ~100 bytes
 each). Disk write failures degrade to in-memory-only with a warning
-log — never breaks login.
+log. Never breaks login.
 
-Side benefit: also fixes the related #148 sso_secret divergence —
+Side benefit: also fixes the related #148 sso_secret divergence ·
 restart-to-recover is no longer needed because no state is held only
 in memory.
 
-### Security — cloud-side hardening (#152, #153, #154)
+### Security. Cloud-side hardening (#152, #153, #154)
 These ship in the cloud (auto-deployed to wattpost.cloud on push to
 main), not the appliance. Documented here for visibility:
   - #152: signup is now always-202 regardless of email existence;
@@ -1318,13 +1318,13 @@ main), not the appliance. Documented here for visibility:
     randomised path in prod; default `/schema` in dev only.
 Found in the pre-launch pentest.
 
-## [0.0.74] — 2026-05-17
+## [0.0.74] · 2026-05-17
 
-### Fixed — Dashboard stuck at "connecting" when accessed via cloud broker on iOS Safari
+### Fixed. Dashboard stuck at "connecting" when accessed via cloud broker on iOS Safari
 On the broker URL (`<slug>.wattpost.cloud`), the dashboard would load
 the shell + tabs but every tile stayed empty and the status pill
 stayed at "connecting…" forever. Confirmed in headless Chromium that
-the JS code was fine — render succeeds when the page is allowed to
+the JS code was fine. Render succeeds when the page is allowed to
 breathe. The trap was iOS Safari's HTTP connection pool: a long-lived
 EventSource through Cloudflare Tunnel holds a connection open, and
 Safari serialises subsequent /api/* fetches behind it, so refresh()
@@ -1333,7 +1333,7 @@ never resolves and the pill never flips.
 Fix: in `wireSignout`'s auth-status callback, detect `origin === "broker"`,
 close any open EventSource, and start the 5 s polling fallback instead.
 LAN access keeps SSE (fresh local connection, no CF in the path, no
-pool starvation). The reroute is transparent — same data shape via the
+pool starvation). The reroute is transparent. Same data shape via the
 same `applySnapshot`, just delivered by REST poll instead of stream.
 
 Caught while writing a headless-Chromium reproduction with synthesized
@@ -1341,13 +1341,13 @@ broker headers (CF-Ray + freshly-minted HMAC). Before fix: page navigation
 timed out waiting for networkidle, status pill stuck on initial HTML
 default. After fix: clean 200, pill flips to "Healthy", real data renders.
 
-## [0.0.73] — 2026-05-17
+## [0.0.73] · 2026-05-17
 
-### Fixed — "Idle" shown when slow-charging from PV
+### Fixed · "Idle" shown when slow-charging from PV
 The 1.5 A "Idle" guard added in v0.0.70 was applied symmetrically
 to both charge and discharge currents. That broke the charging
 case: a battery taking +1 A from a low-output MPPT was labelled
-"Idle" — but it's charging, just slowly. Customer-confusing:
+"Idle". But it's charging, just slowly. Customer-confusing:
 "Idle" implies nothing is happening, when in fact the bank is
 recovering from a low SoC.
 
@@ -1362,36 +1362,36 @@ The "Light load" variant also surfaces the actual draw current, so
 the user can see how close they are to the standby threshold and
 why we're declining to project hours.
 
-## [0.0.72] — 2026-05-17
+## [0.0.72] · 2026-05-17
 
-### Fixed — Battery health endpoint 500'd on any window > 6 hours
+### Fixed. Battery health endpoint 500'd on any window > 6 hours
 `battery_health_aggregate` referenced an `avg_value` column when
 falling back to the rollup tables (samples_1min / samples_1hour /
-samples_1day) — but those tables store the averaged value in a
+samples_1day). But those tables store the averaged value in a
 column called `avg`. SQLite returned "no such column: avg_value"
 and the endpoint 500'd for the default 30-day window (the only
 window the UI ever requests). Customers saw a permanently broken
-Battery health tile and — because the JS dashboard refresh fires
-the same call on boot — a blank dashboard until the request
+Battery health tile and. Because the JS dashboard refresh fires
+the same call on boot. A blank dashboard until the request
 eventually settled. Net effect: feature shipped in #109 silently
 broken for everyone on the rollup window. Caught while debugging
 a "blank dashboard after broker login" report.
 
-## [0.0.71] — 2026-05-17
+## [0.0.71] · 2026-05-17
 
-### Fixed — "Remaining" tile showed instant rate, not realistic forecast
+### Fixed · "Remaining" tile showed instant rate, not realistic forecast
 The forecast-aware overlay ("Forecast: ~6 h until 10% at 19:30")
 that walks PV forecast vs avg load was supposed to handle the
 "2d 5h until empty" misleading-instant-rate case. But
 `/api/runtime-forecast` was returning 404 because the function
 existed in api/app.py but was never added to the route_handlers
-list — same bug class as #109. JS silently hid the forecast line
+list. Same bug class as #109. JS silently hid the forecast line
 on the 404, leaving only the naive instant-rate reading. Pure
 registration fix.
 
-## [0.0.70] — 2026-05-17
+## [0.0.70] · 2026-05-17
 
-### Changed — Saner "until empty" estimate
+### Changed. Saner "until empty" estimate
 At standby loads (sub-1.5 A net), the naive `capacity ÷ current`
 estimate produced laughably long times ("2 d 5 h until empty"
 when the server was just idling). Bumped the "idle, don't show
@@ -1399,36 +1399,36 @@ runtime" threshold from 0.5 A to 1.5 A and subtract a 10 %
 reserve from the headline number, so the displayed figure
 matches what the user can practically use.
 
-## [0.0.69] — 2026-05-17
+## [0.0.69] · 2026-05-17
 
-### Fixed — Battery health panel was rendering empty (route never registered)
+### Fixed. Battery health panel was rendering empty (route never registered)
 The `/api/battery-health` handler existed in api/app.py since #109
 shipped, but I never added it to the Litestar `route_handlers`
 list. Result: panel-battery-health on the dashboard called it,
-got 404, JS gracefully fell back to "—" placeholders, panel
+got 404, JS gracefully fell back to "·" placeholders, panel
 looked permanently broken. Added the registration; cycles +
 lifetime + window cycles + SoC residency histogram now populate
 from the BMS + heartbeat history.
 
 
 
-## [0.0.64] — 2026-05-17
+## [0.0.64] · 2026-05-17
 
-### Changed — Removed Sign In / Sign Out buttons from appliance header
+### Changed. Removed Sign In / Sign Out buttons from appliance header
 Both were ugly clutter. The auth model since v0.0.58 only gates
 Settings + Setup; tapping either bounces to /login automatically.
 A Sign In button at the top was redundant. Sign Out moved inside
-Settings → System (only visible when actually signed in) — that's
+Settings → System (only visible when actually signed in). That's
 where you'd realise you want to drop the session anyway.
 
 Dashboard / History / Devices / Kiosk / Docs all stay completely
-anonymous-readable on LAN — no chrome, no buttons, just data.
+anonymous-readable on LAN. No chrome, no buttons, just data.
 
 app.js v=130, sw.js CACHE_VERSION bumped.
 
-## [0.0.63] — 2026-05-17
+## [0.0.63] · 2026-05-17
 
-### Fixed — CRITICAL: db_path field was missing from Config, so v0.0.60 fix did nothing
+### Fixed. CRITICAL: db_path field was missing from Config, so v0.0.60 fix did nothing
 v0.0.60 added `cli._resolve_db_path` to honour `config.db_path`
 over the CLI default. But `Config` (msgspec.Struct) didn't declare
 a `db_path` field, so msgspec silently dropped the YAML value
@@ -1447,15 +1447,15 @@ Smoke-tested: container now opens DB at
 /var/lib/wattpost/solar-monitor.db (the bind-mount target), WAL
 files visible on the host side, data survives restart.
 
-### Changed — Service worker evicts old caches on activate
+### Changed. Service worker evicts old caches on activate
 Was leaving every prior cache version on disk forever. Now
 deletes anything that isn't the current CACHE_VERSION on
 activate. Belt-and-braces alongside skipWaiting + clients.claim
 to keep "stale UI being served from cache" from biting.
 
-## [0.0.62] — 2026-05-17
+## [0.0.62] · 2026-05-17
 
-### Added — Settings → Kiosk share URL panel
+### Added. Settings → Kiosk share URL panel
 Surfaces the per-appliance public share URL the cloud dashboard
 already builds, plus a Rotate button for one-click revocation
 when the URL leaks. Reads via GET /api/system/kiosk; rotates via
@@ -1465,12 +1465,12 @@ slug = no public URL).
 
 app.js v=129, styles.css v=103, CACHE_VERSION bumped.
 
-## [0.0.61] — 2026-05-17
+## [0.0.61] · 2026-05-17
 
-### Added — Tokened kiosk share URL (Option C)
+### Added. Tokened kiosk share URL (Option C)
 The cloud's "Kiosk" button used to copy a raw tunnel URL that
 didn't actually work via the internet (HTML loaded but every
-data fetch 401'd at the appliance — see earlier analysis). Now:
+data fetch 401'd at the appliance. See earlier analysis). Now:
 
 - Appliance auto-generates `cloud.kiosk_token` (URL-safe 24-byte)
   on first load_config. Persisted to config.yaml + survives
@@ -1483,7 +1483,7 @@ data fetch 401'd at the appliance — see earlier analysis). Now:
   (/api/devices, /api/poll_run, /api/today).
 - Appliance middleware validates `?key=<token>` against the local
   kiosk_token via `hmac.compare_digest`. Allow-list of GET paths
-  the kiosk page actually reads — strict, no API back-door.
+  the kiosk page actually reads. Strict, no API back-door.
 - Kiosk-mode JS captures the `?key=` once at page load + appends
   it to every subsequent /api/* fetch.
 - POST /api/system/kiosk/rotate generates a fresh token + returns
@@ -1495,13 +1495,13 @@ cloud dashboard falls back to the legacy direct-tunnel URL (LAN-
 only). Updating the appliance + waiting one heartbeat fixes the
 share button.
 
-## [0.0.60] — 2026-05-17
+## [0.0.60] · 2026-05-17
 
-### Fixed — CRITICAL: Docker users lost ALL history on every image pull
+### Fixed. CRITICAL: Docker users lost ALL history on every image pull
 config.db_path was settable but the daemon completely ignored it.
 `cmd_serve` always passed `args.db` (default `solar-monitor.db`)
 to build_app, which resolved to `/app/solar-monitor.db` inside
-the container — i.e. the IMAGE's ephemeral writable layer, not
+the container. I.e. the IMAGE's ephemeral writable layer, not
 the bind-mounted /var/lib/wattpost volume. Every
 `docker compose pull && up -d` swapped the image → /app gone →
 every metric the user had ever collected, vanished.
@@ -1512,7 +1512,7 @@ default db_path lands in /var/lib/wattpost anyway via the
 systemd unit). Docker installs with a v0.0.60+ image will now
 write to the bind-mounted volume + survive image upgrades.
 
-### Migrated — Legacy in-image-layer DB → persistent path
+### Migrated. Legacy in-image-layer DB → persistent path
 On startup, if config.db_path points somewhere new but the legacy
 ./solar-monitor.db exists at the daemon's CWD, the file gets
 copied to the new location and the source renamed to
@@ -1523,13 +1523,13 @@ Anyone whose container has been crash-looping since v0.0.56
 (see v0.0.59 hotfix) and has no DB at the legacy path either:
 nothing to migrate, fresh start unfortunately.
 
-## [0.0.59] — 2026-05-17
+## [0.0.59] · 2026-05-17
 
-### Fixed — CRITICAL: appliance crash-loop on startup (v0.0.56–v0.0.58)
+### Fixed. CRITICAL: appliance crash-loop on startup (v0.0.56–v0.0.58)
 The auth_status handler I added in v0.0.56 declared `async def
 auth_status(request)` without a type annotation. Litestar's
 signature scanner refuses to start the app when a route parameter
-lacks a type — every container running :latest after v0.0.56 has
+lacks a type. Every container running :latest after v0.0.56 has
 been crash-looping (alembic-style "ImproperlyConfiguredException:
 'request' does not have a type annotation"). Anyone on Update-now
 since this morning needs v0.0.59 immediately.
@@ -1537,9 +1537,9 @@ since this morning needs v0.0.59 immediately.
 Annotated `request: Request` and imported it. Local smoke test
 passes. Stable on every install path again.
 
-## [0.0.58] — 2026-05-17
+## [0.0.58] · 2026-05-17
 
-### Changed — Settings / Setup tabs require sign-in (UX gate)
+### Changed. Settings / Setup tabs require sign-in (UX gate)
 The previous READONLY_PUBLIC model lets GET requests through on
 LAN without a session and gates only mutations. That worked but
 landed users in a confusing state: tap Settings → page renders →
@@ -1548,7 +1548,7 @@ click Save → 401 → no signal of what went wrong.
 New model: Settings + Setup tabs are gated client-side. Tapping
 either when not signed in redirects to /login?next=<route> and
 bounces back after auth. Dashboard / history / devices / docs /
-kiosk are still anonymous-readable on LAN — kiosk-on-wall
+kiosk are still anonymous-readable on LAN. Kiosk-on-wall
 deployments and family-on-WiFi viewing still work without a
 password.
 
@@ -1557,21 +1557,21 @@ mutation gate (POST/PATCH/DELETE → session required) remains.
 
 app.js v=127, CACHE_VERSION bumped.
 
-## [0.0.57] — 2026-05-17
+## [0.0.57] · 2026-05-17
 
-### Added — Sign Out button in the appliance header
+### Added. Sign Out button in the appliance header
 There wasn't one. The dashboard had a Sign In button (broken in
 its own way until v0.0.56) but no way to *un*-sign-in. Ritual North
 reported the appliance UI never asked him to log in (the
 READONLY_PUBLIC bypass lets GET requests through on LAN without
-a session, by design — so the SPA loads, no login prompt) and
+a session, by design. So the SPA loads, no login prompt) and
 that there was no logout affordance.
 
 Both Sign In + Sign Out live in the header now. Auth-status
 endpoint decides which one to reveal: authed → Sign Out, not
 authed → Sign In. Demo mode suppresses both.
 
-### Added — Diagnostics bundle download (#138)
+### Added. Diagnostics bundle download (#138)
 "Download bundle" button on Settings → Diagnostics. Single JSON
 file: version, deployment (pi|docker), platform, uptime, disk,
 redacted config (bearer_token / tunnel_token / sso_secret /
@@ -1579,12 +1579,12 @@ api_key / password values scrubbed), transport+device counts,
 last poll result, ~500 lines of recent logs. Suitable to attach
 to a support ticket.
 
-## [0.0.56] — 2026-05-17
+## [0.0.56] · 2026-05-17
 
-### Fixed — Sign-in button always shown to authenticated users
+### Fixed. Sign-in button always shown to authenticated users
 The header's "Sign in" affordance gated on `document.cookie.includes
 ("wp_local_session=")` to decide whether to show. Trouble: the
-session cookie is HttpOnly (XSS protection — correct), so JS can
+session cookie is HttpOnly (XSS protection. Correct), so JS can
 never see it. Every authenticated user saw the button.
 
 Replaced the cookie sniff with a tiny `/api/system/auth-status`
@@ -1595,14 +1595,14 @@ users + LAN password sign-ins equally.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
-## [0.0.55] — 2026-05-17
+## [0.0.55] · 2026-05-17
 
-### Fixed — Appliances paired pre-rebrand silently failed heartbeats
+### Fixed. Appliances paired pre-rebrand silently failed heartbeats
 Appliances paired before the wattpost.io → wattpost.cloud rebrand
 have `cloud.endpoint: https://app.wattpost.io` baked into their
 local config. That hostname now 301s at the Cloudflare edge, and
 httpx (correctly) strips the `Authorization` header when following
-a cross-host redirect — so the bearer never reached wattpost.cloud
+a cross-host redirect. So the bearer never reached wattpost.cloud
 and every heartbeat 401'd. Appliance showed offline despite working
 locally + having a valid bearer + the cloud being healthy.
 
@@ -1612,28 +1612,28 @@ config.load_config now auto-upgrades any legacy endpoint
 Affected appliances heal themselves on next daemon start. New
 pairings already default to wattpost.cloud (CloudCfg.endpoint).
 
-### Fixed — Cloud theme defaulted to dark regardless of device
+### Fixed. Cloud theme defaulted to dark regardless of device
 The inline theme bootstrap in _base.html.jinja defaulted to "dark"
 (via the `default_theme` block) when no localStorage preference was
 set. So a light-mode user landing on the dashboard saw dark forever
 until they manually visited /app/account and picked "System". Now
 defaults to "system" so OS preference is honoured from first visit.
 
-## [0.0.54] — 2026-05-16
+## [0.0.54] · 2026-05-16
 
-### Added — Staff admin page (#103, MVP)
+### Added. Staff admin page (#103, MVP)
 New /app/admin (staff-only, returns 404 to non-staff so the page's
 existence isn't leaked). Three tabs:
 
-- **Users** — last 500. Toggles for `require_2fa` and `is_staff`.
+- **Users**. Last 500. Toggles for `require_2fa` and `is_staff`.
   Critically, this is the in-app escape hatch for a 2FA-enrolment
-  lockout — the only previous fix was SSH + psql (see today's
-  incident). Self-demotion via the UI is refused — has to be done
+  lockout. The only previous fix was SSH + psql (see today's
+  incident). Self-demotion via the UI is refused. Has to be done
   manually to prevent accidental admin-lockout.
-- **Appliances** — last 500 with owner email, online flag (any
+- **Appliances**. Last 500 with owner email, online flag (any
   heartbeat in 15 min), tunnel link. "Is the fleet healthy"
   eyeballing.
-- **Audit log** — last 200 events across all users, filterable by
+- **Audit log**. Last 200 events across all users, filterable by
   email / event_type / IP. Failed sign-ins highlight in amber.
 
 All staff-side writes get their own audit entry (`staff.user.patch`)
@@ -1644,36 +1644,36 @@ The topbar now reveals an "Admin" link client-side via /api/me
 when the user is staff. Non-staff and anonymous visitors never
 see it.
 
-### Fixed — audit_events FK actually altered in prod (migration 0024)
+### Fixed. Audit_events FK actually altered in prod (migration 0024)
 v0.0.52 edited the already-applied migration 0023 to flip CASCADE
 → SET NULL, but that edit had no effect on the production DB.
 Migration 0024 performs the real ALTER so account.delete records
 actually outlive the user row in prod.
 
-## [0.0.53] — 2026-05-16
+## [0.0.53] · 2026-05-16
 
-### Fixed — 2FA enforcement could 403 /api/login itself
+### Fixed · 2FA enforcement could 403 /api/login itself
 Defense-in-depth on top of v0.0.52: auth-transition endpoints
 (/api/login, /api/logout, /api/signup, /api/account/password/forgot,
 /api/account/password/reset and their HTML page counterparts) are
 now always reachable, regardless of `require_2fa` enrolment state.
 
 Previously, a user with `require_2fa=true`, no TOTP enrolled, and
-a stale session cookie would get 403'd on `/api/login` — meaning
+a stale session cookie would get 403'd on `/api/login`. Meaning
 they couldn't even start a fresh login from the same browser to
 escape the loop. Now they always can.
 
-## [0.0.52] — 2026-05-16
+## [0.0.52] · 2026-05-16
 
-### Fixed — 2FA enforcement allowlist locked users out of enrolment
+### Fixed · 2FA enforcement allowlist locked users out of enrolment
 The require-2FA middleware's allowlist used the wrong path prefix
 (`/api/twofa/` instead of the actual `/api/account/2fa/`), so a
 user flagged `require_2fa=true` who hadn't yet enrolled TOTP would
-get 403'd from the very endpoints needed to enrol — locking them
+get 403'd from the very endpoints needed to enrol. Locking them
 out of their own account with no escape hatch. Fixed the prefix +
 added a comment loud enough to prevent a repeat.
 
-### Added — Security events page on /app/account (#144)
+### Added. Security events page on /app/account (#144)
 - "Recent security activity" card on the account page renders the
   last 50 audit events from the API stood up in v0.0.50: sign-ins
   (success + failure), 2FA changes, password updates, appliance
@@ -1682,7 +1682,7 @@ added a comment loud enough to prevent a repeat.
   user-agent + timestamp. Friendly event labels + per-category
   icons. Refreshes after revoke-sessions to confirm the action.
 
-### Added — Audit log wired into the remaining security events
+### Added. Audit log wired into the remaining security events
 - `twofa.enrol`, `twofa.disable`, `twofa.backup_codes_regen` from
   /api/account/2fa/*.
 - `account.delete` recorded before the cascade.
@@ -1690,15 +1690,15 @@ added a comment loud enough to prevent a repeat.
   (opens its own session, captures IP/UA).
 - `appliance.delete` from /api/sites/{id}.
 
-### Changed — AuditEvent FK now SET NULL not CASCADE
-So account.delete records survive the user row's deletion — admin
+### Changed. AuditEvent FK now SET NULL not CASCADE
+So account.delete records survive the user row's deletion. Admin
 and fraud workflows still get the "when did account X get
 deleted, from where" trail. PII is already gone with the user, so
 no privacy regression.
 
-## [0.0.51] — 2026-05-16
+## [0.0.51] · 2026-05-16
 
-### Fixed — rate limiter was bucketing on CF edge IP, not real client
+### Fixed. Rate limiter was bucketing on CF edge IP, not real client
 Once the middleware actually fired (v0.0.49), smoke-test logs
 showed every login attempt arrived with a different CF edge IP
 (172.68.x.x, 172.69.x.x, 141.101.x.x) because CF rotates which
@@ -1713,9 +1713,9 @@ non-CF hits, then TCP peer.
 After this deploys, brute-force from a single attacker IP hits
 the 5-per-minute limit regardless of CF edge distribution.
 
-## [0.0.50] — 2026-05-16
+## [0.0.50] · 2026-05-16
 
-### Added — Audit logging for security-relevant events (#144)
+### Added. Audit logging for security-relevant events (#144)
 Common SaaS feature (Stripe, Linear, GitHub all show this). Two
 purposes: customer-facing visibility into account activity +
 ops-facing forensics for incident review.
@@ -1723,7 +1723,7 @@ ops-facing forensics for incident review.
 - **Schema**: new `audit_events` table via migration 0023.
   Composite index on `(user_id, created_at DESC)` for the
   per-user-timeline query.
-- **Helper**: `cloud/wattpost_cloud/audit.py::log_event()` —
+- **Helper**: `cloud/wattpost_cloud/audit.py::log_event()` ·
   swallows failures (audit writes never break the operation
   they're auditing).
 - **Wired into** (this release):
@@ -1738,14 +1738,14 @@ ops-facing forensics for incident review.
   the last 50 events for the signed-in user. UI page can render
   this; backend ready.
 
-## [0.0.49] — 2026-05-16
+## [0.0.49] · 2026-05-16
 
-### Fixed — middleware actually fires now (was silently no-op'd)
+### Fixed. Middleware actually fires now (was silently no-op'd)
 v0.0.48 added `DefineMiddleware(...)` wrappers thinking that
 fixed the v0.0.46/v0.0.47 issue of plain ASGI middleware classes
 being silently ignored. It didn't. Litestar's `middleware=[…]`
 expects `litestar.middleware.ASGIMiddleware` subclasses with a
-`handle(scope, receive, send, next_app)` method — NOT
+`handle(scope, receive, send, next_app)` method. NOT
 `__call__(scope, receive, send)`.
 
 All three security middlewares converted:
@@ -1768,22 +1768,22 @@ After this deploys, all three gates fire on every request for real:
   endpoint → 403 + `must_enroll_2fa: true` payload → frontend
   redirects to enrolment
 
-## [0.0.48] — 2026-05-16
+## [0.0.48] · 2026-05-16
 
-### Fixed — middleware registration (rate-limit was silently ignored)
+### Fixed. Middleware registration (rate-limit was silently ignored)
 v0.0.46 / v0.0.47 registered ASGI middleware in Litestar's
 `middleware=[Cls, Cls]` list, assuming Litestar accepts plain
-ASGI middleware. It doesn't — they were loaded but never invoked
+ASGI middleware. It doesn't. They were loaded but never invoked
 on actual requests. Caught during smoke test (6 bad logins all
 returned 401 instead of 429 by the 6th). Fix: wrap each in
 `DefineMiddleware(...)`. Now ALL three security middlewares are
 actually in the request chain:
 
-  - RateLimitMiddleware (since v0.0.46) — now actually rate-limiting
+  - RateLimitMiddleware (since v0.0.46). Now actually rate-limiting
   - CSRFMiddleware (new this release)
-  - TwoFactorEnforcementMiddleware (since v0.0.47) — now actually enforcing
+  - TwoFactorEnforcementMiddleware (since v0.0.47). Now actually enforcing
 
-### Added — CSRF protection via custom-header pattern (#142)
+### Added. CSRF protection via custom-header pattern (#142)
 - New `cloud/wattpost_cloud/csrf.py` middleware. Requires
   `X-Requested-With: WattPost` on every cookie-auth POST / PUT /
   PATCH / DELETE. Cross-origin form-submits can't set custom
@@ -1810,9 +1810,9 @@ actually in the request chain:
 - Direct tunnel access (leaked URL) → SSO + broker-auth required
 - Internal endpoint probing → 404'd unless from Caddy
 
-## [0.0.47] — 2026-05-16
+## [0.0.47] · 2026-05-16
 
-### Security — 2FA enrolment enforcement for staff accounts
+### Security · 2FA enrolment enforcement for staff accounts
 Admin password leak shouldn't = WattPost cloud compromise. Staff
 users now must enrol TOTP-based 2FA before they can access anything
 beyond the enrolment page itself.
@@ -1848,9 +1848,9 @@ will:
 Non-staff users keep 2FA optional. Push for the recommendation
 later when there's enough mass to bother.
 
-## [0.0.46] — 2026-05-16
+## [0.0.46] · 2026-05-16
 
-### Security — hardening sprint
+### Security. Hardening sprint
 Tier-1 gaps post-rebrand. No customers yet so blast radius is zero,
 but the work needed to land before any do.
 
@@ -1869,7 +1869,7 @@ but the work needed to land before any do.
   - Rejects with 404 (not 400) on any non-Caddy request, so
     attackers can't tell the route exists.
   - Verifies the TCP peer is a private-IP address (10/8, 172/12,
-    192.168/16) — public hits get 404.
+    192.168/16). Public hits get 404.
   - Still requires `X-Forwarded-Host` to end in `.wattpost.cloud`
     so we don't leak ownership info via 401-vs-403 timing.
 - **Security headers on `wattpost.cloud` + `*.wattpost.cloud`** in
@@ -1880,7 +1880,7 @@ but the work needed to land before any do.
 - `curl https://wattpost.cloud/app -I` → headers present
 - `curl https://wattpost.cloud/api/internal/can-access` from public
   → 404 (was 400 in v0.0.45)
-- Rate limiter live in middleware chain — first 5 logins/min OK,
+- Rate limiter live in middleware chain. First 5 logins/min OK,
   6th gets 429
 
 ### What's still on the audit list
@@ -1891,29 +1891,29 @@ but the work needed to land before any do.
 - External uptime monitoring + status page (#140, #141)
 - End-to-end signup → email-verify → pair re-test post-rebrand
 
-## [0.0.45] — 2026-05-16
+## [0.0.45] · 2026-05-16
 
-### Changed — Phase 3 of cloud rebrand: appliance side (#139)
+### Changed. Phase 3 of cloud rebrand: appliance side (#139)
 Final code/doc sweep of `app.wattpost.io` references in the appliance.
 
-- `solar_monitor/config.py` — `CloudCfg.endpoint` default flips from
+- `solar_monitor/config.py` · `CloudCfg.endpoint` default flips from
   `https://app.wattpost.io` → `https://wattpost.cloud`. Existing
   pairings keep their on-disk value (still works via 308); new
   pairings point at the new domain from first heartbeat.
-- `solar_monitor/update/checker.py` — `DEFAULT_MANIFEST_URL` flips
+- `solar_monitor/update/checker.py` · `DEFAULT_MANIFEST_URL` flips
   to `https://wattpost.cloud/api/releases/latest`. Same back-compat
   story.
-- `solar_monitor/api/cloud_admin.py` — pair-flow defaults and
+- `solar_monitor/api/cloud_admin.py`. Pair-flow defaults and
   PUT payload defaults flipped.
-- `solar_monitor/web/login-tunnel.html` — direct-tunnel-access
+- `solar_monitor/web/login-tunnel.html`. Direct-tunnel-access
   block page now points at `wattpost.cloud` for "sign in here".
-- `solar_monitor/web/app.js` — integrations panel's "Pair with"
+- `solar_monitor/web/app.js`. Integrations panel's "Pair with"
   fallback URL.
 - Comments + docstrings across appliance modules sweep-updated.
 
 ### Docs
 - `docs/pairing.md`, `docs/kiosk.md`, `docs/release-pipeline.md`,
-  `docs/cloud-architecture.md` — every customer-visible reference
+  `docs/cloud-architecture.md`. Every customer-visible reference
   to `app.wattpost.io` swapped to `wattpost.cloud`. The 32 hits
   in the docs tree are mechanical replacements; no behavioural
   content changed.
@@ -1926,18 +1926,18 @@ This is the last code/doc commit in the migration. Future phases:
   the Caddyfile entirely.
 - No customer-visible cleanup left after that.
 
-## [0.0.44] — 2026-05-16
+## [0.0.44] · 2026-05-16
 
-### Changed — Phase 2 of cloud rebrand: app.wattpost.io → wattpost.cloud (#139)
+### Changed. Phase 2 of cloud rebrand: app.wattpost.io → wattpost.cloud (#139)
 Following v0.0.43 (which stood up wattpost.cloud + the Caddy broker
 in parallel), this commit completes the URL migration:
 
-- **Cloud code sweep** — 22 hardcoded `https://app.wattpost.io/...`
+- **Cloud code sweep** · 22 hardcoded `https://app.wattpost.io/...`
   references across 13 files (verification emails, password-reset
   links, billing return URLs, marketing copy, referral URLs)
   flipped to `https://wattpost.cloud/...`. Future emails / new
   bookmarks all use the new domain.
-- **Caddy app.wattpost.io block** — replaced with a single
+- **Caddy app.wattpost.io block**. Replaced with a single
   `redir https://wattpost.cloud{uri} 308`. 308 preserves method +
   body, so existing paired appliances heartbeating to
   `app.wattpost.io/api/heartbeat` keep working without any
@@ -1960,9 +1960,9 @@ in parallel), this commit completes the URL migration:
   logs confirm every paired appliance has hit wattpost.cloud at
   least once.
 
-## [0.0.43] — 2026-05-16
+## [0.0.43] · 2026-05-16
 
-### Changed — Cloud broker rebuilt with Caddy on wattpost.cloud (#139)
+### Changed. Cloud broker rebuilt with Caddy on wattpost.cloud (#139)
 Field-scan + Ritual North's pushback on the v0.0.42 Python broker
 ("I don't like that the tunnel is hitting the appliance directly")
 led to a proper architectural redo. Nabu Casa, Tesla, Sonos and
@@ -1975,9 +1975,9 @@ tested HTTP layer (not custom Python).
 - Apex `wattpost.cloud` = the SaaS (was `app.wattpost.io`).
 - `<slug>.wattpost.cloud` = brokered appliance dashboards.
 - Cloudflare Universal SSL covers `wattpost.cloud` + `*.wattpost.cloud`
-  for free (single-level wildcards) — no paid Advanced Cert needed.
+  for free (single-level wildcards). No paid Advanced Cert needed.
 - Single eTLD+1 means session cookies set on the apex are sent to
-  every subdomain (including the broker) automatically — no cross-
+  every subdomain (including the broker) automatically. No cross-
   domain auth dance.
 
 **Data path** (replaces v0.0.42's Python httpx proxy):
@@ -1998,8 +1998,8 @@ needed** (subdomain pattern means the appliance's absolute `/api/*`
 and `/web/*` paths resolve correctly).
 
 **Deleted**:
-- `cloud/wattpost_cloud/api/broker.py` — the Python proxy.
-- HTML shim injection logic — moot under subdomain pattern.
+- `cloud/wattpost_cloud/api/broker.py`. The Python proxy.
+- HTML shim injection logic. Moot under subdomain pattern.
 
 **Cookie domain change**: `.wattpost.io` → `.wattpost.cloud`. Existing
 sessions on app.wattpost.io get invalidated; one re-login per
@@ -2029,9 +2029,9 @@ turns it into a 308 redirect to `wattpost.cloud`.
 - Phase 3: update appliance default endpoint + email templates.
 - Phase 4: remove `app.wattpost.io` after grace period.
 
-## [0.0.42] — 2026-05-16
+## [0.0.42] · 2026-05-16
 
-### Added — Cloud broker (#139)
+### Added. Cloud broker (#139)
 - **Cloud now proxies appliance dashboards.** Previously the
   cloud's "Open" button bounced the user to
   `<slug>.wattpost.io/sso?token=…`; the browser then ran every
@@ -2072,15 +2072,15 @@ turns it into a 308 redirect to `wattpost.cloud`.
 - Direct tunnel access still works (`<slug>.wattpost.io/sso?token=…`)
   for the time being. Once we're confident in the broker we'll
   deprecate it.
-- WebSocket bridging isn't implemented — the appliance doesn't use
+- WebSocket bridging isn't implemented. The appliance doesn't use
   WS today (only SSE). Add when needed.
 - HTML rewriting + the JS shim are belt-and-braces; cleaner long-
   term is to ship appliance HTML/JS with relative URLs and drop
   the shim. Track as a polish item.
 
-## [0.0.41] — 2026-05-16
+## [0.0.41] · 2026-05-16
 
-### Fixed — Tunnel `/login` no longer pretends to work
+### Fixed. Tunnel `/login` no longer pretends to work
 - Direct tunnel URL access (e.g. someone bookmarked the tunnel
   hostname, or shared the link) used to render the LAN password
   form, accept the user's password, issue a session… that the
@@ -2090,8 +2090,8 @@ turns it into a 308 redirect to `wattpost.cloud`.
 - Tunnel-origin hits to `/login` now serve `login-tunnel.html`:
   a dedicated page that says "sign in at app.wattpost.io and
   click Open" with a CTA to the cloud dashboard. No password
-  field on tunnel — there's nothing to fill in.
-- `/api/login` also refuses tunnel-origin POSTs (403) — belt and
+  field on tunnel. There's nothing to fill in.
+- `/api/login` also refuses tunnel-origin POSTs (403). Belt and
   braces in case a client-side script or a manually-crafted
   request hits it directly.
 
@@ -2100,12 +2100,12 @@ turns it into a 308 redirect to `wattpost.cloud`.
   appliance dashboard at `<slug>.wattpost.io`, the cloud serves
   it transparently at `app.wattpost.io/site/{id}/`. User never
   leaves the cloud session; tunnel hostname is invisible. Multi-
-  day build — HTTP proxy + SSE bridging + appliance shared-secret
+  day build. HTTP proxy + SSE bridging + appliance shared-secret
   for defense-in-depth. Issue tracking the design.
 
-## [0.0.40] — 2026-05-16
+## [0.0.40] · 2026-05-16
 
-### Added — In-app password reset + Sign in header link
+### Added. In-app password reset + Sign in header link
 - **Settings → System → "Rotate web password" button.** One-click
   password rotation from the dashboard. Generates a ~16-char random
   password, writes the hash + plaintext mirror, shows the new
@@ -2118,7 +2118,7 @@ turns it into a 308 redirect to `wattpost.cloud`.
   the user has no local session cookie AND a password is set on
   the appliance. Jumps to `/login?next=<current-hash>`. Demo mode
   hides it. Previously the login flow was hidden behind the red
-  "login required" error on attempted writes — now it's a visible
+  "login required" error on attempted writes. Now it's a visible
   affordance the second you load the dashboard.
 
 ### API
@@ -2131,16 +2131,16 @@ turns it into a 308 redirect to `wattpost.cloud`.
   reset-to-defaults, log dumps); password reset is the first
   slice. Track #138 for the rest.
 
-## [0.0.39] — 2026-05-16
+## [0.0.39] · 2026-05-16
 
-### Fixed — Settings → Cloud Save was wiping tunnel + SSO state
+### Fixed. Settings → Cloud Save was wiping tunnel + SSO state
 - The cloud config edit handler (`PUT /api/cloud/config`) rebuilt
   the in-memory `CloudCfg` from scratch using only the form fields
   the user submitted (endpoint + heartbeat_minutes), preserving
   `bearer_token`, `appliance_id`, and `label` but DROPPING
   `tunnel_token`, `tunnel_hostname`, and (newly in 0.0.38)
   `sso_secret`. Then `_serialize_cloud` wrote the slimmed-down
-  CloudCfg back to `config.yaml` — wiping all three on disk.
+  CloudCfg back to `config.yaml`. Wiping all three on disk.
 - Symptom: tunnel + SSO worked right after pair / heartbeat,
   then any "Save" click in Settings → Cloud silently broke
   both. Caught by Ritual North after pulling v0.0.38: heartbeat
@@ -2161,12 +2161,12 @@ sudo cp /opt/wattpost/wattpost-config/config.yaml.bak \
 docker restart wattpost
 ```
 
-Or: do nothing, re-pair from the cloud Sites page — fresh
+Or: do nothing, re-pair from the cloud Sites page. Fresh
 `bearer_token` + `sso_secret` arrive in the pair response.
 
-## [0.0.38] — 2026-05-16
+## [0.0.38] · 2026-05-16
 
-### Added — Cloud→appliance SSO (#137)
+### Added. Cloud→appliance SSO (#137)
 - **Cloud-signed redirect tokens replace the "give everyone the
   tunnel URL" model.** When a logged-in cloud user clicks "Open"
   on the dashboard, the cloud now mints a short-lived
@@ -2183,7 +2183,7 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
   session OK) from `is_session_valid_for_tunnel()` (SSO origin
   required). Local password is still usable for LAN / kiosks /
   break-glass; it just can't grant tunnel access on its own.
-  Closes the threat: a leaked tunnel URL is now harmless — the
+  Closes the threat: a leaked tunnel URL is now harmless. The
   recipient has to log into your cloud account first to mint
   a valid token.
 
@@ -2211,20 +2211,20 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
 ### Threat model notes
 - The tunnel itself stays always-on (cloudflared maintains a
   permanent connection); we don't try to gate the tunnel
-  lifecycle. Auth lives at the appliance — anyone with the URL
+  lifecycle. Auth lives at the appliance. Anyone with the URL
   reaches the auth wall, doesn't sneak past it.
 - Local password becomes the LAN fallback / break-glass route;
   no more single-token-grants-everything. See [[docker-pi-parity]]
   in agent memory.
 
-## [0.0.37] — 2026-05-16
+## [0.0.37] · 2026-05-16
 
-### Security — Docker installs were also wide open (urgent follow-up to 0.0.36)
+### Security. Docker installs were also wide open (urgent follow-up to 0.0.36)
 - **The bug:** v0.0.36 closed the tunnel-via-loopback bypass, but
   Docker installs have a SECOND hole the SD image didn't have:
   `packaging/install.sh` (Pi-only) is what generates the first-boot
   password. Docker installs never ran install.sh, so
-  `password_is_set()` returned False — and the auth middleware
+  `password_is_set()` returned False. And the auth middleware
   used to bypass entirely on "no password set." Net effect: every
   Docker customer's appliance was open to anyone with the URL,
   tunnel or LAN. Caught by Ritual North after he updated to 0.0.36 and
@@ -2243,10 +2243,10 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
      503 (API) or redirects to /login (HTML) until a password is
      configured. The startup hook guarantees one exists in normal
      operation; if hash-write fails (permissions, read-only mount),
-     the operator gets a loud error log AND a 503 wall — no quiet
+     the operator gets a loud error log AND a 503 wall. No quiet
      wide-open state.
 - **What customers need to do:**
-  - SD-card users: nothing — install.sh already set a password.
+  - SD-card users: nothing. Install.sh already set a password.
   - Docker users: `docker compose pull && docker compose up -d`,
     then `docker compose logs wattpost | grep -A2 FIRST-BOOT` to
     find the generated password. Save it; bookmark Settings →
@@ -2259,16 +2259,16 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
 - `docs/docker-install.md` now has a "First-boot password" section
   with the exact `docker compose logs | grep FIRST-BOOT` command.
 
-## [0.0.36] — 2026-05-16
+## [0.0.36] · 2026-05-16
 
-### Security — tunnel URL no longer grants anonymous access (urgent)
+### Security. Tunnel URL no longer grants anonymous access (urgent)
 - **The bug:** the appliance's auth middleware treated source IP
   `127.0.0.1` as fully trusted ("the request must have come through
   the authenticated cloud session"). But cloudflared on the
   appliance proxies tunnel traffic to localhost, so EVERY tunnel
   request appeared as loopback. Net effect: anyone with the
   `{slug}.appliances.wattpost.io` URL got full unauthenticated
-  read + write access to the appliance — including settings, alert
+  read + write access to the appliance. Including settings, alert
   rules, and write-through endpoints. Reported by Ritual North after he
   shared the URL with a friend who could read his appliance from
   another house.
@@ -2278,7 +2278,7 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
   port-forward, the daemon talking to itself) has none of those, so
   legitimate local-trust paths still work. New helper
   `is_tunnel_origin()` is also used to disable the `READONLY_PUBLIC`
-  GET bypass for tunnel requests — a leaked URL would otherwise
+  GET bypass for tunnel requests. A leaked URL would otherwise
   still leak every metric anonymously.
 - **What customers will see after this update:** clicking "Open" on
   the cloud dashboard now lands them on the appliance's local
@@ -2290,9 +2290,9 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
   for a password. Until that lands, the password prompt is the
   correct, safe trade-off.
 
-## [0.0.35] — 2026-05-16
+## [0.0.35] · 2026-05-16
 
-### Added — Forecast-aware runtime prediction (#99)
+### Added. Forecast-aware runtime prediction (#99)
 - **New sub-line on the Hero's Remaining tile.** The existing
   "until empty" was always naive: current instant power × current
   SoC. A 2 kW kettle on for 30 seconds would drag it down to a
@@ -2300,10 +2300,10 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
   - **Forecast-aware** (when an Open-Meteo or Solcast forecast is
     cached): walks hourly through the next 48h, subtracts forecast
     PV from a rolling 1-hour avg load, and reports either an
-    absolute depletion time ("~14h until 10% — 02:30 Tue") or
+    absolute depletion time ("~14h until 10% · 02:30 Tue") or
     "holds for the 48h window" when PV input covers the draw.
   - **Naive rolling fallback** (no forecast configured): same
-    1-hour avg load but no PV — "1h-avg: ~3.2 days to 10%".
+    1-hour avg load but no PV · "1h-avg: ~3.2 days to 10%".
 - **Why the 10 % floor**: LFP wants headroom; predicting to 0 % is
   both alarming and academic since loads cut out before then.
 - **Hidden gracefully** when there's no bank capacity to predict
@@ -2311,19 +2311,19 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
 
 ### API
 - New `GET /api/runtime-forecast` returning `now`, `naive`, and
-  `forecast` blocks. The forecast walk is best-effort — failures
+  `forecast` blocks. The forecast walk is best-effort. Failures
   return `forecast.available=false` and the UI falls back to the
   naive line.
 
 ### Storage
 - New `Store.rolling_load_avg(window_seconds=3600)` returning mean
   bank power over the trailing window. Negative when discharging.
-  Single-query AVG across the V×I join — cheap on the rollup
+  Single-query AVG across the V×I join. Cheap on the rollup
   tables.
 
-## [0.0.34] — 2026-05-16
+## [0.0.34] · 2026-05-16
 
-### Added — Battery health tile (#109)
+### Added. Battery health tile (#109)
 - **New dashboard panel** above Cell balance: four headline stats
   + a 10-bar SoC residency histogram showing where the bank lives
   over the last 30 days.
@@ -2336,7 +2336,7 @@ Or: do nothing, re-pair from the cloud Sites page — fresh
   as "kWh" up to 1 MWh, then "MWh" above.
 - **Window cycles**: equivalent full cycles over the last 30
   days, computed by integrating discharged kWh ÷ bank capacity.
-  Works *without* a BMS — every shunt + battery setup gets this.
+  Works *without* a BMS. Every shunt + battery setup gets this.
 - **Days online**: time since the earliest bank sample. Useful
   for "is the BMS cycle counter saying 247 cycles in only 30
   days?" sanity checks.
@@ -2359,9 +2359,9 @@ residency histogram added on top. Aligns with the moat per
 - New `GET /api/battery-health?days=N` (default 30, clamp 1-365)
   returning the aggregate. Read-only; no auth changes.
 
-## [0.0.33] — 2026-05-16
+## [0.0.33] · 2026-05-16
 
-### Fixed — demo.wattpost.io broken since 0.0.31
+### Fixed. Demo.wattpost.io broken since 0.0.31
 - **Synthetic poller crash loop.** `_compute_bank_aggregate` started
   emitting non-numeric fields (`source: "shunt"|"bms"` and the
   `source_disagreement` dict) in 0.0.31. record_poll's bank-persist
@@ -2369,7 +2369,7 @@ residency histogram added on top. Aligns with the moat per
   `ValueError: could not convert string to float: 'shunt'` on every
   poll. The store stayed empty; the dashboard saw zero devices and
   fell through to "Setup needed" + the wizard redirect. Fix: route
-  bank fields by type — floats to `samples`, strings to
+  bank fields by type. Floats to `samples`, strings to
   `samples_str`, dicts JSON-encoded into `samples_str`.
 - **Demo dashboard yanking visitors into the setup wizard.** Even
   with the persist fix, the demo container has zero configured
@@ -2378,32 +2378,32 @@ residency histogram added on top. Aligns with the moat per
   `is-demo` body class via a new `_maybeFirstBootRedirect` helper
   that awaits the `/api/system/info` promise before deciding.
 
-### Added — Battery health plumbing (groundwork for #109)
+### Added. Battery health plumbing (groundwork for #109)
 - Bank aggregate now surfaces `cycle_count`, `lifetime_throughput_ah`,
   and `lifetime_throughput_kwh` when one or more BMSes report them
-  (JK BMS, Lynx Smart BMS — anything with `cycle_count` +
+  (JK BMS, Lynx Smart BMS. Anything with `cycle_count` +
   `total_charge_ah`). Cycle count is the max across packs (worst-
   pack-defines-bank); throughput is the sum. Empty when no BMS.
 - New `Store.battery_health_aggregate(since, until)` returns a 10-
   bucket SoC residency histogram + window equivalent cycles +
-  days-online. No tile yet — that lands in 0.0.34.
+  days-online. No tile yet. That lands in 0.0.34.
 
-## [0.0.32] — 2026-05-16
+## [0.0.32] · 2026-05-16
 
-### Added — First-class alert rules audit (#107)
+### Added. First-class alert rules audit (#107)
 - **One-tap alert templates.** Settings → Alerts now has a "Quick
   templates" pill row. Tap a chip → add-rule form opens with the
   metric path, comparison operator, threshold, severity, and
   cooldown all pre-filled with sensible defaults. Users don't
   have to learn the metric-path schema or invent thresholds.
   Shipped templates:
-  - Low SoC (< 30%) — warn, 1h cooldown
-  - Critical SoC (< 15%) — alarm, 15min cooldown
-  - Low voltage (< 11.5V for 12V) — alarm
-  - Bank over-temp (> 50°C) — alarm
-  - Cell drift warning (> 100 mV) — warn
-  - Cell drift alarm (> 200 mV) — alarm
-  - Shunt-vs-BMS disagreement (> 10 percentage pts) — warn,
+  - Low SoC (< 30%). Warn, 1h cooldown
+  - Critical SoC (< 15%). Alarm, 15min cooldown
+  - Low voltage (< 11.5V for 12V). Alarm
+  - Bank over-temp (> 50°C). Alarm
+  - Cell drift warning (> 100 mV). Warn
+  - Cell drift alarm (> 200 mV). Alarm
+  - Shunt-vs-BMS disagreement (> 10 percentage pts). Warn,
     catches battery monitoring drift before customers complain
 - **Expanded metric suggestions** in the dropdown. New entries:
   bank.time_to_go_minutes, bank.cell_min_v, bank.cell_max_v,
@@ -2420,18 +2420,18 @@ of notification transports (push, email, MQTT, Discord, ntfy,
 Pushover). That's the alarm wedge per
 [[project-renogy-competitive]] in agent memory.
 
-## [0.0.31] — 2026-05-16
+## [0.0.31] · 2026-05-16
 
-### Added — Victron pairing in the setup wizard (#118 + #120 Phase 1B)
+### Added. Victron pairing in the setup wizard (#118 + #120 Phase 1B)
 - **BLE scan now identifies Victron, Renogy, and JK devices** by
   manufacturer ID + name patterns. Each device row in the scan
   results gets a colour-coded vendor badge:
-  - 🔵 Victron — additionally shows the decoded device class
+  - 🔵 Victron. Additionally shows the decoded device class
     (SmartShunt, SolarCharger, DcDcConverter, etc.) when the
     advertisement payload makes that possible (no decryption
-    needed — model ID is in the public header).
-  - Renogy BT-2 / BT-1 — kept the existing badge.
-  - JK BMS — surfaced as a recognised device with a "manual
+    needed. Model ID is in the public header).
+  - Renogy BT-2 / BT-1. Kept the existing badge.
+  - JK BMS. Surfaced as a recognised device with a "manual
     config needed" placeholder (driver shipped in v0.0.21;
     GATT-handshake wizard support will land in a follow-up).
 - **One-tap Victron pairing.** Tap "Pair Victron" on a Victron
@@ -2451,10 +2451,10 @@ reconciliation in #121, the entire "budget upgrader who buys a
 shunt for visibility" workflow is now one-tap-installable from
 the wizard. No CLI, no YAML, no Python.
 
-## [0.0.30] — 2026-05-16
+## [0.0.30] · 2026-05-16
 
-### Added — "No-BMS" dashboard mode (#115)
-- **Shunt-only installs (Persona B — see `project_target_customer`
+### Added · "No-BMS" dashboard mode (#115)
+- **Shunt-only installs (Persona B. See `project_target_customer`
   in agent memory) now read cleanly.** The bank aggregator in
   #121 already handled the data path; this finishes the UI:
   - **Bank-meta tile** drops the "0× " prefix when no BMS is
@@ -2465,29 +2465,29 @@ the wizard. No CLI, no YAML, no Python.
   - Time-to-go reads from the shunt's Coulomb-counted estimate
     (via #121).
   - Per-device detail page already had a dedicated
-    `buildShuntDetail` renderer — verified it still works.
+    `buildShuntDetail` renderer. Verified it still works.
 - After this lands, a customer with a Victron SmartShunt + a
   Renogy MPPT (no BMS) gets a complete coherent dashboard. The
   budget-upgrader segment we're targeting per
   `project_target_customer` finally has the full experience.
 
-## [0.0.29] — 2026-05-16
+## [0.0.29] · 2026-05-16
 
-### Added — BMS-vs-shunt reconciliation (#121)
+### Added. BMS-vs-shunt reconciliation (#121)
 - **Two-layer bank aggregator.** Cell-level metrics (per-cell V,
-  worst-pack drift, cell min/max) always come from BMSes — shunts
+  worst-pack drift, cell min/max) always come from BMSes. Shunts
   don't have per-cell data. System-level metrics (V, A, SoC,
   remaining Ah, time-to-go) prefer the shunt when present,
   fallback to BMS pack-sum otherwise. **Previously the shunt
-  branch returned early, dropping all cell-level data — fixed.**
+  branch returned early, dropping all cell-level data. Fixed.**
 - **Source-disagreement hint.** When both shunt and BMS report SoC
   and they differ by more than 5 percentage points, the hero tile
-  shows a quiet sub-line: *"BMS 72% · shunt 65% — showing shunt"*.
+  shows a quiet sub-line: *"BMS 72% · shunt 65%. Showing shunt"*.
   Renogy DC Home makes users pick manually; we pick the right
   source automatically *and* tell them when we're unsure.
 - **Time-to-go from shunt.** When the shunt reports a Coulomb-
   counted `time_to_go_minutes`, the Remaining tile uses that
-  instead of the V·I extrapolation — much better accuracy on
+  instead of the V·I extrapolation. Much better accuracy on
   variable loads.
 - **Manual override** via new optional `bank:` config block:
   ```yaml
@@ -2501,11 +2501,11 @@ the wizard. No CLI, no YAML, no Python.
 ### Fixed
 - Previously, the bank aggregator's shunt branch returned early
   and dropped `worst_pack_drift_v`, `cell_min_v`, `cell_max_v`
-  from the snapshot when both a shunt and BMSes were present —
+  from the snapshot when both a shunt and BMSes were present ·
   meaning customers with a hybrid install lost the cell-balance
   panel data. The aggregator now keeps both layers independent.
 
-## [0.0.28] — 2026-05-16
+## [0.0.28] · 2026-05-16
 
 ### Fixed
 - **`pyproject.toml` pinned `victron-ble>=0.10`, which PyPI doesn't
@@ -2517,12 +2517,12 @@ the wizard. No CLI, no YAML, no Python.
 
 ### Appliance code unchanged from v0.0.27.
 
-## [0.0.27] — 2026-05-16
+## [0.0.27] · 2026-05-16
 
 ### Changed
 - **Every offgrid-monitor workflow now runs on the self-hosted VPS
   runners**, not just pi-gen. Previously the Docker, source-tarball,
-  cloud, and demo workflows stayed on GitHub-hosted runners — looked
+  cloud, and demo workflows stayed on GitHub-hosted runners. Looked
   cheap (~1-3 min each) but the appliance-image build fires twice
   per release (main push + tag push) so the real per-release cost
   was ~8.7 min, not the ~1.5 I'd estimated. At our shipping pace
@@ -2532,42 +2532,42 @@ the wizard. No CLI, no YAML, no Python.
   a long pi-gen build doesn't block the fast Docker / source-tarball
   builds that fire on the same tag push.
 - Effective GitHub Actions minutes per release: **0**. (Plus
-  redundancy on the VPS — either runner can pick up either kind of
+  redundancy on the VPS. Either runner can pick up either kind of
   job.)
 
 ### Appliance code unchanged from v0.0.26.
 
-## [0.0.26] — 2026-05-16
+## [0.0.26] · 2026-05-16
 
 ### Changed
 - **Pi-gen SD-image build now runs on our self-hosted Contabo VPS
   runner**, not the GitHub-hosted shared pool. Eliminates the
   ~90-minute hit each release was taking on the ritualnorth
-  account's 3000 GH Actions min/mo allowance — pi-gen is now
+  account's 3000 GH Actions min/mo allowance. Pi-gen is now
   effectively free.
 - **Docker GHCR build + source-tarball publish** stay on GitHub-
   hosted runners. They're fast (~45 s + ~30 s) so the minutes
   cost is negligible, and keeping them on GitHub means Docker
   releases still ship even if the VPS is down.
 - Restored the pi-gen trigger to all `v*` tags (we'd briefly
-  restricted to `v<major>.<minor>.0` only as a minute-saver —
+  restricted to `v<major>.<minor>.0` only as a minute-saver ·
   no longer needed).
 
 ### Appliance code unchanged from v0.0.25.
 
-## [0.0.25] — 2026-05-16
+## [0.0.25] · 2026-05-16
 
-### Added — USB GPS support (#125)
+### Added. USB GPS support (#125)
 - **New `gps:` config block** for mobile/van installs. Daemon
   reads NMEA-0183 from a configured serial port (typically
   `/dev/ttyACM0` for a USB-CDC receiver like the VK-162 G-Mouse).
-  No external dependency on `gpsd` — pyserial + a minimal RMC
+  No external dependency on `gpsd`. Pyserial + a minimal RMC
   decoder in `solar_monitor/gps/nmea.py`.
 - **Significant-move detection** via the haversine distance from
   the last applied fix. Defaults: >5 km from previous applied
   fix OR >30 min stale → triggers a one-shot re-fetch of weather
   + Open-Meteo PV forecast at the new coordinates.
-- **Solcast is intentionally not re-fetched on moves** — it's
+- **Solcast is intentionally not re-fetched on moves**. It's
   site-based (see `project_target_customer` in agent memory and
   the #130 release notes). When GPS is active, switch your
   forecast provider to `openmeteo` for moving-van support.
@@ -2577,7 +2577,7 @@ the wizard. No CLI, no YAML, no Python.
   every move (would write hundreds of files a day in a moving
   van). The original config-file values are the cold-start
   fallback.
-- **`GET /api/gps` status endpoint** — surfaces `configured`,
+- **`GET /api/gps` status endpoint**. Surfaces `configured`,
   latest fix, fix age, last-applied lat/lon. Settings UI panel
   will land in a follow-up commit; for now enable by adding a
   `gps:` block to config.yaml and restarting the daemon.
@@ -2589,26 +2589,26 @@ the wizard. No CLI, no YAML, no Python.
 
 ### Notes
 - VK-162 G-Mouse (£8 puck w/ magnetic base, 1 m USB cable) is the
-  recommended receiver — better satellite reception than a USB
+  recommended receiver. Better satellite reception than a USB
   stick because the puck can sit on the van roof.
 - Wizard support (the "GPS support coming soon" button currently
   shown after USB-scan detects an NMEA-emitting device) will be
   wired in a follow-up once a customer has end-to-end-tested the
   serial → fix → re-fetch path with real hardware.
 
-## [0.0.24] — 2026-05-16
+## [0.0.24] · 2026-05-16
 
-### Added — Output schedules (Phase B of #104)
+### Added. Output schedules (Phase B of #104)
 - **Cron-style local schedule engine** for any controllable output.
   Three trigger kinds: `time` (fires at fixed HH:MM in the
   appliance's local timezone), `sunrise`, `sunset` (both with a
   ± minute offset, sourced from the cached Open-Meteo sunrise/
-  sunset timestamps — sun-relative triggers silently skip when
+  sunset timestamps. Sun-relative triggers silently skip when
   weather isn't configured). Day-of-week mask (MTWTFSS bitmask)
   gates which days a rule fires.
 - **Ticks once per poll cycle** alongside the existing outputs
   state refresh. Schedules dedupe within a day via `last_run_at`
-  — a daemon restart won't re-fire today's already-run rules.
+ . A daemon restart won't re-fire today's already-run rules.
   Result of each fire is recorded ("ok" / "fail:reason") and
   shown in the UI under each schedule row.
 - **API surface**: `GET/POST/PUT/DELETE
@@ -2621,16 +2621,16 @@ the wizard. No CLI, no YAML, no Python.
   status. "+ Add schedule" form has action radio (On/Off),
   trigger picker (Time/Sunrise/Sunset, with conditional
   time-vs-offset input), and day chips (MTWTFSS, default all).
-  Lazy-loaded — the schedule list isn't fetched until the user
+  Lazy-loaded. The schedule list isn't fetched until the user
   taps the section, so users who only want the instant toggle
   pay no overhead.
 
 ### Closes the #104 saga
 Phase A (instant toggle) shipped in v0.0.12. Phase B (schedules)
-ships now. Phase C (cloud-fire — Pro tier) is the only remaining
+ships now. Phase C (cloud-fire. Pro tier) is the only remaining
 piece, deferred until cloud-side roadmap pulls it in.
 
-## [0.0.23] — 2026-05-16
+## [0.0.23] · 2026-05-16
 
 ### Fixed
 - **Forecast form: Open-Meteo fields no longer leak in when
@@ -2643,9 +2643,9 @@ piece, deferred until cloud-side roadmap pulls it in.
   tilt/azimuth/efficiency`. Same fix for the per-provider help
   paragraphs below the form.
 
-## [0.0.22] — 2026-05-16
+## [0.0.22] · 2026-05-16
 
-### Added — Renogy coverage finished
+### Added. Renogy coverage finished
 - **Renogy 1000W/2000W/3000W pure-sine inverter driver (#135).**
   Covers RIV/RNG-INVT inverter-charger family. Exposes AC input +
   AC output (V/A/Hz), battery side, integrated MPPT side (some
@@ -2654,14 +2654,14 @@ piece, deferred until cloud-side roadmap pulls it in.
   from cyril/renogy-bt's `InverterClient.py`. Registered as
   `(vendor=renogy, kind=inverter)`.
 
-### Changed — Model classifier sweep (#134)
+### Changed. Model classifier sweep (#134)
 - **Model-string classifier now recognises the full Renogy line.**
   Probe + setup-wizard now routes:
   - `RVR/WND/ADV/VNG` (any model code) → `charge_controller`
-    — covers Rover (40A/60A/100A), Rover Elite, Rover Boost,
+   . Covers Rover (40A/60A/100A), Rover Elite, Rover Boost,
     Wanderer (10A/30A/Li/PG), Adventurer (30A), Voyager (20A
     waterproof) and any newer SKU using the same prefix.
-  - `DCC*` with a digit anywhere → `dcdc` — covers DCC50S,
+  - `DCC*` with a digit anywhere → `dcdc`. Covers DCC50S,
     DCC30S, DCC25S, DCC15S (plus `RNG-DCC*` variants).
   - `RBT*` or `*LFP*` → `smart_battery`.
   - `RIV*` or `*INV*` → `inverter`.
@@ -2672,13 +2672,13 @@ piece, deferred until cloud-side roadmap pulls it in.
 
 ### Renogy coverage status
 Effectively complete. The only gap is the Smart Shunt 300
-(#113) — blocked on the lack of a community-documented register
+(#113). Blocked on the lack of a community-documented register
 map, will be unblocked via the discovery telemetry pipeline
 (#129) or a customer-contributed Modbus capture.
 
-## [0.0.21] — 2026-05-16
+## [0.0.21] · 2026-05-16
 
-### Added — JK BMS (JiKong) support (#114)
+### Added. JK BMS (JiKong) support (#114)
 - **New `ble_jkbms` BLE transport** for JK's proprietary GATT
   protocol (service 0xFFE0, char 0xFFE1). Maintains a persistent
   GATT connection + notification subscription; on connect, sends
@@ -2693,7 +2693,7 @@ map, will be unblocked via the discovery telemetry pipeline
   SoC, time-to-go, temps, MOS state, cycle count, alarm flags all
   surface as standard normalised fields.
 - **Why this matters**: JK BMS is the dominant choice in the DIY
-  LFP crowd — 16x EVE 280Ah builds, 48V house banks, vanlife.
+  LFP crowd · 16x EVE 280Ah builds, 48V house banks, vanlife.
   Adding support brings that entire segment (orders of magnitude
   larger than the commercial-pack market) into WattPost's reach.
   See `project_target_customer` + `project_coverage_commitment`
@@ -2706,17 +2706,17 @@ map, will be unblocked via the discovery telemetry pipeline
   correctly. Parser code mirrors syssi's C++ field offsets
   byte-for-byte for the trailer (V/A/SoC/temps/cycles/alarms),
   but trailer values are unvalidated against real hardware in
-  this release — the fixture I had was hand-transcribed and
+  this release. The fixture I had was hand-transcribed and
   inconsistent. First-customer validation will flush out any
   alignment issues; the code path is in place, the JK protocol
   is well-documented, and any field-position fixes are
   surgical.
 
-## [0.0.20] — 2026-05-16
+## [0.0.20] · 2026-05-16
 
-### Added — Victron coverage sweep
+### Added. Victron coverage sweep
 - **Victron SmartSolar MPPT driver (#131).** Every model from
-  75/15 through 250/100 — they all share one `SolarCharger` BLE
+  75/15 through 250/100. They all share one `SolarCharger` BLE
   Instant Readout decoder, so one driver covers the whole family.
   Registered as `(vendor=victron, kind=charge_controller)` so the
   existing dashboard tiles render unchanged. Validated end-to-end
@@ -2741,14 +2741,14 @@ map, will be unblocked via the discovery telemetry pipeline
 
 WattPost now covers every consumer Victron BLE Instant Readout
 device. The only remaining Victron gap is VE.Bus (MultiPlus /
-Phoenix / Quattro inverters) — needs a separate transport,
+Phoenix / Quattro inverters). Needs a separate transport,
 deferred until first customer asks.
 
-## [0.0.19] — 2026-05-16
+## [0.0.19] · 2026-05-16
 
 ### Added
 - **Renogy DCC50S / DCC30S driver (#123).** The DC-DC + MPPT combo
-  charger that dominates mid-tier van builds — single device with
+  charger that dominates mid-tier van builds. Single device with
   both an alternator input and a solar input. Speaks Modbus RTU
   over the existing BT-2 / USB-RS485 transports; just a new
   register map. Configure with `vendor: renogy, kind: dcdc`.
@@ -2759,7 +2759,7 @@ deferred until first customer asks.
   `alternator_direct` value the DCC50S exposes (engine running,
   pure alternator feed) that the Rover doesn't have.
 - Register map sourced from cyril/renogy-bt's `DCChargerClient.py`
-  — well-validated against real DCC50S hardware in production at
+ . Well-validated against real DCC50S hardware in production at
   multiple van builders.
 
 ### Notes for the user
@@ -2767,11 +2767,11 @@ deferred until first customer asks.
   and Renogy (DCC50S/DCC30S). The orchestrator resolves by
   `(vendor, kind)` tuple, so both can coexist on the same Pi.
 
-## [0.0.18] — 2026-05-16
+## [0.0.18] · 2026-05-16
 
 ### Added
 - **Victron Orion-Tr Smart DC-DC support (read-only).** Trivial
-  follow-up to #112 — reuses the existing `ble_victron_advertise`
+  follow-up to #112. Reuses the existing `ble_victron_advertise`
   transport, just registers a new driver under `device_kind: dcdc`.
   Exposes input voltage, output voltage, charging state (off/bulk/
   abs/float/etc), charger error, off reason (e.g. ENGINE_SHUTDOWN
@@ -2783,22 +2783,22 @@ deferred until first customer asks.
   protocol so a single driver covers the family.
 
 ### Deferred
-- **#113 Renogy Smart Shunt 300** — no widely-documented OSS
+- **#113 Renogy Smart Shunt 300**. No widely-documented OSS
   register map exists; shipping a guessed driver risks silently
   returning wrong values. Deferred until either a customer
   contributes a Modbus capture, or #129 (anonymous device-discovery
   telemetry) gives us enough samples to reverse-engineer.
 
-## [0.0.17] — 2026-05-16
+## [0.0.17] · 2026-05-16
 
 ### Added
-- **Open-Meteo PV forecast provider** — free, unlimited, lat/lon-
+- **Open-Meteo PV forecast provider**. Free, unlimited, lat/lon-
   based PV forecast that doesn't require a Solcast account. Solar
   irradiance from Open-Meteo is combined with the user's array
   geometry (capacity_kW, tilt, azimuth, system_efficiency) via a
   simple solar-position + tilt-cosine model to estimate PV output
   hourly for 7 days. Validated end-to-end against a real UK
-  location — physically sensible peak watts + day totals.
+  location. Physically sensible peak watts + day totals.
 - **Settings → Integrations → PV forecast** form now has a
   provider dropdown: pick "Solcast (site-trained ML)" for fixed-
   roof installs with a registered account, or "Open-Meteo
@@ -2808,7 +2808,7 @@ deferred until first customer asks.
   integration's location.
 - **Why this matters**: Solcast is fundamentally site-based
   (free tier = 10 calls/day, max 2 sites, no API to register
-  sites) — a non-starter for moving vans + a real barrier-to-
+  sites). A non-starter for moving vans + a real barrier-to-
   entry for casual users. Open-Meteo doesn't have any of those
   limits. We're already calling Open-Meteo for current weather;
   the irradiance endpoint is one more parameter.
@@ -2822,42 +2822,42 @@ deferred until first customer asks.
 - Today / Tomorrow tile sub-line now credits whichever provider
   is configured rather than hard-coding "Solcast".
 
-## [0.0.16] — 2026-05-16
+## [0.0.16] · 2026-05-16
 
 ### Added
 - **USB-scan now classifies each device by protocol.** The wizard's
   wired-adapter list opens each `/dev/ttyUSB*` / `/dev/ttyACM*`,
   reads briefly, and tags it as:
-  - `Modbus` — silent serial (the typical case) — "Use as Modbus" button
-  - `NMEA GPS` — emitted `$GP…` / `$GN…` sentences (preparation for
+  - `Modbus`. Silent serial (the typical case) · "Use as Modbus" button
+  - `NMEA GPS`. Emitted `$GP…` / `$GN…` sentences (preparation for
     #125 USB GPS support; button disabled with "coming soon" hint)
-  - `unknown output` — bytes seen but no recognised pattern
-  - `port busy` — already held by another process
+  - `unknown output`. Bytes seen but no recognised pattern
+  - `port busy`. Already held by another process
 - Stops users accidentally adding a GPS receiver as a Modbus
-  transport — a £8 VK-162 G-Mouse GPS would otherwise show up
+  transport. A £8 VK-162 G-Mouse GPS would otherwise show up
   alongside legitimate RS-485 adapters and silently fail every poll
   after pairing.
 
 ### Notes
 - Detection is read-only (no Modbus probe write at scan time). The
   existing `/api/setup/probe` endpoint does an active slave-ID
-  sweep once a Modbus transport is selected — that's where real
+  sweep once a Modbus transport is selected. That's where real
   device confirmation happens.
 
-## [0.0.15] — 2026-05-16
+## [0.0.15] · 2026-05-16
 
 ### Added
 - **"Add another transport" in the setup wizard.** Once you've got
   a transport configured, a collapsible tile under the list lets
   you wire up a second one without deleting the first. Same two
   buttons (Bluetooth / Wired USB-RS485) as the empty-state
-  picker. Pairs cleanly with the underlying architecture —
+  picker. Pairs cleanly with the underlying architecture ·
   BLE and USB serial subsystems are completely independent on
   the Pi, so a single host can run a Renogy BT-2 for the MPPT
   *and* a USB-RS485 dongle for a JK BMS at the same time without
   contention.
 
-## [0.0.14] — 2026-05-16
+## [0.0.14] · 2026-05-16
 
 ### Added
 - **Setup wizard now also finds USB-RS485 adapters.** Phase 1 of
@@ -2868,12 +2868,12 @@ deferred until first customer asks.
   sees, labels each with the chip (FTDI FT232 / WCH CH340 /
   Prolific PL2303 / Silicon Labs CP210x), and the user picks one
   with a single tap. Add-transport writes a `serial_modbus` block
-  with sensible defaults (9600 baud, 8N1 — Renogy/Epever standard).
+  with sensible defaults (9600 baud, 8N1. Renogy/Epever standard).
 - **Why this matters**: replacing the BT-2 dongle with a wired
   USB-RS485 dongle (~£10) gives sub-millisecond round-trips, no
   BLE timeouts, and proper FC06 ack frames (fixing the silent-ack
   quirk we hit during #104 de-risk). It also opens the door for
-  customers who don't have line-of-sight BLE to their kit — cabin
+  customers who don't have line-of-sight BLE to their kit. Cabin
   installs, gear in a metal-roof barn, etc.
 
 ### Notes
@@ -2881,27 +2881,27 @@ deferred until first customer asks.
   the wizard) lands in a follow-up. The current Victron driver
   (v0.0.13) still needs manual YAML config; #118 tracks that gap.
 - See the wizard's new tooltip: the RJ45 port on chargers is
-  **RS-485, not Ethernet** — Cat5 from there terminates at a
+  **RS-485, not Ethernet**. Cat5 from there terminates at a
   USB-RS485 dongle on the Pi, NOT the Pi's network jack.
 
-## [0.0.13] — 2026-05-16
+## [0.0.13] · 2026-05-16
 
 ### Added
 - **Victron SmartShunt support (read-only).** The BMV-style
-  battery monitor — voltage, current, SoC, time-to-go, consumed
+  battery monitor. Voltage, current, SoC, time-to-go, consumed
   Ah, aux input (starter/midpoint/temperature), model + alarm
-  state — now lights up the same dashboard tiles as our other
+  state. Now lights up the same dashboard tiles as our other
   vendors. New BLE transport `ble_victron_advertise` runs a
   passive BleakScanner that decrypts Victron's Instant Readout
   advertisements via the per-device key (find it in
   VictronConnect → Product info → Show device key). New vendor
   `victron` with driver `shunt`. Validated end-to-end against
-  the `victron-ble` library's upstream test fixtures — every
+  the `victron-ble` library's upstream test fixtures. Every
   field decodes correctly.
 - Adds `victron-ble>=0.10` as a dependency.
 
 ### Notes for early adopters
-- v0.0.13 ships the engine — a wizard flow for adding a Victron
+- v0.0.13 ships the engine. A wizard flow for adding a Victron
   device is coming in #118. Until then, drop a transport block
   and matching device block into `config.yaml` manually:
 
@@ -2919,11 +2919,11 @@ deferred until first customer asks.
           label: shunt
 
 - **Write capability is permanently out of scope for Victron.**
-  Heavy-Victron customers live on VRM/Cerbo — chasing them is a
+  Heavy-Victron customers live on VRM/Cerbo. Chasing them is a
   rabbit hole we won't go down. See `project_victron_scope` in
   the AI's memory for the strategic call.
 
-## [0.0.12] — 2026-05-16
+## [0.0.12] · 2026-05-16
 
 ### Added
 - **Renogy MPPT load-output toggle.** Rover-family chargers (Rover
@@ -2931,14 +2931,14 @@ deferred until first customer asks.
   terminal as a controllable output on the device-detail page.
   Toggle button writes register 0x010A via FC06 and confirms the
   new state via an explicit FC03 read-back inside the same BLE
-  session — works around the BT-2 dongle quirk where Rover
+  session. Works around the BT-2 dongle quirk where Rover
   firmware 3.x silently swallows FC06 ack frames. Confirmed
   end-to-end against a real RNG-CTRL-RVR40 FW 3.1.0.
 - **One-shot safety gate** before the first toggle on any output:
   the panel explains what's about to happen ("write command to
   your charger, the load terminal will switch") and the user has
   to acknowledge before any control surface appears. Persisted
-  per-output — won't nag on every visit.
+  per-output. Won't nag on every visit.
 - **Audit line** under each control: "Last command: on · 6 sec
   ago · by user · ok". So you can see whether a command actually
   landed, especially handy when BLE was wobbly.
@@ -2954,10 +2954,10 @@ deferred until first customer asks.
   share the same exception-code plumbing as FC03.
 - **SQLite tables `controllable_outputs` + `output_schedules`.**
   The schedules table lands ahead of the scheduler tick that
-  uses it (Phase B of #104) — the schema's lighter to evolve
+  uses it (Phase B of #104). The schema's lighter to evolve
   if it ships in one shot.
 
-## [0.0.11] — 2026-05-16
+## [0.0.11] · 2026-05-16
 
 ### Added
 - **Right-now tile now shows the next 8 hours.** Apple-Weather-
@@ -2965,16 +2965,16 @@ deferred until first customer asks.
   a tiny WMO icon (sun / partly cloudy / cloud / rain / snow /
   thunder, switched to a moon for night-time clear skies), and
   the predicted °C for each cell. Pulled from the same
-  Open-Meteo fetch as the current conditions — one extra HTTP
-  param, no new provider — so refresh cadence + auth-free
+  Open-Meteo fetch as the current conditions. One extra HTTP
+  param, no new provider. So refresh cadence + auth-free
   setup is unchanged. The strip is hidden if the provider
   doesn't return hourly data, and scrolls horizontally on
   narrow viewports rather than wrapping.
 
-## [0.0.10] — 2026-05-16
+## [0.0.10] · 2026-05-16
 
 ### Changed
-- **Dashboard tile redesign — Today is now the headline.**
+- **Dashboard tile redesign. Today is now the headline.**
   The standalone "Tomorrow" tile is gone; its content folds
   into the Today panel as a sub-line. The Today panel now
   shows kWh-so-far as a big hero number, with a forecast
@@ -2984,8 +2984,8 @@ deferred until first customer asks.
   come ("Of 3.8 kWh expected · 1.4 kWh still to come"). The
   Tomorrow preview drops to a one-line footer at the bottom
   of the tile.
-- **Sunset flip.** After dusk — when no PV is forecast for
-  the rest of today and tomorrow's window has data — the
+- **Sunset flip.** After dusk. When no PV is forecast for
+  the rest of today and tomorrow's window has data. The
   Today tile auto-flips: Tomorrow's expected kWh becomes the
   headline, today's tally demotes to "Today (final): PV …
   Load …" in the footer. The dashboard's "operational
@@ -2999,20 +2999,20 @@ deferred until first customer asks.
   Was the only dashboard tile without a panel tint, which
   made it visually inert next to the others.
 
-## [0.0.9] — 2026-05-16
+## [0.0.9] · 2026-05-16
 
 ### Fixed
 - **Bumped the `/web/app.js?v=` cache-buster** in index.html.
   Several recent appliance fixes (Settings → About row visibility,
   history chart forecast bound, Check-now button focus state)
   were sitting unread in the container because the script-tag's
-  version query hadn't moved since v0.0.5 — Cloudflare's edge
+  version query hadn't moved since v0.0.5. Cloudflare's edge
   was serving the same URL out of its 4h cache regardless of
   what the container actually held. From now on the index.html
   `?v=` must move in lockstep with `sw.js` CACHE_VERSION so
   every JS update gets a fresh URL that bypasses any CDN cache.
 
-## [0.0.8] — 2026-05-16
+## [0.0.8] · 2026-05-16
 
 ### Fixed
 - **History chart: the forecast overlay no longer stretches the
@@ -3021,40 +3021,40 @@ deferred until first customer asks.
   appended. The forecast horizon now mirrors the chosen history
   window (1h history → 1h forecast, 24h → 24h, etc).
 - **"Check now" button on Settings → About stops looking
-  pressed** after the action completes — it was the iOS focus
+  pressed** after the action completes. It was the iOS focus
   ring sticking; we now blur the button when the work returns.
 - **iOS Safari picks up appliance updates faster.** Service
   worker registration now uses `updateViaCache: 'none'`, so
   Safari fetches the SW file fresh on every page load instead
   of holding the previous version's cached copy for hours.
 
-## [0.0.7] — 2026-05-15
+## [0.0.7] · 2026-05-15
 
 ### Fixed
 - **Settings → About uptime now reports the daemon's uptime**,
   not the host's. The previous `/proc/uptime` read leaked the
-  host machine's uptime through Docker — a freshly-restarted
+  host machine's uptime through Docker. A freshly-restarted
   container could show "3d 23h" if that's how long the laptop
   had been booted.
 - **"Updates: docker compose pull..." row only shows when
   there's actually an update pending.** Used to render
   permanently on every Docker install, even with nothing to
-  apply — read as a nag.
+  apply. Read as a nag.
 - **Fresh installs land in the setup wizard automatically.**
   First-time users opening the dashboard with zero transports
   configured used to see an empty dashboard with a "Setup
   needed" pill top-right and no signpost. They now get
   redirected straight to `#/setup` on first paint.
 
-## [0.0.6] — 2026-05-15
+## [0.0.6] · 2026-05-15
 
 ### Added
 - **Cloud dashboard shows weather + PV forecast per site.**
   Each heartbeat now ships the appliance's cached weather
   snapshot (temperature, conditions, sunset) and Solcast
   forecast totals (today + tomorrow kWh). The cloud card
-  surfaces a quiet strip — e.g. *"☀ 16°C · Mostly clear ·
-  Sunset 19:42 · Today 4.2 kWh PV · Tomorrow 5.1 kWh"* — so a
+  surfaces a quiet strip. E.g. *"☀ 16°C · Mostly clear ·
+  Sunset 19:42 · Today 4.2 kWh PV · Tomorrow 5.1 kWh"*. So a
   glance at app.wattpost.io tells you whether your off-grid
   setup is going to make it through the day.
 - **Appliance reports its install method** in the heartbeat
@@ -3064,14 +3064,14 @@ deferred until first customer asks.
 
 ### Changed
 - Update notes pulled from `releases.wattpost.io/CHANGELOG.md`
-  remain the same source as before — this entry will appear
+  remain the same source as before. This entry will appear
   in the dashboard's "Release notes" link.
 
-## [0.0.5] — 2026-05-15
+## [0.0.5] · 2026-05-15
 
 ### Changed
 - **Setup wizard BLE scan now flags "recently visible but
-  missing" dongles** — when a BT-2 was seen in the last 15 min
+  missing" dongles**. When a BT-2 was seen in the last 15 min
   but doesn't respond to the active scan, the wizard surfaces
   it with a likely-cause hint (most commonly: the Renogy mobile
   app is holding the connection). Replaces the previous silent
@@ -3083,11 +3083,11 @@ deferred until first customer asks.
 ### Fixed
 - **iOS Safari text inflation** on `/docs` made body text ~2×
   nav text. Pinned with `text-size-adjust: 100%`.
-- **Docs grid overflowed viewport** on narrow mobile screens —
+- **Docs grid overflowed viewport** on narrow mobile screens ·
   wide tables now horizontally scroll, grid cells respect
   viewport width.
 
-## [0.0.4] — 2026-05-15
+## [0.0.4] · 2026-05-15
 
 ### Added
 - **Cloud-managed updates for Pi appliances.** Multi-site
@@ -3102,7 +3102,7 @@ deferred until first customer asks.
   billing buttons in the cloud dashboard and account page.
   Webhook ingestion mirrors subscription state into the
   `appliances` table.
-- **Per-device delete button on the appliance Devices tab** —
+- **Per-device delete button on the appliance Devices tab** ·
   one click + confirm to drop a slave from polling, no trip
   through the Setup wizard.
 - **Bank aggregate pinned to the top of the Devices tab.**
@@ -3124,7 +3124,7 @@ deferred until first customer asks.
   firmware generation (`fff1` first, `ffd2` fallback). Setup
   wizard's scan finds Renogy devices reliably across both
   generations without manual config.
-- **BLE self-heals stale BlueZ state** on connect failures —
+- **BLE self-heals stale BlueZ state** on connect failures ·
   the daemon now sends `bluetoothctl disconnect` + `remove`
   on the retry path, recovering from "device disconnected
   during service discovery" without operator intervention.
@@ -3151,22 +3151,22 @@ deferred until first customer asks.
 
 ### Fixed
 - **"Setup needed" pill stuck on amber** despite a healthy
-  appliance — SSE snapshot's `poll_run` was missing the
+  appliance. SSE snapshot's `poll_run` was missing the
   `transports` field, so every tick reset the dashboard's
   view to "no transports configured".
 - **Pairing flow re-introduced "Restart daemon"** UX after the
   hot-start path was added; UI now respects the
   `restart_required: false` response.
-- **About → Update section** showed "Latest available —" and
+- **About → Update section** showed "Latest available ·" and
   a stuck "Update progress: waiting…" on Docker after earlier
   manual Update-Now clicks. Both rows now hide when there's
   nothing to apply.
 - **Setup wizard locked users out** when the BLE link was
-  idle-dropped — the transport row went disabled with no
+  idle-dropped. The transport row went disabled with no
   recovery. Now: row stays clickable, scan auto-reopens the
   link.
 
-## [0.0.3] — 2026-05-15
+## [0.0.3] · 2026-05-15
 
 ### Added
 - BLE transport auto-detects the notify characteristic per Renogy
@@ -3180,26 +3180,26 @@ deferred until first customer asks.
 - Release notes are now fetched live from `releases.wattpost.io`
   on every manifest poll and cached on the appliance. Means the
   dashboard can preview a not-yet-installed version's changelog
-  entry — bundled docs only cover versions ≤ the running release.
+  entry. Bundled docs only cover versions ≤ the running release.
   Falls back to bundled `docs/release-notes.md` when offline.
 
 ### Changed
 - Settings → About: Docker installs no longer show an in-app
-  "Update now" button — they get a persistent hint to run
+  "Update now" button. They get a persistent hint to run
   `docker compose pull && docker compose up -d` on the host
   (matches Immich / Pi-hole / Vaultwarden conventions). Pi
   installs are unchanged.
 
-## [0.0.2] — 2026-05-15
+## [0.0.2] · 2026-05-15
 
 ### Added
-- WattPost cloud (wattpost.io) — opt-in. Pair the appliance to a
+- WattPost cloud (wattpost.io). Opt-in. Pair the appliance to a
   cloud account from Settings → Integrations → WattPost cloud,
   paste an 8-character code, daemon exchanges it for a long-lived
   bearer token and starts pushing 5-minute heartbeats. Cloud's
   multi-site dashboard shows online/offline per appliance and
   flags overdue heartbeats. Local appliance keeps working with
-  no internet, no cloud, no account — strictly additive.
+  no internet, no cloud, no account. Strictly additive.
 
 - Solcast PV forecast: configurable in Settings → Integrations
   (user supplies their own free API key + resource UUID), polled
@@ -3212,13 +3212,13 @@ deferred until first customer asks.
   peak power + time, day-after preview, and a translucent SVG
   sparkline of tomorrow's curve. Auto-hidden when no forecast
   data is cached.
-- Dashboard "7-day outlook" strip below the Tomorrow tile —
+- Dashboard "7-day outlook" strip below the Tomorrow tile ·
   per-day kWh + mini sparkline across all forecast days, common
   Y scale so quiet days read as quiet next to sunny ones, the
   Tomorrow card highlighted as the focal point.
 - History chart's forecast overlay now renders Solcast's
   P10–P90 confidence band as a translucent amber fill between
-  the bounds — wide band = the model isn't sure, narrow = high
+  the bounds. Wide band = the model isn't sure, narrow = high
   confidence. Median line stays dashed on top.
 - Current weather (Open-Meteo): new `weather/` module + Settings
   → Integrations row + dashboard "Right now" tile showing temp,
@@ -3249,26 +3249,26 @@ deferred until first customer asks.
 - CI: `.github/workflows/build-image.yml` builds the SD image via
   pi-gen on tag push (`v*`) and attaches the `.img.xz` + SHA256 to a
   GitHub Release. `workflow_dispatch` available for smoke tests.
-- Local alert engine — rule schema (metric / op / threshold / severity /
+- Local alert engine. Rule schema (metric / op / threshold / severity /
   cooldown), Settings → Alerts UI editor (rules + transports), per-rule
   Test button
 - Notification transports: ntfy, Discord webhook, generic webhook,
   SMTP / email, MQTT-publish (LAN-local), Pushover
 - CSV export of any metric over any range
   (`/api/devices/{label}/history.csv`)
-- PWA install — manifest + service worker, dashboard installs to home
+- PWA install. Manifest + service worker, dashboard installs to home
   screen on iOS / Android
-- Tailscale auto-config — sudoers entry, `tailscale serve` for HTTPS,
+- Tailscale auto-config. Sudoers entry, `tailscale serve` for HTTPS,
   Settings → System surfaces the auth URL
-- In-app docs (`/docs/...`) rendered from bundled Markdown — no
+- In-app docs (`/docs/...`) rendered from bundled Markdown. No
   external site needed
-- Diagnostics — Settings → System shows recent log lines + a Restart
+- Diagnostics. Settings → System shows recent log lines + a Restart
   daemon button (no SSH required)
-- Kiosk mode — `#/kiosk` chrome-free SoC + flow tiles, Settings toggle
+- Kiosk mode · `#/kiosk` chrome-free SoC + flow tiles, Settings toggle
   to default-on for one device, Wake Lock keeps the screen on
-- WebSocket / SSE live updates — dashboard streams snapshots after
+- WebSocket / SSE live updates. Dashboard streams snapshots after
   every poll instead of polling every 5s
-- BLE discovery wizard — Setup page scans an open transport for new
+- BLE discovery wizard. Setup page scans an open transport for new
   slave IDs and appends them to config.yaml
 - Home Assistant MQTT discovery topics
 - packaging/install.sh + systemd unit + pi-gen stage for SD-image
@@ -3279,12 +3279,12 @@ deferred until first customer asks.
   timeouts on daemon restart by clearing BlueZ's stale connection
   state (`bluetoothctl disconnect`) and retrying once
 - Tailscale endpoints surface real sudo errors to the UI instead of
-  returning `ok:true` and only logging — Enable HTTPS / Connect /
+  returning `ok:true` and only logging. Enable HTTPS / Connect /
   Disconnect now show a username-aware fix-it hint
   (`packaging/dev-sudoers.sh` for dev shells, re-run `install.sh`
   for production `wattpost` user)
 
-## [0.0.1] — 2026-05-12
+## [0.0.1] · 2026-05-12
 Initial private commit. End-to-end working appliance against a live
 Renogy rig.
 
@@ -3314,7 +3314,7 @@ Renogy rig.
     direction, signed-W indicator pill
   - Hero with net power, time-to-empty/full, voltage, capacity, bank
     info
-  - **Power flow strip** — data-driven from device kinds. Sources →
+  - **Power flow strip**. Data-driven from device kinds. Sources →
     Battery → Loads, animated arrows, energy-balance "Load" tile that
     captures bus-wired consumption invisible to the charge controller
   - Today strip (PV / charged Ah / peak / **real load** / lifetime)
@@ -3324,9 +3324,9 @@ Renogy rig.
     rollup table by range
   - Device detail cards with kind icons + firmware + serial
   - Section header icons, status pill icon (✓ / ⚠ / ✗)
-  - Conditional alert banner — hidden when healthy; surfaces low SoC,
+  - Conditional alert banner. Hidden when healthy; surfaces low SoC,
     cell drift, over-temperature, comms loss, transport errors
-- MQTT exporter (aiomqtt-based) — full device snapshots + per-metric
+- MQTT exporter (aiomqtt-based). Full device snapshots + per-metric
   topics, retained, with LWT `_status` topic for online/offline
 - Tailscale-friendly: serves on 0.0.0.0, no TLS required for LAN, no
   cloud touched
@@ -3336,7 +3336,7 @@ Renogy rig.
   drift, power-flow has source→storage tint gradient)
 
 ### Notes
-- Bank current rounds at 0.01 A per pack — small trickle currents
+- Bank current rounds at 0.01 A per pack. Small trickle currents
   (< ~0.5 A on a single 100 Ah pack) show as zero. Not a bug, a BMS
   resolution limit.
 - Renogy load output (`load_power_w`) is intentionally not used as

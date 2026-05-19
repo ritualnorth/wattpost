@@ -8,7 +8,7 @@ your phone on the road, you have two options:
 Tailscale builds a private mesh between your devices. You don't open
 ports, you don't have a public IP, you don't manage certs.
 
-1. Sign up at [tailscale.com](https://tailscale.com) — free plan
+1. Sign up at [tailscale.com](https://tailscale.com). Free plan
    covers up to 100 devices.
 2. **Settings → Network → Connect to my tailnet**. The button runs
    `tailscale up`, surfaces an auth URL inline. Click it on the
@@ -31,7 +31,7 @@ config files, no monitoring required.
 
 The auth URL is a **one-time, ~10-minute token** that adds the
 appliance to whichever Tailscale account first opens it. Treat it
-like a password — only open it on your device.
+like a password. Only open it on your device.
 
 ## WattPost cloud
 
@@ -42,7 +42,7 @@ install. Browser-side broker dashboard at
 `app.wattpost.io/site/{id}/` opens the appliance UI inside your
 cloud session.
 
-Pricing starts at £3/mo (Hobby, 1 site) with a 14-day trial — see
+Pricing starts at £3/mo (Hobby, 1 site) with a 14-day trial. See
 [wattpost.cloud/pricing](https://wattpost.cloud/pricing) for the full
 comparison. Includes heartbeat-stale alerts, off-site backups, and
 the REST API.

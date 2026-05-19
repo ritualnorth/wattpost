@@ -14,32 +14,32 @@ Rules are defined in `config.yaml` under `alerts:` or, more typically, edited vi
 
 | Level | When to use | Quiet-hours behaviour |
 | - | - | - |
-| `info` | "FYI — load tile crossed a milestone" | Buffered, dropped at the next window end |
+| `info` | "FYI. Load tile crossed a milestone" | Buffered, dropped at the next window end |
 | `warn` | "Battery's getting low" | Buffered, replayed when quiet hours end |
-| `alarm` | "Cells at 2.7 V — disconnect now" | Always pages through immediately |
+| `alarm` | "Cells at 2.7 V. Disconnect now" | Always pages through immediately |
 
 ## Transports
 
 All are free + local:
 
-- **ntfy** — push to your phone via [ntfy.sh](https://ntfy.sh) (or your own ntfy server)
-- **Discord webhook** — drop into a channel
-- **Pushover** — paid app, very reliable
-- **Email** (SMTP) — your relay, your Gmail app password, your ISP, etc.
-- **MQTT** — publish to a topic; Home Assistant / Node-RED / your own scripts can subscribe
-- **Generic webhook** — `POST` JSON to any URL
+- **ntfy**. Push to your phone via [ntfy.sh](https://ntfy.sh) (or your own ntfy server)
+- **Discord webhook**. Drop into a channel
+- **Pushover**. Paid app, very reliable
+- **Email** (SMTP). Your relay, your Gmail app password, your ISP, etc.
+- **MQTT**. Publish to a topic; Home Assistant / Node-RED / your own scripts can subscribe
+- **Generic webhook** · `POST` JSON to any URL
 
 The Cloud tier adds:
 
-- **Heartbeat-stale alerts** — server-side, fires email when an appliance's heartbeat is overdue
-- **SMS via Twilio** (coming) — on our credit, no per-message billing for you
-- **Cross-site rules** — "any of my N appliances below 30%"
+- **Heartbeat-stale alerts**. Server-side, fires email when an appliance's heartbeat is overdue
+- **SMS via Twilio** (coming). On our credit, no per-message billing for you
+- **Cross-site rules** · "any of my N appliances below 30%"
 
 ## Quiet hours
 
 Configurable per-appliance overnight window (e.g. 22:00 → 07:00). During quiet hours, `info` and `warn` alerts buffer; they're replayed (or dropped if too stale) when the window ends. `alarm` severity always pages through.
 
-Quiet hours are local to the appliance's timezone — set in **Settings → System → Locale + clock**.
+Quiet hours are local to the appliance's timezone. Set in **Settings → System → Locale + clock**.
 
 ## Cooldown
 

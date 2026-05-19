@@ -1,4 +1,4 @@
-# Wired setup — Cat5 / USB-RS485 / BT-2 alternatives
+# Wired setup. Cat5 / USB-RS485 / BT-2 alternatives
 
 The default WattPost install talks Modbus over Bluetooth via a Renogy
 BT-1 / BT-2 dongle. That's the fastest path to "it works", but it's
@@ -11,12 +11,12 @@ before you order anything else:
 
 | Option | Approx cost | Wiring effort | Reliability |
 | - | - | - | - |
-| **Renogy "RS485-to-USB" cable** (pre-wired RJ45 → USB) | £15-20 | None | Best — Renogy-spec, no crimping |
-| **DSD TECH SH-U10** (FTDI FT232 USB-RS485) + Cat5e patch cable | ~£12 | One end of the patch cable: strip pins 3 + 4, screw-terminal them into A + B on the adapter | Excellent — FTDI is the gold-standard chip on Linux |
-| **Generic USB-to-RJ45 RS485 console cable** | ~£12-18 | Plug-and-play | Mixed — usually CH340 chip; pinout sometimes A↔B reversed |
+| **Renogy "RS485-to-USB" cable** (pre-wired RJ45 → USB) | £15-20 | None | Best. Renogy-spec, no crimping |
+| **DSD TECH SH-U10** (FTDI FT232 USB-RS485) + Cat5e patch cable | ~£12 | One end of the patch cable: strip pins 3 + 4, screw-terminal them into A + B on the adapter | Excellent. FTDI is the gold-standard chip on Linux |
+| **Generic USB-to-RJ45 RS485 console cable** | ~£12-18 | Plug-and-play | Mixed. Usually CH340 chip; pinout sometimes A↔B reversed |
 
 **Rule of thumb:** if you're testing WattPost for the first time, buy
-the **Renogy pre-wired cable** — zero variables, RJ45 plugs straight
+the **Renogy pre-wired cable**. Zero variables, RJ45 plugs straight
 in. Move to the DSD/FTDI adapter once you're confident in the
 software path and want longer runs (Cat5e is good to ~30 m, far
 better than BLE through walls).
@@ -73,7 +73,7 @@ straight to the MPPT's RJ45 port.
 ```
 
 Crimp pins **3 + 4** (A + B) into the screw terminals of any FTDI- or
-CH340-based USB-RS485 dongle. Leave 7 + 8 unconnected — the MPPT
+CH340-based USB-RS485 dongle. Leave 7 + 8 unconnected. The MPPT
 supplies its own 5 V on those, and shorting them to the Pi side is
 not recommended.
 
@@ -115,7 +115,7 @@ on-board BLE out of action.
 ## 4. JK BMS BLE
 
 JK BMSes (B series, BD6A20S etc.) advertise their own Bluetooth
-service — no separate dongle. The wizard's BLE scan picks them up
+service. No separate dongle. The wizard's BLE scan picks them up
 automatically; they show with a "JK BMS" hint badge.
 
 ```
@@ -125,14 +125,14 @@ automatically; they show with a "JK BMS" hint badge.
   └──────────────┘
 ```
 
-JK BMS BLE is read-only forever — see
+JK BMS BLE is read-only forever. See
 [Adding devices](/docs/devices) for what we expose.
 
 ## 5. Victron Instant Readout
 
 Victron's Smart-series devices (SmartShunt, SmartSolar MPPT, Orion-Tr
 Smart, BMV-7xx etc.) broadcast unsolicited BLE advertisements every
-~1 s. WattPost scans them passively — no pairing — but you do need
+~1 s. WattPost scans them passively. No pairing. But you do need
 the per-device encryption key (a 32-character hex string visible
 once in the VictronConnect app under **Settings → Product info →
 Instant readout via Bluetooth → Show**).
@@ -166,7 +166,7 @@ chooses the shunt over the BMS for SoC (see the
 - **USB-RS485 not detected**: check the adapter is in
   `lsusb` (`lsusb | grep -i ch340`). FTDI-based adapters use
   `dmesg | grep tty` to find the assigned `/dev/ttyUSB*`.
-- **No response on serial**: A/B reversed is the most common cause —
+- **No response on serial**: A/B reversed is the most common cause ·
   swap pins 3 and 4 and re-scan.
 - **BLE drops every few minutes**: power-saving on the Pi's onboard
   radio. `sudo iwconfig wlan0 power off` and add it to `/etc/rc.local`.

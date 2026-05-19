@@ -1,7 +1,7 @@
 # Quick start
 
 WattPost polls off-grid solar gear over Bluetooth and serves a local
-dashboard. Two install paths — pick whichever fits.
+dashboard. Two install paths. Pick whichever fits.
 
 | | SD-card image (Pi) | Docker container (Linux box) |
 |---|---|---|
@@ -10,15 +10,15 @@ dashboard. Two install paths — pick whichever fits.
 | Updates | "Update now" in Settings | `docker compose pull` |
 | Best for | dedicated appliance | homelab / existing Linux box |
 
-The dashboard, scanner, vendor drivers, alerts, cloud-pairing — all
+The dashboard, scanner, vendor drivers, alerts, cloud-pairing. All
 identical between the two. The only differences are how you install
 and how you update.
 
-## Path A — SD card on a Raspberry Pi
+## Path A. SD card on a Raspberry Pi
 
 What you need:
 
-- A Raspberry Pi 4 or 5 (any RAM size — the 1 GB Pi 4 works fine).
+- A Raspberry Pi 4 or 5 (any RAM size. The 1 GB Pi 4 works fine).
 - An 8 GB+ microSD card.
 - A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) plugged
   into your charge controller / battery.
@@ -27,7 +27,7 @@ What you need:
 Then:
 
 1. Install **Raspberry Pi Imager** from [raspberrypi.com/software](https://www.raspberrypi.com/software/).
-2. [Download the WattPost image](/download) — about 600 MB.
+2. [Download the WattPost image](/download). About 600 MB.
 3. In Imager: **Choose OS → Use custom** → select the `.img.xz`.
 4. **Choose Storage** → pick the SD card.
 5. Hit **Write**. ~3–5 minutes.
@@ -36,7 +36,7 @@ Then:
    on the same network. If `.local` doesn't resolve, look up the
    Pi's IP and use that.
 
-## Path B — Docker on an existing Linux host
+## Path B. Docker on an existing Linux host
 
 What you need:
 
@@ -46,14 +46,14 @@ What you need:
 - A [Renogy BT-1 or BT-2 dongle](/docs/supported-hardware) plugged
   into your charge controller / battery.
 
-Then follow [Run in Docker](/docs/docker-install) — one compose file,
+Then follow [Run in Docker](/docs/docker-install). One compose file,
 two volumes, one `docker compose up -d`. Open
 `http://<this-host-ip>:8000` once it's up.
 
 Both paths land in the same place: the WattPost dashboard, ready to
 pair gear.
 
-## Path C — USB-RS485 (wired, no Bluetooth)
+## Path C. USB-RS485 (wired, no Bluetooth)
 
 Skip the BT-2 dongle entirely and run a wire from the Pi to your
 Renogy gear's RJ45 comms port. Bullet-proof on long runs, immune
@@ -76,20 +76,20 @@ Then:
 4. Hit **Scan for devices** on that connection. Same Renogy slave-ID
    sweep as the BT-2 path, just over the wire.
 
-USB-RS485 and a BT-2 can run side by side on the same Pi — useful if
+USB-RS485 and a BT-2 can run side by side on the same Pi. Useful if
 you have multiple Renogy units in different cabinets / van bays.
 See [Wired setup](/docs/wired-setup) for the full reference.
 
 Note: this path is for **Renogy** today (the only vendor where USB-RS485 is
 a real-world install). Victron and JK BMS broadcast over Bluetooth
-directly — no dongle, no wire — so they don't need this option.
+directly. No dongle, no wire. So they don't need this option.
 
 ## Pair your first device
 
 In the dashboard:
 
 1. **Settings → Setup**
-2. Confirm the **Bluetooth ready** banner at the top is green —
+2. Confirm the **Bluetooth ready** banner at the top is green ·
    that's the daemon seeing your BLE adapter.
 3. Click **Find my dongle** in step 1. The wizard scans for
    advertising BLE devices for ~8 seconds and lists them. Your
@@ -99,7 +99,7 @@ In the dashboard:
 5. After restart, step 2 (**Scan for devices**) is unlocked. Hit
    **Scan**; the wizard probes the standard Renogy slave IDs over
    the BT-2 link. Identified devices appear with **Add** buttons.
-6. Add each one. Restart the daemon once more — live data starts
+6. Add each one. Restart the daemon once more. Live data starts
    flowing on the dashboard within ~10 s of the first poll.
 
 No config files to hand-edit.
@@ -107,6 +107,6 @@ No config files to hand-edit.
 ## What's next?
 
 - [Pair an account](/docs/pairing) for the multi-site cloud dashboard
-- [Set up alerts](/docs/alerts) — ntfy, Discord, Pushover, email, MQTT
+- [Set up alerts](/docs/alerts). Ntfy, Discord, Pushover, email, MQTT
 - [Browse supported hardware](/docs/supported-hardware)
 - [How updates work](/docs/updates)

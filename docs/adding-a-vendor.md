@@ -3,7 +3,7 @@
 The framework is designed so adding a Modbus-speaking vendor (Renogy clone,
 Epever, SRNE-based controller, generic Modbus shunt) is a self-contained
 folder drop. Non-Modbus vendors (Victron broadcast, JK-BMS GATT) require an
-additional transport type — see the section at the bottom.
+additional transport type. See the section at the bottom.
 
 ## Steps for a Modbus vendor
 
