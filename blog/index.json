@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "victron-over-cable",
+      "title": "Read your Victron gear over cable when Bluetooth isn't reliable",
+      "summary": "WattPost v0.1.23 adds a wired alternative to BLE Instant Readout. Metal-van builds and dense-RF environments where Bluetooth keeps dropping now have a path that just works. Step-by-step setup with Victron's VE.Direct cable.",
+      "published_at": "2026-06-16",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "v0-1-22-release",
       "title": "What shipped in WattPost v0.1.22",
       "summary": "The smart-plug output adapter the solar-pause rule was missing. Shelly Gen2 and Tasmota over local HTTP, no broker, no Home Assistant, no cloud. Plus a correction to last week's v0.1.21 notes.",
