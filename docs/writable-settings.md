@@ -57,6 +57,24 @@ lab (no register guessing. Too easy to brick a customer's gear):
 - **Renogy smart shunt** (RBM-S100 / S300 / S500). Battery capacity, full-charge voltage threshold for SoC sync
 - **Renogy smart lithium batteries**. Most parameters are BMS-side only, no documented user-writable surface
 
+### How a new register gets validated
+
+The recipe for any new device with a candidate writable register:
+
+1. Run `scripts/probe_writable_setting.py` against a real unit. The
+   script does a no-op FC06 round-trip first (any device that
+   supports FC06 on that register round-trips cleanly), then an
+   optional `--set N` probe that writes and restores.
+2. If the probe passes, add a `WritableSetting` entry to the
+   vendor driver's `writable_settings()` method (see
+   `solar_monitor/vendors/renogy/rover.py` for the canonical
+   shape). Match the value scaling (`scale`, `units`, `min`,
+   `max`) to what the device actually accepts.
+3. End-to-end test: `scripts/verify_fc06_serial.py` exercises the
+   full `write_setting_register()` path against a loopback Modbus
+   slave with no hardware required, so the integration stays
+   green in CI.
+
 ## The confirm modal
 
 Click any value to open the modal. It shows:
