@@ -27,6 +27,12 @@ from .smart_battery_protect import VictronSmartBatteryProtect
 from .ac_charger import VictronAcCharger
 from .smart_lithium import VictronSmartLithium
 from .lynx_smart_bms import VictronLynxSmartBMS
+# VE.Direct (wired) drivers, separate kinds so the user can pick
+# "Victron SmartShunt over BLE" vs "Victron SmartShunt over VE.Direct"
+# in the setup flow when both are possible.
+from .ve_direct import (
+    VictronVeDirectShunt, VictronVeDirectMppt, VictronVeDirectPhoenix,
+)
 
 INFO = VendorInfo(
     id="victron",
@@ -55,9 +61,40 @@ register_vendor(
     },
 )
 
+
+# VE.Direct (wired) is registered as a sibling vendor so users
+# distinguish the transport in config.yaml. Output dict shape is
+# identical to the BLE drivers above so the dashboard, bank
+# aggregation and exporters don't see which path the data came in
+# on. See #197.
+VEDIRECT_INFO = VendorInfo(
+    id="victron_vedirect",
+    display_name="Victron (VE.Direct, wired)",
+    description=(
+        "Wired alternative to BLE Instant Readout. Reads VE.Direct "
+        "text frames over a USB-to-TTL adapter on the device's 4-pin "
+        "JST port. Use this for metal-van installs where BLE is "
+        "unreliable, or when you'd rather not deal with per-device "
+        "encryption keys. Read-only. Covers SmartShunt / BMV-7xx "
+        "(shunt), SmartSolar MPPT (charge_controller), and the "
+        "Phoenix Inverter VE.Direct family (inverter)."
+    ),
+)
+
+register_vendor(
+    info=VEDIRECT_INFO,
+    drivers={
+        "shunt":             VictronVeDirectShunt,
+        "charge_controller": VictronVeDirectMppt,
+        "inverter":          VictronVeDirectPhoenix,
+    },
+)
+
 __all__ = [
     "INFO",
+    "VEDIRECT_INFO",
     "VictronSmartShunt", "VictronDcDc", "VictronSmartSolar",
     "VictronOrionXS", "VictronSmartBatteryProtect", "VictronAcCharger",
     "VictronSmartLithium", "VictronLynxSmartBMS",
+    "VictronVeDirectShunt", "VictronVeDirectMppt", "VictronVeDirectPhoenix",
 ]

@@ -36,12 +36,24 @@ hardware in the lab (issues #185, #186).
 | DC-DC              | Orion-Tr Smart, Orion XS                                              |
 | AC chargers        | Blue Smart IP22 / IP65 / IP67                                         |
 | Other              | Smart BatteryProtect, Smart Lithium, Lynx Smart BMS                   |
+| Inverters          | Phoenix Inverter VE.Direct (small pure-sine, wired only)              |
 
-Read-only is a deliberate scope decision. Heavy-Victron users
-live inside VRM and will not switch. Our Victron customer is the
-mixed-stack builder who wants one dashboard alongside their
-Renogy or JBD gear. MultiPlus / Phoenix inverters need VE.Bus,
-which is a different physical layer — deferred indefinitely.
+Two read paths:
+
+- **BLE Instant Readout** — default for every device above except
+  the Phoenix Inverter. Broadcast, no pairing, per-device
+  encryption key from VictronConnect.
+- **VE.Direct (wired)** — alternative path for SmartShunt /
+  SmartSolar MPPT / Phoenix Inverter. Use this in metal-van
+  builds or anywhere BLE is unreliable. Cable is Victron's
+  VE.Direct-to-USB (~£25) or a £12 DIY JST + FTDI rig. See
+  [wired-setup.md](wired-setup.md).
+
+Read-only either way. Heavy-Victron users live inside VRM and
+will not switch. Our Victron customer is the mixed-stack builder
+who wants one dashboard alongside their Renogy or JBD gear.
+MultiPlus / Quattro inverters need VE.Bus, which is a different
+physical layer plus an MK3-USB interface — deferred indefinitely.
 
 ### Other
 

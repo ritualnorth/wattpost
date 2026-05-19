@@ -26,6 +26,10 @@ try:
     from . import ble_jkbms  # noqa: F401
 except ImportError:
     pass
+try:
+    from . import ve_direct  # noqa: F401
+except ImportError:
+    pass
 
 __all__ = [
     "Transport",
