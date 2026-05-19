@@ -329,6 +329,35 @@ class Store:
         # boot to apply any user override from config.yaml.
         self._bank_source: str = "auto"
         self._bank_disagreement_pct: float = 5.0
+        # Retention overrides (#172). Default to the module-level
+        # constants. `set_retention_policy()` mutates these at runtime
+        # when the user PATCHes /api/system/history_settings.
+        self._retention_raw_s:  int = RETENTION_RAW
+        self._retention_1min_s: int = RETENTION_1MIN
+        self._retention_1hour_s: int = RETENTION_1HOUR
+
+    def set_retention_policy(
+        self,
+        raw_days: int | None = None,
+        min_days: int | None = None,
+        hour_days: int | None = None,
+    ) -> None:
+        """Hot-applied retention windows (#172). None means "keep
+        the current value" — pass each one only when changing it.
+        Clamped to sensible minimums so a fat-fingered 0 doesn't
+        wipe history on the next maintenance pass."""
+        if raw_days is not None:
+            self._retention_raw_s = max(1, int(raw_days)) * 86400
+        if min_days is not None:
+            self._retention_1min_s = max(1, int(min_days)) * 86400
+        if hour_days is not None:
+            self._retention_1hour_s = max(7, int(hour_days)) * 86400
+        log.info(
+            "retention policy: raw=%dd, 1min=%dd, 1hour=%dd",
+            self._retention_raw_s // 86400,
+            self._retention_1min_s // 86400,
+            self._retention_1hour_s // 86400,
+        )
 
     def set_bank_policy(self, source: str, disagreement_pct: float) -> None:
         """Hot-applied bank-aggregator policy. Called by the scheduler
@@ -1083,8 +1112,10 @@ class Store:
         db = self._db
 
         # ---- Roll up samples → samples_1min ----
-        # Re-roll the last RETENTION_RAW window. Cheap, ensures any late
-        # writes get reflected.
+        # Re-roll the last raw-retention window. Cheap, ensures any
+        # late writes get reflected. All four retention windows below
+        # are instance attributes so the user can edit them live via
+        # Settings → History (#172) without a restart.
         rolled_min = await db.execute(
             "INSERT OR REPLACE INTO samples_1min "
             "(bucket_ts, device, metric, avg, min, max, n) "
@@ -1093,7 +1124,7 @@ class Store:
             "FROM samples "
             "WHERE ts >= ? "
             "GROUP BY b, device, metric",
-            (now - RETENTION_RAW,),
+            (now - self._retention_raw_s,),
         )
         stats["rolled_into_1min"] = rolled_min.rowcount
 
@@ -1106,7 +1137,7 @@ class Store:
             "FROM samples_1min "
             "WHERE bucket_ts >= ? "
             "GROUP BY b, device, metric",
-            (now - RETENTION_1MIN,),
+            (now - self._retention_1min_s,),
         )
         stats["rolled_into_1hour"] = rolled_hour.rowcount
 
@@ -1119,28 +1150,28 @@ class Store:
             "FROM samples_1hour "
             "WHERE bucket_ts >= ? "
             "GROUP BY b, device, metric",
-            (now - RETENTION_1HOUR,),
+            (now - self._retention_1hour_s,),
         )
         stats["rolled_into_1day"] = rolled_day.rowcount
 
         # ---- Purge past retention ----
         purged_raw = await db.execute(
-            "DELETE FROM samples WHERE ts < ?", (now - RETENTION_RAW,)
+            "DELETE FROM samples WHERE ts < ?", (now - self._retention_raw_s,)
         )
         stats["purged_raw"] = purged_raw.rowcount
 
         purged_str = await db.execute(
-            "DELETE FROM samples_str WHERE ts < ?", (now - RETENTION_RAW,)
+            "DELETE FROM samples_str WHERE ts < ?", (now - self._retention_raw_s,)
         )
         stats["purged_raw_str"] = purged_str.rowcount
 
         purged_min = await db.execute(
-            "DELETE FROM samples_1min WHERE bucket_ts < ?", (now - RETENTION_1MIN,)
+            "DELETE FROM samples_1min WHERE bucket_ts < ?", (now - self._retention_1min_s,)
         )
         stats["purged_1min"] = purged_min.rowcount
 
         purged_hour = await db.execute(
-            "DELETE FROM samples_1hour WHERE bucket_ts < ?", (now - RETENTION_1HOUR,)
+            "DELETE FROM samples_1hour WHERE bucket_ts < ?", (now - self._retention_1hour_s,)
         )
         stats["purged_1hour"] = purged_hour.rowcount
 

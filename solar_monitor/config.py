@@ -259,6 +259,26 @@ class DiscoveryCfg(msgspec.Struct, kw_only=True):
     enabled: bool = False
 
 
+class HistoryCfg(msgspec.Struct, kw_only=True):
+    """Polling cadence + how long each retention tier keeps data.
+
+    Every field is optional; absent values fall back to the historical
+    module-level constants (60s poll, 7/30/365-day retention pyramid).
+    Editable via Settings → History (#172). Values apply live: the
+    scheduler reads `interval_seconds` each cycle and storage reads
+    the retention windows on every maintenance pass.
+
+    The four defaults are sized for a Pi 4 with a 16 GB SD card and
+    a single bank. Bigger installs (Pi 5, more devices) can shorten
+    raw retention; off-grid users who only check the dashboard
+    monthly can extend hour-aggregate retention.
+    """
+    poll_interval_seconds: int | None = None  # default 60
+    retention_raw_days: int | None = None     # default 7
+    retention_min_days: int | None = None     # default 30
+    retention_hour_days: int | None = None    # default 365
+
+
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
@@ -281,6 +301,7 @@ class Config(msgspec.Struct, kw_only=True):
     bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
     backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
     discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)
+    history: HistoryCfg | None = None    # optional — poll cadence + retention (#172)
 
 
 def load_config(path: str | Path) -> Config:
