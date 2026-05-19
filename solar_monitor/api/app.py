@@ -77,6 +77,7 @@ from .system import (
     tailscale_status, tailscale_up, tailscale_down,
     tailscale_serve, update_state, update_check_now, update_apply, update_log,
     release_changelog, appliance_branding, rotate_web_password,
+    get_history_settings, patch_history_settings,
 )
 from .backup import (
     export_backup, import_backup,
@@ -1086,6 +1087,21 @@ def build_app(
     config_path: str = "config.yaml",
 ) -> Litestar:
     store = Store(db_path)
+    # Apply config.history overrides (#172). The CLI-passed
+    # interval_seconds wins ONLY when the config doesn't specify one,
+    # so the YAML value takes effect after the next daemon restart
+    # without anyone having to re-edit a systemd unit. Retention
+    # windows mutate `store` directly — also persisted via the
+    # /api/system/history_settings PATCH endpoint.
+    hist = getattr(config, "history", None)
+    if hist:
+        if hist.poll_interval_seconds is not None:
+            interval_seconds = int(hist.poll_interval_seconds)
+        store.set_retention_policy(
+            raw_days=hist.retention_raw_days,
+            min_days=hist.retention_min_days,
+            hour_days=hist.retention_hour_days,
+        )
     scheduler = PollScheduler(config, store, interval_seconds=interval_seconds)
     # Stash config_path on the scheduler too so the CloudService it
     # owns can persist mutations (sso_secret from heartbeat) without
@@ -1426,6 +1442,8 @@ def build_app(
             diagnostics_bundle,
             broker_auth_log,
             kiosk_status,
+            get_history_settings,
+            patch_history_settings,
             rotate_kiosk_token,
             update_state,
             update_check_now,

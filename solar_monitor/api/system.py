@@ -19,7 +19,8 @@ import time
 import time
 from typing import Any
 
-from litestar import Request, get, post
+import msgspec
+from litestar import Request, get, patch, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 from litestar.response import Response
@@ -720,3 +721,127 @@ async def tailscale_serve() -> dict[str, Any]:
     if not ok:
         raise HTTPException(status_code=500, detail=hint or "tailscale serve failed")
     return {"ok": True}
+
+
+# ---------- editable retention + poll interval (#172) ----------
+
+class HistorySettingsPatch(msgspec.Struct):
+    """All fields optional; only the ones present in the request get
+    applied. Lets the UI patch one knob without resending the rest."""
+    poll_interval_seconds: int | None = None
+    retention_raw_days:    int | None = None
+    retention_min_days:    int | None = None
+    retention_hour_days:   int | None = None
+
+
+@get("/api/system/history_settings")
+async def get_history_settings(state: State) -> dict[str, Any]:
+    """Current poll cadence + per-tier retention windows.
+
+    Reads from the live scheduler + store (not from config.yaml on
+    disk), so values reflect any unsaved PATCH that hasn't been
+    persisted yet. The persisted (`saved_*`) fields show the
+    config.yaml state for comparison.
+    """
+    scheduler = state["scheduler"]
+    store = state["store"]
+    config = state["config"]
+    hist = getattr(config, "history", None)
+    return {
+        "live": {
+            "poll_interval_seconds": int(scheduler.interval_seconds),
+            "retention_raw_days":    store._retention_raw_s   // 86400,
+            "retention_min_days":    store._retention_1min_s  // 86400,
+            "retention_hour_days":   store._retention_1hour_s // 86400,
+        },
+        "saved": {
+            "poll_interval_seconds": (hist.poll_interval_seconds if hist else None),
+            "retention_raw_days":    (hist.retention_raw_days    if hist else None),
+            "retention_min_days":    (hist.retention_min_days    if hist else None),
+            "retention_hour_days":   (hist.retention_hour_days   if hist else None),
+        },
+        "defaults": {
+            "poll_interval_seconds": 60,
+            "retention_raw_days":    7,
+            "retention_min_days":    30,
+            "retention_hour_days":   365,
+        },
+    }
+
+
+@patch("/api/system/history_settings")
+async def patch_history_settings(
+    data: HistorySettingsPatch, state: State,
+) -> dict[str, Any]:
+    """Apply + persist changes to the polling cadence or retention
+    windows. Values apply live: the scheduler reads its
+    interval_seconds each cycle and the store reads retention on
+    every maintenance pass."""
+    import yaml as _yaml, shutil as _shutil
+    from pathlib import Path as _Path
+
+    scheduler = state["scheduler"]
+    store = state["store"]
+    config_path: str = state.get("config_path", "config.yaml")
+
+    # Clamp + validate. Reject obvious nonsense; tier ordering is the
+    # main invariant — raw must be shortest, hour longest.
+    if data.poll_interval_seconds is not None:
+        if not (5 <= data.poll_interval_seconds <= 3600):
+            raise HTTPException(
+                status_code=400,
+                detail="poll_interval_seconds must be between 5 and 3600",
+            )
+    new_raw  = data.retention_raw_days  if data.retention_raw_days  is not None else None
+    new_min  = data.retention_min_days  if data.retention_min_days  is not None else None
+    new_hour = data.retention_hour_days if data.retention_hour_days is not None else None
+    # When validating ordering, fall back to the current live value
+    # for any tier the patch isn't touching so we compare apples-to-
+    # apples.
+    eff_raw  = new_raw  if new_raw  is not None else store._retention_raw_s   // 86400
+    eff_min  = new_min  if new_min  is not None else store._retention_1min_s  // 86400
+    eff_hour = new_hour if new_hour is not None else store._retention_1hour_s // 86400
+    if not (1 <= eff_raw <= 90):
+        raise HTTPException(status_code=400, detail="retention_raw_days must be between 1 and 90")
+    if not (eff_raw <= eff_min <= 365):
+        raise HTTPException(
+            status_code=400,
+            detail="retention_min_days must be ≥ retention_raw_days and ≤ 365",
+        )
+    if not (eff_min <= eff_hour <= 3650):
+        raise HTTPException(
+            status_code=400,
+            detail="retention_hour_days must be ≥ retention_min_days and ≤ 3650",
+        )
+
+    # Apply live BEFORE persisting. Order matters: if the YAML write
+    # fails the user sees a 500 but the values are already in effect
+    # — better than failing silently after persisting.
+    if data.poll_interval_seconds is not None:
+        scheduler.interval_seconds = int(data.poll_interval_seconds)
+        log.info("history: live poll interval = %ds", scheduler.interval_seconds)
+    store.set_retention_policy(
+        raw_days=new_raw, min_days=new_min, hour_days=new_hour,
+    )
+
+    # Persist to config.yaml under `history:`. Touch-existing-block
+    # so unrelated keys in `history:` (none today, but future-proof)
+    # are preserved.
+    path = _Path(config_path)
+    raw = _yaml.safe_load(path.read_text()) or {}
+    hist = raw.get("history") or {}
+    if not isinstance(hist, dict):
+        hist = {}
+    if data.poll_interval_seconds is not None:
+        hist["poll_interval_seconds"] = int(data.poll_interval_seconds)
+    if new_raw  is not None: hist["retention_raw_days"]  = int(new_raw)
+    if new_min  is not None: hist["retention_min_days"]  = int(new_min)
+    if new_hour is not None: hist["retention_hour_days"] = int(new_hour)
+    raw["history"] = hist
+    backup = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+    return await get_history_settings(state)

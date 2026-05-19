@@ -3191,6 +3191,90 @@ function renderSettings() {
   wireBackupRunNow();
   refreshCloudBackups();
   refreshDiscoveryToggle();
+  refreshHistorySettings();  // #172 — editable poll interval + retention
+}
+
+// History & polling editor (#172). Pull current values, fill the form,
+// wire Save and Reset buttons. Values apply live; the Save → PATCH
+// also persists to config.yaml so a daemon restart doesn't revert.
+async function refreshHistorySettings() {
+  let data;
+  try { data = await api("/api/system/history_settings"); }
+  catch (e) {
+    const status = $("#hist-status");
+    if (status) status.textContent = `Couldn't load: ${e.message || e}`;
+    return;
+  }
+  const live = data.live || {};
+  const setVal = (id, v) => { const el = $(id); if (el && v != null) el.value = v; };
+  setVal("#hist-poll", live.poll_interval_seconds);
+  setVal("#hist-raw",  live.retention_raw_days);
+  setVal("#hist-min",  live.retention_min_days);
+  setVal("#hist-hour", live.retention_hour_days);
+  // Save handler. Bind once via a data flag so re-rendering Settings
+  // doesn't stack listeners.
+  const saveBtn = $("#hist-save");
+  if (saveBtn && !saveBtn.dataset.bound) {
+    saveBtn.dataset.bound = "1";
+    saveBtn.addEventListener("click", saveHistorySettings);
+  }
+  const resetBtn = $("#hist-reset");
+  if (resetBtn && !resetBtn.dataset.bound) {
+    resetBtn.dataset.bound = "1";
+    resetBtn.addEventListener("click", () => {
+      const d = data.defaults || {};
+      setVal("#hist-poll", d.poll_interval_seconds);
+      setVal("#hist-raw",  d.retention_raw_days);
+      setVal("#hist-min",  d.retention_min_days);
+      setVal("#hist-hour", d.retention_hour_days);
+      const status = $("#hist-status");
+      if (status) status.textContent = "Defaults loaded — click Save to apply.";
+    });
+  }
+}
+
+async function saveHistorySettings() {
+  const status = $("#hist-status");
+  const btn    = $("#hist-save");
+  if (!btn) return;
+  btn.disabled = true;
+  const orig = btn.textContent; btn.textContent = "Saving…";
+  if (status) { status.textContent = ""; status.className = "settings-foot hist-status"; }
+  const num = (sel) => {
+    const el = $(sel);
+    if (!el || el.value === "") return null;
+    const n = parseInt(el.value, 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  const body = {
+    poll_interval_seconds: num("#hist-poll"),
+    retention_raw_days:    num("#hist-raw"),
+    retention_min_days:    num("#hist-min"),
+    retention_hour_days:   num("#hist-hour"),
+  };
+  try {
+    const r = await fetch("/api/system/history_settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    if (status) {
+      status.classList.add("hist-status--ok");
+      status.textContent = "Saved. Polling interval applies on the next cycle; retention on the next maintenance pass.";
+    }
+  } catch (e) {
+    if (status) {
+      status.classList.add("hist-status--err");
+      status.textContent = `Save failed: ${e.message || e}`;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
 }
 
 // Discovery telemetry (#129). Reads /api/system/discovery to render

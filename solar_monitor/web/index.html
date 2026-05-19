@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=110" />
+  <link rel="stylesheet" href="/web/styles.css?v=111" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -624,10 +624,50 @@
             </div>
             <p class="settings-foot">Edits apply on the next daemon restart for transports; rule changes hot-reload immediately.</p>
           </div>
-          <div class="settings-block">
-            <h3>Polling</h3>
-            <div class="settings-row"><span>Interval</span><span class="v">60 s</span></div>
-            <div class="settings-row"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
+          <div class="settings-block" id="settings-history-block">
+            <h3>History &amp; polling</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              How often the daemon polls each device and how long each
+              retention tier keeps data. Changes apply live; the next
+              poll cycle uses the new interval and the next maintenance
+              pass (~10 min) applies the new retention windows.
+            </p>
+            <div class="hist-form">
+              <label class="hist-row">
+                <span>Poll interval</span>
+                <span class="hist-input">
+                  <input id="hist-poll" type="number" min="5" max="3600" step="1"/>
+                  <span class="hist-unit">seconds</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Raw samples</span>
+                <span class="hist-input">
+                  <input id="hist-raw" type="number" min="1" max="90" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>1-min aggregates</span>
+                <span class="hist-input">
+                  <input id="hist-min" type="number" min="1" max="365" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>1-hour aggregates</span>
+                <span class="hist-input">
+                  <input id="hist-hour" type="number" min="7" max="3650" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="hist-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <button id="hist-reset" class="btn-action" type="button">Reset to defaults</button>
+                <span id="hist-status" class="settings-foot hist-status"></span>
+              </div>
+            </div>
+            <div class="settings-row" style="margin-top:.65rem"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
             <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
           <div class="settings-block">
@@ -888,6 +928,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=170"></script>
+  <script src="/web/app.js?v=171"></script>
 </body>
 </html>
