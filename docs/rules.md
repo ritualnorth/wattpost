@@ -17,7 +17,7 @@ Concrete example: *when `soc_pct` on `bank` falls below `30`, for
 `120` seconds, then send a `ntfy` warning **and** toggle the Renogy
 Rover load output **off**.*
 
-Rules live next to alerts in `config.yaml` under `rules:` — most
+Rules live next to alerts in `config.yaml` under `rules:`. Most
 people never touch that file because the dashboard's **Settings →
 Rules** panel covers the full surface.
 
@@ -41,14 +41,14 @@ window has elapsed.
 
 | Kind | Behaviour |
 |---|---|
-| Alert | Fire to any [alert transport](/docs/alerts) — ntfy, Discord, Pushover, email, MQTT, webhook |
-| Device write | Toggle a writable setting on a device — Rover load output, charge profile, voltage cutoff |
+| Alert | Fire to any [alert transport](/docs/alerts). Ntfy, Discord, Pushover, email, MQTT, webhook |
+| Device write | Toggle a writable setting on a device. Rover load output, charge profile, voltage cutoff |
 | MQTT publish | Push a custom payload to a topic you pick |
 | Webhook | POST JSON to any URL |
 | Scene | Combine N actions into one named scene; rules invoke by name |
 
 Device writes use the same [writable settings](/docs/writable-settings)
-machinery — Modbus FC06 with a confirmation read on Renogy, BLE
+machinery. Modbus FC06 with a confirmation read on Renogy, BLE
 characteristic write on the rest.
 
 ## Examples
@@ -63,7 +63,7 @@ do alert(severity=alarm, transport=ntfy)
 
 If the bank dips below 25% for a minute and you're not home, the
 load output (typically powering DC fridges, lights, USB strips)
-goes off — preserving the bank for the inverter / essentials until
+goes off. Preserving the bank for the inverter / essentials until
 solar returns at sunrise.
 
 ### Pre-charge before a cloudy day
@@ -94,7 +94,7 @@ up to turn on the bedroom oil-filled radiator.
 ## Testing a rule
 
 Each rule has a **Test** button in the Rules panel. It fires every
-action exactly as it would in production — useful for verifying
+action exactly as it would in production. Useful for verifying
 ntfy reaches your phone, that the load-output write actually toggles
 the Rover, etc. The trigger evaluation is skipped, but cooldowns
 and dedupe still apply.

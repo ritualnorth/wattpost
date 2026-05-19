@@ -1,7 +1,7 @@
 # MQTT-out + Home Assistant
 
 WattPost publishes every metric, on every poll, to a local MQTT
-broker — with **Home Assistant auto-discovery** built in. Drop one
+broker. With **Home Assistant auto-discovery** built in. Drop one
 config block on your broker, install the Mosquitto add-on in HA,
 and every device + metric appears as a first-class sensor.
 
@@ -21,7 +21,7 @@ WattPost appliance:
    - Broker host: your HA box's IP (or `homeassistant.local`)
    - Port: `1883`
    - Username / password: the ones you set in the Mosquitto add-on
-   - Topic prefix: `solar` (the default — leave it alone)
+   - Topic prefix: `solar` (the default. Leave it alone)
    - **Home Assistant discovery**: on
    - **Test** → "✓ Connected, published 1 retained message"
    - **Save**
@@ -102,17 +102,17 @@ options too.
 
 ## Troubleshooting
 
-**HA shows no entities after enabling** — discovery messages need to
+**HA shows no entities after enabling**. Discovery messages need to
 land before HA starts listening. Restart the WattPost daemon to
 re-publish the retained config payloads; HA will pick them up
 immediately.
 
-**Entities flip to Unavailable randomly** — broker connection is
+**Entities flip to Unavailable randomly**. Broker connection is
 dropping. Check broker logs; usually a credential rotation or a
 Mosquitto add-on update. The daemon retries every 10 s; once the
 broker is reachable again the `online` LWT clears it.
 
-**Want to remove old entities** — delete the retained config message:
+**Want to remove old entities**. Delete the retained config message:
 
 ```bash
 mosquitto_pub -h <broker> -t 'homeassistant/sensor/<node>/<entity>/config' -r -n

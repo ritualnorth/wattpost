@@ -22,7 +22,7 @@ GET /api/load_heatmap?days=30
 GET /api/stream                 # Server-Sent Events (live)
 ```
 
-CORS is open by default (`*`) — call it from a browser dashboard.
+CORS is open by default (`*`). Call it from a browser dashboard.
 
 ## MQTT export
 
@@ -44,7 +44,7 @@ The MQTT exporter has **HA discovery** built in. With the default
 config (`ha_discovery: true`), the daemon publishes
 `homeassistant/sensor/<node>/<label>_<metric>/config` retained
 messages on first poll. HA picks them up and auto-creates one sensor
-per metric, grouped under one *device* per WattPost device — exactly
+per metric, grouped under one *device* per WattPost device. Exactly
 what you'd see if you'd installed a vendor integration.
 
 Discovery configs include device-class hints (`voltage` / `current` /
@@ -82,4 +82,4 @@ fire:
 }
 ```
 
-n8n, IFTTT, Zapier, Lambda — anything that accepts a POST.
+n8n, IFTTT, Zapier, Lambda. Anything that accepts a POST.

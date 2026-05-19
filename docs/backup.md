@@ -7,11 +7,11 @@ survive even when the hardware doesn't.
 
 | Path | What | Replaceable? |
 |---|---|---|
-| `/opt/wattpost/venv` (Pi) / image (Docker) | Python runtime | Yes — re-install / re-pull fetches it. |
+| `/opt/wattpost/venv` (Pi) / image (Docker) | Python runtime | Yes. Re-install / re-pull fetches it. |
 | `/etc/wattpost/config.yaml` | Your devices + alerts + transports | **Back this up.** |
 | `/var/lib/wattpost/solar-monitor.db` | All historical telemetry | Back this up if it matters. |
 
-## Manual backup — SD-card install
+## Manual backup. SD-card install
 
 SSH into the Pi:
 
@@ -21,10 +21,10 @@ sudo tar czf wattpost-backup-$(date +%F).tar.gz \
     /var/lib/wattpost/solar-monitor.db*
 ```
 
-Copy that file off the Pi. Restore is the reverse — `tar xzf` into
+Copy that file off the Pi. Restore is the reverse · `tar xzf` into
 the new SD card after installing WattPost, then restart the daemon.
 
-## Manual backup — Docker install
+## Manual backup. Docker install
 
 Both the config and database live in the volumes you bind-mounted
 into the container (`./wattpost-config/` and `./wattpost-data/` if
@@ -60,7 +60,7 @@ After a hardware failure:
    Pi; the daemon downloads the snapshot, swaps `config.yaml` + the
    DB into place, restarts.
 4. ~10 minutes later you're back: history, paired BLE addresses,
-   alert rules, exporter config — everything.
+   alert rules, exporter config. Everything.
 
 No more re-pairing four batteries by hand. See
 [Cloud overview](/docs/cloud-overview) for the full feature list.
@@ -69,5 +69,5 @@ No more re-pairing four batteries by hand. See
 
 Every mutation through Settings (devices, alerts, transports) takes
 a `.bak` copy of `config.yaml` before writing. If something goes
-wrong you'll find `config.yaml.bak` next to the live config — copy
+wrong you'll find `config.yaml.bak` next to the live config. Copy
 back to restore.

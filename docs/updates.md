@@ -42,7 +42,7 @@ That's the update. The `latest` tag follows main; for traceability, pin to a `sh
 
 ## What if an update breaks something?
 
-For v0.0.x, the upgrade is **non-atomic** — if `install.sh` partially fails, the appliance can be in a half-upgraded state. SSH in and:
+For v0.0.x, the upgrade is **non-atomic**. If `install.sh` partially fails, the appliance can be in a half-upgraded state. SSH in and:
 
 ```
 sudo /opt/wattpost-src.old/packaging/install.sh
@@ -58,14 +58,14 @@ Not yet shipped. Planned: an opt-in toggle in **Settings → System → Update c
 
 ## Image upgrades
 
-The **SD image** (the .img.xz you flashed) only really needs replacing if there's a major OS-level change — new Debian release, kernel update, new system service that can't be pulled in via source updates. Source updates handle 95% of releases. Flashing a fresh image is a once-every-six-months affair, not per-release.
+The **SD image** (the .img.xz you flashed) only really needs replacing if there's a major OS-level change. New Debian release, kernel update, new system service that can't be pulled in via source updates. Source updates handle 95% of releases. Flashing a fresh image is a once-every-six-months affair, not per-release.
 
 To re-flash without losing data:
 
 1. Back up `/etc/wattpost/config.yaml` and `/var/lib/wattpost/solar-monitor.db` to your laptop
 2. Flash the new image
 3. Boot, restore the two files
-4. The appliance re-uses the existing bearer token and cloud pairing — no re-pair needed
+4. The appliance re-uses the existing bearer token and cloud pairing. No re-pair needed
 
 ## How we publish a release
 
@@ -77,4 +77,4 @@ Internal note for our future selves:
 4. Within ~60s the cloud picks up the new manifest (in-process cache TTL)
 5. Within ~24h every paired appliance discovers the new version and offers the Update button
 
-[Source tarballs](https://releases.wattpost.io/source/latest.tar.gz) update independently — every push to `main` that touches the appliance refreshes them via the `publish-source.yml` workflow. So in-place upgrades flow continuously while image rebuilds are quarterly-ish.
+[Source tarballs](https://releases.wattpost.io/source/latest.tar.gz) update independently. Every push to `main` that touches the appliance refreshes them via the `publish-source.yml` workflow. So in-place upgrades flow continuously while image rebuilds are quarterly-ish.

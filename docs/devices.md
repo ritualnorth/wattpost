@@ -2,15 +2,15 @@
 
 WattPost reads telemetry from four kinds of source:
 
-- **Renogy over Bluetooth** — Modbus via a [BT-1 or BT-2 dongle](/docs/supported-hardware) plugged into the device's comms port
-- **Renogy over USB-RS485** — same Modbus, wired straight from a USB adapter on the Pi to the device's RJ45 comms port; see [Wired setup](/docs/wired-setup) for cables + pinouts
-- **Victron** — passive **Instant Readout** BLE advertisements, one encryption key per device
-- **JK BMS** — its own advertised BLE service, no dongle, no key
+- **Renogy over Bluetooth**. Modbus via a [BT-1 or BT-2 dongle](/docs/supported-hardware) plugged into the device's comms port
+- **Renogy over USB-RS485**. Same Modbus, wired straight from a USB adapter on the Pi to the device's RJ45 comms port; see [Wired setup](/docs/wired-setup) for cables + pinouts
+- **Victron**. Passive **Instant Readout** BLE advertisements, one encryption key per device
+- **JK BMS**. Its own advertised BLE service, no dongle, no key
 
 Everything below works the same on the SD-card install and the
 Docker install. No config files to hand-edit.
 
-## Step 1 — Add a BLE transport
+## Step 1. Add a BLE transport
 
 A "transport" is one BT-2 (or compatible) dongle the daemon talks
 to. Each dongle is one transport; you can pair multiple if you have
@@ -28,7 +28,7 @@ more than one site / RV.
 4. **Settings → System → Restart daemon** (or `docker compose restart
    wattpost` if running in Docker).
 
-## Step 2 — Scan for devices on a transport
+## Step 2. Scan for devices on a transport
 
 Once you have at least one transport configured:
 

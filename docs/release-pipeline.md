@@ -34,7 +34,7 @@ scp → VPS                   scp → VPS
 ## What gets released
 
 Three artefacts, three pipelines, all triggered by **git tags** for
-release builds — only the Docker `:edge` channel publishes on every
+release builds. Only the Docker `:edge` channel publishes on every
 commit. This keeps version numbers honest and stops the "Update
 available" badge from nagging users on every fix-commit.
 
@@ -42,18 +42,18 @@ available" badge from nagging users on every fix-commit.
 | ------------------------ | ----------------------------- | ------------------------------------------------ | ------------------------------------------------ |
 | `wattpost-source-*.tar.gz` | `.github/workflows/publish-source.yml` | `https://releases.wattpost.io/source/latest.tar.gz` | Git tag `v*` (or manual `workflow_dispatch`)     |
 | `wattpost-*.img.xz`        | `.github/workflows/build-image.yml`     | `https://releases.wattpost.io/img/latest.img.xz`    | Git tag `v*` (or manual `workflow_dispatch`)     |
-| `ghcr.io/.../wattpost-appliance:latest` | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Git tag `v*` — gets `:vX.Y.Z`, `:X.Y`, `:latest` |
-| `ghcr.io/.../wattpost-appliance:edge`   | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Every push to `main` — gets `:edge`, `:sha-<short>` |
+| `ghcr.io/.../wattpost-appliance:latest` | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Git tag `v*`. Gets `:vX.Y.Z`, `:X.Y`, `:latest` |
+| `ghcr.io/.../wattpost-appliance:edge`   | `.github/workflows/build-appliance-image.yml` | (Docker registry)                                | Every push to `main`. Gets `:edge`, `:sha-<short>` |
 
 The source tarball is what the appliance's **Update now** button pulls down for in-place upgrades. The `.img.xz` is what a new user flashes onto a fresh SD card via Raspberry Pi Imager.
 
-Both are anonymously fetchable. There's no auth on `releases.wattpost.io` because the contents are by definition shippable to anyone — the SD image and the source tarball are what a customer already has on their flashed Pi.
+Both are anonymously fetchable. There's no auth on `releases.wattpost.io` because the contents are by definition shippable to anyone. The SD image and the source tarball are what a customer already has on their flashed Pi.
 
 ## Serving infrastructure
 
 - **Container**: `shared-caddy` in `vps-infra/docker-compose.yml`. Same Alpine Caddy that serves `wattpost.io` + `wattpost.cloud`.
-- **Host directory**: `/srv/wattpost-releases/{img,source}/` — bind-mounted read-only into the container. Created by `vps-infra/scripts/bootstrap.sh`.
-- **Caddy block**: `vps-infra/caddy/Caddyfile` → `releases.wattpost.io`. `file_server browse` so the directory listing is human-readable. 24h cache header — fine because filenames are versioned.
+- **Host directory**: `/srv/wattpost-releases/{img,source}/`. Bind-mounted read-only into the container. Created by `vps-infra/scripts/bootstrap.sh`.
+- **Caddy block**: `vps-infra/caddy/Caddyfile` → `releases.wattpost.io`. `file_server browse` so the directory listing is human-readable. 24h cache header. Fine because filenames are versioned.
 - **DNS**: `releases.wattpost.io` A → `REDACTED-ORIGIN-IP` (Proxied through CF). Set in CF dashboard for the `wattpost.io` zone.
 - **TLS**: same `cloudflare_tls` snippet (`tls internal`) used by every other proxied domain. CF zone SSL must stay on **Full** (not Strict) for this to work; documented in `vps-infra/caddy/Caddyfile` warning banner.
 
@@ -65,7 +65,7 @@ A normal main push automatically:
 - Builds + pushes the appliance Docker image as `:edge` and
   `:sha-<short>` (`build-appliance-image.yml`)
 
-That's the bleeding-edge channel — fine for our dev environment
+That's the bleeding-edge channel. Fine for our dev environment
 and tester opt-in (`image: ghcr.io/ritualnorth/wattpost-appliance:edge`),
 NOT what customers should track. It deliberately does NOT bump the
 manifest version or build a source tarball, so paired Pi
@@ -75,7 +75,7 @@ appliances don't get nagged on every fix commit.
 
 1. Bump `__version__` in `solar_monitor/__init__.py` (e.g. `0.0.3` → `0.0.4`).
 2. Move the `[Unreleased]` block in `CHANGELOG.md` to a new
-   `[0.0.4] — YYYY-MM-DD` section. Leave `[Unreleased]` empty
+   `[0.0.4]. YYYY-MM-DD` section. Leave `[Unreleased]` empty
    above it for the next batch.
 3. Commit: `git commit -am "Release v0.0.4"`.
 4. Tag: `git tag v0.0.4 && git push origin main v0.0.4`.
@@ -107,7 +107,7 @@ Pi-gen successfully BUILDS the image then SCPs it to
 path occasionally route-flaps for several minutes; the workflow
 retries with exponential backoff (~25 min total), but a long
 outage can still bail. When that happens the image lives **only**
-on the GH run as an artefact + attached to a GH Release —
+on the GH run as an artefact + attached to a GH Release ·
 customers still see the OLD image on the /download page.
 
 Recovery from a developer laptop with VPS SSH access:
@@ -159,7 +159,7 @@ minute or two.
 
 Tag still triggers everything, but `__version__` inside the
 shipped code will be wrong vs. the tag. CI doesn't validate this
-yet — worth adding eventually (see backlog: validate
+yet. Worth adding eventually (see backlog: validate
 `__version__` matches tag in CI). For now, just be disciplined:
 bump in the same commit as the tag, easy to remember.
 
@@ -167,11 +167,11 @@ bump in the same commit as the tag, easy to remember.
 
 The flow is implemented across:
 
-- `solar_monitor/update/checker.py` — daily poll of `/api/releases/latest` from the cloud.
-- `solar_monitor/api/system.py` — endpoints: `GET /api/system/update`, `POST /api/system/update/check`, `POST /api/system/update/apply`, `GET /api/system/update/log`.
-- `solar_monitor/web/app.js` — the **Update now** button in Settings → About, with live log polling.
-- `packaging/cli/wattpost-update` — root-owned helper that does the actual fetch+verify+swap+install.
-- `/etc/sudoers.d/wattpost` — NOPASSWD grant for `/usr/local/bin/wattpost-update` (no args; the daemon can't pass arbitrary URLs).
+- `solar_monitor/update/checker.py`. Daily poll of `/api/releases/latest` from the cloud.
+- `solar_monitor/api/system.py`. Endpoints: `GET /api/system/update`, `POST /api/system/update/check`, `POST /api/system/update/apply`, `GET /api/system/update/log`.
+- `solar_monitor/web/app.js`. The **Update now** button in Settings → About, with live log polling.
+- `packaging/cli/wattpost-update`. Root-owned helper that does the actual fetch+verify+swap+install.
+- `/etc/sudoers.d/wattpost`. NOPASSWD grant for `/usr/local/bin/wattpost-update` (no args; the daemon can't pass arbitrary URLs).
 
 Step by step:
 
@@ -191,15 +191,15 @@ If the daemon was started before the helper was installed (legacy paired applian
 
 ## Operator runbook
 
-**Pi-gen build fails.** Most common reason historically has been qemu emulation bugs (see `.github/workflows/build-image.yml` — we're pinned to `tonistiigi/binfmt:latest` for qemu 9.x because Ubuntu's apt qemu segfaults Python 3.13 at random). Pull the failed log: `gh run view <run-id> --log-failed | tail -100`. Look at what stage died; if it's deep in pi-gen's own apt-install loop and we haven't changed pi-gen, retry — there's still some qemu flakiness even with the newer build.
+**Pi-gen build fails.** Most common reason historically has been qemu emulation bugs (see `.github/workflows/build-image.yml`. We're pinned to `tonistiigi/binfmt:latest` for qemu 9.x because Ubuntu's apt qemu segfaults Python 3.13 at random). Pull the failed log: `gh run view <run-id> --log-failed | tail -100`. Look at what stage died; if it's deep in pi-gen's own apt-install loop and we haven't changed pi-gen, retry. There's still some qemu flakiness even with the newer build.
 
 **scp step fails.** The build runs as a GH Actions hosted runner, talking to the VPS over SSH with the `VPS_SSH_KEY` secret. Same key as `build-cloud-image.yml`'s deploy step. If scp 502s or auth-fails, regenerate the key on the VPS, update GH secrets.
 
 **releases.wattpost.io returns 521.** CF can't reach origin. Check (in this order):
 
-1. `dig +short releases.wattpost.io @1.1.1.1` — should return CF IPs (104.x or 172.x).
-2. CF dashboard → DNS — record should be `A` / `releases` / `REDACTED-ORIGIN-IP` / Proxied.
-3. `curl -sI --resolve releases.wattpost.io:443:REDACTED-ORIGIN-IP https://releases.wattpost.io/ -k` — should 200 from inside the VPS. If yes, the break is CF→origin; if no, Caddy isn't serving it.
+1. `dig +short releases.wattpost.io @1.1.1.1`. Should return CF IPs (104.x or 172.x).
+2. CF dashboard → DNS. Record should be `A` / `releases` / `REDACTED-ORIGIN-IP` / Proxied.
+3. `curl -sI --resolve releases.wattpost.io:443:REDACTED-ORIGIN-IP https://releases.wattpost.io/ -k`. Should 200 from inside the VPS. If yes, the break is CF→origin; if no, Caddy isn't serving it.
 4. Caddy block syntax: `docker exec shared-caddy caddy validate --config /etc/caddy/Caddyfile`.
 
 **`latest.img.xz` points to wrong file / nothing.** The `build-image.yml`'s "Update `latest` symlink" step picks the newest `wattpost-*.img.xz` by mtime. SSH in, `cd /srv/wattpost-releases/img && ls -lt`, and `ln -sfn <correct-file> latest.img.xz` manually.
@@ -208,6 +208,6 @@ If the daemon was started before the helper was installed (legacy paired applian
 
 ## Related docs
 
-- [`docs/architecture.md`](architecture.md) — overall appliance design
-- [`docs/cloud-architecture.md`](cloud-architecture.md) — cloud + tunnel pattern
-- `packaging/README.md` — install.sh / systemd unit specifics
+- [`docs/architecture.md`](architecture.md). Overall appliance design
+- [`docs/cloud-architecture.md`](cloud-architecture.md). Cloud + tunnel pattern
+- `packaging/README.md`. Install.sh / systemd unit specifics
