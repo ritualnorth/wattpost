@@ -141,3 +141,11 @@ Pick option 2 for one-off bespoke protocols.
 See `solar_monitor/vendors/victron/PROTOCOL.md` and
 `solar_monitor/vendors/jkbms/PROTOCOL.md` for the relevant protocol notes
 once those packages exist.
+
+## Which vendor to add next
+
+The prioritised queue lives in
+[coverage-roadmap.md](coverage-roadmap.md). It's organised by paying-
+persona impact rather than alphabetically — pick the highest-tier
+unowned entry rather than the most interesting one, unless a paying
+customer has asked for a specific device.
