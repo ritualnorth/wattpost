@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "v0-1-20-release",
+      "title": "What shipped in WattPost v0.1.20",
+      "summary": "Three customer-facing changes: a wizard hint for the Bluetooth ownership conflict we lost a day to, deeper BLE diagnostics for the Realtek+BlueZ silent-scan bug, and editable polling cadence + history retention in Settings.",
+      "published_at": "2026-05-19",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "bt2-silent-on-lan",
       "title": "How a laptop on the same network made our Renogy BT-2 dongle invisible",
       "summary": "We lost a day to a BT-2 that refused to advertise. The fix was three words on a different host. Here's the debugging story and the wizard hint we shipped so the next person catches it in minutes.",
