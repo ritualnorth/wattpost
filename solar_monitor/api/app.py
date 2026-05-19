@@ -92,7 +92,19 @@ def _web_dir() -> Path:
 
 @get("/api/health", sync_to_thread=False)
 def health() -> dict[str, Any]:
-    return {"ok": True, "ts": int(time.time())}
+    # The `service` field is the discrimination key for the setup
+    # wizard's LAN peer scan (#184): another WattPost on the same
+    # subnet that's holding a Renogy BT-2 dongle will respond here
+    # with the same string, and the wizard surfaces a hint so the
+    # user doesn't burn a day debugging "why won't this dongle pair".
+    # Keep `service` exactly "wattpost" — the scanner string-matches.
+    from .. import __version__
+    return {
+        "ok": True,
+        "ts": int(time.time()),
+        "service": "wattpost",
+        "version": __version__,
+    }
 
 
 @get("/api/today")

@@ -7496,9 +7496,15 @@ async function wizFindDongle() {
   // shown ABOVE the live results so users notice it before they
   // give up assuming nothing's there.
   const missingHtml = renderMissingPanel(data.seen_recently_missing || []);
+  // LAN peer panel (#184). Surfaces "another WattPost on your
+  // network is probably holding the BT-2" when the scan came back
+  // without any Renogy hits AND the backend found peers on the
+  // same subnet. Backend only populates lan_peers when zero Renogy
+  // devices were found, so we render unconditionally if present.
+  const lanPeerHtml = renderLanPeerPanel(data.lan_peers || []);
 
   if (!data.devices?.length) {
-    list.innerHTML = missingHtml + `<div class="wiz-empty">Nothing visible right now. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
+    list.innerHTML = missingHtml + lanPeerHtml + `<div class="wiz-empty">Nothing visible right now. Check the dongle is powered (BT-2 has a small LED) and within ~5 m. Try again.</div>`;
     return;
   }
   // Build a row per discovered device. Detection happens server-side
@@ -7511,7 +7517,7 @@ async function wizFindDongle() {
   //   * JK BMS      → "Pair JK BMS" → wizAddTransportFromJk (placeholder
   //                                   until #114-wizard support lands)
   //   * Unknown     → "Use as Modbus" + manual-Y type warning
-  list.innerHTML = missingHtml + data.devices.map(d => {
+  list.innerHTML = missingHtml + lanPeerHtml + data.devices.map(d => {
     const nameStr = d.name
       ? `<strong>${escHtml(d.name)}</strong>`
       : `<em class="settings-foot">(no name)</em>`;
@@ -7667,6 +7673,39 @@ function renderMissingPanel(missing) {
         <div class="wiz-missing-cause">${escHtml(m.likely_cause || "")}</div>
       </div>
     `).join("")}
+  </div>`;
+}
+
+// Warn the user when another WattPost on the same LAN looks
+// suspicious. Issue #184: a Renogy BT-2 dongle is a single-master
+// device; if a laptop / NAS / other Pi on the network has the
+// same dongle in its config and is connected to it, the BT-2 stops
+// advertising entirely and our local scan finds nothing. The
+// debugging story for this took most of a day; surfacing it as a
+// first-class hint saves customers from the same trip.
+function renderLanPeerPanel(peers) {
+  if (!peers || !peers.length) return "";
+  const lines = peers.map(p => {
+    const v = p.version ? ` (v${escHtml(String(p.version))})` : "";
+    return `<li><code>${escHtml(p.ip)}</code>${v}</li>`;
+  }).join("");
+  return `<div class="wiz-missing">
+    <div class="wiz-missing-head">
+      <strong>Another WattPost is running on this network</strong>
+      <span class="settings-foot">${peers.length} peer(s)</span>
+    </div>
+    <div class="wiz-missing-row">
+      <div>
+        <ul style="margin:0 0 .5rem 1rem;padding:0">${lines}</ul>
+        <div class="settings-foot">
+          A Renogy BT-2 dongle only allows one connection at a time.
+          If the same dongle is already paired on the host above,
+          this appliance won't see it. Either remove the dongle from
+          the other host (Settings → Devices → Delete) or stop its
+          WattPost daemon, then scan again.
+        </div>
+      </div>
+    </div>
   </div>`;
 }
 
