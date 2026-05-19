@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.24] · 2026-05-19
+
+### Added · #199 Setup wizard support for VE.Direct
+
+v0.1.23 shipped VE.Direct as config-yaml-only. This release wires
+it into the setup wizard so customers don't have to edit YAML to
+add a Victron device over cable:
+
+- `/api/setup/usb_scan` now sniffs at 19200 baud as a second pass
+  when 9600 yields unrecognised bytes. VE.Direct frames identify
+  themselves via the literal `PID\t` / `Checksum\t` substrings;
+  no false positives from random serial noise.
+- The wizard's USB results list now renders a "Victron VE.Direct"
+  chip for any port emitting frames, with a primary action to
+  add it directly. No more "Use as Modbus" guess for a Victron
+  cable.
+- `POST /api/setup/transports/add` accepts `type: ve_direct` +
+  validates that baudrate is 19200 + dedupes on port.
+- The transports list in the wizard now displays VE.Direct
+  entries with a "Victron VE.Direct" label instead of falling
+  back to the default Bluetooth tag.
+
+### Docs · README refresh
+
+The top-level README was still saying "Renogy and, soon, Victron
+and JK-BMS" and "Victron SmartShunt awaits hardware" — both
+v0.0.x-era. Refreshed: top section reflects what actually ships,
+component table is current through v0.1.23, the architecture
+tree shows the new transport + adapter layers (smart_plug,
+solar_pause, ve_direct).
+
 ## [0.1.23] · 2026-05-19
 
 ### Added · #197 VE.Direct wired transport for Victron read
