@@ -8,6 +8,49 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.20] · 2026-05-19
+
+### Added · #184 wizard hint for "BT-2 held by another LAN host"
+
+A Renogy BT-2 dongle only allows one BLE central at a time. If
+another WattPost on the same LAN (laptop docker, NAS, garage
+Pi) has the same dongle paired, the dongle stops advertising
+entirely and a fresh appliance's scan finds nothing. The setup
+wizard now probes the local /24 when a scan turns up zero
+Renogy devices and surfaces a yellow panel naming the suspect
+peer.
+
+Detection uses `/api/health` which now includes
+`service: "wattpost"` + version. Self-exclusion is via the
+kernel's outbound-route IP (the obvious "first non-loopback NIC"
+approach picks the docker0 bridge inside host-mode containers
+and silently scans the wrong subnet).
+
+### Added · #158 BLE diagnostic endpoint
+
+New "Run BLE diagnostics" button in the setup wizard runs
+bleak and `bluetoothctl --timeout 3 scan on` side-by-side and
+reports the divergence. Catches the Realtek + BlueZ 5.72
+silent-failure case where `bluetoothctl` returns zero device
+hits but bleak finds plenty. Six verdicts covered:
+`ok` / `scan_silent_failure` / `bleak_silent_failure` /
+`bleak_failed` / `bluetoothctl_failed` / `no_devices_seen`,
+each with a one-paragraph suggestion the UI renders verbatim.
+
+### Added · #172 editable retention tiers + poll interval
+
+Settings → History & polling tile lets users edit polling cadence
+and per-tier history retention:
+
+- Poll interval · 5–3600 s · default 60
+- Raw samples · 1–90 d · default 7
+- 1-min aggregates · raw–365 d · default 30
+- 1-hour aggregates · 1-min–3650 d · default 365
+
+Values apply live (next poll cycle / next maintenance pass) and
+persist to `config.yaml` under a new `history:` block. Tier
+ordering is enforced server-side: raw ≤ min ≤ hour.
+
 ## [0.1.19] · 2026-05-19
 
 ### Added · #170 writable-settings fan-out (phase 3, Renogy DCC50S/30S)
