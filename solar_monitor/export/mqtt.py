@@ -68,6 +68,14 @@ def _ha_sensor_meta(metric: str) -> dict[str, str]:
         # Amp-hours — no HA class; total_increasing for counters, but our
         # _ah metrics are instantaneous (remaining/capacity), so measurement.
         return {"unit_of_measurement": "Ah", "state_class": "measurement"}
+    if m.endswith("_wh"):
+        # Watt-hours: energy. Both "_today_wh" (daily reset) and
+        # "_total_wh" (lifetime cumulative) use total_increasing —
+        # HA detects resets automatically and adjusts. Required for
+        # HA's built-in Energy dashboard to pick these up as Solar
+        # production / Battery in/out sources.
+        return {"device_class": "energy", "unit_of_measurement": "Wh",
+                "state_class": "total_increasing"}
     if m.endswith("_hz"):
         return {"device_class": "frequency", "unit_of_measurement": "Hz",
                 "state_class": "measurement"}

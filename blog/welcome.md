@@ -24,22 +24,23 @@ Thursday evening and have live battery telemetry on the dashboard
 before bed.
 
 **Debugging write-ups.** When we get stuck and figure something
-out, we write it down. Last week we lost most of a day to a BT-2
-dongle that was paired to a laptop on the same network. The
-software side was clean. The fix was physical. That kind of story
-saves the next person a day.
+out, we write it down. A BT-2 dongle that goes silent because a
+laptop on the same network claimed the BLE master slot; a Renogy
+register address that quietly changed between firmware versions;
+a BlueZ quirk on a specific chipset. That kind of story saves the
+next person a day, and there's no other blog on the internet
+that's going to write it.
 
 Posts here earn their place by being useful to somebody flashing
-their first SD card, comparing off-grid monitors, or debugging the
-same problem we already solved. We are not going to write filler
-for the sake of cadence.
+their first SD card, comparing off-grid monitors, or debugging
+the same problem we already solved. We are not going to write
+filler for the sake of cadence.
 
-The first proper tutorial is in production now. Working title:
-*From blank SD card to live dashboard, in one sitting*. Video at
-every step, screenshots where they help, no skipped detail. It is
-the kind of content the install path deserves and the kind of
-content we wished was on every other monitor's site when we
-evaluated them.
+The plan for the early posts is roughly this. A first install
+walkthrough, from blank SD to live dashboard. A piece on adding
+WattPost to Home Assistant. The Lovelace dashboards we built for
+our own house, ready to paste. A debugging story or two. A
+release note per shipped version. Anything else worth saying.
 
 Until then, the [supported hardware](/docs/supported-hardware)
 page lists everything WattPost talks to today plus what is in the
