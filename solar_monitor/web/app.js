@@ -3192,6 +3192,65 @@ function renderSettings() {
   refreshCloudBackups();
   refreshDiscoveryToggle();
   refreshHistorySettings();  // #172 — editable poll interval + retention
+  wireResetToDefaults();     // #138 — Danger zone
+}
+
+function wireResetToDefaults() {
+  const input = document.getElementById("reset-confirm-input");
+  const btn   = document.getElementById("reset-go");
+  const keep  = document.getElementById("reset-keep-cloud");
+  const msg   = document.getElementById("reset-msg");
+  if (!input || !btn || btn.dataset.bound) return;
+  btn.dataset.bound = "1";
+
+  // Button only enables when the user has typed "RESET" exactly,
+  // case-sensitive. Anything else keeps it disabled so a mistyped
+  // confirmation can't trigger the wipe.
+  input.addEventListener("input", () => {
+    btn.disabled = input.value !== "RESET";
+    if (msg) msg.textContent = "";
+  });
+
+  btn.addEventListener("click", async () => {
+    if (!confirm(
+      "This will wipe all transports, devices, exporters, alerts and " +
+      "rules from this appliance. History and your web password are " +
+      "kept. Continue?"
+    )) return;
+    btn.disabled = true;
+    const orig = btn.textContent; btn.textContent = "Wiping…";
+    if (msg) { msg.textContent = ""; msg.classList.remove("hist-status--err", "hist-status--ok"); }
+    try {
+      const r = await fetch("/api/system/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirm: input.value,
+          keep_cloud_pairing: keep ? !!keep.checked : true,
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${r.status}`);
+      }
+      const data = await r.json();
+      if (msg) {
+        msg.classList.add("hist-status--ok");
+        const wiped = data.wiped || {};
+        const total = Object.values(wiped).reduce((a, b) => a + (b|0), 0);
+        msg.textContent = `Wiped ${total} item${total === 1 ? "" : "s"}. Reloading…`;
+      }
+      // Force a hard reload so the wizard reopens against the empty config.
+      setTimeout(() => { window.location.reload(); }, 1200);
+    } catch (e) {
+      if (msg) {
+        msg.classList.add("hist-status--err");
+        msg.textContent = `Reset failed: ${e.message || e}`;
+      }
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  });
 }
 
 // History & polling editor (#172). Pull current values, fill the form,

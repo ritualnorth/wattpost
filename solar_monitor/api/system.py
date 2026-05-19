@@ -845,3 +845,71 @@ async def patch_history_settings(
     tmp.replace(path)
 
     return await get_history_settings(state)
+
+
+class ResetRequest(msgspec.Struct):
+    confirm: str
+    keep_cloud_pairing: bool = True
+
+
+# Sub-blocks the reset endpoint will drop entirely. Listed so the YAML
+# falls back to first-boot defaults instead of carrying tier overrides
+# or quiet-hours rules from the previous install.
+_RESET_OPTIONAL_BLOCKS = (
+    "bank", "quiet_hours", "forecast", "weather", "history", "discovery",
+)
+_RESET_LIST_BLOCKS = (
+    "transports", "devices", "exporters", "alerts",
+    "notification_transports", "output_schedules", "rules",
+)
+
+
+@post("/api/system/reset")
+async def reset_to_defaults(
+    data: ResetRequest, state: State,
+) -> dict[str, Any]:
+    import yaml as _yaml
+    import shutil as _shutil
+    from pathlib import Path as _Path
+
+    if data.confirm != "RESET":
+        raise HTTPException(
+            status_code=400,
+            detail='confirmation string must be exactly "RESET"',
+        )
+
+    config_path: str = state.get("config_path", "config.yaml")
+    path = _Path(config_path)
+    raw = _yaml.safe_load(path.read_text()) or {}
+
+    counts = {k: len(raw.get(k, []) or []) for k in _RESET_LIST_BLOCKS}
+
+    for key in _RESET_LIST_BLOCKS:
+        if key in raw:
+            raw[key] = []
+    for key in _RESET_OPTIONAL_BLOCKS:
+        raw.pop(key, None)
+    if not data.keep_cloud_pairing:
+        raw.pop("cloud", None)
+
+    backup = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+    log.warning(
+        "[reset] config wiped: %s; keep_cloud_pairing=%s",
+        counts, data.keep_cloud_pairing,
+    )
+
+    return {
+        "ok": True,
+        "wiped": counts,
+        "kept_cloud_pairing": data.keep_cloud_pairing,
+        "next_step": (
+            "Reload the dashboard. The setup wizard will reopen so "
+            "you can re-pair devices. Restart the daemon to fully "
+            "release any open transports."
+        ),
+    }

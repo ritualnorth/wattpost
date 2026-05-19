@@ -175,9 +175,16 @@ The Docker image:
   install. Your appliance's local dashboard is reachable at
   `<your-slug>.wattpost.io` over the Cloudflare Tunnel once
   pairing is complete.
-- **Doesn't** ship the `wattpost-config` whiptail TUI. Configure via
-  the dashboard's Settings UI or by editing the volume's
-  `config.yaml`.
+- **Doesn't** ship the `wattpost-config` whiptail TUI. Everything
+  the TUI did is reachable from the dashboard's Settings UI:
+  daemon logs and the diagnostics bundle live under Diagnostics,
+  the web password rotates under Security, "Check for updates"
+  lives under About, and a Reset to defaults button lives at the
+  bottom of Diagnostics (type `RESET` to enable, keeps history
+  and cloud pairing by default). The one thing that has to stay
+  on the host is the web port — change the `8000:8000` mapping
+  in your `docker-compose.yml` and `docker compose up -d` to
+  apply.
 - **Doesn't** auto-update via the daemon's "Update now" button ·
   that's image-replacement (`docker compose pull`) instead.
 - **Doesn't** include the in-app Tailscale toggle. Tailscale in
