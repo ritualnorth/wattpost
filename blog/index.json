@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "renogy-over-cable",
+      "title": "Wire your Renogy gear to WattPost instead of using a BT-2 dongle",
+      "summary": "For metal-van installs, long cable runs, or anywhere your BT-2 dongle keeps dropping out. Step-by-step setup with USB-RS485 + Cat5e: cable picks, pinout, daisy-chain vs Hub vs multi-adapter topologies, and the by-id path that survives reboots.",
+      "published_at": "2026-06-23",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "victron-over-cable",
       "title": "Read your Victron gear over cable when Bluetooth isn't reliable",
       "summary": "WattPost v0.1.23 adds a wired alternative to BLE Instant Readout. Metal-van builds and dense-RF environments where Bluetooth keeps dropping now have a path that just works. Step-by-step setup with Victron's VE.Direct cable.",
