@@ -261,9 +261,12 @@ class PollScheduler:
         # /api/poll_run fetch.
         configured = 0
         open_count = 0
-        if self._poller is not None:
-            configured = len(self._poller._transports)
-            for t in self._poller._transports.values():
+        # SyntheticPoller (demo mode) has no _transports; default to 0/0
+        # rather than throw a 500.
+        transports = getattr(self._poller, "_transports", None) if self._poller else None
+        if transports:
+            configured = len(transports)
+            for t in transports.values():
                 client = getattr(t, "_client", None)
                 if client and getattr(client, "is_connected", False):
                     open_count += 1

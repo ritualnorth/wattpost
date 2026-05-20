@@ -1190,6 +1190,23 @@ def build_app(
     import os as _os
     _DEMO = _os.environ.get("WATTPOST_DEMO") == "1"
 
+    def _log_500_traceback(exc: Exception, request: Request) -> None:
+        # Litestar swallows the traceback for 500s by default; without
+        # this we only see "500 Internal Server Error" in logs and have
+        # to repro by hand. Mirrors what cloud got in #194.
+        from litestar.exceptions import HTTPException as _LHE
+        if isinstance(exc, _LHE) and exc.status_code < 500:
+            return
+        import logging as _logging
+        import traceback as _tb
+        _log = _logging.getLogger(__name__)
+        _log.error(
+            "appliance 500 on %s %s\n%s",
+            getattr(request, "method", "?"),
+            getattr(getattr(request, "url", None), "path", "?"),
+            "".join(_tb.format_exception(type(exc), exc, exc.__traceback__)),
+        )
+
     class _ReadOnlyDemoMiddleware:
         def __init__(self, app):
             self.app = app
@@ -1529,6 +1546,7 @@ def build_app(
         ],
         on_startup=[on_startup],
         on_shutdown=[on_shutdown],
+        after_exception=[_log_500_traceback],
         # Middleware order matters: read-only-demo first so demo
         # writes 403 early; local-auth second so non-demo installs
         # get login-gated. Both no-op when their condition isn't

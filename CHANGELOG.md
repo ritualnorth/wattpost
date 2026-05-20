@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.29] · 2026-05-20
+
+### Fixed
+
+- **`/api/snapshot` 500 in demo mode** — `build_snapshot` accessed
+  `self._poller._transports` directly, but the synthetic poller
+  used in demo / dev installs has no such attribute. Defaults
+  configured/open transport counts to 0 when the poller doesn't
+  expose them. Found during the appliance smoke sweep.
+- **Appliance 500s now log the traceback** — added an
+  `after_exception` hook on the Litestar app so unhandled
+  exceptions print the full stack to stdout instead of vanishing
+  into a generic "500 Internal Server Error". Mirrors what cloud
+  got in #194; the snapshot bug above is what made the gap
+  obvious.
+
 ## [0.1.28] · 2026-05-19
 
 ### Added · #208 Admin oversight (release / billing / support actions)
