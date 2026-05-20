@@ -67,6 +67,15 @@ def _resolve_db_path(args: argparse.Namespace, config) -> str:
         chosen = cfg_path
     else:
         chosen = args.db
+    # SQLite-special values pass straight through — don't try to
+    # treat them as filesystem paths or run legacy-migration on them.
+    # `:memory:` is the in-process DB sqlite reserves; `file::memory:?...`
+    # is the URI form. Both are valid sqlite open()s but don't have
+    # a `.exists()`-style filesystem identity. Without this the
+    # atomic-swap health probe (#36) crashed with a confusing
+    # PermissionError on Path(':memory:').exists().
+    if chosen.startswith(":") or chosen.startswith("file::"):
+        return chosen
     # One-shot migration from the legacy in-image-layer location.
     from pathlib import Path
     target = Path(chosen)
