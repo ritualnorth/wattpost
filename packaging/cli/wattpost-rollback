@@ -1,0 +1,77 @@
+#!/bin/bash
+# WattPost rollback — flip /opt/wattpost back to the previous slot.
+#
+# Invoked two ways:
+#   1. Manual:   sudo /usr/local/bin/wattpost-rollback
+#      Used by a human (or wattpost-config TUI menu) to undo an
+#      update that misbehaves at runtime — perfectly bootable but
+#      something's off, "give me yesterday back".
+#   2. Auto:     sudo /usr/local/bin/wattpost-rollback --auto
+#      Fired by wattpost-rollback.service (OnFailure=) when
+#      wattpost.service hits the systemd start-limit threshold
+#      (3 failures in 60s). The just-deployed slot can boot the
+#      health probe in wattpost-update but then crashes against
+#      real config / real hardware → this is the safety net.
+#
+# Either way: re-target /opt/wattpost atomically to whatever
+# /opt/wattpost-slots/previous resolves to, then restart
+# wattpost.service. Sets the previous-symlink to the just-demoted
+# slot so the operator can swap back if they want.
+#
+# Logs to /var/log/wattpost-rollback.log.
+
+set -euo pipefail
+
+LOG=/var/log/wattpost-rollback.log
+SLOTS_DIR=/opt/wattpost-slots
+APP_ROOT=/opt/wattpost
+PREV_LINK="${SLOTS_DIR}/previous"
+MODE="${1:-manual}"
+
+log() { echo "$(date -Is) $*" | tee -a "${LOG}"; }
+fail() { log "ERROR: $*"; exit "${2:-1}"; }
+
+if [ ! -L "${APP_ROOT}" ]; then
+    fail "${APP_ROOT} is not a symlink — slot layout not initialised (run install.sh once)" 3
+fi
+if [ ! -L "${PREV_LINK}" ]; then
+    fail "no previous slot recorded at ${PREV_LINK} — nothing to roll back to" 4
+fi
+
+PREV_TARGET=$(readlink -f "${PREV_LINK}")
+CURRENT=$(readlink -f "${APP_ROOT}")
+
+if [ ! -d "${PREV_TARGET}" ]; then
+    fail "previous slot target ${PREV_TARGET} doesn't exist — was it deleted by hand?" 5
+fi
+if [ "${CURRENT}" = "${PREV_TARGET}" ]; then
+    log "already on ${PREV_TARGET}; nothing to do"
+    exit 0
+fi
+
+log "==> rolling back (mode=${MODE})"
+log "    current:  ${CURRENT}"
+log "    previous: ${PREV_TARGET}"
+
+# Atomic symlink flip — same mv -T trick as wattpost-update's swap.
+ln -sfn "${PREV_TARGET}" "${APP_ROOT}.new"
+mv -Tf "${APP_ROOT}.new" "${APP_ROOT}"
+
+# Update previous → the slot we just demoted, so a subsequent
+# wattpost-rollback (or "redo update" gesture) would swap back.
+ln -sfn "${CURRENT}" "${PREV_LINK}"
+
+log "    symlink flipped; restarting wattpost.service"
+if [ "${MODE}" = "--auto" ]; then
+    # Running inside systemd's OnFailure context. Use --no-block so
+    # we don't deadlock waiting for a unit that systemd has just
+    # marked failed. The unit we're restarting *is* the one that
+    # failed, but it's a fresh start cycle so the rate-limit window
+    # doesn't apply.
+    systemctl reset-failed wattpost.service || true
+    systemctl start --no-block wattpost.service
+else
+    systemctl restart wattpost.service
+fi
+
+log "==> rollback complete (now on ${PREV_TARGET})"

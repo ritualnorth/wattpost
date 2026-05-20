@@ -1,0 +1,15 @@
+[Unit]
+Description=Auto-rollback to previous WattPost slot
+Documentation=https://github.com/ritualnorth/offgrid-monitor
+# Only fire if there's actually a previous slot to roll back to —
+# saves a spurious failed-unit on fresh installs.
+ConditionPathExists=/opt/wattpost-slots/previous
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wattpost-rollback --auto
+# Don't let this unit get stuck in a rollback loop — if rollback
+# itself fails, leave the operator to clean up by hand. (The boot-
+# loop we're protecting against is captured by StartLimit on the
+# main service; we don't want to layer another loop on top.)
+RemainAfterExit=no

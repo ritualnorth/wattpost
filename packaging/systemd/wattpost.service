@@ -6,6 +6,8 @@ Documentation=https://github.com/ritualnorth/offgrid-monitor
 # transports reach the outside world on first poll.
 After=bluetooth.service network-online.target
 Wants=bluetooth.service network-online.target
+# Auto-rollback watchdog: fires when the StartLimit below is hit.
+OnFailure=wattpost-rollback.service
 
 [Service]
 Type=simple
@@ -44,6 +46,16 @@ ExecStart=/opt/wattpost/venv/bin/solar-monitor --log-level INFO serve \
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=15
+
+# Auto-rollback watchdog (#36 Slice 3). If the daemon fails to
+# start 3 times within 60s, systemd gives up on the unit AND fires
+# the OnFailure unit below — which rolls /opt/wattpost back to the
+# previous slot and starts the daemon there. Pairs with the
+# inactive-slot health probe in wattpost-update: the probe catches
+# import errors / API breakage, this watchdog catches "boots fine
+# in sandbox but crashes against real DB / real BLE / real config".
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 # Hardening — minimum capabilities, read-only filesystem except for
 # the state + log paths we explicitly need.
