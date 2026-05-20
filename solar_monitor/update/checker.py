@@ -26,6 +26,7 @@ log = logging.getLogger(__name__)
 
 CHECK_INTERVAL_SECONDS = 24 * 3600   # 1 day
 DEFAULT_MANIFEST_URL   = "https://wattpost.cloud/api/releases/latest"
+DEFAULT_BEACON_URL     = "https://wattpost.cloud/api/local_installs/beacon"
 DEFAULT_CHANGELOG_URL  = "https://releases.wattpost.io/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 
@@ -85,9 +86,15 @@ class UpdateChecker:
         self,
         manifest_url: str | None = None,
         changelog_url: str | None = None,
+        beacon_url: str | None = None,
+        install_id: str | None = None,
+        telemetry_enabled: bool = True,
     ) -> None:
-        self.manifest_url  = manifest_url  or DEFAULT_MANIFEST_URL
-        self.changelog_url = changelog_url or DEFAULT_CHANGELOG_URL
+        self.manifest_url      = manifest_url  or DEFAULT_MANIFEST_URL
+        self.changelog_url     = changelog_url or DEFAULT_CHANGELOG_URL
+        self.beacon_url        = beacon_url    or DEFAULT_BEACON_URL
+        self.install_id        = install_id
+        self.telemetry_enabled = telemetry_enabled
         self.state = UpdateState()
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
@@ -138,6 +145,27 @@ class UpdateChecker:
                 except Exception as e:
                     log.info("changelog fetch failed (keeping prior "
                              "cache + local fallback): %s", e)
+
+                # Fire the anonymous install beacon (#217) — separate
+                # URL so the Cloudflare-cached /api/releases/latest
+                # endpoint stays fast. install_id is the only ID we
+                # send; suppressed entirely when local_telemetry is
+                # opted out. Failure is non-fatal — we don't want a
+                # missing beacon to mask a successful version check.
+                if self.telemetry_enabled and self.install_id:
+                    try:
+                        import os as _os
+                        method = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
+                        await client.post(
+                            self.beacon_url,
+                            json={
+                                "install_id":     self.install_id,
+                                "version":        APPLIANCE_VERSION,
+                                "install_method": method,
+                            },
+                        )
+                    except Exception as e:
+                        log.info("local-install beacon failed (non-fatal): %s", e)
         except Exception as e:
             self.state.last_checked_at = int(time.time())
             self.state.last_error      = str(e)[:200]
