@@ -432,9 +432,16 @@ async def update_apply() -> dict[str, Any]:
     runs install.sh. Live log at /var/log/wattpost-update.log.
     """
     if not os.path.exists("/usr/local/bin/wattpost-update"):
+        # 400, not 500 — Litestar hides the `detail` on 5xx so the user
+        # would see a useless "Internal Server Error" otherwise. This
+        # branch happens on Docker installs (no helper bundled) and on
+        # broken Pi installs; both are precondition failures, not
+        # server-side bugs.
         raise HTTPException(
-            status_code=500,
-            detail="wattpost-update helper not found — reinstall to fix",
+            status_code=400,
+            detail="wattpost-update helper not found — Docker installs "
+                   "should run `docker compose pull && docker compose up -d` "
+                   "on the host instead.",
         )
     # setsid + nohup so the child survives this Python process getting
     # SIGTERM'd by install.sh's `systemctl restart wattpost`. We don't
