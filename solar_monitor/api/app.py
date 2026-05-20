@@ -1335,7 +1335,7 @@ def build_app(
                 # happened during incidents. Costs effectively nothing
                 # (HMAC was going to run anyway).
                 from .. import diagnostics as _diag
-                _verdict, _age = _web_auth.verify_broker_auth_verdict(
+                _verdict, _age, _bscope = _web_auth.verify_broker_auth_verdict(
                     broker_header.decode("latin-1", errors="ignore"), _sso,
                 )
                 _diag.record_broker_auth(
@@ -1346,8 +1346,23 @@ def build_app(
                     cf_ray=_cf_ray,
                 )
                 if _verdict == "ok":
-                    await self.app(scope, receive, send)
-                    return
+                    # Owner-scope ("user") = full access, same as a
+                    # local logged-in session. Kiosk-scope ("kiosk")
+                    # = read-only allow-list, identical to the legacy
+                    # ?key= bypass (#225).
+                    if _bscope == "user":
+                        await self.app(scope, receive, send)
+                        return
+                    if _bscope == "kiosk":
+                        if _method in ("GET", "HEAD", "OPTIONS") and (
+                            _path == "/kiosk"
+                            or any(_path.startswith(p) for p in _kiosk_paths)
+                        ):
+                            await self.app(scope, receive, send)
+                            return
+                        # Outside the allow-list: fall through to
+                        # auth-required. The kiosk visitor doesn't
+                        # have a local session, so they get 401'd.
             # No password file = misconfigured install. Fail-closed
             # to the login page (which itself surfaces a "password
             # not configured" message), NEVER let the request through.
