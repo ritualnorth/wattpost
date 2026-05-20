@@ -1344,6 +1344,15 @@ def build_app(
                     verdict=_verdict,
                     header_age_s=_age,
                     cf_ray=_cf_ray,
+                    # Capture the raw header shape only when the verify
+                    # failed — costs nothing on the happy path, and gives
+                    # us the exact bytes to diagnose cloud↔appliance
+                    # wire-format drift like the one #225 caused.
+                    header_prefix=(
+                        broker_header.decode("latin-1", errors="replace")[:80]
+                        if (broker_header is not None and _verdict != "ok")
+                        else None
+                    ),
                 )
                 if _verdict == "ok":
                     # Owner-scope ("user") = full access, same as a

@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.32] · 2026-05-20
+
+### Fixed · #225 dual-format broker-auth verifier
+
+The #225 kiosk-share work landed on `main` between the v0.1.31
+release commit and the v0.1.31 tag, so the appliance side of the
+change never made it into a shipped build. v0.1.31 appliances
+still only understood the legacy two-part `X-WP-Broker-Auth:
+<ts>.<sig>` header, even though the cloud started emitting the
+three-part `<ts>.<scope>.<sig>` shape on every brokered request.
+Result: cloud "Open" button bounced every customer to the
+"Sign in via wattpost.cloud" page after the cloud deployed.
+
+The wire-format hotfix already shipped on the cloud (emit legacy
+two-part for owner sessions, three-part only for kiosk scope).
+v0.1.32 carries the corresponding appliance change: the verifier
+accepts both shapes and routes by scope (owner = full access,
+kiosk = read-only allow-list).
+
+Customers on v0.1.32+ unlock the kiosk-share feature properly.
+Customers on v0.1.31 keep working via the cloud's wire-compat
+emit until they upgrade.
+
+### Added · `header_prefix` in broker-auth diagnostics
+
+`/api/diagnostics/broker-auth` now records the first ~80 bytes
+of the raw `X-WP-Broker-Auth` header on non-ok verdicts. Lets
+operators diagnose cloud↔appliance wire-format drift without
+re-instrumenting the daemon. Captured only on `bad-format`,
+`bad-mac`, or `expired` — zero overhead on the happy path. Ring
+stays local: behind appliance auth, never leaves the box.
+
 ## [0.1.31] · 2026-05-20
 
 ### Added · #36 Atomic-swap auto-apply updater
