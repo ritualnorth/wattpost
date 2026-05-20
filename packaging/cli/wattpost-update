@@ -72,6 +72,10 @@ cleanup() {
         kill -TERM "${PROBE_PID}" 2>/dev/null || true
         wait "${PROBE_PID}" 2>/dev/null || true
     fi
+    # Per-probe scratch dir (created in the health probe section).
+    if [ -n "${PROBE_CWD:-}" ] && [ -d "${PROBE_CWD}" ]; then
+        rm -rf "${PROBE_CWD}" || true
+    fi
 }
 trap cleanup EXIT
 
@@ -145,6 +149,15 @@ log "    health probe on 127.0.0.1:${PROBE_PORT} (--db :memory:, demo mode)..."
 # Demo mode = synthetic poller, no real BLE contention with the
 # running daemon. :memory: DB = no migration / write side-effects.
 # WATTPOST_PORT=$PROBE_PORT prevents any port.env override.
+#
+# CWD must be writable by the wattpost user — several daemon
+# subsystems (backups dir, etc.) default to relative paths and
+# would fail mkdir(parents=True) against the inherited "/" CWD.
+# Use a per-probe scratch dir under /tmp; gets nuked after the
+# probe terminates.
+PROBE_CWD=$(mktemp -d /tmp/wattpost-probe.XXXXXX)
+chown "${APP_USER}:${APP_GROUP}" "${PROBE_CWD}"
+cd "${PROBE_CWD}"
 sudo -u "${APP_USER}" \
     WATTPOST_DEMO=1 \
     WATTPOST_PORT="${PROBE_PORT}" \
@@ -157,6 +170,7 @@ sudo -u "${APP_USER}" \
         --interval 999999 \
     > "${PROBE_LOG}" 2>&1 &
 PROBE_PID=$!
+cd - >/dev/null
 
 # Wait up to 12s for the probe daemon to come up.
 PROBE_UP=false
