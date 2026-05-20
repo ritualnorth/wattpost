@@ -166,7 +166,15 @@ jobs:
           mkdir -p ~/.ssh
           printenv SSH_KEY > ~/.ssh/id_release
           chmod 0600 ~/.ssh/id_release
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # ssh-keyscan can transiently fail (DNS race, network blip on
+          # the GH runner side); a failure here used to bail the script
+          # via `set -e` with NO output (because of the 2>/dev/null mute).
+          # Log + tolerate it: known_hosts is just an optimisation —
+          # the actual SSH calls below set StrictHostKeyChecking=accept-new
+          # so they discover the host themselves on first connect.
+          if ! ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts; then
+            echo "warn: ssh-keyscan failed, ssh will discover the host on first connect" >&2
+          fi
 
           # Azure (runner) → Contabo path silently drops idle TCP every
           # so often. Keepalives surface a dead connection in ~60s
@@ -177,7 +185,8 @@ jobs:
                       -o BatchMode=yes
                       -o ConnectTimeout=20
                       -o ServerAliveInterval=15
-                      -o ServerAliveCountMax=4)
+                      -o ServerAliveCountMax=4
+                      -o StrictHostKeyChecking=accept-new)
 
           # Retry helper. Pi-gen takes ~90 minutes, then we try to
           # publish; by then the runner is on a relatively old Azure
