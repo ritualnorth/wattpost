@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+
+- **install.sh on non-Pi Debian/Ubuntu hosts** — the systemd unit
+  declares `SupplementaryGroups=bluetooth`, which fails with
+  `216/GROUP` and crash-loops the daemon on hosts where bluez
+  hasn't created the group yet (notably Ubuntu Server cloud-init
+  images). install.sh now creates the `bluetooth` group if it's
+  missing, so the unit can always resolve it. Pi OS, which ships
+  bluez, is unaffected. Found during a fresh-VM Phase F smoke.
+
 ## [0.1.29] · 2026-05-20
 
 ### Fixed
