@@ -589,20 +589,30 @@ main {
   pointer-events: none;
 }
 .donut-head      { fill: #58a6ff; stroke: #ffffff; }
-.donut-head-glow { fill: rgba(88,166,255,0.45); opacity: 0.6; }
-.donut-head-glow { animation: donut-head-pulse 1800ms ease-out infinite; }
+.donut-head-glow {
+  fill: rgba(88,166,255,0.55);
+  /* Animate via transform+opacity rather than the `r` attribute —
+     iOS Safari historically didn't animate `r` via CSS, and even on
+     versions that do it's silently dropped under "Reduce Motion"
+     without firing the prefers-reduced-motion media query reliably
+     on every install. transform-box: fill-box ensures the scale
+     happens about the circle's own centre, not the SVG viewport. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: donut-head-pulse 1800ms ease-out infinite;
+}
 .donut-state.charging    .donut-head      { fill: #56d364; stroke: #ffffff; }
-.donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.45); }
+.donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.55); }
 .donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
-.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.40); }
+.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.50); }
 .donut-state.discharging .donut-head      { fill: #f0c849; stroke: #ffffff; }
-.donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.45); }
+.donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.55); }
 .donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
-.donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.55); animation-duration: 900ms; }
+.donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.65); animation-duration: 900ms; }
 @keyframes donut-head-pulse {
-  0%   { r: 7;  opacity: 0.55; }
-  60%  { r: 14; opacity: 0;    }
-  100% { r: 7;  opacity: 0;    }
+  0%   { transform: scale(1);   opacity: 0.7; }
+  60%  { transform: scale(2.2); opacity: 0;   }
+  100% { transform: scale(1);   opacity: 0;   }
 }
 @media (prefers-reduced-motion: reduce) {
   .donut-head-glow { animation: none; opacity: 0.35; }
@@ -2607,13 +2617,27 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
  * with a unit suffix on the right. Match the dashboard's settings-row
  * grammar so the new tile sits naturally beside the existing rows. */
 .hist-form { display: flex; flex-direction: column; gap: .5rem; }
-.hist-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .9rem; }
-.hist-row > span:first-child { color: var(--text-muted); }
-.hist-input { display: inline-flex; align-items: center; gap: .35rem; }
+.hist-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .9rem; min-width: 0; }
+.hist-row > span:first-child { color: var(--text-muted); min-width: 0; }
+.hist-input { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; max-width: 100%; }
 .hist-input input {
   width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums;
   padding: .25rem .4rem; border: 1px solid var(--surface-3);
   border-radius: 6px; background: var(--surface-1); color: inherit;
+}
+/* <select> inside hist-input would otherwise size to the longest
+   option's text — when the placeholder is something verbose like
+   "No smart plug or AC charger output configured" (solar-pause panel
+   with no plugs yet), the dropdown blows past the row's right edge
+   on narrow viewports. Cap the width and let the browser ellipsis
+   the visible option. */
+.hist-input select {
+  max-width: 14rem;
+  min-width: 0;
+  text-overflow: ellipsis;
+  padding: .25rem .4rem; border: 1px solid var(--surface-3);
+  border-radius: 6px; background: var(--surface-1); color: inherit;
+  font: inherit;
 }
 .hist-input .hist-unit { color: var(--text-muted); font-size: .82rem; min-width: 3.5rem; }
 .hist-actions { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-top: .35rem; }
