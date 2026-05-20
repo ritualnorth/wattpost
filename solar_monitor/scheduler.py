@@ -113,10 +113,22 @@ class PollScheduler:
 
         # Self-update *check* — polls the cloud's release manifest
         # daily and exposes the result on /api/system/update so the
-        # UI can show "v0.0.x available". No auto-apply yet.
+        # UI can show "v0.0.x available". No auto-apply yet. Same
+        # task also fires the anonymous local-install beacon (#217)
+        # when telemetry is enabled (default ON; opt-out via
+        # `local_telemetry: { enabled: false }` in config.yaml).
         self._updater: UpdateChecker | None = None
         try:
-            self._updater = UpdateChecker()
+            from .install_id import load_or_create as _load_install_id
+            _install_id = _load_install_id()
+            _tele_on = (
+                config.local_telemetry is None
+                or config.local_telemetry.enabled
+            )
+            self._updater = UpdateChecker(
+                install_id=_install_id,
+                telemetry_enabled=_tele_on,
+            )
         except Exception:
             log.exception("update checker failed to initialise")
 

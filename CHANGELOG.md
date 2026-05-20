@@ -8,17 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
-### Fixed
-
-- **install.sh on non-Pi Debian/Ubuntu hosts** — the systemd unit
-  declares `SupplementaryGroups=bluetooth`, which fails with
-  `216/GROUP` and crash-loops the daemon on hosts where bluez
-  hasn't created the group yet (notably Ubuntu Server cloud-init
-  images). install.sh now creates the `bluetooth` group if it's
-  missing, so the unit can always resolve it. Pi OS, which ships
-  bluez, is unaffected. Found during a fresh-VM Phase F smoke.
-
 ## [0.1.29] · 2026-05-20
+
+### Added · #217 Anonymous local-install beacon
+
+Fleet visibility for the un-paired population. The appliance
+generates a random UUID at first boot (`/var/lib/wattpost/install-id`),
+then once a day — piggy-backed onto the existing update-check —
+POSTs three fields to `wattpost.cloud/api/local_installs/beacon`:
+the install_id, the daemon version, and `pi` vs `docker`.
+Cloudflare's country header is read server-side and persisted as
+a 2-letter ISO code; no IP, no email, no MAC, no battery data.
+
+Default ON. Opt out with `local_telemetry.enabled: false` in
+`config.yaml` (the update check still fires — we need it for the
+`Update available` badge — just without the install_id query).
+
+Customer-visible: a new `Privacy & telemetry` page in the docs
+spelling out every outbound flow and how to switch each one off.
+
+Internal: new `local_installs` table (migration 0034) + admin
+Overview tile showing total / 7-day-active / version distribution
+/ install method / country breakdown.
 
 ### Fixed
 
@@ -33,6 +44,13 @@ Versions follow [Semantic Versioning].
   into a generic "500 Internal Server Error". Mirrors what cloud
   got in #194; the snapshot bug above is what made the gap
   obvious.
+- **install.sh on non-Pi Debian/Ubuntu hosts** — the systemd unit
+  declares `SupplementaryGroups=bluetooth`, which fails with
+  `216/GROUP` and crash-loops the daemon on hosts where bluez
+  hasn't created the group yet (notably Ubuntu Server cloud-init
+  images). install.sh now creates the `bluetooth` group if it's
+  missing, so the unit can always resolve it. Pi OS, which ships
+  bluez, is unaffected. Found during a fresh-VM Phase F smoke.
 
 ## [0.1.28] · 2026-05-19
 
