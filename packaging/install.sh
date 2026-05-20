@@ -21,6 +21,17 @@ CONFIG_FILE="${CONFIG_DIR}/config.yaml"
 STATE_DIR="/var/lib/wattpost"
 SERVICE_DEST="/etc/systemd/system/wattpost.service"
 
+# Atomic-swap layout (#36). The customer-visible path stays
+# /opt/wattpost — what changes is that it's now a symlink to one
+# of two slot directories under /opt/wattpost-slots/. Slot a is
+# the bootstrap target; subsequent updates (#36 Slice 2) install
+# into the inactive slot, run a health probe, then atomic-flip
+# the /opt/wattpost symlink. wattpost-update + an OnFailure
+# watchdog enable automated rollback (#36 Slice 3).
+SLOTS_DIR=/opt/wattpost-slots
+SLOT_A="${SLOTS_DIR}/a"
+SLOT_B="${SLOTS_DIR}/b"
+
 # Default: install from the local checkout (the directory this script
 # lives in). For a future remote-install path, override with
 # WATTPOST_SOURCE=git+https://... or a wheel URL.
@@ -74,8 +85,62 @@ fi
 usermod -a -G bluetooth "${APP_USER}"
 
 step "preparing ${APP_ROOT}, ${CONFIG_DIR}, ${STATE_DIR}"
-mkdir -p "${APP_ROOT}" "${CONFIG_DIR}" "${STATE_DIR}"
-chown -R "${APP_USER}:${APP_GROUP}" "${APP_ROOT}" "${STATE_DIR}"
+mkdir -p "${CONFIG_DIR}" "${STATE_DIR}"
+
+# ---- atomic-swap slot layout (#36) ----
+# Three states ${APP_ROOT} can be in:
+#   1. missing — fresh install. Create slot a, symlink ${APP_ROOT} → a.
+#   2. real directory — legacy pre-#36 install. Move it into slot a,
+#      replace the directory with a symlink. One-way migration.
+#   3. symlink — already in slot layout. No-op, just resolve the
+#      target to know which slot we're installing into.
+mkdir -p "${SLOTS_DIR}"
+if [ -L "${APP_ROOT}" ]; then
+    TARGET=$(readlink -f "${APP_ROOT}")
+    if [ ! -d "${TARGET}" ]; then
+        # Dangling symlink — slot dir was deleted out from under us.
+        # Recover by recreating slot a and re-pointing.
+        warn "${APP_ROOT} → ${TARGET} is dangling; recreating slot a"
+        rm -f "${APP_ROOT}"
+        mkdir -p "${SLOT_A}"
+        ln -sfn "${SLOT_A}" "${APP_ROOT}"
+    fi
+elif [ -d "${APP_ROOT}" ]; then
+    step "migrating legacy ${APP_ROOT}/ into slot layout"
+    # Pause the service so the venv isn't in active use while we
+    # rename its parent directory. The mv is atomic on the same FS;
+    # the symlink replace below is also atomic via mv -T.
+    systemctl stop wattpost.service 2>/dev/null || true
+    if [ -d "${SLOT_A}" ]; then
+        # Both legacy dir AND slot a exist — operator did something
+        # weird (manual rsync etc.). Don't clobber the slot; bail
+        # with instructions.
+        echo "error: ${APP_ROOT} and ${SLOT_A} both exist." >&2
+        echo "  Resolve by hand: either rm -rf ${SLOT_A} (if it's" >&2
+        echo "  stale) or rm -rf ${APP_ROOT} (if the slot is canonical)." >&2
+        exit 1
+    fi
+    mv "${APP_ROOT}" "${SLOT_A}"
+    ln -s "${SLOT_A}" "${APP_ROOT}.new"
+    mv -Tf "${APP_ROOT}.new" "${APP_ROOT}"
+else
+    # Fresh install — no prior layout to migrate.
+    mkdir -p "${SLOT_A}"
+    ln -sfn "${SLOT_A}" "${APP_ROOT}"
+fi
+
+# Migrate the legacy /opt/wattpost-src into the active slot. Prior
+# to #36, wattpost-update downloaded source into a sibling dir;
+# now it lives under the slot so an inactive-slot install has its
+# own source tree.
+ACTIVE_SLOT=$(readlink -f "${APP_ROOT}")
+LEGACY_SRC=/opt/wattpost-src
+if [ -d "${LEGACY_SRC}" ] && [ ! -e "${ACTIVE_SLOT}/src" ]; then
+    step "migrating ${LEGACY_SRC}/ → ${ACTIVE_SLOT}/src/"
+    mv "${LEGACY_SRC}" "${ACTIVE_SLOT}/src"
+fi
+
+chown -R "${APP_USER}:${APP_GROUP}" "${SLOTS_DIR}" "${STATE_DIR}"
 chown "${APP_USER}:${APP_GROUP}" "${CONFIG_DIR}"
 
 # ----- venv -----
