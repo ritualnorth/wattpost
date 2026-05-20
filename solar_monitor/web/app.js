@@ -806,6 +806,20 @@ function computeRemaining(bank) {
 }
 
 // ---------- HERO ----------
+// Position the leading-edge dot (head + halo) at the tip of the arc
+// for the given pct. Math: 12 o'clock = pct 0; clockwise to pct 100.
+function positionDonutHead(wrap, pct) {
+  const r = Number(wrap.dataset.radius || 86);
+  const cx = 100, cy = 100;
+  const theta = (pct / 100) * 2 * Math.PI;
+  const x = cx + r * Math.sin(theta);
+  const y = cy - r * Math.cos(theta);
+  wrap.querySelectorAll(".donut-head, .donut-head-glow").forEach(el => {
+    el.setAttribute("cx", x.toFixed(2));
+    el.setAttribute("cy", y.toFixed(2));
+  });
+}
+
 function renderHero() {
   const bank = aggregateBank();
   if (!bank) {
@@ -818,21 +832,15 @@ function renderHero() {
   const arc = $("#donut-arc");
   const pct = Math.min(100, Math.max(0, bank.soc));
   arc.setAttribute("stroke-dasharray", `${pct} ${100 - pct}`);
-  const socCls = pct < 20 ? "soc-low" : pct < 50 ? "soc-mid" : "soc-high";
-  arc.classList.remove("soc-low", "soc-mid", "soc-high");
-  arc.classList.add(socCls);
   // Mirror the SoC paint onto the kiosk donut (lives in a different DOM
   // tree but uses the same class hooks).
   const kioskArc = document.querySelector(".kiosk-donut .donut-arc");
-  if (kioskArc) {
-    kioskArc.setAttribute("stroke-dasharray", `${pct} ${100 - pct}`);
-    kioskArc.classList.remove("soc-low", "soc-mid", "soc-high");
-    kioskArc.classList.add(socCls);
-  }
+  if (kioskArc) kioskArc.setAttribute("stroke-dasharray", `${pct} ${100 - pct}`);
   const kioskSoc = $("#kiosk-soc");
   if (kioskSoc) kioskSoc.textContent = bank.soc.toFixed(1);
-  // Tint the hero container with the same SoC band so the card hue
-  // matches the donut color.
+  // Hero card still hue-tints by SoC band for backwards-compat. Future:
+  // drop these classes once the new donut palette covers it.
+  const socCls = pct < 20 ? "soc-low" : pct < 50 ? "soc-mid" : "soc-high";
   const heroEl = document.querySelector(".hero-v2");
   if (heroEl) {
     heroEl.classList.remove("soc-low", "soc-mid", "soc-high");
@@ -854,14 +862,28 @@ function renderHero() {
     discharging: `${bank.sumI.toFixed(2)} A · discharging`,
   }[powerState];
 
-  // Donut wrapper state — drives ring color, pulse animation direction,
-  // glow, and the small flow-indicator pill under "State of charge".
-  // Applied to both the dashboard wrapper and the kiosk one (both carry
-  // the shared .donut-state class).
+  // Donut wrapper state — drives ring gradient + leading-edge dot color
+  // + flow-pill color. Four states:
+  //   critical    SoC < 15 (urgent palette overrides flow direction)
+  //   charging    netW > +5  AND SoC ≥ 15
+  //   discharging netW < −5  AND SoC ≥ 15
+  //   holding     |netW| ≤ 5 AND SoC ≥ 15 (the no-flow / idle bucket)
+  // Critical wins over flow so a draining-fast-at-12% bank reads RED,
+  // not the calmer amber, regardless of direction.
+  let donutState;
+  if (pct < 15) donutState = "critical";
+  else if (Math.abs(bank.netW) < 5) donutState = "holding";
+  else if (bank.netW > 0) donutState = "charging";
+  else donutState = "discharging";
   document.querySelectorAll(".donut-state").forEach(el => {
-    el.classList.remove("charging", "discharging", "idle");
-    el.classList.add(powerState);
+    el.classList.remove("charging", "discharging", "holding", "critical", "idle");
+    el.classList.add(donutState);
+    positionDonutHead(el, pct);
   });
+  // The flow pill colors still hook off the legacy charging/discharging/
+  // idle classes — keep those applied alongside the new state so existing
+  // .donut-state.charging .donut-flow rules still match.
+  document.querySelectorAll(".donut-state").forEach(el => el.classList.add(powerState));
   const flowText = $("#donut-flow .donut-flow-text");
   if (flowText) {
     flowText.textContent = powerState === "idle"
