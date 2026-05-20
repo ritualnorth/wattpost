@@ -8,6 +8,30 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.30] · 2026-05-20
+
+### Fixed
+
+- **`wattpost-update` was silently doing nothing on Pi installs**
+  — `pyproject.toml` hardcodes `version = "0.0.1"` while the
+  daemon's `__version__` bumps in `solar_monitor/__init__.py`.
+  pip's `--upgrade` saw "0.0.1 already installed, skip" and did
+  not swap the venv contents. The on-disk source got swapped, the
+  `/etc/wattpost/version` file got rewritten, and the UI said
+  "updated to vX.Y.Z" — but the running code stayed on whatever
+  the user originally installed. install.sh now passes
+  `--force-reinstall --no-deps` so the venv actually moves. Verified
+  end-to-end on a fresh Ubuntu host (v0.1.28 → v0.1.29 round-trip
+  via `wattpost-update`).
+- **`/api/system/update/apply` returned `Internal Server Error`**
+  on Docker installs (or any host without `/usr/local/bin/wattpost-update`)
+  because Litestar hides `HTTPException.detail` on 5xx. Changed to
+  400; users now see the actionable text ("Docker installs should
+  run `docker compose pull && docker compose up -d`…") instead of
+  a generic 500. The UI hides the button on Docker so this is an
+  edge case, but curl users + broken-helper Pi installs now get a
+  useful response.
+
 ## [0.1.29] · 2026-05-20
 
 ### Added · #217 Anonymous local-install beacon
