@@ -437,6 +437,10 @@ async function api(path) {
 function applySnapshot(frame) {
   devices = frame.devices || [];
   lastRun = frame.poll_run?.last_run || null;
+  // Keep the Settings tab's Daemon row in sync when poll data arrives
+  // (no-op if the row isn't in the DOM yet — it's only rendered when
+  // Settings is active).
+  renderDaemonStatus();
   todayAggregate = frame.today || null;
   solarPauseStatus = frame.solar_pause || null;
   // Frame-scoped cache. Reset on every apply so a stale value from the
@@ -3279,6 +3283,20 @@ window.addEventListener("hashchange", () => setRoute(currentRouteName()));
   }
 })();
 
+// Set the Daemon row based on whatever poll data we have. Pulled out
+// of renderSettings() so applySnapshot can call it too — otherwise the
+// Settings tab opens before the first snapshot, shows "starting…",
+// and never refreshes until the user navigates away and back.
+function renderDaemonStatus() {
+  const el = document.getElementById("settings-daemon");
+  if (!el) return;
+  if (lastRun) {
+    el.textContent = lastRun.errors_count === 0 ? "running, healthy" : "running, errors";
+  } else {
+    el.textContent = "starting…";
+  }
+}
+
 // ---------- settings panel ----------
 function renderSettings() {
   if (lastRun) {
@@ -3287,8 +3305,12 @@ function renderSettings() {
     $("#settings-errors").textContent = String(lastRun.errors_count);
   }
   // Daemon status implied from the same source as the header pill.
-  const ok = lastRun && lastRun.errors_count === 0;
-  $("#settings-daemon").textContent = ok ? "running, healthy" : (lastRun ? "running, errors" : "no data");
+  // First-paint race: if Settings opens before the first poll has
+  // landed, lastRun is null. Show "starting…" rather than the legacy
+  // "no data" which read as a fault to users. applySnapshot() also
+  // calls renderDaemonStatus() when the first poll arrives so the
+  // value updates without a tab switch.
+  renderDaemonStatus();
   // MQTT export now has its own row in Settings → Integrations; the old
   // "see config.yaml" placeholder was removed when that UI shipped.
   refreshAlertsPanel();
@@ -4015,18 +4037,20 @@ async function refreshUpdateState() {
 
   const isDocker = u.deployment === "docker";
 
-  // "Latest available" row appears only when there's a real update
-  // to surface AND we know what version it is. The version check
-  // guards a transient state right after first boot — the daemon
-  // may have computed has_update=true from a stale local value
-  // before the manifest poll completes, in which case
-  // latest_version is still null and we'd render "v—".
+  // "Latest available" row is ALWAYS visible — gives users a positive
+  // confirmation either way (the previous behaviour silently hid the
+  // row when up-to-date, which read as "data missing"). Two shapes:
+  //   has_update + latest_version → "v0.1.34 available" + Release-notes link
+  //   otherwise                   → "Up to date" (no link, no apply btn)
+  // The version-known guard still matters for the transient first-boot
+  // window where has_update=true but latest_version=null — we then
+  // render "Checking…" instead of the misleading "v—".
   const row = $("#settings-update-row");
-  const showRow = u.has_update && !!u.latest_version;
-  if (row) row.hidden = !showRow;
-  if (showRow) {
-    set("#settings-update-latest", "v" + u.latest_version);
-    const a = $("#settings-update-link");
+  if (row) row.hidden = false;
+  const pendingUpdate = u.has_update && !!u.latest_version;
+  const a = $("#settings-update-link");
+  if (pendingUpdate) {
+    set("#settings-update-latest", "v" + u.latest_version + " available");
     if (a) {
       // Always route to the in-app hash route — the appliance
       // dashboard uses hash routing (#/docs/<slug>), not server
@@ -4037,16 +4061,18 @@ async function refreshUpdateState() {
     }
     row?.classList.add("settings-row--update");
   } else {
+    set("#settings-update-latest",
+      u.has_update ? "Checking…" : "Up to date");
+    if (a) a.hidden = true;
     row?.classList.remove("settings-row--update");
   }
 
   // Apply button: only on Pi installs with an actual pending update.
   // Docker users update via `docker compose pull` on the host — no
   // in-app button, by design (matches Immich, Pi-hole, Vaultwarden
-  // conventions). Gated on showRow so we don't render "Apply" while
-  // the row itself is hidden waiting for a version.
+  // conventions).
   const applyBtn = $("#settings-update-apply");
-  if (applyBtn) applyBtn.hidden = isDocker || !showRow;
+  if (applyBtn) applyBtn.hidden = isDocker || !pendingUpdate;
 
   // "Updates: docker compose pull..." row — only when there's
   // actually an update pending on a Docker install. Used to be
@@ -4054,15 +4080,18 @@ async function refreshUpdateState() {
   // something" even when up to date. The Docker-update path is
   // documented anyway; only surface the hint when actionable.
   const dockerRow = $("#settings-update-docker-row");
-  if (dockerRow) dockerRow.hidden = !(isDocker && showRow);
+  if (dockerRow) dockerRow.hidden = !(isDocker && pendingUpdate);
 
-  // Hide the in-flight progress row whenever there's no update to
-  // apply. Without this it stuck around after a Pi user finished an
-  // earlier update — and on Docker it never makes sense (Apply is
-  // disabled). The apply handler unhides it on click; otherwise
-  // it's always hidden.
+  // Force-hide the in-flight progress row whenever refreshUpdateState
+  // runs. The apply handler is the ONLY thing that should ever unhide
+  // it — previously, the row could get stuck visible after a daemon
+  // restart left the DOM in mid-apply state, showing a permanent
+  // "waiting…" zombie to users who hadn't pressed Apply themselves.
+  // Service workers caching the half-progress shell made it worse.
+  // Apply handler still unhides on click, then calls back to here on
+  // completion, so the row hides cleanly when the apply finishes.
   const progressRow = $("#settings-update-progress-row");
-  if (progressRow && !showRow) progressRow.hidden = true;
+  if (progressRow) progressRow.hidden = true;
 
   if (u.last_checked_at) {
     set("#settings-update-checked", fmt.ago(u.last_checked_at)
