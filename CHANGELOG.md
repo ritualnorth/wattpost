@@ -8,6 +8,53 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.31] · 2026-05-20
+
+### Added · #36 Atomic-swap auto-apply updater
+
+Updates are now crash-safe and self-healing. Pi installs gain an
+A/B slot layout (`/opt/wattpost-slots/{a,b}/`); `wattpost-update`
+installs into the inactive slot, runs a health probe with a
+sandbox daemon, atomically flips the `/opt/wattpost` symlink, and
+auto-rolls back if the post-swap daemon doesn't come up. Even if
+the daemon boots fine in the probe but later crashloops against
+real hardware/config, a systemd `OnFailure=` watchdog catches it
+(`StartLimit` 3 failures in 60s) and fires `wattpost-rollback`.
+
+What this gets you:
+- Power loss mid-update can't brick the device; the symlink swap
+  is atomic (single `rename(2)`).
+- A bad release parks you on the previous working version within
+  ~60s, no SSH required.
+- Installer-tier accounts can flip "Auto-apply updates fleet-wide"
+  on the cloud dashboard — zero-touch updates across every site,
+  with the same safety net per appliance.
+
+New surface:
+- `/opt/wattpost-slots/{a,b}/` slot directories
+- `/usr/local/bin/wattpost-update` (rewritten end-to-end)
+- `/usr/local/bin/wattpost-rollback` (new)
+- `wattpost-rollback.service` systemd OnFailure unit
+- `GET /api/system/slots` + `POST /api/system/slots/rollback`
+- `wattpost-config` menu entries 11 + 12 (slot status, rollback)
+- Cloud-side: `appliances.auto_apply_updates` boolean (migration
+  0036), dashboard toggle, heartbeat-handler auto-queue, dedup
+  against in-flight updates.
+- New docs page at `/docs/atomic-swap-updates` walking through
+  the full flow.
+
+### Fixed (side effects of building #36)
+
+- `solar_monitor.cli._resolve_db_path` and `storage.sqlite.open`
+  both choked on `:memory:` (treated as a filesystem path).
+  Fixed — SQLite-special paths now pass through verbatim. Needed
+  by the atomic-swap health probe.
+- Cloudflare was caching `releases.wattpost.io/source/latest.tar.gz`
+  longer than `publish-source.yml` expected, leaving the tarball
+  and its `.sha256` out of sync. `wattpost-update` now appends a
+  cache-buster query string. Proper Caddy-side `Cache-Control`
+  fix tracked separately (#224).
+
 ## [0.1.30] · 2026-05-20
 
 ### Fixed
