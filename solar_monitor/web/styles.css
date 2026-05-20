@@ -554,51 +554,59 @@ main {
   stroke: var(--surface-3);
 }
 .donut-arc {
-  /* color is set per state via JS or :is() variant below */
-  stroke: var(--green);
-  transition: stroke-dasharray 0.8s ease, stroke 0.4s ease, filter 0.4s ease;
-  filter: drop-shadow(0 0 6px rgba(63,185,80,0.35));
+  /* Gradient + halo are picked per state via .donut-state.<state>
+     selectors below. JS sets the wrapper's state class on every snapshot
+     paint. Pre-state default = holding (calm blue). */
+  stroke: url(#g-soc-holding);
+  transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
 }
+/* Legacy band coloring — used by the per-pack mini donuts in the
+   bank-compare detail view (`.hero-donut-wrap` without a `.donut-state`
+   wrapper, so the new state palette doesn't kick in). Two-class
+   specificity beats the default `.donut-arc` rule so these win. */
 .donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px rgba(248,81,73,0.45)); }
 .donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(210,153,34,0.4)); }
 .donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
 
-/* Active glow intensifies + shifts color when charging or discharging */
-.donut-state.charging .donut-arc {
-  filter: drop-shadow(0 0 12px rgba(63,185,80,0.55));
-}
-.donut-state.discharging .donut-arc {
-  filter: drop-shadow(0 0 12px rgba(210,153,34,0.55));
-}
+/* State palette: charging green, holding blue, discharging amber,
+   critical red. The gradient IDs are duplicated in the kiosk donut
+   under a `-k-` prefix so the two SVGs don't share defs. */
+.donut-state.charging    .donut-arc { stroke: url(#g-soc-charging);    filter: drop-shadow(0 0 10px rgba(86,211,100,0.50)); }
+.donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  rgba(88,166,255,0.35)); }
+.donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(240,200,73,0.50)); }
+.donut-state.critical    .donut-arc { stroke: url(#g-soc-critical);    filter: drop-shadow(0 0 12px rgba(255,123,114,0.65)); }
+.kiosk-donut.donut-state.charging    .donut-arc { stroke: url(#g-soc-k-charging); }
+.kiosk-donut.donut-state.holding     .donut-arc { stroke: url(#g-soc-k-holding); }
+.kiosk-donut.donut-state.discharging .donut-arc { stroke: url(#g-soc-k-discharging); }
+.kiosk-donut.donut-state.critical    .donut-arc { stroke: url(#g-soc-k-critical); }
 
-/* Rotating pulse — a small bright dash travels the ring's circumference.
-   Hidden by default; shown only when charging/discharging. Direction is
-   controlled by the sign of stroke-dashoffset animation. */
-.donut-pulse {
-  stroke: transparent;
-  stroke-linecap: round;
-  opacity: 0;
-  transition: opacity 0.4s ease;
+/* Leading-edge dot — small solid circle at the tip of the arc with a
+   halo that pulses outward. Replaces the old rotating "ring runner"
+   indicator. JS positions cx/cy on every snapshot paint. */
+.donut-head, .donut-head-glow {
+  transition: cx 0.8s ease, cy 0.8s ease, fill 0.4s ease, stroke 0.4s ease;
+  pointer-events: none;
 }
-/* Pulse runs on top of the donut arc. We deliberately don't use --green /
-   --amber for the stroke itself — they're the *ring* colors and the pulse
-   would disappear against them. Use a near-white core so the pip is
-   visible in both themes, and tint the glow with the action color so it
-   still reads as "charging" or "discharging" at a glance. */
-.donut-state.charging .donut-pulse {
-  stroke: var(--donut-pulse-stroke);
-  opacity: 0.95;
-  filter: drop-shadow(0 0 5px var(--donut-pulse-charging-glow));
-  animation: pulse-cw 3.5s linear infinite;
+.donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-head-glow { fill: rgba(88,166,255,0.45); opacity: 0.6; }
+.donut-head-glow { animation: donut-head-pulse 1800ms ease-out infinite; }
+.donut-state.charging    .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.45); }
+.donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.40); }
+.donut-state.discharging .donut-head      { fill: #f0c849; stroke: #ffffff; }
+.donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.45); }
+.donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
+.donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.55); animation-duration: 900ms; }
+@keyframes donut-head-pulse {
+  0%   { r: 7;  opacity: 0.55; }
+  60%  { r: 14; opacity: 0;    }
+  100% { r: 7;  opacity: 0;    }
 }
-.donut-state.discharging .donut-pulse {
-  stroke: var(--donut-pulse-stroke);
-  opacity: 0.95;
-  filter: drop-shadow(0 0 5px var(--donut-pulse-discharging-glow));
-  animation: pulse-ccw 3.5s linear infinite;
+@media (prefers-reduced-motion: reduce) {
+  .donut-head-glow { animation: none; opacity: 0.35; }
 }
-@keyframes pulse-cw  { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -100; } }
-@keyframes pulse-ccw { from { stroke-dashoffset: 0; } to { stroke-dashoffset:  100; } }
 
 /* Net W indicator under "State of charge" */
 .donut-flow {
