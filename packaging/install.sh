@@ -97,7 +97,16 @@ find "${SOURCE}" -maxdepth 3 -name '*.egg-info' -type d \
 # aarch64 wheels on PyPI; this flag tells pip to grab those even when
 # a newer sdist exists. Native installs are unaffected (wheel still
 # chosen first by default).
-"${APP_VENV}/bin/pip" install --prefer-binary --upgrade "${SOURCE}"
+#
+# --force-reinstall --no-deps: pyproject.toml hardcodes version="0.0.1"
+# (the package metadata never bumps even when solar_monitor/__init__.py
+# does), so a plain `--upgrade` is a no-op when the upstream version
+# string didn't change — pip says "0.0.1 already installed". Force-
+# reinstall makes wattpost-update actually swap the venv contents.
+# --no-deps so we don't reinstall the entire dep tree on every update
+# (deps move on their own cadence; `pip install --upgrade` above
+# already bumped them if needed).
+"${APP_VENV}/bin/pip" install --prefer-binary --upgrade --force-reinstall --no-deps "${SOURCE}"
 
 # ----- config (only if not present — don't clobber the user's edits) -----
 if [[ ! -f "${CONFIG_FILE}" ]]; then
