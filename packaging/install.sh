@@ -228,6 +228,10 @@ wattpost ALL=(root) NOPASSWD: /usr/bin/tailscale up *, /usr/bin/tailscale logout
 # helper itself is a fixed, trusted script — locked to no args so the
 # daemon can't pass a malicious source URL.
 wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-update
+# Allow rollback from the dashboard / wattpost-config — also a fixed
+# trusted script, no args (the --auto flag is only added by the
+# systemd OnFailure unit which doesn't go through sudo).
+wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-rollback
 SUDO
 # visudo -c validates syntax before we move it into /etc/sudoers.d/
 if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
@@ -250,6 +254,20 @@ if [ -f "${SCRIPT_DIR}/cli/wattpost-update" ]; then
     touch /var/log/wattpost-update.log
     chgrp wattpost /var/log/wattpost-update.log
     chmod 0644 /var/log/wattpost-update.log
+fi
+
+# Install the rollback helper + its OnFailure systemd unit (#36 Slice 3).
+step "installing wattpost-rollback helper + OnFailure watchdog"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-rollback" ]; then
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/cli/wattpost-rollback" /usr/local/bin/wattpost-rollback
+    touch /var/log/wattpost-rollback.log
+    chgrp wattpost /var/log/wattpost-rollback.log
+    chmod 0644 /var/log/wattpost-rollback.log
+fi
+if [ -f "${SCRIPT_DIR}/systemd/wattpost-rollback.service" ]; then
+    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-rollback.service" \
+        /etc/systemd/system/wattpost-rollback.service
 fi
 
 # ----- cloudflared (optional, for cloud tunnel) -----
