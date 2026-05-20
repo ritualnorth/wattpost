@@ -24,6 +24,7 @@
     { "slug": "security",        "title": "About the \"Not Secure\" warning", "section": "Security" },
 
     { "slug": "backup",                "title": "Backup & disaster recovery", "section": "Operations" },
+    { "slug": "atomic-swap-updates",   "title": "How updates work",           "section": "Operations" },
     { "slug": "privacy-and-telemetry", "title": "Privacy & telemetry",        "section": "Operations" },
     { "slug": "troubleshooting",       "title": "Troubleshooting",            "section": "Operations" },
     { "slug": "faq",             "title": "FAQ",                        "section": "Operations" },

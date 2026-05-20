@@ -230,6 +230,43 @@ action_update_check() {
     msg "Update status" "${out}\n\n(To apply an available update, use the dashboard's Update button — auto-apply is on the v0.0.x roadmap.)"
 }
 
+action_slot_status() {
+    # Show the atomic-swap slot layout (#36). Same data as
+    # /api/system/slots but readable from the shell without needing
+    # the daemon to be alive.
+    local active prev active_name prev_name active_ver prev_ver msg_body
+    if [ ! -L /opt/wattpost ]; then
+        msg "Slot status" "This appliance is on the legacy /opt/wattpost layout (pre-#36). Run install.sh once to migrate to slots; that gives you atomic-swap updates + the rollback option in this menu."
+        return 0
+    fi
+    active="$(readlink -f /opt/wattpost)"
+    active_name="$(basename "${active}")"
+    active_ver="$(cat "${active}/version" 2>/dev/null || echo '?')"
+    if [ -L /opt/wattpost-slots/previous ]; then
+        prev="$(readlink -f /opt/wattpost-slots/previous)"
+        prev_name="$(basename "${prev}")"
+        prev_ver="$(cat "${prev}/version" 2>/dev/null || echo '?')"
+        msg_body="Active slot:     ${active_name}  (v${active_ver})\nPrevious slot:   ${prev_name}  (v${prev_ver})\n\nIf the active slot misbehaves, choose 'Roll back to previous slot' from the main menu to atomically swap back."
+    else
+        msg_body="Active slot:     ${active_name}  (v${active_ver})\nPrevious slot:   none\n\nNo updates have completed yet, so there's nothing to roll back to. Run 'Check for updates' to fetch the latest version."
+    fi
+    msg "Slot status" "${msg_body}"
+}
+
+action_rollback() {
+    needs_root || return 0
+    if [ ! -L /opt/wattpost-slots/previous ]; then
+        msg "Rollback" "Nothing to roll back to — this appliance has never been updated via wattpost-update (no previous slot recorded)."
+        return 0
+    fi
+    local prev_ver
+    prev_ver="$(cat "$(readlink -f /opt/wattpost-slots/previous)/version" 2>/dev/null || echo '?')"
+    if confirm "Roll back to v${prev_ver}?" "Swaps /opt/wattpost to the previous slot and restarts the daemon. About 5s of downtime. The current slot is preserved and stays the rollback target so you can swap forward again later."; then
+        ${SUDO} /usr/local/bin/wattpost-rollback
+        msg "Rollback complete" "Daemon restarted on the previous slot. Check 'Daemon status' (option 1) to confirm it's healthy."
+    fi
+}
+
 action_reboot() {
     needs_root || return 0
     if confirm "Reboot the Pi?" "Disconnects you from SSH. The dashboard comes back ~30s after reboot."; then
@@ -256,7 +293,7 @@ main_menu() {
             choice=$(${TUI} --backtitle "${BACKTITLE}" \
                             --title "WattPost setup" \
                             --cancel-button "Quit" \
-                            --menu "Pick an option:" 20 76 12 \
+                            --menu "Pick an option:" 22 76 14 \
                 "1" "Daemon status" \
                 "2" "Recent logs (last 80 lines)" \
                 "3" "Live log tail (Ctrl+C returns)" \
@@ -266,6 +303,8 @@ main_menu() {
                 "7" "Cloud pairing status" \
                 "8" "Unpair from cloud" \
                 "9" "Check for updates" \
+                "11" "Slot status (#36 atomic-swap)" \
+                "12" "Roll back to previous slot" \
                 "10" "Reboot Pi" \
                 "0" "About WattPost" \
                 3>&1 1>&2 2>&3) || break
@@ -280,6 +319,8 @@ main_menu() {
                 8) action_unpair ;;
                 9) action_update_check ;;
                 10) action_reboot ;;
+                11) action_slot_status ;;
+                12) action_rollback ;;
                 0) action_about ;;
             esac
         else
@@ -296,6 +337,8 @@ main_menu() {
             echo "  8) Unpair from cloud"
             echo "  9) Check for updates"
             echo "  10) Reboot Pi"
+            echo "  11) Slot status"
+            echo "  12) Roll back to previous slot"
             echo "  0) About"
             echo "  q) Quit"
             printf 'Choice: '
@@ -311,6 +354,8 @@ main_menu() {
                 8) action_unpair ;;
                 9) action_update_check ;;
                 10) action_reboot ;;
+                11) action_slot_status ;;
+                12) action_rollback ;;
                 0) action_about ;;
                 q|Q) break ;;
             esac

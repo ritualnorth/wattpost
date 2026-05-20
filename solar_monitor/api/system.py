@@ -333,6 +333,88 @@ async def update_state(state: State) -> dict[str, Any]:
     return state_dict
 
 
+@get("/api/system/slots")
+async def slot_state() -> dict[str, Any]:
+    """Atomic-swap slot layout (#36). Reports which slot is active,
+    which slot the auto-rollback would swap to, and the version each
+    one is carrying. Returns empty dict on Docker installs and on
+    legacy /opt/wattpost layouts that haven't been migrated to slots
+    yet — UI should hide the slot card in those cases."""
+    deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
+    if deployment == "docker":
+        return {"applicable": False, "reason": "docker-install"}
+    app_root = "/opt/wattpost"
+    slots_dir = "/opt/wattpost-slots"
+    try:
+        if not os.path.islink(app_root) or not os.path.isdir(slots_dir):
+            return {"applicable": False, "reason": "legacy-layout"}
+        active = os.path.realpath(app_root)
+        active_name = os.path.basename(active)
+        prev_link = os.path.join(slots_dir, "previous")
+        previous = os.path.realpath(prev_link) if os.path.islink(prev_link) else None
+        previous_name = os.path.basename(previous) if previous else None
+
+        def _read_version(slot_path: str) -> str | None:
+            vfile = os.path.join(slot_path, "version")
+            try:
+                with open(vfile, "r") as f:
+                    return f.read().strip() or None
+            except OSError:
+                return None
+
+        return {
+            "applicable":     True,
+            "active":         {"name": active_name, "path": active,
+                               "version": _read_version(active)},
+            "previous":       (None if previous is None
+                               else {"name": previous_name, "path": previous,
+                                     "version": _read_version(previous)}),
+            "rollback_available": previous is not None and previous != active,
+        }
+    except Exception as e:
+        return {"applicable": False, "reason": f"error: {e}"}
+
+
+@post("/api/system/slots/rollback", status_code=202)
+async def slot_rollback() -> dict[str, Any]:
+    """Trigger a rollback to the previous slot. Fires the same
+    wattpost-rollback helper that the OnFailure watchdog uses, so
+    behaviour is identical between manual and auto rollback.
+
+    Requires that a previous slot is recorded — fresh installs that
+    have never updated have nothing to roll back to and get a 400."""
+    if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
+        raise HTTPException(
+            status_code=400,
+            detail="rollback isn't supported on Docker installs — "
+                   "downgrade by pulling an earlier image tag.",
+        )
+    if not os.path.exists("/usr/local/bin/wattpost-rollback"):
+        raise HTTPException(
+            status_code=400,
+            detail="wattpost-rollback helper not found — reinstall to fix",
+        )
+    if not os.path.islink("/opt/wattpost-slots/previous"):
+        raise HTTPException(
+            status_code=400,
+            detail="no previous slot recorded — this appliance has "
+                   "never been updated via wattpost-update, so there's "
+                   "nothing to roll back to.",
+        )
+    try:
+        await asyncio.create_subprocess_exec(
+            "/usr/bin/setsid", "sudo", "-n",
+            "/usr/local/bin/wattpost-rollback",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=f"could not start rollback: {e}")
+    return {"ok": True, "log_path": "/var/log/wattpost-rollback.log"}
+
+
 @post("/api/system/web-password/rotate")
 async def rotate_web_password() -> dict[str, Any]:
     """Generate a new local web password and persist it. Returns the
