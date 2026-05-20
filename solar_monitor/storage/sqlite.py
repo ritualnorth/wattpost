@@ -322,7 +322,16 @@ class Store:
     """
 
     def __init__(self, path: str | Path) -> None:
-        self.path = Path(path)
+        # SQLite-special paths (`:memory:`, `file::memory:?...`) are
+        # not filesystem paths — pass them through verbatim so the
+        # mkdir-parents call in `open()` doesn't try to create `.`.
+        # The health-probe path in wattpost-update (#36) uses
+        # `:memory:` so it can boot the daemon without touching the
+        # real DB.
+        self._is_memory = isinstance(path, str) and (
+            path == ":memory:" or path.startswith("file::memory:")
+        )
+        self.path = path if self._is_memory else Path(path)
         self._db: aiosqlite.Connection | None = None
         # Bank-aggregator policy (#121). Defaults match BankCfg's
         # defaults; the scheduler calls `set_bank_policy()` after
@@ -375,7 +384,8 @@ class Store:
     async def open(self) -> None:
         if self._db is not None:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if not self._is_memory:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
         self._db = await aiosqlite.connect(self.path)
         for pragma in PRAGMAS:
             await self._db.execute(pragma)
