@@ -63,9 +63,15 @@ if ! id "${APP_USER}" >/dev/null 2>&1; then
             "${APP_USER}"
 fi
 # bluetooth group: gives DBus access to BlueZ for BLE scans/connects.
-if getent group bluetooth >/dev/null; then
-    usermod -a -G bluetooth "${APP_USER}"
+# Ensure the group exists even when bluez isn't installed yet —
+# the systemd unit declares `SupplementaryGroups=bluetooth` and
+# misses-fatally with `216/GROUP` if the group is absent. Pi OS
+# ships bluez (so the group is pre-created); plain Ubuntu Server
+# does not. Group creation is cheap and harmless.
+if ! getent group bluetooth >/dev/null; then
+    groupadd --system bluetooth
 fi
+usermod -a -G bluetooth "${APP_USER}"
 
 step "preparing ${APP_ROOT}, ${CONFIG_DIR}, ${STATE_DIR}"
 mkdir -p "${APP_ROOT}" "${CONFIG_DIR}" "${STATE_DIR}"
