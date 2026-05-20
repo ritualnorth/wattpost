@@ -2,6 +2,14 @@
   "_comment": "Blog posts in publishing order. Adding a .md to /blog/ without an entry here keeps it as a draft (unreachable by URL slug). Order is by published_at desc at render time; raw order here doesn't matter beyond keeping diffs sane.",
   "posts": [
     {
+      "slug": "atomic-swap-updates",
+      "title": "Your WattPost can never brick itself on an update",
+      "summary": "v0.1.31 ships A/B slots, pre-swap health probes, atomic symlink flips and a systemd OnFailure watchdog. Power loss mid-install, a broken release, a half-baked venv — worst case is 'stuck on yesterday's version, dashboard healthy, no SSH required.' Plus 'Auto-apply updates fleet-wide' for installer-tier customers.",
+      "published_at": "2026-05-20",
+      "author": "Ritual North",
+      "hero": null
+    },
+    {
       "slug": "renogy-over-cable",
       "title": "Wire your Renogy gear to WattPost instead of using a BT-2 dongle",
       "summary": "For metal-van installs, long cable runs, or anywhere your BT-2 dongle keeps dropping out. Step-by-step setup with USB-RS485 + Cat5e: cable picks, pinout, daisy-chain vs Hub vs multi-adapter topologies, and the by-id path that survives reboots.",
