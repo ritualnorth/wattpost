@@ -67,6 +67,7 @@ def record_broker_auth(
     header_age_s: float | None = None,
     cf_ray: str | None = None,
     method: str = "GET",
+    header_prefix: str | None = None,
 ) -> None:
     """Append a broker-auth verify result. Verdicts:
       ok          — HMAC matched, timestamp fresh
@@ -78,6 +79,13 @@ def record_broker_auth(
     `header_age_s` is `now - header_ts` (seconds) when computable. For
     `expired` it tells you which way the skew leans; for `ok` it
     surfaces clock drift before it becomes a verify failure.
+
+    `header_prefix` is the first ~80 chars of the raw header bytes,
+    captured ONLY on non-ok verdicts. Useful for diagnosing the exact
+    shape an attacker (or a buggy cloud) sent — the ts + scope + sig
+    pattern is well-formed enough that 80 chars covers it. Stays
+    local: the ring is exposed via /api/diagnostics/broker-auth
+    behind auth, never leaves the appliance.
     """
     import time as _t
     try:
@@ -88,6 +96,7 @@ def record_broker_auth(
             "verdict": verdict,
             "header_age_s": header_age_s,
             "cf_ray": cf_ray,
+            "header_prefix": header_prefix,
         })
     except Exception:
         # Never let diagnostics break the request path.
