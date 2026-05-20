@@ -26,7 +26,11 @@ set -euo pipefail
 LOG=/var/log/wattpost-update.log
 SRC_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}"
 SHA_URL="${SRC_URL}.sha256"
-SRC_DIR=/opt/wattpost-src
+# After #36, source lives inside the active slot (resolved via the
+# /opt/wattpost symlink). install.sh's slot migration creates this
+# path on first run; the legacy /opt/wattpost-src is moved into it.
+APP_ROOT=/opt/wattpost
+SRC_DIR="$(readlink -f "${APP_ROOT}" 2>/dev/null || echo "${APP_ROOT}")/src"
 TMP_TAR="$(mktemp --suffix=.tar.gz)"
 TMP_SHA="$(mktemp --suffix=.sha256)"
 LOCK=/run/wattpost-update.lock
