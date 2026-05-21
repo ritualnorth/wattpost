@@ -8,6 +8,63 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.33] · 2026-05-21
+
+### Fixed · phantom PV credit at sunrise
+
+`pv_today_wh` was reading MAX of the device's running counter,
+which doesn't reset on UTC midnight (it follows the MPPT's own
+clock). On a fresh morning poll the appliance was reporting
+~940 Wh of "harvested today" at 06:00 — yesterday's accumulated
+total bleeding through. Replaced with a positive-delta walk over
+ordered samples that resets cleanly on counter rollback. Live
+verified: 940 → 12 Wh on a real install.
+
+### Fixed · cloud broker "Open" intermittent white screen
+
+`broker_can_access` was checking the ASGI scope peer IP and
+rejecting requests it didn't recognise — but behind CF + Caddy
+that field intermittently reports a Cloudflare edge IP
+(141.101.x, 162.158.x) instead of the proxy. About 30 % of
+brokered requests were 403'ing as a result, surfacing to
+customers as the long-running "white screen on Open" bug.
+Removed the peer check entirely; the existing auth + owner_id
+checks cover all real threats.
+
+### Fixed · kiosk-share modal stuck on "Loading…"
+
+`fmt.ago(...)` typo in the cloud kiosk-shares list called an
+undefined function, throwing inside the render loop after the
+fetch resolved. Result: modal opened, fetched the list, then
+silently swallowed the render and left the spinner in place.
+Fixed the call site (`fmtAgo`) and wrapped the render in a
+try/catch so any future render error logs to console instead of
+freezing the panel.
+
+### Fixed · cloud backup gate bypass on LIST endpoint
+
+The Hobby-tier cloud backup feature gate was applied to the
+UPLOAD endpoint but not the LIST endpoint — a Hobby user could
+toggle backups on in the UI and the appliance would happily
+list (empty) cloud backups, masking the upgrade prompt.
+LIST now honours `is_staff` / `is_comped` the same way UPLOAD
+does, via a shared `_user_can_cloud_backup` helper.
+
+### Fixed · stale UI shell after service-worker eviction
+
+Service-worker `CACHE_VERSION` and the `?v=` cache-busters on
+`index.html`, `app.js`, and `styles.css` were bumped to force
+eviction of the donut-era + kiosk-exit-era stale shells. iOS
+Safari in particular was serving the wrong version of the topbar
+and kiosk exit-button hide-logic long after `docker compose pull`.
+
+### Added · cloud error tracking via self-hosted GlitchTip
+
+`sentry-sdk` is now wired into the cloud Litestar app behind a
+`SENTRY_DSN` env var (silent no-op if unset). Catches 5xx
+tracebacks + integrates with Litestar + the logging chain.
+DSN is paste-only at the VPS — code path is live.
+
 ## [0.1.32] · 2026-05-20
 
 ### Fixed · #225 dual-format broker-auth verifier
