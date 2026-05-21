@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.37] · 2026-05-21
+
+### Changed · appliance dashboard strips its chrome inside the WattPost mobile app
+
+When the appliance dashboard is loaded inside the Capacitor
+WebView (detected by `WattPostApp/` in the User-Agent), the
+appliance now hides:
+
+- Its own top header (the cloud already gave the user a status
+  bar + mobile shell; the appliance's `.app-header` rendered as
+  duplicate chrome)
+- The floating "?" help FAB (docs live in the mobile app's
+  Account tab)
+
+Side effect: standalone PWA users on the appliance's local URL
+see the original layout — only the `WattPostApp/` UA flips this.
+
+Cache-busters: `app.js?v=185`, `styles.css?v=122`,
+`sw.js CACHE_VERSION` → `wattpost-v98-app185-css122`.
+
 ## [0.1.36] · 2026-05-21
 
 ### Fixed · appliance dashboard respects device safe-area insets

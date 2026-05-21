@@ -3861,3 +3861,25 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 .schedule-form-status { font-size: .8rem; color: var(--text-3); }
 .schedule-form-status.err { color: var(--red, #f85149); }
+
+/* ───────────── In-WattPost-app shell: strip our chrome ─────────────
+   When the appliance dashboard renders inside the WattPost native
+   shell (detected via navigator.userAgent contains "WattPostApp/"),
+   the cloud already gives us a status bar + tab bar; ours would be
+   duplicate chrome. Hide it. Also hide the floating help-FAB —
+   docs route lives in the cloud's Account tab anyway. */
+html.in-wattpost-app .app-header { display: none !important; }
+html.in-wattpost-app .help-fab,
+html.in-wattpost-app #help-fab,
+html.in-wattpost-app .docs-fab {
+  display: none !important;
+}
+/* Tighten main padding now the header's gone */
+html.in-wattpost-app body > main,
+html.in-wattpost-app .container {
+  padding-top: max(12px, env(safe-area-inset-top)) !important;
+}
+/* No bottom tab bar inside the broker tunnel — the appliance HTML
+   is served on its own origin (<slug>.wattpost.cloud) so the cloud's
+   /app tab bar isn't reachable from here. Native back-gesture
+   returns the user to Sites. */
