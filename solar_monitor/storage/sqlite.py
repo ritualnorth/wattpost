@@ -1307,18 +1307,46 @@ class Store:
         # systematically under-counts fast peaks — observed at ~40%
         # under on a real install. Fall back to integration only for
         # PV devices that don't surface the counter (rare).
+        #
+        # Counter-reset detection: the device's daily counter resets
+        # on ITS OWN clock (BT-2 dongle time), not the server's
+        # midnight. Across midnight-UTC → device-midnight, the
+        # samples carry yesterday's accumulated total — taking a
+        # naive `MAX(value)` would phantom-credit that to today.
+        # Walk the samples per device in time order and accumulate
+        # only the POSITIVE deltas (cur >= prev). When the counter
+        # drops, that's a reset event — we start a fresh leg.
         pv_today_wh = 0.0
-        async with self._db.execute(
-            "SELECT device, MAX(value) AS energy_wh "
-            "FROM samples WHERE metric = 'energy_today_wh' "
-            "  AND ts BETWEEN ? AND ? GROUP BY device",
-            (midnight_ts, now_ts),
-        ) as cur:
-            async for _dev, val in cur:
-                if val is not None:
-                    pv_today_wh += float(val)
-        if pv_today_wh <= 0:
-            # No device counter found — integrate as a fallback.
+        sql = (
+            "SELECT device, ts, value FROM samples "
+            "WHERE metric = 'energy_today_wh' "
+            "  AND ts BETWEEN ? AND ? "
+            "ORDER BY device, ts"
+        )
+        seen_any = False
+        prev_dev: str | None = None
+        prev_v: float = 0.0
+        async with self._db.execute(sql, (midnight_ts, now_ts)) as cur:
+            async for dev, _ts, v in cur:
+                seen_any = True
+                v = float(v)
+                if dev != prev_dev:
+                    # First sample for this device in the window. We
+                    # don't yet know whether the counter has reset
+                    # since yesterday; treat the value at this point
+                    # as the baseline (not as today's harvest).
+                    prev_dev = dev
+                    prev_v = v
+                    continue
+                if v >= prev_v:
+                    pv_today_wh += (v - prev_v)
+                # else: counter dropped → device reset. Don't credit
+                # the drop as negative energy; just rebase.
+                prev_v = v
+        if not seen_any or pv_today_wh <= 0:
+            # No device counter visible — or the counter hasn't moved
+            # at all today (overnight, brand-new install). Integrate
+            # power directly as a fallback.
             pv_today_wh = await _integrate_metric("pv_power_w")
         # AC chargers / DC-DC: no per-device daily counter in the BLE
         # advertisement payload, so integration is the only option.
