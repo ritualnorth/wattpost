@@ -44,11 +44,30 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=114" />
+  <link rel="stylesheet" href="/web/styles.css?v=115" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
-  <div id="alerts" class="alerts" hidden></div>
+  <!-- Single collapsible alert banner — replaces the old stacked rows
+       that were eating ~25% of the mobile fold. Banner shows a one-line
+       summary; tap to expand the per-category detail. Same-category
+       alerts (e.g. cell drift on two batteries at the same value) are
+       collapsed server-side via renderAlerts() before they reach the
+       DOM. -->
+  <div id="alerts" class="alerts" hidden>
+    <button type="button" class="alerts-summary" id="alerts-summary"
+            aria-expanded="false" aria-controls="alerts-detail">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           aria-hidden="true">
+        <path d="M12 2L2 21h20L12 2z"/>
+        <path d="M12 9v6M12 18h.01"/>
+      </svg>
+      <span class="alerts-summary-count" id="alerts-summary-count">·</span>
+      <span class="alerts-summary-cats" id="alerts-summary-cats"></span>
+      <span class="alerts-summary-chev" aria-hidden="true">›</span>
+    </button>
+    <div class="alerts-detail" id="alerts-detail" hidden></div>
+  </div>
 
   <!-- Full-screen overlay while the daemon is restarting -->
   <div id="restart-overlay" class="restart-overlay" hidden>
@@ -87,6 +106,18 @@
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
     </button>
+    <!-- Help icon-button — small, sits in the topbar instead of a
+         floating FAB. Same destination (#/docs), less screen real-estate
+         eaten on mobile, no overlay clash with the dashboard tiles. -->
+    <a class="help-btn" id="help-btn" href="#/docs"
+       aria-label="Open documentation" title="Help & documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
+        <line x1="12" y1="17" x2="12" y2="17.01"/>
+      </svg>
+    </a>
     <!-- Sign-in / sign-out lived here briefly but moved inside Settings
          (the only place you actually need them) — clicking Settings on
          an unauthed session bounces to /login automatically, so the
@@ -132,16 +163,9 @@
     </a>
   </nav>
 
-  <!-- Floating help button. The Docs tab used to live in the main nav
-       but was crowding the 5th slot. As a "?" FAB it stays one tap
-       away from every page without competing with primary navigation. -->
-  <a class="docs-fab" href="#/docs" aria-label="Open documentation" title="Help & documentation">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="10"/>
-      <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
-      <line x1="12" y1="17" x2="12" y2="17.01"/>
-    </svg>
-  </a>
+  <!-- Floating help button was previously here; lifted into the topbar
+       as a small icon-button (above) so it doesn't eat screen real
+       estate or compete with primary tiles on mobile. -->
 
   <main>
     <!-- =====================================================
@@ -1054,6 +1078,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=178"></script>
+  <script src="/web/app.js?v=179"></script>
 </body>
 </html>

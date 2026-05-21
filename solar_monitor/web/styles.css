@@ -155,26 +155,69 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---------------- alert banner ---------------- */
+/* ---------------- alert banner (single, collapsible) ----------------
+   Replaces the stacked alert-row design that ate ~25% of the mobile
+   fold. One summary row by default; tap to expand per-category detail.
+   Same-category alerts (e.g. cell drift on two batteries at the same
+   value) are merged in renderAlerts() so a 3-row stack becomes a
+   2-line banner. Colour palette flips between warn and crit based on
+   the highest-severity child via the .alerts.crit modifier. */
 .alerts {
-  display: flex; flex-direction: column;
-  background: linear-gradient(180deg, rgba(248,81,73,0.12), rgba(248,81,73,0));
-  border-bottom: 1px solid rgba(248,81,73,0.4);
+  margin: .75rem 1rem 0;
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.35);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.alerts.crit {
+  background: rgba(218,54,51,0.12);
+  border-color: rgba(218,54,51,0.40);
 }
 .alerts[hidden] { display: none; }
-.alert-row {
-  display: flex; align-items: center; gap: .65rem;
-  padding: .6rem 1.5rem;
-  font-size: .88rem;
+.alerts-summary {
+  width: 100%;
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .75rem;
+  background: transparent; color: inherit;
+  border: 0; cursor: pointer; text-align: left;
+  font: inherit;
 }
-.alert-row + .alert-row {
-  border-top: 1px solid rgba(248,81,73,0.15);
+.alerts-summary .icon { width: 16px; height: 16px; flex-shrink: 0; color: #f0c849; }
+.alerts.crit .alerts-summary .icon { color: #ff7b72; }
+.alerts-summary-count { font-size: .82rem; font-weight: 500; color: var(--text); }
+.alerts-summary-cats {
+  flex: 1; min-width: 0; text-align: right;
+  font-size: .78rem; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.alert-row.warn { color: #f1cf6f; background: rgba(210,153,34,0.07); }
-.alert-row.alarm { color: #ffb0ab; background: rgba(248,81,73,0.10); }
-.alert-row .icon {
-  width: 18px; height: 18px;
-  flex-shrink: 0;
+.alerts-summary-chev {
+  color: var(--text-3); font-size: .85rem;
+  transition: transform 180ms ease;
+}
+.alerts[aria-expanded="true"] .alerts-summary-chev,
+.alerts.expanded .alerts-summary-chev { transform: rotate(90deg); }
+
+.alerts-detail {
+  border-top: 1px solid rgba(210,153,34,0.30);
+}
+.alerts.crit .alerts-detail { border-top-color: rgba(218,54,51,0.35); }
+.alerts-detail[hidden] { display: none; }
+.alerts-detail-row {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .5rem .75rem;
+  font-size: .82rem;
+}
+.alerts-detail-row + .alerts-detail-row {
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.alerts-detail-row .sev {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #f0c849; flex-shrink: 0;
+}
+.alerts-detail-row .sev.alarm { background: #ff7b72; }
+.alerts-detail-row .lbl { flex: 1; color: var(--text); min-width: 0; }
+.alerts-detail-row .val {
+  color: var(--text-3); font-variant-numeric: tabular-nums; font-size: .78rem;
 }
 
 /* ---------------- demo banner ---------------- */
@@ -457,40 +500,30 @@ body.is-demo #settings-update-apply { display: none !important; }
   }
 }
 
-/* ---------------- floating help button ----------------
- * A "?" FAB anchored to the bottom-right of every page. Tap → docs
- * route. Positioned with safe-area-inset for notched/rounded phone
- * bezels. Hidden on the docs route itself (no point showing a
- * shortcut to the page you're already on).
+/* ---------------- help icon-button (topbar) ----------------
+ * Was a floating "?" FAB; lifted into the topbar so it stops competing
+ * with primary dashboard tiles for screen real estate on mobile. Same
+ * destination (#/docs), one-tap reachability preserved. Hidden on the
+ * docs route + kiosk route — pointless to surface a shortcut to the
+ * page you're already on or a chrome-free wallmount.
  */
-.docs-fab {
-  position: fixed;
-  right: calc(1rem + env(safe-area-inset-right, 0px));
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-  z-index: 50;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px; height: 48px;
+.help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.15);
+  background: var(--surface-2);
+  color: var(--text-3);
+  border: 1px solid var(--border);
   text-decoration: none;
-  transition: transform .15s, box-shadow .15s;
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
 }
-.docs-fab:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(0,0,0,.30), 0 2px 4px rgba(0,0,0,.18);
-}
-.docs-fab:active { transform: translateY(0); }
-.docs-fab svg { width: 24px; height: 24px; }
-/* On the docs route, hide the FAB so it doesn't sit on top of the
- * sidebar / content the user just opened. body data-route is set by
- * the router (app.js onEnterX handlers). */
-body[data-route="docs"] .docs-fab,
-body[data-route="kiosk"] .docs-fab,
-body.kiosk-active .docs-fab { display: none; }
+.help-btn:hover { background: var(--surface-3); color: var(--text); }
+.help-btn:active { background: var(--surface-3); }
+.help-btn svg { width: 16px; height: 16px; }
+body[data-route="docs"] .help-btn,
+body[data-route="kiosk"] .help-btn,
+body.kiosk-active .help-btn { display: none; }
 
 /* ---------------- routes ---------------- */
 .route { display: none; }

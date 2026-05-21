@@ -1955,32 +1955,61 @@ function drawTodaySpark(points, nowTs, host) {
 }
 
 // ---------- ALERTS ----------
+// Friendly per-category short labels for the banner summary. Keep
+// them tight — 1-2 words; the summary line ellipsises if too long.
+const ALERT_CAT_LABELS = {
+  comms_stale:      "Comms slow",
+  comms_alarm:      "No recent poll",
+  poll_errors:      "Device errors",
+  no_first_poll:    "Daemon starting",
+  low_soc:          "Low SoC",
+  critical_soc:     "Critical SoC",
+  cell_drift:       "Cell drift",
+  cell_over_voltage:"Cell over-V",
+  cell_under_voltage:"Cell under-V",
+  cell_temp:        "Cell temp",
+  mppt_temp:        "MPPT temp",
+};
+
 function renderAlerts() {
-  const host = $("#alerts");
-  host.innerHTML = "";
+  const host    = $("#alerts");
+  const summary = $("#alerts-summary");
+  const detail  = $("#alerts-detail");
+  const cntEl   = $("#alerts-summary-count");
+  const catsEl  = $("#alerts-summary-cats");
+
+  // Build the raw alert list with category + value tags so we can
+  // group same-category alerts (e.g. cell drift on two batteries at
+  // the same value) into a single row. Per-device alerts carry a
+  // `device_label` so the group can list them inline.
   const alerts = [];
+  const push = (a) => alerts.push(a);
 
   // Comms / poll health
   if (lastRun) {
     const age = Math.floor(Date.now() / 1000) - lastRun.ts;
-    if (age > 300) alerts.push({ level: "alarm", msg: `No successful poll for ${fmt.ago(lastRun.ts)}` });
-    else if (age > 120) alerts.push({ level: "warn", msg: `Last poll ${fmt.ago(lastRun.ts)} — comms slow` });
-    if (lastRun.errors_count > 0) alerts.push({
-      level: "warn",
-      msg: `${lastRun.errors_count} device error${lastRun.errors_count === 1 ? "" : "s"} on last poll`,
-    });
+    if (age > 300) push({ level: "alarm", category: "comms_alarm",
+      lbl: "No recent poll", value: fmt.ago(lastRun.ts) });
+    else if (age > 120) push({ level: "warn", category: "comms_stale",
+      lbl: "Comms slow", value: `last ${fmt.ago(lastRun.ts)}` });
+    if (lastRun.errors_count > 0) push({ level: "warn", category: "poll_errors",
+      lbl: `${lastRun.errors_count} device error${lastRun.errors_count === 1 ? "" : "s"}`,
+      value: "last poll" });
   } else {
-    alerts.push({ level: "warn", msg: "Daemon hasn't completed its first poll yet" });
+    push({ level: "warn", category: "no_first_poll",
+      lbl: "Daemon starting", value: "no poll yet" });
   }
 
   // Bank-level
   const bank = aggregateBank();
   if (bank) {
-    if (bank.soc < 10) alerts.push({ level: "alarm", msg: `Bank state of charge critical (${bank.soc.toFixed(1)} %)` });
-    else if (bank.soc < 20) alerts.push({ level: "warn", msg: `Bank state of charge low (${bank.soc.toFixed(1)} %)` });
+    if (bank.soc < 10) push({ level: "alarm", category: "critical_soc",
+      lbl: "Bank SoC critical", value: `${bank.soc.toFixed(1)} %` });
+    else if (bank.soc < 20) push({ level: "warn", category: "low_soc",
+      lbl: "Bank SoC low", value: `${bank.soc.toFixed(1)} %` });
   }
 
-  // Per-device alerts
+  // Per-device alerts — tagged with device_label so groupable later.
   for (const dev of devices.filter(d => d.kind === "smart_battery")) {
     const l = dev.latest || {};
     const cells = [];
@@ -1992,13 +2021,17 @@ function renderAlerts() {
     if (cells.length) {
       const spread = Math.max(...cells) - Math.min(...cells);
       if (spread >= 0.20)
-        alerts.push({ level: "alarm", msg: `${dev.label}: cell drift ${spread.toFixed(2)} V` });
+        push({ level: "alarm", category: "cell_drift", device_label: dev.label,
+          lbl: `${dev.label}: cell drift`, value: `${spread.toFixed(2)} V` });
       else if (spread >= 0.10)
-        alerts.push({ level: "warn", msg: `${dev.label}: cell drift ${spread.toFixed(2)} V` });
+        push({ level: "warn", category: "cell_drift", device_label: dev.label,
+          lbl: `${dev.label}: cell drift`, value: `${spread.toFixed(2)} V` });
       if (cells.some(v => v > 3.65))
-        alerts.push({ level: "alarm", msg: `${dev.label}: cell over-voltage` });
+        push({ level: "alarm", category: "cell_over_voltage", device_label: dev.label,
+          lbl: `${dev.label}: cell over-voltage`, value: "" });
       if (cells.some(v => v < 2.8))
-        alerts.push({ level: "alarm", msg: `${dev.label}: cell under-voltage` });
+        push({ level: "alarm", category: "cell_under_voltage", device_label: dev.label,
+          lbl: `${dev.label}: cell under-voltage`, value: "" });
     }
     const temps = [];
     const tn = +l.temperature_sensor_count || 0;
@@ -2007,32 +2040,85 @@ function renderAlerts() {
       if (typeof t === "number") temps.push(t);
     }
     for (const t of temps) {
-      if (t >= 60) { alerts.push({ level: "alarm", msg: `${dev.label}: cell temp ${t.toFixed(0)} °C` }); break; }
-      if (t >= 50) { alerts.push({ level: "warn", msg: `${dev.label}: cell temp ${t.toFixed(0)} °C` }); break; }
+      if (t >= 60) { push({ level: "alarm", category: "cell_temp", device_label: dev.label,
+        lbl: `${dev.label}: cell temp`, value: `${t.toFixed(0)} °C` }); break; }
+      if (t >= 50) { push({ level: "warn", category: "cell_temp", device_label: dev.label,
+        lbl: `${dev.label}: cell temp`, value: `${t.toFixed(0)} °C` }); break; }
     }
   }
   // Controller temps
   for (const dev of devices.filter(d => d.kind === "charge_controller")) {
     const t = +dev.latest?.controller_temperature_c;
     if (typeof t === "number") {
-      if (t >= 70) alerts.push({ level: "alarm", msg: `${dev.label}: MPPT hot (${t.toFixed(0)} °C)` });
-      else if (t >= 60) alerts.push({ level: "warn", msg: `${dev.label}: MPPT warm (${t.toFixed(0)} °C)` });
+      if (t >= 70) push({ level: "alarm", category: "mppt_temp", device_label: dev.label,
+        lbl: `${dev.label}: MPPT hot`, value: `${t.toFixed(0)} °C` });
+      else if (t >= 60) push({ level: "warn", category: "mppt_temp", device_label: dev.label,
+        lbl: `${dev.label}: MPPT warm`, value: `${t.toFixed(0)} °C` });
     }
   }
 
-  if (alerts.length === 0) { host.hidden = true; return; }
-  host.hidden = false;
-  for (const a of alerts) {
-    const row = document.createElement("div");
-    row.className = `alert-row ${a.level}`;
-    row.innerHTML = `
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 2L2 21h20L12 2z"/>
-        <path d="M12 9v6M12 18h.01"/>
-      </svg>
-      <span>${a.msg}</span>`;
-    host.appendChild(row);
+  if (alerts.length === 0) {
+    host.hidden = true;
+    detail.hidden = true;
+    return;
   }
+
+  // Group same-category alerts that share the same value into a single
+  // row. e.g. two batteries at "cell drift 0.10 V" collapses into one
+  // row with both labels comma-joined. Categories without a value
+  // (over/under-voltage) also collapse if the device_label is the only
+  // differentiator. Items without device_label or with distinct values
+  // stay as-is.
+  const grouped = [];
+  const seen = new Map(); // key "<category>|<value>" → index in grouped
+  for (const a of alerts) {
+    if (!a.device_label) {
+      grouped.push({ ...a, devices: [] });
+      continue;
+    }
+    const key = `${a.category}|${a.value || ""}`;
+    if (seen.has(key)) {
+      const g = grouped[seen.get(key)];
+      g.devices.push(a.device_label);
+      // Severity escalates if any member is alarm.
+      if (a.level === "alarm") g.level = "alarm";
+    } else {
+      seen.set(key, grouped.length);
+      grouped.push({ ...a, devices: [a.device_label] });
+    }
+  }
+  // Rewrite grouped rows where devices.length > 1: replace the lbl
+  // (which was just one device's prefix) with category + device list.
+  for (const g of grouped) {
+    if (g.devices.length > 1) {
+      const cat = ALERT_CAT_LABELS[g.category] || g.category;
+      g.lbl = `${cat} · ${g.devices.join(", ")}`;
+    }
+  }
+
+  // Top-level severity: any alarm in the set flips the banner to crit.
+  const hasAlarm = grouped.some(g => g.level === "alarm");
+  host.classList.toggle("crit", hasAlarm);
+
+  // Summary text
+  cntEl.textContent = grouped.length === 1
+    ? "1 alert"
+    : `${grouped.length} alerts`;
+  const cats = [...new Set(grouped.map(g => ALERT_CAT_LABELS[g.category] || g.category))];
+  catsEl.textContent = cats.slice(0, 3).join(" · ")
+    + (cats.length > 3 ? ` · +${cats.length - 3}` : "");
+
+  // Detail rows — built once per render. The banner stays collapsed
+  // until the user taps the summary; collapse state is preserved
+  // across renders via the [aria-expanded] attribute on the summary.
+  detail.innerHTML = grouped.map(g => `
+    <div class="alerts-detail-row">
+      <span class="sev ${g.level === "alarm" ? "alarm" : ""}"></span>
+      <span class="lbl">${g.lbl}</span>
+      <span class="val">${g.value || ""}</span>
+    </div>`).join("");
+
+  host.hidden = false;
 }
 
 // ---------- cells ----------
@@ -4100,6 +4186,21 @@ async function refreshUpdateState() {
     set("#settings-update-checked", "never");
   }
 }
+
+// Alert banner expand/collapse — toggles the detail panel + the chevron
+// rotation via the `expanded` class on the host. We deliberately use
+// addEventListener (not the inline onclick from the wireframe) so the
+// handler survives DOM diffs in renderAlerts (which only rewrites the
+// summary text + detail innerHTML, never the summary button itself).
+document.getElementById("alerts-summary")?.addEventListener("click", () => {
+  const host   = document.getElementById("alerts");
+  const detail = document.getElementById("alerts-detail");
+  const btn    = document.getElementById("alerts-summary");
+  if (!host || !detail || !btn) return;
+  const open = host.classList.toggle("expanded");
+  detail.hidden = !open;
+  btn.setAttribute("aria-expanded", String(open));
+});
 
 document.getElementById("settings-update-now")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget;
