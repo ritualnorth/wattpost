@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.38] · 2026-05-21
+
+### Changed · appliance ships device snapshot in heartbeat extras
+
+Each heartbeat now includes a `devices` field listing up to 8
+devices the appliance is polling — name, vendor, kind, online
+flag, and one headline value (battery SoC, charger PV power,
+shunt current, etc.). Capped at ~400 bytes total to stay
+inside the 2 KiB extras budget.
+
+This powers the **Devices** section on the mobile per-site
+dashboard at `wattpost.cloud/app/site/{id}` so a Pro / Installer
+user opening the app sees their Renogy MPPT, JK BMS, and Victron
+shunt on one screen — without needing to open the appliance's
+own dashboard. Older appliances (≤0.1.37) keep working; the
+cloud simply hides the section when the field is absent.
+
 ## [0.1.37] · 2026-05-21
 
 ### Changed · appliance dashboard strips its chrome inside the WattPost mobile app
