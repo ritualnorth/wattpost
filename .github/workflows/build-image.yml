@@ -115,17 +115,15 @@ jobs:
           echo "checksum=$IMG.sha256" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$IMG")" >> "$GITHUB_OUTPUT"
 
-      # Always upload as a workflow artefact so manual runs have
-      # something to grab without going through the Releases UI.
-      - name: Upload as workflow artefact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wattpost-image
-          path: |
-            ${{ steps.locate.outputs.image }}
-            ${{ steps.locate.outputs.checksum }}
-          retention-days: 14
-          if-no-files-found: error
+      # NB: we used to upload-artifact the .img.xz here for manual-run
+      # convenience. Removed 2026-05-21 because (a) self-hosted runners
+      # made the SD images live on the runner's disk and ALSO get scp'd
+      # to releases.wattpost.io/img/ (the actual public distribution),
+      # so the GitHub copy was redundant; and (b) at ~570 MB per build
+      # × 14 d retention the cumulative artefact storage blew through
+      # the 2 GB free tier in ~3-4 builds. If you need the image on a
+      # manual test run, grab it from releases.wattpost.io/img/ — the
+      # scp step uploads it whether or not we're on a tag push.
 
       # On tag pushes only: attach to a GitHub Release. action-gh-release
       # creates the release if it doesn't exist, or appends to an
