@@ -1851,6 +1851,15 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   display: flex; flex-direction: column; gap: .8rem;
   min-width: 0;
 }
+.today-hero-block {
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.today-hero-k {
+  /* Caption above the big number — was unlabeled, leaving users
+     guessing "what's 940?". meta-k already gives the uppercase
+     micro-label aesthetic used in every other cell on the card. */
+  display: block;
+}
 .today-hero-val {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;

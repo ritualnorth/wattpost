@@ -44,7 +44,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=116" />
+  <link rel="stylesheet" href="/web/styles.css?v=117" />
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -269,7 +269,10 @@
         </div>
         <div class="today-grid">
           <div class="today-hero">
-            <div class="today-hero-val"><span id="today-pv">·</span></div>
+            <div class="today-hero-block">
+              <span class="meta-k today-hero-k" id="today-hero-k">Harvested today</span>
+              <div class="today-hero-val"><span id="today-pv">·</span></div>
+            </div>
             <div class="today-hero-cells">
               <div class="today-cell"><span class="meta-k">Charged</span><span class="today-v" id="today-charged">·</span></div>
               <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">·</span></div>
@@ -1078,6 +1081,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=179"></script>
+  <script src="/web/app.js?v=180"></script>
 </body>
 </html>

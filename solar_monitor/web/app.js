@@ -1865,6 +1865,8 @@ function renderToday() {
 
     if (sleep) {
       if (headline) headline.textContent = "Tomorrow";
+      const kEl = document.getElementById("today-hero-k");
+      if (kEl) kEl.textContent = "Forecast tomorrow";
       $("#today-pv").textContent = `${(s.tomorrowWh / 1000).toFixed(1)} kWh`;
       if (sub) {
         sub.textContent = s.tomorrowPeak
@@ -1879,6 +1881,8 @@ function renderToday() {
       drawTodaySpark(s.tomorrowPoints, null, spark);
     } else {
       if (headline) headline.textContent = "Today";
+      const kEl = document.getElementById("today-hero-k");
+      if (kEl) kEl.textContent = "Harvested today";
       if (sub) {
         if (s.todayWh > 0) {
           const expected  = (s.todayWh / 1000).toFixed(1);
