@@ -27,6 +27,15 @@ const config: CapacitorConfig = {
     androidScheme: 'https',
     iosScheme: 'https',
     cleartext: false,
+    // Keep all wattpost.cloud navigation inside the in-app WebView.
+    // Without this whitelist Capacitor sees the bootstrap's redirect
+    // to an external origin and punts to the system browser — which
+    // shipped the app straight to Chrome on first launch. The broker
+    // sub-domains (<slug>.wattpost.cloud) need the wildcard.
+    allowNavigation: [
+      'wattpost.cloud',
+      '*.wattpost.cloud',
+    ],
   },
   plugins: {
     SplashScreen: {
