@@ -44,7 +44,20 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=121" />
+  <link rel="stylesheet" href="/web/styles.css?v=122" />
+  <script>
+    // Detect the WattPost mobile shell (sets a UA marker via
+    // capacitor.config.ts.{ios,android}.appendUserAgent). When set,
+    // tag <body> so CSS can strip the appliance's own header — the
+    // mobile app's native tab bar + cloud-served wrapper already
+    // provide chrome; rendering ours again is "website in a frame"
+    // double chrome. Done inline before paint so there's no flash. #}
+    (function () {
+      if (/WattPostApp\//.test(navigator.userAgent)) {
+        document.documentElement.classList.add("in-wattpost-app");
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
@@ -1071,6 +1084,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=184"></script>
+  <script src="/web/app.js?v=185"></script>
 </body>
 </html>
