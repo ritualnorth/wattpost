@@ -12,12 +12,18 @@ const config: CapacitorConfig = {
     // Allow the app to load https://*.wattpost.cloud + wattpost.cloud
     // without HTTPS errors mid-handshake.
     limitsNavigationsToAppBoundDomains: false,
+    // Marker the cloud sniffs in User-Agent to strip the marketing
+    // chrome (topbar + footer) so /login + /app feel native instead
+    // of "the website inside a frame". Bumped in lock-step with the
+    // mobile-app/package.json version.
+    appendUserAgent: 'WattPostApp/0.1.0',
   },
   android: {
     backgroundColor: '#0d1117',
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
+    appendUserAgent: 'WattPostApp/0.1.0',
   },
   server: {
     // The native shell ships a bootstrap www/ that immediately hands
