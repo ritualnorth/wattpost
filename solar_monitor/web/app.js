@@ -1885,9 +1885,29 @@ function renderToday() {
       if (kEl) kEl.textContent = "Harvested today";
       if (sub) {
         if (s.todayWh > 0) {
+          // s.todayWh is the provider's full-day forecast at fetch
+          // time; s.todayRemainingWh is the from-this-moment-to-EOD
+          // portion. Earlier UX rendered both as
+          //   "Of X kWh expected · Y still to come"
+          // which read as a contradiction once Y == X (e.g. the
+          // forecast was refreshed at midnight + hasn't moved while
+          // the day passed). Show the actual harvested figure
+          // against the forecast instead, so users see the ratio
+          // they care about: "are we on track today?".
           const expected  = (s.todayWh / 1000).toFixed(1);
-          const remaining = (s.todayRemainingWh / 1000).toFixed(1);
-          sub.textContent = `Of ${expected} kWh expected · ${remaining} kWh still to come · ${provLabel}`;
+          const harvestWh = (todayAggregate && typeof todayAggregate.sources_today_wh === "number")
+            ? todayAggregate.sources_today_wh
+            : null;
+          if (harvestWh != null) {
+            const harvestStr = harvestWh >= 1000
+              ? `${(harvestWh / 1000).toFixed(1)} kWh`
+              : `${harvestWh.toFixed(0)} Wh`;
+            const pct = s.todayWh > 0
+              ? Math.round((harvestWh / s.todayWh) * 100) : 0;
+            sub.textContent = `Forecast ${expected} kWh · ${harvestStr} so far (${pct} %) · ${provLabel}`;
+          } else {
+            sub.textContent = `Forecast ${expected} kWh today · ${provLabel}`;
+          }
         } else {
           sub.textContent = `${provLabel} · refreshed ${fmt.ago(f.fetched_at)}`;
         }
