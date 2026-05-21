@@ -81,6 +81,29 @@ async function registerForPushAndGetToken() {
   });
 }
 
+// If the user opened the app by tapping a push notification, the
+// Capacitor PushNotifications plugin queues a tap event that fires
+// shortly after a listener is registered. We catch it here and
+// override the default /app redirect with the URL the cloud baked
+// into the FCM data block (e.g. /app/sites/12 for a per-site alert).
+function setupTapNavigationListener(base) {
+  const PN = window.Capacitor?.Plugins?.PushNotifications;
+  if (!PN) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    PN.addListener('pushNotificationActionPerformed', (event) => {
+      const url = event && event.notification && event.notification.data && event.notification.data.url;
+      if (url && typeof url === 'string') {
+        // Same-origin path → prepend base; absolute → use as-is.
+        const target = url.startsWith('http') ? url : `${base}${url}`;
+        resolve(target);
+      }
+    });
+    // No-tap path resolves null after a short window; the bootstrap's
+    // regular redirect runs.
+    setTimeout(() => resolve(null), 250);
+  });
+}
+
 async function go() {
   try {
     // Push the WebView below the system status bar. Without this,
@@ -102,20 +125,28 @@ async function go() {
     const base = await pickBaseUrl();
     msg.textContent = 'Loading WattPost…';
 
-    // Wait briefly for the FCM token so we can attach it to the URL.
-    // Cap the wait so users don't stare at the splash too long.
-    const token = await Promise.race([
-      tokenPromise,
-      new Promise((r) => setTimeout(() => r(null), 3000)),
+    // If launched from a tap, snag the deep-link URL.
+    const tapTargetPromise = setupTapNavigationListener(base);
+
+    // Wait briefly for the FCM token AND any pending tap-navigation.
+    const [token, tapTarget] = await Promise.all([
+      Promise.race([
+        tokenPromise,
+        new Promise((r) => setTimeout(() => r(null), 3000)),
+      ]),
+      tapTargetPromise,
     ]);
     const platform = (window.Capacitor && window.Capacitor.getPlatform &&
                       window.Capacitor.getPlatform()) || 'web';
 
-    // Hand off to the cloud /app entry. The cloud renders sign-in or
-    // the multi-site picker depending on session state.
+    // Build the redirect. Default is /app; if the user tapped a push,
+    // route them straight to the URL the cloud baked into the payload.
     const params = new URLSearchParams({ from: 'mobile', platform });
     if (token) params.set('fcm', token);
-    const target = `${base}/app?${params.toString()}`;
+    const sep = (tapTarget && tapTarget.includes('?')) ? '&' : '?';
+    const target = tapTarget
+      ? `${tapTarget}${sep}${params.toString()}`
+      : `${base}/app?${params.toString()}`;
     setTimeout(() => { window.location.replace(target); }, 200);
   } catch (e) {
     msg.classList.add('err');
