@@ -211,18 +211,14 @@ fi
 # their notes/password-manager forever, even though they'll never
 # need it — pure friction.
 
-# ----- sudoers fragment for Tailscale -----
-# Settings → Network needs to run `tailscale up / logout / serve` from
-# the daemon (which runs as the wattpost system user). Without this,
-# the Connect / Disconnect / HTTPS-serve buttons would all 500 with a
-# permission error. Limited to the three exact subcommands, so the
+# ----- sudoers fragment for the update + rollback helpers -----
+# The dashboard's "Update now" button + the OnFailure rollback unit
+# both need to invoke root-owned helpers from the unprivileged
+# wattpost daemon. Limited to two fixed scripts (no args) so the
 # escalation surface stays tight.
-step "granting wattpost user sudo access for tailscale + update helper"
+step "granting wattpost user sudo access for the update helper"
 SUDOERS_FILE="/etc/sudoers.d/wattpost"
 cat > "${SUDOERS_FILE}.tmp" <<'SUDO'
-# Allow the wattpost daemon to manage its Tailscale connection from
-# the dashboard's Settings → Network block.
-wattpost ALL=(root) NOPASSWD: /usr/bin/tailscale up *, /usr/bin/tailscale logout, /usr/bin/tailscale serve *
 # Allow the wattpost daemon to fire the in-place upgrade helper from
 # the dashboard's "Update now" button (and from wattpost-config). The
 # helper itself is a fixed, trusted script — locked to no args so the
@@ -238,8 +234,11 @@ if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
     install -m 0440 "${SUDOERS_FILE}.tmp" "${SUDOERS_FILE}"
 fi
 rm -f "${SUDOERS_FILE}.tmp"
-# Clean up the old filename so we don't end up with two sudoers
-# entries for the same user after upgrade.
+# Tear down the old Tailscale sudoers fragment unconditionally — it
+# pre-dated the merged /etc/sudoers.d/wattpost file above and shipped
+# on every install up through v0.1.33. Removing it on each run of
+# install.sh is the migration path for existing appliances (which
+# the auto-updater re-runs anyway).
 rm -f /etc/sudoers.d/wattpost-tailscale
 
 # Install the update helper. Root-owned, world-readable, world-

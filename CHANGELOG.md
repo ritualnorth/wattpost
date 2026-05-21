@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.34] · 2026-05-21
+
+### Removed · Tailscale integration
+
+Remote access via WattPost now goes through `wattpost.cloud` (pair
+your appliance, then use the cloud broker URL). The in-app
+Tailscale wiring — Settings → Network panel, install.sh sudoers
+fragment, /api/system/tailscale/* endpoints, MOTD URL — is all
+gone in this release.
+
+If you were using Tailscale as your remote-access path, you have
+two choices:
+1. **Pair with wattpost.cloud** (recommended — handles HTTPS,
+   auth, no port-forwarding). Free Hobby tier covers one site.
+   See docs/remote-access.md.
+2. **Run Tailscale yourself** — `curl -fsSL https://tailscale.com/install.sh | sh`
+   on the appliance host, then `sudo tailscale up`. The WattPost
+   daemon no longer manages it but doesn't conflict with it
+   either.
+
+The `/etc/sudoers.d/wattpost-tailscale` fragment is removed on
+the next `install.sh` run (which the auto-updater does anyway).
+
 ## [0.1.33] · 2026-05-21
 
 ### Fixed · phantom PV credit at sunrise

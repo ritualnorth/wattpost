@@ -6,8 +6,9 @@ re-deriving every decision.
 
 ## Product goals (shapes everything below)
 
-1. **Local-first.** Works without internet. Optional Tailscale for
-   remote. No cloud requirement, ever.
+1. **Local-first.** Works without internet. Optional pairing with
+   wattpost.cloud unlocks remote access; the cloud is additive and
+   not required for normal operation.
 2. **Multi-vendor.** Renogy, Victron, JK-BMS, Daly, plus future BMSes
    and shunts. Adding a vendor is a folder drop, not a refactor.
 3. **Pi-hole UX.** SD-card image, web admin on the LAN, no mobile app

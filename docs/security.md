@@ -19,21 +19,14 @@ real cert.
 
 ## Removing the warning
 
-Three ways, in order of difficulty:
+Two ways, in order of difficulty:
 
-1. **Tailscale Serve** (recommended).
-   Once your tailnet is up, Settings → Network → **Enable HTTPS via
-   Tailscale Serve**. Tailscale auto-provisions a Let's Encrypt cert
-   for `*.<your-tailnet>.ts.net`. From there, open
-   `https://wattpost.<your-tailnet>.ts.net/`. Green padlock, no
-   warning, no install. Works both at home and remotely.
+1. **Pair with wattpost.cloud** (recommended).
+   The cloud broker gives you `https://yourname.wattpost.cloud/` with
+   a real Let's Encrypt cert maintained by us. Free Hobby tier covers
+   one site. See [Remote access](/docs/remote-access) for pairing.
 
-2. **WattPost cloud**.
-   Managed remote access at `https://<slug>.wattpost.io/` via
-   Cloudflare Tunnel. Real cert maintained by us. From £3/mo ·
-   see [Remote access](/docs/remote-access).
-
-3. **Browser exceptions**.
+2. **Browser exceptions**.
    If you'd rather keep using `http://<pi-ip>:8000`, every browser
    lets you dismiss / hide the warning permanently for a known
    address. iOS Safari hides it from the URL bar by default once
@@ -47,3 +40,30 @@ Three ways, in order of difficulty:
 - **A real cert for an internal IP / `.local` hostname**. Doesn't
   exist. Let's Encrypt and the public CAs only issue for public
   DNS names.
+
+## How the cloud broker authenticates requests
+
+Once you pair, requests to `https://yourname.wattpost.cloud/` are
+proxied through our broker before they hit your appliance's tunnel.
+The broker enforces:
+
+- **HMAC-signed request headers.** Every browser request carries a
+  short-lived `X-WP-Broker-Auth` header signed against a per-site
+  secret. Replay window is tight (seconds, not minutes), and the
+  scope tag (`user` vs `kiosk`) is part of what's signed — so an
+  attacker who scrapes a kiosk header can't strip the tag and
+  promote it to full access.
+- **`owner_id` check.** The broker verifies the logged-in cloud
+  user owns this appliance before forwarding any request. A leaked
+  pairing code or stolen tunnel URL doesn't grant access on its own.
+- **Kiosk shares are read-only.** A `wattpost.cloud/k/<token>` URL
+  is scoped to a fixed allow-list of GET endpoints — they can never
+  POST to `/api/system/restart`, `/api/devices`, or anything that
+  writes config. The token exchanges for a short cookie on first
+  load and never appears in subsequent URLs (so it doesn't end up
+  in your browser history / server logs).
+
+If you'd rather skip the broker entirely, the appliance still binds
+`0.0.0.0:<port>` on your LAN — put it behind your own VPN / reverse
+proxy. See [Remote access](/docs/remote-access) for the unsupported
+options.

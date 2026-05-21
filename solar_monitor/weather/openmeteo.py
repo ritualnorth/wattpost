@@ -151,7 +151,7 @@ def _parse_iso(s):
         # share a timezone, treating the timestamp as if it were UTC.
         # The dashboard re-renders with `Date(ts * 1000)` which then
         # applies the *browser's* timezone — so anyone viewing this
-        # over a Tailnet from another timezone sees the local sunrise
+        # over a VPN from another timezone sees the local sunrise
         # of where the appliance sits.
         dt = datetime.fromisoformat(s)
         if dt.tzinfo is None:
