@@ -19,7 +19,9 @@ android/app/release/
 android/local.properties
 android/.idea/
 android/captures/
-android/gradle/wrapper/gradle-wrapper.jar
+# gradle-wrapper.jar IS committed — without it `./gradlew` can't
+# bootstrap on a fresh clone. ~50 KB, version-pinned to gradle/wrapper/
+# gradle-wrapper.properties.
 
 # Capacitor sync targets www/ when cap sync runs. Source of truth lives
 # in this repo's www/, but the iOS/Android projects also keep a copy

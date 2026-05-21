@@ -71,21 +71,43 @@ npx cap open ios   # opens Xcode
 #    AppIcon asset catalog or `npx cordova-res ios` to generate sizes)
 ```
 
-### Android — requires Java 17+ + Android SDK 34+
+### Android — DONE on the dev laptop (2026-05-21)
+
+The Android target is scaffolded and builds a working debug APK on
+this dev laptop (192.168.1.13, Ubuntu 24.04). Toolchain installed
+under `~/Android/Sdk`; env vars persisted in `~/.bashrc`.
+Requirements: OpenJDK 21 + Android SDK cmdline-tools + platforms;android-34
++ build-tools;34.0.0. Capacitor 8 needs JDK 21 (not 17).
+
+Build the debug APK:
 
 ```bash
-# On any Linux/Mac with Android SDK installed:
-cd mobile-app
-npm install
-npx cap add android
-npx cap sync android
-npx cap open android  # opens Android Studio
-
-# In android/app/build.gradle:
-# - applicationId "io.wattpost.app"
-# - minSdkVersion 24, targetSdkVersion 34
-# Configure firebase-messaging for FCM push.
+cd /home/user/solar-monitor/mobile-app
+npm run sync                        # cap sync + copies www/ in
+cd android
+./gradlew assembleDebug
+# Output: android/app/build/outputs/apk/debug/app-debug.apk (~5.6 MB)
 ```
+
+Sideload to a real device for testing:
+
+```bash
+adb devices                         # device must show as authorised
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+For a signed release APK (Play Store), generate a keystore + add
+to `android/app/build.gradle`:
+
+```bash
+keytool -genkey -v -keystore ~/wattpost-release.keystore \
+  -alias wattpost -keyalg RSA -keysize 2048 -validity 10000
+./gradlew bundleRelease
+# Output: android/app/build/outputs/bundle/release/app-release.aab
+```
+
+Configure firebase-messaging for FCM push when the Firebase project
+lands (separate setup, see below).
 
 ## Push notifications
 
