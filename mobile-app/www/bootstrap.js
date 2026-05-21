@@ -31,6 +31,40 @@ async function pickBaseUrl() {
   return ENV.prod;
 }
 
+// Register for push notifications on the LOCAL Capacitor origin
+// before redirecting to wattpost.cloud. The cloud page can't reach
+// the PushNotifications plugin (cross-origin webview limitation —
+// Capacitor.Plugins proxy isn't initialised on external origins),
+// so we register here, wait for the FCM token, then pass it forward
+// as a URL param. The cloud reads ?fcm= on /app and POSTs to
+// /api/account/push/mobile/register once authenticated.
+//
+// Times out after 4 s — if the device can't reach FCM (no Play
+// services, no network, etc.) we still let the user into the app;
+// push just won't work this session.
+async function registerForPushAndGetToken() {
+  const PN = window.Capacitor?.Plugins?.PushNotifications;
+  if (!PN) return null;
+  try {
+    const perm = await PN.requestPermissions();
+    if (perm.receive !== 'granted') return null;
+    await PN.register();
+  } catch (e) {
+    console.warn('bootstrap push: register call failed', e);
+    return null;
+  }
+  return new Promise((resolve) => {
+    let done = false;
+    const settle = (v) => { if (!done) { done = true; resolve(v); } };
+    PN.addListener('registration', (t) => settle(t && t.value || null));
+    PN.addListener('registrationError', (e) => {
+      console.warn('bootstrap push: registrationError', e);
+      settle(null);
+    });
+    setTimeout(() => settle(null), 4000);
+  });
+}
+
 async function go() {
   try {
     // Push the WebView below the system status bar. Without this,
@@ -44,13 +78,28 @@ async function go() {
       }
     } catch (e) { /* PWA path / pre-init — ignore */ }
 
+    // Kick off push registration in parallel with everything else.
+    // We don't block the redirect on it — if the token arrives in
+    // time, we pass it through; if not, the next launch picks it up.
+    const tokenPromise = registerForPushAndGetToken();
+
     const base = await pickBaseUrl();
+    msg.textContent = 'Loading WattPost…';
+
+    // Wait briefly for the FCM token so we can attach it to the URL.
+    // Cap the wait so users don't stare at the splash too long.
+    const token = await Promise.race([
+      tokenPromise,
+      new Promise((r) => setTimeout(() => r(null), 3000)),
+    ]);
+    const platform = (window.Capacitor && window.Capacitor.getPlatform &&
+                      window.Capacitor.getPlatform()) || 'web';
+
     // Hand off to the cloud /app entry. The cloud renders sign-in or
     // the multi-site picker depending on session state.
-    const target = `${base}/app?from=mobile`;
-    msg.textContent = 'Loading WattPost…';
-    // Small delay so the splash has time to fade — feels less janky
-    // than an instantaneous redirect.
+    const params = new URLSearchParams({ from: 'mobile', platform });
+    if (token) params.set('fcm', token);
+    const target = `${base}/app?${params.toString()}`;
     setTimeout(() => { window.location.replace(target); }, 200);
   } catch (e) {
     msg.classList.add('err');
