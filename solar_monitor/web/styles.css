@@ -647,6 +647,17 @@ main {
 .donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.55); }
 .donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
 .donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.65); animation-duration: 900ms; }
+/* Decouple the leading-edge dot + halo colour from the arc colour
+   when there's a non-trivial flow. The arc still reflects SoC
+   severity; the head reflects flow direction. The visible case
+   this unlocks is "critical SoC, but charging" — red arc + green
+   pulsing head, telegraphing recovery without losing the "we're
+   low" message. Applied only when |netW| > 5 W; the holding band
+   keeps its neutral blue head. */
+.donut-state.donut-head-flow-up   .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.donut-head-flow-up   .donut-head-glow { fill: rgba(86,211,100,0.55); }
+.donut-state.donut-head-flow-down .donut-head      { fill: #f0c849; stroke: #ffffff; }
+.donut-state.donut-head-flow-down .donut-head-glow { fill: rgba(240,200,73,0.55); }
 @keyframes donut-head-pulse {
   0%   { transform: scale(1);   opacity: 0.7; }
   60%  { transform: scale(2.2); opacity: 0;   }

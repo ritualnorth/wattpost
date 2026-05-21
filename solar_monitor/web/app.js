@@ -879,9 +879,20 @@ function renderHero() {
   else if (Math.abs(bank.netW) < 5) donutState = "holding";
   else if (bank.netW > 0) donutState = "charging";
   else donutState = "discharging";
+  // Flow-direction modifier — drives the leading-edge dot + halo
+  // colour independently of the arc colour. Only applied when the
+  // bank has >5 W of net flow (the "holding" band keeps its neutral
+  // blue head). The visible case this unlocks: critical SoC + net
+  // charging shows a red arc with a GREEN pulsing head, telegraphing
+  // recovery without losing the "we're low" message on the arc.
+  let headFlow = null;
+  if (bank.netW > 5)       headFlow = "donut-head-flow-up";
+  else if (bank.netW < -5) headFlow = "donut-head-flow-down";
   document.querySelectorAll(".donut-state").forEach(el => {
-    el.classList.remove("charging", "discharging", "holding", "critical", "idle");
+    el.classList.remove("charging", "discharging", "holding", "critical", "idle",
+                        "donut-head-flow-up", "donut-head-flow-down");
     el.classList.add(donutState);
+    if (headFlow) el.classList.add(headFlow);
     positionDonutHead(el, pct);
   });
   // The flow pill colors still hook off the legacy charging/discharging/

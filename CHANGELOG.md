@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.35] · 2026-05-21
+
+### Changed · donut head telegraphs flow direction
+
+The leading-edge dot + pulsing halo on the SoC donut now reflect
+*flow direction* instead of inheriting the arc's SoC-severity
+colour. The arc still reads SoC: green / blue / amber / red
+across charging / holding / discharging / critical bands. But the
+head dot independently shows whether the bank is charging (green
+pulse) or discharging (amber pulse).
+
+The visible case this unlocks: a bank at 11 % SoC that's actively
+charging shows a red ring (still low — don't sugarcoat it) with a
+green pulsing head (we're recovering). Before this change the
+head was red too, masking the recovery signal.
+
+Applied only when |netW| > 5 W. The "holding" band keeps its
+neutral blue head so a near-zero net flow doesn't flicker between
+green and amber.
+
 ## [0.1.34] · 2026-05-21
 
 ### Removed · Tailscale integration
