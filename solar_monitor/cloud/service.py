@@ -623,6 +623,56 @@ class CloudService:
                             break
                 except Exception:
                     pass
+
+                # Per-device snapshot for the mobile per-site dashboard
+                # (#238). One concise row per device — name, vendor,
+                # kind, online flag, headline value. Capped at 8
+                # devices and ~400 bytes total to stay inside the
+                # 2 KiB extras budget. Headline value differs by kind:
+                # battery → SoC%, charger → power, shunt → current,
+                # etc.  Falls back to the first metric we can render.
+                try:
+                    devs_payload: list[dict[str, Any]] = []
+                    now_ts = int(time.time())
+                    for label, dev in latest_for_extras.items():
+                        if not isinstance(dev, dict):
+                            continue
+                        kind = str(dev.get("_kind") or "").lower()
+                        vendor = str(dev.get("_vendor") or "")
+                        last_seen = int(dev.get("_last_seen") or 0)
+                        # "Online" if the device last reported within
+                        # 3× the poll cadence — generous enough to
+                        # avoid false offlines on BLE re-scan, tight
+                        # enough that a truly-silent device shows.
+                        online = (now_ts - last_seen) < 600
+                        headline: dict[str, Any] | None = None
+                        # Order matters — first match wins.  Battery
+                        # SoC trumps everything; chargers report power;
+                        # shunts pick current.  Falls through to bus
+                        # voltage as a last resort.
+                        if "soc_pct" in dev and isinstance(dev["soc_pct"], (int, float)):
+                            headline = {"k": "SoC", "v": round(float(dev["soc_pct"]), 1), "u": "%"}
+                        elif "pv_power_w" in dev and isinstance(dev["pv_power_w"], (int, float)):
+                            headline = {"k": "PV", "v": round(float(dev["pv_power_w"])), "u": "W"}
+                        elif "output_power_w" in dev and isinstance(dev["output_power_w"], (int, float)):
+                            headline = {"k": "Power", "v": round(float(dev["output_power_w"])), "u": "W"}
+                        elif "ac_input_power_w" in dev and isinstance(dev["ac_input_power_w"], (int, float)):
+                            headline = {"k": "AC in", "v": round(float(dev["ac_input_power_w"])), "u": "W"}
+                        elif "current_a" in dev and isinstance(dev["current_a"], (int, float)):
+                            headline = {"k": "Current", "v": round(float(dev["current_a"]), 1), "u": "A"}
+                        elif "battery_voltage_v" in dev and isinstance(dev["battery_voltage_v"], (int, float)):
+                            headline = {"k": "Voltage", "v": round(float(dev["battery_voltage_v"]), 2), "u": "V"}
+                        devs_payload.append({
+                            "name":   str(label)[:32],
+                            "kind":   kind[:16],
+                            "vendor": vendor[:16],
+                            "online": online,
+                            "h":      headline,
+                        })
+                    if devs_payload:
+                        extras["devices"] = devs_payload[:8]
+                except Exception:
+                    log.exception("cloud heartbeat: devices snapshot failed")
         except Exception:
             log.warning("cloud heartbeat: today_aggregate read failed",
                         exc_info=True)
