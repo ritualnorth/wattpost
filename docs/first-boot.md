@@ -7,16 +7,19 @@ Power on a freshly-flashed WattPost Pi and a lot happens in the first 30 seconds
 SSH in (`ssh wattpost@wattpost.local`, default password `wattpost`. Change it!) and you'll see:
 
 ```
-  WattPost v0.0.1    uptime: 1m
+  WattPost v0.1.34    uptime: 1m
 
   Dashboard:  http://wattpost.local
   Daemon:     ● running
-  Cloud:      ─
+  Cloud:      not paired (pair at https://wattpost.cloud/app/pair)
   Tunnel:     ─
-  Tailscale:  ─
 
   Type wattpost-config for the setup menu.
 ```
+
+Pair with **[wattpost.cloud](https://wattpost.cloud/app/pair)** if you
+want to reach the dashboard from outside your LAN — see
+[Remote access](remote-access.md) for the full pairing walk-through.
 
 Everything you need to find the dashboard. Type `wattpost-config` for the interactive setup menu. Change web port, reset web password, check daemon status, view live logs, pair / unpair from cloud, check for updates.
 

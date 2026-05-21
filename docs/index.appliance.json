@@ -18,7 +18,7 @@
     { "slug": "forecast",        "title": "PV forecast (Solcast)",          "section": "Integrations" },
     { "slug": "weather",         "title": "Current weather (Open-Meteo)",   "section": "Integrations" },
     { "slug": "integrations",    "title": "Home Assistant, Grafana, MQTT",  "section": "Integrations" },
-    { "slug": "remote-access",   "title": "Remote access (Tailscale)",      "section": "Integrations" },
+    { "slug": "remote-access",   "title": "Remote access (wattpost.cloud)", "section": "Integrations" },
 
     { "slug": "local-password",  "title": "Local web password",       "section": "Security" },
     { "slug": "security",        "title": "About the \"Not Secure\" warning", "section": "Security" },

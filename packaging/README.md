@@ -80,16 +80,8 @@ up on a manually-installed Pi.
 | `wattpost` daemon       | pip: `install.sh` does `pip install -e ${WATTPOST_SOURCE}` into `/opt/wattpost/venv` | The appliance itself |
 | `wattpost.service`      | `install.sh` drops a unit at `/etc/systemd/system/wattpost.service` | systemd lifecycle |
 | `/etc/wattpost/config.yaml` | Seeded from `config.example.yaml` (only on fresh install — re-runs preserve) | User config |
-| `/etc/sudoers.d/wattpost-tailscale` | `install.sh` | Lets the daemon call `tailscale up/logout/serve` without a password — only those three subcommands |
+| `/etc/sudoers.d/wattpost` | `install.sh` | Lets the daemon call `/usr/local/bin/wattpost-update` and `/usr/local/bin/wattpost-rollback` without a password — only those two fixed scripts |
 | `wattpost` system user (in the `bluetooth` group) | `install.sh` | Hardened systemd unit runs as this user, not root |
-
-### Deferred — *not* yet in the image (manual install per-customer):
-
-- **Tailscale** — required for Settings → Network → Connect to do
-  anything. Most users won't use it (cloud tunnel via wattpost.io
-  is the canonical remote-access path). When a user does want it,
-  `curl -fsSL https://tailscale.com/install.sh | sh` from a serial
-  console is the documented step.
 
 ### Re-deriving this list
 
