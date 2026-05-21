@@ -48,6 +48,22 @@ async function registerForPushAndGetToken() {
   try {
     const perm = await PN.requestPermissions();
     if (perm.receive !== 'granted') return null;
+    // Create our "alerts" channel so the cloud's FCM payload
+    // (which sets channel_id="alerts") can land on a HIGH-importance
+    // channel instead of FCM's lowercased fallback. No-op on iOS.
+    try {
+      if (window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'android') {
+        await PN.createChannel({
+          id: 'alerts',
+          name: 'Alerts',
+          description: 'Battery, charger, and device alerts',
+          importance: 5,    // HIGH — heads-up banner + sound
+          visibility: 1,    // PUBLIC — show on lockscreen
+          lights: true,
+          vibration: true,
+        });
+      }
+    } catch (e) { console.warn('bootstrap push: createChannel failed', e); }
     await PN.register();
   } catch (e) {
     console.warn('bootstrap push: register call failed', e);
