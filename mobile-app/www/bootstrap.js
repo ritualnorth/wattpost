@@ -33,6 +33,17 @@ async function pickBaseUrl() {
 
 async function go() {
   try {
+    // Push the WebView below the system status bar. Without this,
+    // Android draws the WebView edge-to-edge AND we hit a quirk
+    // where env(safe-area-inset-top) reports 0, so even with our
+    // CSS fix the topbar overlaps the clock/battery icons.
+    // Setting overlay=false makes the status bar its own region.
+    try {
+      if (window.Capacitor?.Plugins?.StatusBar) {
+        await window.Capacitor.Plugins.StatusBar.setOverlaysWebView({ overlay: false });
+      }
+    } catch (e) { /* PWA path / pre-init — ignore */ }
+
     const base = await pickBaseUrl();
     // Hand off to the cloud /app entry. The cloud renders sign-in or
     // the multi-site picker depending on session state.
