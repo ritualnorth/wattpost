@@ -27,17 +27,49 @@ inside the WebView — zero duplication.
 └─────────────────────────────────────────────────────┘
 ```
 
-## v1 scope
+## v1 scope (shipping state, 2026-05-21)
 
-- Sign in via cloud's existing email/password (Hobby users get the upgrade-gate screen).
-- Multi-site picker → per-site broker dashboard, identical to PWA.
-- APNs/FCM push for `Alerts` — fires off the existing VAPID infra in cloud.
-- Account screen: minimal (signed-in email, manage-account link to Safari, sign out).
-- App icon + splash from `www/assets/icon.svg` + `www/assets/splash.svg`.
+- ✅ **Sign in** — app-native form (no marketing chrome). Auth via existing cloud session cookie.
+- ✅ **Sites tab** — row card per appliance, tappable to broker URL.
+- ✅ **Empty state** — branded ⚡ hero card + Pair-an-appliance CTA when zero appliances.
+- ✅ **Alerts tab** — severity-stripe row cards, friendly 🔔 empty state, unread badge on tab bar.
+- ✅ **Account tab** — Apple-safe minimal: signed-in email, Docs, Email support, Privacy, Terms,
+   Sign out, version. No pricing visible (anti-steering compliant).
+- ✅ **Bottom tab bar** — Sites / Alerts / Account, active state, safe-area-inset-bottom.
+- ✅ **Per-site dashboard** (broker page) — appliance v0.1.37+ strips its own chrome inside the
+   WattPost shell.
+- ✅ **FCM push** — bootstrap registers, token passes to cloud via URL, cloud dispatches via
+   FCM v1 API → emulator receives notifications with HIGH-importance `alerts` channel.
+- ✅ **Tap deep-link** — tapping a push opens the app to the URL the cloud baked into the payload.
+- ✅ **Branded icon + splash** — generated from www/assets/icon.svg via @capacitor/assets.
 
-Out of scope for v1: native dashboard reimplementation, BLE pairing on phone,
-Watch / CarPlay / widgets. See `~/.claude/projects/-home-james-solar-monitor/memory/project_wattpost_mobile_app.md`
+Out of scope for v1: native dashboard reimplementation, BLE pairing on phone, Watch / CarPlay /
+widgets. See `~/.claude/projects/-home-james-solar-monitor/memory/project_wattpost_mobile_app.md`
 for the full scope decision log.
+
+## Shipping checklist (Play Store · still pending)
+
+| Item | Status |
+|---|---|
+| Debug APK builds + installs + runs | ✅ |
+| FCM end-to-end push working | ✅ |
+| Branded launcher + splash | ✅ |
+| Google Play Developer Console signup ($25 one-off) | ⏳ Needs Ritual North |
+| Upload keystore (generate inside Play Console at signup) | ⏳ |
+| Release AAB build with signed upload key | ⏳ (one `./gradlew bundleRelease` once keystore exists) |
+| Store listing copy + screenshots | ⏳ Screenshots can come from the mobile-app-mockups |
+| Privacy policy URL | ✅ wattpost.io/privacy |
+
+## iOS
+
+No Xcode on the dev laptop (Linux). Three paths when you want iOS:
+
+1. **GitHub Actions macOS runners** (~£5/yr at our cadence) — best for one-shot builds.
+2. **Cloud Mac rental** (MacStadium / MacInCloud) — £50-80/mo for interactive debugging.
+3. **Mac mini purchase** — £600 one-off, pays back vs cloud at ~10 months.
+
+The Capacitor iOS target add (`npx cap add ios`) needs ~10 min on a real Mac with Xcode +
+CocoaPods. Codepath-wise everything else is identical to Android.
 
 ## Local development (web bootstrap only)
 
