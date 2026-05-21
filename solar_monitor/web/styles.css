@@ -289,7 +289,12 @@ body.is-demo #settings-update-apply { display: none !important; }
   top: 0;
   z-index: 10;
   display: flex;
-  justify-content: space-between;
+  /* Brand pushes right via margin-right:auto on .brand below — gives
+     us a left-aligned brand with status + help-btn clustered on the
+     right. Previously this was space-between, which left the Healthy
+     pill floating in the middle once the help-btn was added (3
+     children with space-between = one in each third of the header). */
+  gap: .5rem;
   align-items: center;
   padding: 0.9rem 1.5rem;
   border-bottom: 1px solid var(--border);
@@ -297,7 +302,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-.brand { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.brand { display: flex; align-items: center; gap: .5rem; min-width: 0; margin-right: auto; }
 .brand .logo { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
 .brand .title {
   font-weight: 600;
