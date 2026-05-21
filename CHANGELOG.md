@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.36] · 2026-05-21
+
+### Fixed · appliance dashboard respects device safe-area insets
+
+The `.app-header` topbar padding now uses
+`max(design-floor, env(safe-area-inset-*))` on all four sides so
+the system status bar / display cutout no longer draws on top of
+the brand + Healthy pill + help button when the dashboard
+renders inside the Capacitor WebView (or any other mobile shell
+that opts into edge-to-edge layout). Desktop browsers see no
+change — `env()` resolves to 0.
+
+Caught during the first WattPost mobile-app emulator test.
+
 ## [0.1.35] · 2026-05-21
 
 ### Changed · donut head telegraphs flow direction

@@ -296,7 +296,15 @@ body.is-demo #settings-update-apply { display: none !important; }
      children with space-between = one in each third of the header). */
   gap: .5rem;
   align-items: center;
-  padding: 0.9rem 1.5rem;
+  /* Top + side padding scale with the device safe area so the
+     OS status bar / display cutout don't draw on top of brand /
+     health pill / help-btn when this page renders inside the
+     Capacitor WebView. env() returns 0 in desktop browsers. */
+  padding:
+    max(0.9rem, env(safe-area-inset-top))
+    max(1.5rem, env(safe-area-inset-right))
+    0.9rem
+    max(1.5rem, env(safe-area-inset-left));
   border-bottom: 1px solid var(--border);
   background: var(--header-bg);
   backdrop-filter: blur(12px);
