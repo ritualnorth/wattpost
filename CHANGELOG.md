@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.58] · 2026-05-22
+
+### Added · Heartbeat ships local alert rules to cloud (#261 slice 1A)
+
+The appliance now includes a `local_alert_rules` array in heartbeat
+extras — full snapshot of currently-configured rules with metric,
+op, threshold, severity, cooldown, transports, and last-fired
+timestamp. Step 1 of the rules-unification work: the cloud Rules
+page will surface these as read-only rows with a "Runs locally"
+chip in the next cloud deploy, then editing-from-cloud and
+push-down via the appliance command queue follows. No user-visible
+change in this release on its own — the cloud ingest path needs
+to be deployed alongside.
+
 ## [0.1.57] · 2026-05-22
 
 ### Fixed · History chart legends came back
