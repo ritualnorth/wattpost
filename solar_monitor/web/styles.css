@@ -912,10 +912,14 @@ main {
 
 /* ---------------- power flow strip ---------------- */
 .flow {
+  /* v2: SVG (perimeter nodes + animated particles) stacked above the
+   * battery card. Was flex-row in v1 (sources / connector / battery
+   * tile / connector / loads); the v2 redesign replaces all of that
+   * with a single SVG + a slim card. */
   display: flex;
+  flex-direction: column;
   align-items: stretch;
-  gap: .5rem;
-  flex-wrap: wrap;
+  gap: 0;
 }
 .flow-col {
   display: flex; flex-direction: column;
@@ -1399,6 +1403,123 @@ main {
 .donut-state.charging    .flow-donut-arrow { color: var(--green); }
 .donut-state.discharging .flow-donut-arrow { color: var(--amber); }
 .donut-state.critical    .flow-donut-arrow { color: var(--red); }
+
+/* ───── v2 SVG flow diagram (Powerwall-style) ─────
+   Replaces the old flow-col / flow-conn layout. Sources/loads arc
+   around a notional bus point; particles travel along bezier paths.
+   Battery lives in `.bat-card` below the SVG (not inside it) when
+   the bank flow is small; only joins the diagram when it carries
+   ≥10 W. */
+.flow-svg-v2 {
+  width: 100%;
+  height: auto;
+  max-height: 290px;
+  display: block;
+  margin: -0.25rem auto 0;
+}
+.flow-svg-v2 .flow-conn-v2          { fill: none; stroke: var(--border); stroke-width: 1.4; }
+.flow-svg-v2 .flow-conn-v2.active   { stroke: var(--text-3); }
+.flow-svg-v2 .flow-node-ring        { fill: var(--surface); stroke-width: 1.6; }
+.flow-svg-v2 .flow-node-ring.pv     { stroke: var(--pv,    #f0c849); }
+.flow-svg-v2 .flow-node-ring.batt   { stroke: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-node-ring.load   { stroke: var(--load,  #58a6ff); }
+.flow-svg-v2 .flow-node-ring.grid,
+.flow-svg-v2 .flow-node-ring.ac     { stroke: var(--grid,  #b1b9c2); }
+.flow-svg-v2 .flow-node-ring.dc     { stroke: var(--dc,    #d29922); }
+.flow-svg-v2 .flow-node-ring.amber  { stroke: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-ring.red    { stroke: var(--red,   #ff7b72); }
+.flow-svg-v2 .flow-node-ring.silent { stroke: var(--text-3); opacity: .5; }
+.flow-svg-v2 .flow-node-ring.neutral{ stroke: var(--text-3); }
+.flow-svg-v2 .flow-node-icon        { color: var(--text-3); fill: none; stroke: currentColor; }
+.flow-svg-v2 .flow-node-icon.pv     { color: var(--pv,    #f0c849); }
+.flow-svg-v2 .flow-node-icon.batt   { color: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-node-icon.load   { color: var(--load,  #58a6ff); }
+.flow-svg-v2 .flow-node-icon.grid,
+.flow-svg-v2 .flow-node-icon.ac     { color: var(--grid,  #b1b9c2); }
+.flow-svg-v2 .flow-node-icon.dc     { color: var(--dc,    #d29922); }
+.flow-svg-v2 .flow-node-icon.amber  { color: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-icon.red    { color: var(--red,   #ff7b72); }
+.flow-svg-v2 .flow-node-icon.silent { color: var(--text-3); opacity: .55; }
+.flow-svg-v2 .flow-node-w           { fill: var(--text-1); font-size: 13px; font-weight: 600; }
+.flow-svg-v2 .flow-node-w.silent    { fill: var(--text-3); font-weight: 400; }
+.flow-svg-v2 .flow-particle-v2.pv   { fill: var(--pv,    #f0c849); filter: drop-shadow(0 0 3px var(--pv,   #f0c849)); }
+.flow-svg-v2 .flow-particle-v2.batt { fill: var(--batt,  #56d364); filter: drop-shadow(0 0 3px var(--batt, #56d364)); }
+.flow-svg-v2 .flow-particle-v2.load { fill: var(--load,  #58a6ff); filter: drop-shadow(0 0 3px var(--load, #58a6ff)); }
+.flow-svg-v2 .flow-particle-v2.grid,
+.flow-svg-v2 .flow-particle-v2.ac   { fill: var(--grid,  #b1b9c2); filter: drop-shadow(0 0 3px var(--grid, #b1b9c2)); }
+.flow-svg-v2 .flow-particle-v2.dc   { fill: var(--dc,    #d29922); filter: drop-shadow(0 0 3px var(--dc,   #d29922)); }
+.flow-svg-v2 .flow-particle-v2.amber{ fill: var(--amber, #f0c849); filter: drop-shadow(0 0 3px var(--amber,#f0c849)); }
+.flow-svg-v2 .flow-particle-v2.neutral { fill: var(--text-3); }
+/* Respect reduced motion — replace SMIL flow with a subtle dash on
+   the line so it still implies direction without animation. */
+@media (prefers-reduced-motion: reduce) {
+  .flow-svg-v2 .flow-particle-v2 { display: none; }
+  .flow-svg-v2 .flow-conn-v2.active { stroke-dasharray: 4 4; }
+}
+
+/* Battery card under the SVG. Icon (left), SoC + state label, signed
+   power on the right, thin fill bar spanning the bottom. */
+.bat-card {
+  margin: .75rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0 .85rem;
+  align-items: center;
+  padding: .8rem .95rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.bat-icon-wrap {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface);
+  border: 1.6px solid var(--batt, #56d364);
+  color: var(--batt, #56d364);
+  display: flex; align-items: center; justify-content: center;
+  grid-row: 1 / span 2;
+}
+.bat-icon-wrap svg { width: 22px; height: 22px; }
+.bat-icon-wrap.amber { border-color: var(--amber, #f0c849); color: var(--amber, #f0c849); }
+.bat-icon-wrap.red   { border-color: var(--red,   #ff7b72); color: var(--red,   #ff7b72); }
+.bat-icon-wrap.blue  { border-color: var(--load,  #58a6ff); color: var(--load,  #58a6ff); }
+.bat-icon-wrap.green { border-color: var(--batt,  #56d364); color: var(--batt,  #56d364); }
+.bat-headline {
+  display: flex; align-items: baseline; gap: .55rem;
+  min-width: 0;
+}
+.bat-soc      { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--text-1); }
+.bat-soc-unit { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: .1rem; }
+.bat-state    { font-size: .7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.bat-power {
+  grid-column: 3; grid-row: 1 / span 2;
+  text-align: right;
+  font-size: 1.05rem; font-weight: 600;
+  color: var(--text-1);
+}
+.bat-power.charging    { color: var(--batt,  #56d364); }
+.bat-power.discharging { color: var(--amber, #f0c849); }
+.bat-power-sub { font-size: .7rem; color: var(--text-3); font-weight: 400; margin-top: .15rem; }
+.bat-fill {
+  grid-column: 2 / span 2;
+  height: 4px; border-radius: 999px; background: var(--surface, #131820);
+  overflow: hidden; margin-top: .55rem;
+}
+.bat-fill-inner {
+  height: 100%; background: var(--batt, #56d364);
+  transition: width .8s ease, background .4s ease;
+}
+.bat-fill-inner.amber { background: var(--amber, #f0c849); }
+.bat-fill-inner.red   { background: var(--red,   #ff7b72); }
+.bat-fill-inner.blue  { background: var(--load,  #58a6ff); }
+.bat-fill-inner.green { background: var(--batt,  #56d364); }
+
+/* On narrow screens compact slightly. */
+@media (max-width: 480px) {
+  .flow-svg-v2 { max-height: 240px; }
+  .bat-card    { padding: .7rem .8rem; }
+  .bat-soc     { font-size: 1.4rem; }
+  .bat-power   { font-size: .95rem; }
+}
 
 .flow-caption {
   padding: .55rem .75rem 0;
