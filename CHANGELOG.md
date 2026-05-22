@@ -8,6 +8,17 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.46] · 2026-05-22
+
+### Fixed · Power flow summary line ignored the battery
+
+The "N sources · X W in · M loads · Y W out" header could appear
+off-balance when solar didn't quite cover the load and the battery
+was making up the difference — e.g. "94 W in · 99 W out" with no
+hint that the missing 5 W came from the bank. The header now adds
+a `battery N W in/out` pill whenever the bank contribution is
+≥ 1 W, so the totals reconcile.
+
 ## [0.1.45] · 2026-05-22
 
 ### Fixed · SD-image build (pi-gen) — broken since v0.1.32

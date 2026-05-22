@@ -1356,9 +1356,20 @@ function renderFlow(targetHost) {
     host.appendChild(loadsCol);
   }
 
-  // Sub-header summary — describe whatever's actually present
+  // Sub-header summary — describe whatever's actually present.
+  // Include battery contribution so totals reconcile: a discharging
+  // bank counts as power "in" to the bus, a charging bank as "out".
+  // Without this the line looked broken when solar < load and the
+  // battery covered the gap (e.g. 94 W in · 99 W out, with no hint
+  // that the missing 5 W came from the bank).
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
+  const battW = Math.round(model.batteryNetW || 0);
+  if (model.bank && Math.abs(battW) >= 1) {
+    parts.push(battW < 0
+      ? `battery ${Math.abs(battW)} W in`
+      : `battery ${battW} W out`);
+  }
   if (hasLoads)   parts.push(`${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ${totalLoadW.toFixed(0)} W out`);
   if (sub) sub.textContent = parts.join(" · ") || "system idle";
 }
