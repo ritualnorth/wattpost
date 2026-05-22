@@ -1330,6 +1330,15 @@ main {
   color: var(--text-3);
   font-size: .85rem;
 }
+.flow-caption {
+  padding: .55rem .75rem 0;
+  text-align: center;
+  color: var(--text-2);
+  font-size: .85rem;
+  line-height: 1.35;
+  min-height: 1.35em;
+}
+.flow-caption:empty { display: none; }
 /* Idle state — battery tile centered, no source/load skeletons */
 .flow.flow--idle {
   justify-content: center;

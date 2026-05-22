@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.48] · 2026-05-22
+
+### Changed · Power flow gets a plain-English caption
+
+The diagram was technically correct but kept producing "wait, why
+do the numbers not match?" moments — e.g. solar pushing 94 W, load
+pulling 99 W, battery at 100% but quietly trickling 5 W into the
+gap. The numbers DO reconcile, but you had to know where to look.
+
+Under the diagram there's now a single line in plain English:
+
+- "Sources covering load · charging battery at 40 W"
+- "Load is 5 W more than sources · battery making up the difference"
+- "Running off battery · 99 W to load"
+- "Sources matched to load · battery resting"
+
+The v0.1.46 "battery N W in/out" pill in the sub-header is dropped
+— it was bus-perspective wording that read backwards from how you
+think about it.
+
 ## [0.1.47] · 2026-05-22
 
 ### Fixed · Power flow connector amperage was misleading
