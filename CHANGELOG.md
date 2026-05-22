@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.41] · 2026-05-22
+
+### Fixed · Victron BLE adverts dropped by orchestrator reopen loop
+
+The orchestrator's transport-liveness check assumed every transport
+exposed a GATT-style `_client` attribute with `is_connected`. The
+passive BLE-advertise listeners that drive Victron Instant Readout
+(IP22, SmartShunt, SmartSolar, etc.) deliberately don't — they
+subscribe to a shared BlueZ scanner. So:
+
+```python
+client = getattr(t, "_client", None)       # None on advertise listener
+if client is None or not getattr(client, "is_connected", True):
+    # reopen
+```
+
+That `client is None` branch fired on every poll cycle, so
+every ~60 s we tore down the scanner subscription, BlueZ
+deregistered the discovery filter, the listener rearmed, and
+adverts arriving during the settle window were silently lost.
+
+On most installs we'd still decode something in each 60 s
+window — Victron broadcasts every ~5 s, so the dropouts were
+brief enough to be invisible. On the Garage Stack appliance
+(Proxmox VM, USB-passed-through dongle) the timing's worse,
+and the loop killed every IP22 advert for 2+ hours before this
+was noticed.
+
+Now we only reopen when a transport actually exposes a client
+that reports disconnected. Passive listeners manage their own
+lifecycle; the orchestrator no longer interferes.
+
 ## [0.1.40] · 2026-05-22
 
 ### Fixed · charger_state pill now reflects the bank, not whichever charger sorted first
