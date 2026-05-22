@@ -477,6 +477,14 @@ class CloudService:
         # Free-form extras for the cloud dashboard to render later.
         # Keep this concise — the cloud caps extras at 2 KiB.
         extras: dict[str, Any] = {}
+        # BLE adapter health (#244). Surfaces "wedged" Realtek dongles
+        # to the cloud so users see "Bluetooth dongle not responding"
+        # rather than every Victron device independently going silent.
+        try:
+            from ..transport.ble_victron_advertise import adapter_health
+            extras["ble_adapter_state"] = adapter_health()
+        except Exception:
+            pass
         try:
             from .. import __version__
             extras["version"] = __version__
