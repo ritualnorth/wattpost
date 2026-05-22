@@ -1297,7 +1297,15 @@ function renderFlow(targetHost) {
     for (const s of model.sources) sourcesCol.appendChild(makeFlowTile(s));
     host.appendChild(sourcesCol);
 
-    const sourcesPillA = busbarV > 0 ? totalSourceW / busbarV : null;
+    // Connector annotation is bus-side: watts contributed by sources.
+    // We deliberately drop amperage when the bank is present — the
+    // pill A was `totalSourceW / busbarV`, i.e. "what 94 W of solar
+    // looks like as amps on the bus". It read as "amps into the
+    // battery", which is wrong: only the bank's own shunt current
+    // (shown on the bank tile, `sumI`) is actually entering or
+    // leaving the bank. Without bank we still show A because there's
+    // nowhere else to put it.
+    const sourcesPillA = !model.bank && busbarV > 0 ? totalSourceW / busbarV : null;
     host.appendChild(makeConnector({
       label: sourcesPillA != null
         ? `${totalSourceW.toFixed(0)} W · ${sourcesPillA.toFixed(1)} A`
@@ -1340,7 +1348,10 @@ function renderFlow(targetHost) {
 
   // ----- Loads column (only when present) -----
   if (hasLoads) {
-    const loadsPillA = busbarV > 0 ? totalLoadW / busbarV : null;
+    // Same reasoning as the sources connector: bus-side amperage
+    // reads as "out of the battery" when the bank is present, which
+    // is wrong. Bank's own shunt current is on the bank tile.
+    const loadsPillA = !model.bank && busbarV > 0 ? totalLoadW / busbarV : null;
     host.appendChild(makeConnector({
       label: loadsPillA != null
         ? `${totalLoadW.toFixed(0)} W · ${loadsPillA.toFixed(1)} A`

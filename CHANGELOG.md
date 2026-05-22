@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.47] · 2026-05-22
+
+### Fixed · Power flow connector amperage was misleading
+
+The connectors between sources / battery / loads were labelled with
+their bus-equivalent amperage (e.g. 94 W solar → "6.6 A"). Because
+the top connector visually terminates at the battery tile, that
+amperage read as "6.6 A flowing into the battery" — even when the
+bank's own shunt was reporting only ±0.3 A. When the bank is
+present we now drop the connector amperage and leave the watts on
+their own; the bank tile remains the source of truth for shunt
+current. Without a bank the connectors still show A (no other place
+to put it).
+
 ## [0.1.46] · 2026-05-22
 
 ### Fixed · Power flow summary line ignored the battery
