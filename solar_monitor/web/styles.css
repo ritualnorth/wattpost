@@ -1330,6 +1330,76 @@ main {
   color: var(--text-3);
   font-size: .85rem;
 }
+
+/* Power-flow donut centerpiece (replaces the rectangular battery tile).
+   Same SoC palette + gradient defs as the Hero donut so the colour
+   semantics match across the dashboard. Gradient defs live inside the
+   Hero SVG up the DOM; SVG url() references resolve document-wide. */
+.flow-donut-wrap {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: .25rem auto;
+  flex: 0 0 auto;
+  align-self: center;
+}
+@media (min-width: 720px) {
+  .flow-donut-wrap { width: 200px; height: 200px; }
+}
+.flow-donut {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.flow-donut .donut-track { stroke: var(--surface-3); }
+.flow-donut .donut-arc {
+  stroke: url(#g-soc-holding);
+  transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
+}
+.flow-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 .9rem;
+  pointer-events: none;
+}
+.flow-donut-pct {
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-1);
+}
+.flow-donut-pct-unit {
+  font-size: .9rem;
+  margin-left: .15rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.flow-donut-state {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-2);
+  margin-top: .35rem;
+}
+.flow-donut-flow {
+  font-size: .85rem;
+  margin-top: .45rem;
+  color: var(--text-1);
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+.flow-donut-arrow { font-weight: 700; }
+.donut-state.charging    .flow-donut-arrow { color: var(--green); }
+.donut-state.discharging .flow-donut-arrow { color: var(--amber); }
+.donut-state.critical    .flow-donut-arrow { color: var(--red); }
+
 .flow-caption {
   padding: .55rem .75rem 0;
   text-align: center;

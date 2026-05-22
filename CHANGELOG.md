@@ -8,6 +8,26 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.50] · 2026-05-22
+
+### Changed · Power flow: battery centerpiece is now a SoC donut
+
+The Power-flow tile's central battery rectangle is replaced with a
+SoC donut, matching the Hero donut's visual language. The donut
+shows:
+
+- Percentage SoC big in the centre
+- State label underneath (Full / Charging / Discharging / Resting / Low)
+- Direction arrow + magnitude inside the donut (↓ X W in when charging,
+  ↑ X W out when discharging) — battery-relative, never bus-relative
+- Bus voltage + shunt amperage as a small sub-line
+- Arc colour-coded by state (charging green, holding blue, discharging
+  amber, critical red)
+
+The eye now lands on the SoC + direction first instead of a
+`−5 W` figure that needed a translation. Sources and loads stay
+as flanking tiles, plain-English caption stays below.
+
 ## [0.1.49] · 2026-05-22
 
 ### Added · "Battery full · solar throttled" caption
