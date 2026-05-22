@@ -1376,7 +1376,7 @@ main {
   font-size: 2.1rem;
   font-weight: 700;
   line-height: 1;
-  color: var(--text-1);
+  color: var(--text);
 }
 .flow-donut-pct-unit {
   font-size: .9rem;
@@ -1394,7 +1394,7 @@ main {
 .flow-donut-flow {
   font-size: .85rem;
   margin-top: .45rem;
-  color: var(--text-1);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   gap: .25rem;
@@ -1447,7 +1447,7 @@ main {
 .energy-self-legend { display: grid; gap: .25rem; font-size: .72rem; }
 .energy-self-legend .self-row { display: flex; align-items: center; gap: .4rem; color: var(--text-2); }
 .energy-self-legend .self-row .dot { width: 8px; height: 8px; border-radius: 50%; }
-.energy-self-legend .self-row .pct { margin-left: auto; color: var(--text-1); font-weight: 600; }
+.energy-self-legend .self-row .pct { margin-left: auto; color: var(--text); font-weight: 600; }
 
 /* ───── v2 SVG flow diagram (Powerwall-style) ─────
    Replaces the old flow-col / flow-conn layout. Sources/loads arc
@@ -1485,7 +1485,7 @@ main {
 .flow-svg-v2 .flow-node-icon.amber  { color: var(--amber, #f0c849); }
 .flow-svg-v2 .flow-node-icon.red    { color: var(--red,   #ff7b72); }
 .flow-svg-v2 .flow-node-icon.silent { color: var(--text-3); opacity: .55; }
-.flow-svg-v2 .flow-node-w           { fill: var(--text-1); font-size: 13px; font-weight: 600; }
+.flow-svg-v2 .flow-node-w           { fill: var(--text); font-size: 13px; font-weight: 600; }
 .flow-svg-v2 .flow-node-w.silent    { fill: var(--text-3); font-weight: 400; }
 .flow-svg-v2 .flow-particle-v2.pv   { fill: var(--pv,    #f0c849); filter: drop-shadow(0 0 3px var(--pv,   #f0c849)); }
 .flow-svg-v2 .flow-particle-v2.batt { fill: var(--batt,  #56d364); filter: drop-shadow(0 0 3px var(--batt, #56d364)); }
@@ -1532,14 +1532,14 @@ main {
   display: flex; align-items: baseline; gap: .55rem;
   min-width: 0;
 }
-.bat-soc      { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--text-1); }
+.bat-soc      { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--text); }
 .bat-soc-unit { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: .1rem; }
 .bat-state    { font-size: .7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
 .bat-power {
   grid-column: 3; grid-row: 1 / span 2;
   text-align: right;
   font-size: 1.05rem; font-weight: 600;
-  color: var(--text-1);
+  color: var(--text);
 }
 .bat-power.charging    { color: var(--batt,  #56d364); }
 .bat-power.discharging { color: var(--amber, #f0c849); }
@@ -2393,7 +2393,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-size: 1.25rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--text-1);
+  color: var(--text);
 }
 .bhealth-residency {
   margin-top: .25rem;
@@ -3297,7 +3297,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .settings-table tr:last-child td { border-bottom: none; }
 .settings-row-label {
   font-weight: 500;
-  color: var(--text-1);
+  color: var(--text);
 }
 .settings-row-help {
   font-size: .74rem;
@@ -3342,7 +3342,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  color: var(--text-1);
+  color: var(--text);
   font: inherit;
 }
 .settings-edit-cur-label { font-size: .78rem; color: var(--text-3); }
