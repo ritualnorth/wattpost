@@ -2850,6 +2850,12 @@ body.kiosk-active .route.kiosk-route.active {
   background: var(--surface-2);
 }
 body:not(.kiosk-active) .kiosk-exit { display: none; }
+/* Honour `hidden` set by JS — needed because the `.kiosk-exit`
+   author rule above has equal specificity to the UA `[hidden]`
+   declaration and wins by source order, silently leaving the
+   broker-view + kiosk-share Exit button visible. Bit us when the
+   broker dashboard kept showing Exit at top-right. */
+.kiosk-exit[hidden] { display: none !important; }
 
 /* Settings toggle row (Appearance → Kiosk default) */
 .settings-toggle {
