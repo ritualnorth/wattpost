@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.59] · 2026-05-22
+
+### Added · Bidirectional rule sync — edit local rules from the cloud (#261 slice 2)
+
+The other half of the unification. Cloud-side edits to an appliance-
+local rule now push down to the appliance via the existing command-
+queue, get applied locally (in-place mutate of `config.alerts`,
+atomic-write `config.yaml`, hot-reload the alerts engine — no daemon
+restart), and re-surface on the next heartbeat to confirm.
+
+Two new command kinds the appliance handles: `set_local_rule` and
+`delete_local_rule`. Both carry their rule spec in the generic
+`payload_json` field on the command (new on the cloud, see migration
+0041 in the matching cloud deploy).
+
+The cloud Rules page lifts the Edit / Delete / toggle restrictions
+on rows tagged `Runs locally` — they all just work now, with the
+appliance picking up the change on next heartbeat. If the heartbeat
+or command fails, the rule re-appears on the appliance's snapshot
+and the user can retry.
+
 ## [0.1.58] · 2026-05-22
 
 ### Added · Heartbeat ships local alert rules to cloud (#261 slice 1A)
