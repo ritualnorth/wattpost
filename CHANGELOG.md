@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.57] · 2026-05-22
+
+### Fixed · History chart legends came back
+
+v0.1.56's `legend: { show: false }` was too aggressive — it stripped
+the colour-swatch + series-name labels too, leaving the per-metric
+and compare-packs charts with no key at all. Switched to
+`legend: { live: false }` so the labels stay but the cursor-driven
+value column doesn't (which was the actual placeholder culprit).
+Energy chart stays on `show: false` since it has its own static
+HTML legend below.
+
 ## [0.1.56] · 2026-05-22
 
 ### Fixed · Placeholder legend on all History charts
