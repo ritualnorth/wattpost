@@ -8,6 +8,34 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.44] · 2026-05-22
+
+### Changed · plain-English alert copy across every local transport (#249)
+
+Same fix shape we applied cloud-side, now on the appliance.
+Previously every local-alert transport (ntfy, Discord, Pushover,
+SMTP-from-the-Pi) emitted strings like
+
+  `bank.soc_pct = 18.50 (lt threshold 20.00)`
+
+which reads as a debug printout to the user. Now they're
+rendered through a single set of helpers in
+`solar_monitor/alerts/base.py`:
+
+  `State of charge is 18.5% (threshold < 20%)`
+
+— with units inferred per metric (% / V / W / A / °C / min),
+operator words humanised (< / > / ≤ / ≥), and per-metric
+rounding (SoC 1dp, voltage 2dp, watts integer).
+
+The SMTP local-alert email also gets a better subject:
+`WattPost warn: state of charge 18.5% (Low battery)` — leads
+with the metric + current value so a phone preview answers
+"which?" + "how bad?" without opening.
+
+Machine-format transports (MQTT, webhook) keep raw JSON
+unchanged — downstream integrations render their own way.
+
 ## [0.1.43] · 2026-05-22
 
 ### Fixed · appliance PWA hints suppressed under cloud broker
