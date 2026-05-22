@@ -1396,12 +1396,28 @@ function flowCaption(model, totalSourceW, totalLoadW) {
   const battW = Math.round(model.batteryNetW || 0);
   const sourcesActive = totalSourceW >= 1;
   const loadsActive   = totalLoadW   >= 1;
+  const soc = model.bank.soc || 0;
+  // "Effectively full" — MPPTs go into float around 98-100%. We use
+  // 98 so we catch the "100.0 % shown, 99.6 actual" case too.
+  const bankFull = soc >= 98;
 
   // Battery is meaningfully charging (sources > loads, excess into bank).
   if (battW >= 1) {
     if (sourcesActive && loadsActive) return `Sources covering load · charging battery at ${battW} W`;
     if (sourcesActive)                return `Charging battery at ${battW} W`;
     return "";
+  }
+
+  // Bank is full and the MPPT is loafing — pulling just enough sun
+  // to cover the load (and a few W of bus maintenance). This is the
+  // most common "wait, why is solar only 94 W when it's sunny?"
+  // case, so we call it out before the generic discharge text.
+  // Heuristic: bank full + sources active + the bank itself isn't
+  // doing much (|netW| < 50 W). If the load suddenly spikes the
+  // MPPT ramps up and we fall through to the normal captions below.
+  if (bankFull && sourcesActive && Math.abs(battW) < 50) {
+    if (loadsActive) return `Battery full · solar throttled to load demand (${Math.round(totalSourceW)} W, panels not maxed)`;
+    return `Battery full · solar throttled (no demand)`;
   }
 
   // Battery is meaningfully discharging (sources < loads, bank fills gap).
