@@ -8,6 +8,17 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.54] · 2026-05-22
+
+### Fixed · Broker Exit-kiosk button kept showing
+
+The `.kiosk-exit` author CSS had equal specificity to the UA
+`[hidden]` declaration and won by source order, so the JS's
+`hidden = true` for broker / kiosk-share visitors was silently
+ignored — Exit button kept rendering top-right on
+`<slug>.wattpost.cloud`. Added a `.kiosk-exit[hidden]` rule with
+`!important` to honour the attribute.
+
 ## [0.1.53] · 2026-05-22
 
 ### Fixed · Energy chart cleanup
