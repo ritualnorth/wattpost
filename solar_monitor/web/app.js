@@ -1271,16 +1271,7 @@ function renderFlow(targetHost) {
     const battCol = document.createElement("div");
     battCol.className = "flow-col flow-col--solo";
     if (model.bank) {
-      const b = model.bank;
-      battCol.appendChild(makeFlowTile({
-        label: "Battery bank",
-        color: "batt",
-        icon: "battery",
-        power: b.netW,
-        signed: true,
-        active: false,
-        sub: `${b.soc.toFixed(1)} % · ${b.meanV.toFixed(2)} V`,
-      }));
+      battCol.appendChild(makeFlowDonut(model.bank, model.batteryNetW));
     }
     host.appendChild(battCol);
     if (sub) sub.textContent = "no sources or loads configured";
@@ -1322,31 +1313,17 @@ function renderFlow(targetHost) {
     }));
   }
 
-  // ----- Battery tile (always) -----
+  // ----- Battery donut (always) -----
+  // Replaces the old rectangular battery tile. The donut becomes the
+  // single visual anchor: SoC arc colour-coded by state, percentage
+  // big in the middle, direction arrow + magnitude as a sub-line.
+  // Topology is unchanged (battery still sits between sources and
+  // loads visually) but the donut anchors the eye on the most-watched
+  // number — SoC — instead of a "−5 W" that confused users.
   const battCol = document.createElement("div");
   battCol.className = "flow-col";
   if (model.bank) {
-    const b = model.bank;
-    // Sub-line now includes A — sumI is what the BMS sees flowing
-    // through its terminals (= net charge/discharge at battery side).
-    // Reads alongside "+269 W" as "20.2 A" so users can match the
-    // pill amperage to bank amperage directly.
-    const subParts = [
-      `${b.soc.toFixed(1)} %`,
-      `${b.meanV.toFixed(2)} V`,
-    ];
-    if (typeof b.sumI === "number") {
-      subParts.push(`${b.sumI >= 0 ? "+" : ""}${b.sumI.toFixed(1)} A`);
-    }
-    battCol.appendChild(makeFlowTile({
-      label: "Battery bank",
-      color: "batt",
-      icon: "battery",
-      power: b.netW,
-      signed: true,
-      active: Math.abs(b.netW) > 1,
-      sub: subParts.join(" · "),
-    }));
+    battCol.appendChild(makeFlowDonut(model.bank, model.batteryNetW));
   } else {
     battCol.appendChild(makeFlowTile({ label: "Battery", color: "neutral", icon: "battery", power: 0, sub: "—" }, true));
   }
@@ -1433,6 +1410,69 @@ function flowCaption(model, totalSourceW, totalLoadW) {
   if (sourcesActive)                return `Sources idle to a full battery · no load drawing`;
   if (loadsActive)                  return `Running off battery · no draw beyond idle`;
   return `System idle`;
+}
+
+function makeFlowDonut(bank, batteryNetW) {
+  // Battery donut for the Power-flow centerpiece. Reuses the SoC
+  // palette + gradient defs from the Hero donut (url(#g-soc-…)) so
+  // colour semantics match across the dashboard. The donut is the
+  // single visual anchor; sources and loads stay as flanking tiles.
+  const soc   = Math.max(0, Math.min(100, bank.soc || 0));
+  const netW  = Math.round(batteryNetW || 0);
+  const aNetW = Math.abs(netW);
+  const meanV = typeof bank.meanV === "number" ? bank.meanV : null;
+  const sumI  = typeof bank.sumI  === "number" ? bank.sumI  : null;
+
+  // State drives colour. Treat ≥98% SoC as "Full" regardless of small
+  // discharge noise — at full SoC a tiny −5 W trickle is the MPPT in
+  // float, not a real discharge alert.
+  let state, label;
+  if (soc < 15)            { state = "critical";    label = "Low"; }
+  else if (soc >= 98)      { state = "holding";     label = "Full"; }
+  else if (aNetW < 5)      { state = "holding";     label = "Resting"; }
+  else if (netW > 0)       { state = "charging";    label = "Charging"; }
+  else                     { state = "discharging"; label = "Discharging"; }
+
+  // Direction line inside the donut. ↓ = energy flowing INTO the
+  // battery (charging), ↑ = energy LEAVING the battery (discharging).
+  // We never label this in bus terms — it's strictly battery-relative.
+  let flowHTML = "";
+  if (aNetW >= 1) {
+    const arrow = netW > 0 ? "↓" : "↑";
+    const dir   = netW > 0 ? "in" : "out";
+    flowHTML = `<div class="flow-donut-flow"><span class="flow-donut-arrow">${arrow}</span><span>${aNetW} W ${dir}</span></div>`;
+  }
+
+  // Sub-line: bus voltage (always useful), and shunt amperage when
+  // there's enough current to be meaningful.
+  const subParts = [];
+  if (meanV != null) subParts.push(`${meanV.toFixed(2)} V`);
+  if (sumI  != null && Math.abs(sumI) >= 0.1) {
+    subParts.push(`${sumI >= 0 ? "+" : ""}${sumI.toFixed(1)} A`);
+  }
+  const subHTML = subParts.length
+    ? `<div class="flow-donut-flow" style="margin-top:.25rem;font-size:.72rem;color:var(--text-2);">${subParts.join(" · ")}</div>`
+    : "";
+
+  const wrap = document.createElement("div");
+  wrap.className = `flow-donut-wrap donut-state ${state}`;
+  wrap.setAttribute("role", "img");
+  wrap.setAttribute("aria-label", `Battery ${soc.toFixed(0)} percent, ${label.toLowerCase()}${aNetW >= 1 ? `, ${aNetW} watts ${netW > 0 ? "in" : "out"}` : ""}`);
+  wrap.innerHTML = `
+    <svg class="flow-donut" viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14"/>
+      <circle class="donut-arc"   cx="100" cy="100" r="86" fill="none" stroke-width="14"
+              pathLength="100" stroke-dasharray="${soc.toFixed(1)} ${(100 - soc).toFixed(1)}"
+              stroke-linecap="round" transform="rotate(-90 100 100)"/>
+    </svg>
+    <div class="flow-donut-center">
+      <div class="flow-donut-pct"><span>${soc.toFixed(0)}</span><span class="flow-donut-pct-unit">%</span></div>
+      <div class="flow-donut-state">${label}</div>
+      ${flowHTML}
+      ${subHTML}
+    </div>
+  `;
+  return wrap;
 }
 
 function makeFlowTile(t, muted = false) {
