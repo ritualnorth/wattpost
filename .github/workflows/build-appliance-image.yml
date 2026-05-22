@@ -21,13 +21,18 @@ on:
     paths-ignore: []
   workflow_dispatch:
 
-# Coalesce per-ref so back-to-back commits to the same branch or
-# rapid tag pushes don't pile up on the runner. Different tags
-# still produce distinct runs (each tag is a different ref → its
-# own concurrency group) so we don't lose the :vX.Y.Z Docker
-# tags anyone might pin to.
+# Concurrency strategy:
+#  - **Tag pushes**: group by the tag ref so a rapid retag of the
+#    SAME tag (`git tag -d` + push) cancels the previous build for
+#    that tag. Different tags still get distinct groups.
+#  - **Main pushes**: group by COMMIT SHA, not by branch. Each commit
+#    on main must publish its own `:edge` Docker tag — if we group
+#    by the `refs/heads/main` ref, back-to-back commits on main
+#    cancel each other (bit us before — fix #262: `:edge` never
+#    updated after slice 1B because slice 1A's main build got
+#    cancelled). Per-SHA groups never collide.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: true
 
 permissions:
