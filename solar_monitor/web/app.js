@@ -137,12 +137,23 @@ const FLOW_MAPPING = {
   shunt:         { battery: true },
   bms:           { battery: true },  // Victron Lynx Smart BMS, JK BMS
   // Renogy DCC50S / DCC30S / DCC25S / DCC15S — alternator + MPPT
-  // combos. Colour-coded as "dc" (amber) to distinguish from AC
-  // chargers ("grid", grey) at a glance — a van running both will
-  // otherwise look like two identical grey sources.
+  // combos. The unit has TWO input sides: an engine-driven DC-DC
+  // (alternator) AND a built-in MPPT (PV). Both render as separate
+  // source nodes so a customer with solar wired into their DCC sees
+  // sun + engine independently rather than one ambiguous source.
+  //
+  // Latent bug fix: the alternator metric was named `alt_power_w`
+  // here but the driver publishes `alternator_power_w`. DCC owners
+  // had been seeing 0 W on the alternator side since #123 shipped.
   dcdc_charger:  {
-    sources: [{ id: "alt", label: "Alternator", color: "dc", icon: "alternator",
-                metric: "alt_power_w", vMetric: "alt_voltage_v", aMetric: "alt_current_a" }],
+    sources: [
+      { id: "dcc_alt", label: "Alternator", color: "dc", icon: "alternator",
+        metric: "alternator_power_w",
+        vMetric: "alternator_voltage_v", aMetric: "alternator_current_a" },
+      { id: "dcc_pv",  label: "Solar",      color: "pv", icon: "sun",
+        metric: "pv_power_w",
+        vMetric: "pv_voltage_v",          aMetric: "pv_current_a" },
+    ],
   },
   // Victron Orion DC-DC chargers (Orion-Tr Smart + Orion XS). Same
   // flow role as a Renogy DCC: takes alternator/aux DC, outputs to
