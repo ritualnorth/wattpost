@@ -40,6 +40,19 @@ async def energy_today(
     views (Slice 2). All returned series share the same `ts` array.
     """
     store: Store = state["store"]
+    return await compute_energy(store, since=since, until=until, bucket=bucket)
+
+
+async def compute_energy(
+    store: Store,
+    *,
+    since: int | None = None,
+    until: int | None = None,
+    bucket: int | None = None,
+) -> dict[str, Any]:
+    """Helper extracted from the HTTP endpoint so background services
+    (cloud heartbeat) can reuse the aggregation without a Litestar
+    State context. Same return shape as `/api/energy/today`."""
     now_ts = int(time.time())
     if since is None:
         local = time.localtime(now_ts)
