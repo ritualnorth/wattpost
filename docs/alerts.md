@@ -1,6 +1,8 @@
 # Alerts
 
-WattPost evaluates **alert rules** on every poll cycle (~60 s) and fans out matching events to **transports**. Rules + transports are entirely local in the free tier; the cloud adds heartbeat-stale alerts (only the cloud can tell you when the appliance itself is dead).
+WattPost evaluates **alert rules** on every poll cycle (~60 s) and fans out matching events to **transports**. Rules + transports are entirely local in the free tier; the cloud adds the things only an outside observer can do — heartbeat-stale detection, cross-site triggers, weather-aware rules.
+
+If you're paired to wattpost.cloud, every rule below is **mirrored into your cloud Rules page** and editable from anywhere. The cloud is the canonical editing surface; the appliance is where the rule actually fires (so it works even when the cloud is unreachable). See [/docs/cloud-alerts-and-notifications](/docs/cloud-alerts-and-notifications) for the full picture.
 
 ## A rule, abstractly
 
