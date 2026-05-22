@@ -136,8 +136,12 @@ const FLOW_MAPPING = {
   smart_battery: { battery: true },
   shunt:         { battery: true },
   bms:           { battery: true },  // Victron Lynx Smart BMS, JK BMS
+  // Renogy DCC50S / DCC30S / DCC25S / DCC15S — alternator + MPPT
+  // combos. Colour-coded as "dc" (amber) to distinguish from AC
+  // chargers ("grid", grey) at a glance — a van running both will
+  // otherwise look like two identical grey sources.
   dcdc_charger:  {
-    sources: [{ id: "alt", label: "Alternator", color: "grid", icon: "alternator",
+    sources: [{ id: "alt", label: "Alternator", color: "dc", icon: "alternator",
                 metric: "alt_power_w", vMetric: "alt_voltage_v", aMetric: "alt_current_a" }],
   },
   // Victron Orion DC-DC chargers (Orion-Tr Smart + Orion XS). Same
@@ -145,11 +149,12 @@ const FLOW_MAPPING = {
   // the bank. The Victron driver exposes input/output as paired
   // current/voltage; we surface the OUTPUT power as the contribution
   // to the bank (input - efficiency = output, the output is what
-  // actually reaches the busbar).
-  dcdc:    { sources: [{ id: "alt", label: "DC-DC", color: "grid", icon: "alternator",
+  // actually reaches the busbar). Colour `dc` (amber) same as the
+  // Renogy combo above — both are "engine-driven DC input."
+  dcdc:    { sources: [{ id: "alt", label: "DC-DC", color: "dc", icon: "alternator",
                           metric: "output_power_w",
                           vMetric: "output_voltage_v", aMetric: "output_current_a" }] },
-  dcdc_xs: { sources: [{ id: "alt", label: "DC-DC", color: "grid", icon: "alternator",
+  dcdc_xs: { sources: [{ id: "alt", label: "DC-DC", color: "dc", icon: "alternator",
                           metric: "output_power_w",
                           vMetric: "output_voltage_v", aMetric: "output_current_a" }] },
   // Victron AC chargers (Blue Smart IP22 / IP65 / Phoenix Smart).
@@ -1347,7 +1352,7 @@ function buildFlowSvgV2(model, opts) {
     const x2 = charging ? bx : FLOW_BUS_X;
     const y2 = charging ? by - 22 : FLOW_BUS_Y;
     addFlowPath(svg, pathId, x1, y1, x2, y2, true);
-    activePaths.push({ id: pathId, color: charging ? "batt" : "amber", w: Math.abs(battNetW) });
+    activePaths.push({ id: pathId, color: charging ? "batt" : "discharge", w: Math.abs(battNetW) });
   }
 
   // Bus → load (each load).
@@ -1368,7 +1373,7 @@ function buildFlowSvgV2(model, opts) {
     const [bx, by] = batPos;
     addFlowNode(svg, bx, by, {
       label: "Battery",
-      color: battNetW > 0 ? "batt" : "amber",
+      color: battNetW > 0 ? "batt" : "discharge",
       icon: "battery",
       power: Math.abs(battNetW),
     }, false);
@@ -1485,7 +1490,7 @@ function buildBatCard(bank, battNetW) {
   else if (soc >= 98)                { state = "Full";           tone = "blue"; }
   else if (aNetW < 5)                { state = "Resting";        tone = "blue"; }
   else if (battNetW > 0)             { state = "Charging";       tone = "green"; }
-  else                               { state = "Discharging";    tone = "amber"; }
+  else                               { state = "Discharging";    tone = "discharge"; }
 
   let flowText, flowClass;
   if (aNetW < 1)         { flowText = "Idle";                                              flowClass = ""; }

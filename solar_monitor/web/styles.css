@@ -1472,6 +1472,7 @@ main {
 .flow-svg-v2 .flow-node-ring.ac     { stroke: var(--grid,  #b1b9c2); }
 .flow-svg-v2 .flow-node-ring.dc     { stroke: var(--dc,    #d29922); }
 .flow-svg-v2 .flow-node-ring.amber  { stroke: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-ring.discharge { stroke: #f06292; }
 .flow-svg-v2 .flow-node-ring.red    { stroke: var(--red,   #ff7b72); }
 .flow-svg-v2 .flow-node-ring.silent { stroke: var(--text-3); opacity: .5; }
 .flow-svg-v2 .flow-node-ring.neutral{ stroke: var(--text-3); }
@@ -1483,6 +1484,7 @@ main {
 .flow-svg-v2 .flow-node-icon.ac     { color: var(--grid,  #b1b9c2); }
 .flow-svg-v2 .flow-node-icon.dc     { color: var(--dc,    #d29922); }
 .flow-svg-v2 .flow-node-icon.amber  { color: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-icon.discharge { color: #f06292; }
 .flow-svg-v2 .flow-node-icon.red    { color: var(--red,   #ff7b72); }
 .flow-svg-v2 .flow-node-icon.silent { color: var(--text-3); opacity: .55; }
 .flow-svg-v2 .flow-node-w           { fill: var(--text); font-size: 13px; font-weight: 600; }
@@ -1494,6 +1496,12 @@ main {
 .flow-svg-v2 .flow-particle-v2.ac   { fill: var(--grid,  #b1b9c2); filter: drop-shadow(0 0 3px var(--grid, #b1b9c2)); }
 .flow-svg-v2 .flow-particle-v2.dc   { fill: var(--dc,    #d29922); filter: drop-shadow(0 0 3px var(--dc,   #d29922)); }
 .flow-svg-v2 .flow-particle-v2.amber{ fill: var(--amber, #f0c849); filter: drop-shadow(0 0 3px var(--amber,#f0c849)); }
+/* "discharge" — pink; reserved for the energy *leaving the battery*
+   on its way to the load. Distinct enough from solar yellow + AC
+   grey + DC-DC amber that off-grid users can tell at a glance
+   whether the load is being fed by the bank vs by sources. Same
+   colour the Energy chart uses for the "Out of battery" area. */
+.flow-svg-v2 .flow-particle-v2.discharge { fill: #f06292; filter: drop-shadow(0 0 3px #f06292); }
 .flow-svg-v2 .flow-particle-v2.neutral { fill: var(--text-3); }
 /* Respect reduced motion — replace SMIL flow with a subtle dash on
    the line so it still implies direction without animation. */
@@ -1525,6 +1533,7 @@ main {
 }
 .bat-icon-wrap svg { width: 22px; height: 22px; }
 .bat-icon-wrap.amber { border-color: var(--amber, #f0c849); color: var(--amber, #f0c849); }
+.bat-icon-wrap.discharge { border-color: #f06292; color: #f06292; }
 .bat-icon-wrap.red   { border-color: var(--red,   #ff7b72); color: var(--red,   #ff7b72); }
 .bat-icon-wrap.blue  { border-color: var(--load,  #58a6ff); color: var(--load,  #58a6ff); }
 .bat-icon-wrap.green { border-color: var(--batt,  #56d364); color: var(--batt,  #56d364); }
@@ -1554,6 +1563,7 @@ main {
   transition: width .8s ease, background .4s ease;
 }
 .bat-fill-inner.amber { background: var(--amber, #f0c849); }
+.bat-fill-inner.discharge { background: #f06292; }
 .bat-fill-inner.red   { background: var(--red,   #ff7b72); }
 .bat-fill-inner.blue  { background: var(--load,  #58a6ff); }
 .bat-fill-inner.green { background: var(--batt,  #56d364); }

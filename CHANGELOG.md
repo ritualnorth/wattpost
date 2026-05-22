@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.60] · 2026-05-22
+
+### Changed · Power-flow source colours distinguish DC-DC from AC, battery discharge is pink
+
+Three colour bugs on the Power-flow tile:
+
+- **DC-DC chargers + alternators rendered the same grey as AC
+  chargers** — a van running both showed two indistinguishable
+  grey sources. Fixed: DC-DC + alternator now use the existing
+  `--dc` amber. AC charger stays grey (mains-tied semantic).
+- **Battery discharge particles were amber** — too close to solar
+  yellow + DC-DC amber, the visual story ("is the battery feeding
+  the load?") was lost in the wash of warm tones. Fixed: dedicated
+  pink (`#f06292`) for any flow leaving the battery, matching the
+  "Out of battery" colour already used in the Energy chart.
+- **Battery card discharging state** updated to the same pink so
+  the icon ring + fill bar consistent with the SVG.
+
+Now the colour vocabulary is: yellow = sun, grey = mains, amber =
+engine (DC-DC / alternator), pink = battery is paying for it,
+green = battery charging, blue = headed to the load. Off-grid
+users can read the diagram at a glance.
+
 ## [0.1.59] · 2026-05-22
 
 ### Added · Bidirectional rule sync — edit local rules from the cloud (#261 slice 2)
