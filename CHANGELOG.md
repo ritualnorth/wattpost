@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.62] · 2026-05-22
+
+### Added · Energy data shipped to cloud (#252 slice 1)
+
+Appliance now includes two new extras blocks in heartbeat:
+
+- `energy_today` — totals + self-powered breakdown for the current
+  local day. ~150 bytes.
+- `energy_hourly_24h` — parallel arrays of the last 24 hourly
+  buckets (ts, solar_w, charger_w, bank_w, soc_pct). ~600 bytes.
+
+Both lifted from the same `compute_energy()` helper that powers
+`/api/energy/today`. Refactor extracts the body out of the HTTP
+endpoint so it's callable from the background heartbeat path
+without faking a Litestar state.
+
+No user-visible change in this release on its own — the cloud
+ingest path (slice 2) is needed for the data to surface anywhere.
+Once both halves are deployed, the cloud Energy page becomes the
+multi-day / week / month / year chart that's been missing.
+
 ## [0.1.61] · 2026-05-22
 
 ### Fixed · Renogy DCC50S/DCC30S — alternator side was showing 0 W

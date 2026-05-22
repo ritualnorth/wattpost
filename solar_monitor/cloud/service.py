@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -666,6 +667,55 @@ class CloudService:
                 ]
         except Exception:
             log.exception("cloud heartbeat: local_alert_rules collection failed")
+
+        # #252 slice 1 — ship today's energy totals + the last 24h of
+        # hourly buckets so the cloud Energy page can render the same
+        # multi-series chart we ship locally PLUS accumulate week /
+        # month / year history. Two payloads:
+        #
+        #   energy_today        — totals + self-powered breakdown for
+        #                          the current local calendar day.
+        #                          ~150 bytes. Today-tile food.
+        #   energy_hourly_24h   — parallel arrays: ts + per-series.
+        #                          24 hourly buckets, ~600 bytes.
+        #                          Cloud accumulates these into a
+        #                          per-site history table.
+        #
+        # Both lifted from compute_energy() (the helper extracted from
+        # the existing /api/energy/today endpoint).
+        try:
+            from ..api.energy import compute_energy
+            store = getattr(self.scheduler, "store", None)
+            if store is not None:
+                # Local-day window (default args).
+                today = await compute_energy(store)
+                extras["energy_today"] = {
+                    "totals":       today.get("totals", {}),
+                    "self_powered": today.get("self_powered", {}),
+                }
+                # Last 24 hours at hourly resolution.
+                now_ts = int(time.time())
+                hourly = await compute_energy(
+                    store,
+                    since=now_ts - 24 * 3600,
+                    until=now_ts,
+                    bucket=3600,
+                )
+                s = hourly.get("series", {})
+                ts_list = s.get("ts") or []
+                if ts_list:
+                    def _r(v: float | None) -> float | None:
+                        return None if v is None else round(float(v), 1)
+                    extras["energy_hourly_24h"] = {
+                        "ts":        [int(t) for t in ts_list],
+                        "solar_w":   [_r(v) for v in (s.get("solar_w")   or [])],
+                        "charger_w": [_r(v) for v in (s.get("charger_w") or [])],
+                        "bank_w":    [_r(v) for v in (s.get("bank_w")    or [])],
+                        "soc_pct":   [_r(v) for v in (s.get("soc_pct")   or [])],
+                    }
+        except Exception:
+            log.exception("cloud heartbeat: energy aggregation failed")
+
         # Cloud alerts inbox (#206): ship recent events from the engine's
         # ring buffer so the cloud can render a per-account feed across
         # every site. Cap to last 20 since the previous successful
