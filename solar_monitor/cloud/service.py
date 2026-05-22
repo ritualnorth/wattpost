@@ -610,19 +610,31 @@ class CloudService:
                 except Exception:
                     log.exception("cloud heartbeat: time-to-empty/full failed")
 
-                # Charger state pill — pick the first device that reports
-                # one (typically the MPPT or AC charger). On a mixed
-                # install we just surface "any active charger's mode",
-                # which is the headline customer-facing answer ("bulk?
-                # absorption? float?"). 16-char cap stays cheap.
+                # Charger state pill — surface the BANK-LEVEL stage,
+                # not whichever device's label happened to sort first
+                # in get_latest(). On a multi-charger install (MPPT +
+                # AC charger + DC-DC) different chargers can be in
+                # different stages at the same instant — MPPT may
+                # have hit absorb voltage while AC charger is still
+                # in bulk, etc.
                 #
-                # Skip silent devices: a charger that hasn't broadcast
-                # in 10+ min is showing stale state. Better to emit no
-                # pill at all than a misleading "bulk" badge while the
-                # BLE radio has gone dark. Same 10-min threshold the
+                # Pick the most-active stage across every online
+                # charger. The pill is meant to answer the user's
+                # mental-model question "is my bank charging hard
+                # right now, or just maintaining?" — so if ANY
+                # charger is in bulk, the answer is "bulk".
+                #
+                # Skip silent devices (≥10 min since last broadcast):
+                # a stale "bulk" from a dead BLE radio would otherwise
+                # poison the aggregate. Same 10-min threshold the
                 # devices snapshot uses for the online flag.
+                STAGE_PRIORITY = (
+                    "bulk", "mppt", "absorption", "equalize",
+                    "float", "storage", "low_power", "off", "fault",
+                )
                 try:
                     now_ts = int(time.time())
+                    stages: list[str] = []
                     for _label, dev in latest_for_extras.items():
                         if not isinstance(dev, dict):
                             continue
@@ -631,8 +643,15 @@ class CloudService:
                             continue
                         st = dev.get("charging_state")
                         if st:
-                            extras["charger_state"] = str(st).lower()[:16]
-                            break
+                            stages.append(str(st).lower())
+                    if stages:
+                        def _rank(s: str) -> int:
+                            try:
+                                return STAGE_PRIORITY.index(s)
+                            except ValueError:
+                                return len(STAGE_PRIORITY)  # unknowns last
+                        winner = min(stages, key=_rank)
+                        extras["charger_state"] = winner[:16]
                 except Exception:
                     pass
 

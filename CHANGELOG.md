@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.40] · 2026-05-22
+
+### Fixed · charger_state pill now reflects the bank, not whichever charger sorted first
+
+On a multi-charger install (MPPT + AC charger + DC-DC) different
+chargers can be in different stages at the same instant — MPPT
+in absorption while the AC charger is still in bulk, or vice
+versa. Today we picked whichever charger sorted first by label
+in `get_latest()`, so the pill was effectively alphabetical
+luck of the draw.
+
+Now the pill picks the **most-active stage** across every
+online charger:
+
+  `bulk > mppt > absorption > equalize > float > storage > low_power > off > fault`
+
+If ANY charger is in bulk, the pill says bulk — matches the
+user's mental model ("is my bank charging hard right now or
+just maintaining?"). Silent devices (≥10 min since last
+broadcast) are excluded so a dead BLE radio's stale "bulk"
+doesn't poison the aggregate.
+
 ## [0.1.39] · 2026-05-22
 
 ### Fixed · stale charger state + phantom "Other source" tile
