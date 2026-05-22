@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.49] · 2026-05-22
+
+### Added · "Battery full · solar throttled" caption
+
+When the bank is at ≥98% SoC and the MPPT has dropped into float
+mode (only pulling enough sun to cover load + bus maintenance),
+the panel output looks artificially low — "three panels on a sunny
+day and only 94 W?". The power-flow caption now calls this out
+directly:
+
+> Battery full · solar throttled to load demand (94 W, panels not maxed)
+
+so people don't go hunting for a fault that isn't there.
+
 ## [0.1.48] · 2026-05-22
 
 ### Changed · Power flow gets a plain-English caption
