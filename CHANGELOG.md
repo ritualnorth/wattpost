@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.39] · 2026-05-22
+
+### Fixed · stale charger state + phantom "Other source" tile
+
+Two related UX fixes for the "AC charger went silent on BLE"
+case (very common on Victron IP22 chargers, which intermittently
+stop broadcasting during float / storage stages):
+
+- **Cloud dashboard's "bulk" pill stayed forever**: the appliance
+  read `charger_state` straight from the latest-values table
+  without any recency check, so an IP22 that broadcast `bulk`
+  before going quiet kept showing as "bulk" on
+  wattpost.cloud/app indefinitely. Now skips devices whose
+  `_last_seen` is more than 10 min old — same threshold the
+  Devices snapshot uses for the online flag.
+- **Power Flow tile rendered a phantom "Other source · estimated"**:
+  when reconciliation found unattributed watts flowing into the
+  bank (because the silent charger was still physically pushing
+  but its BLE was dark), the dashboard added a separate "Other
+  source" tile alongside the silent AC Charger tile. Now, when
+  exactly one source is silent and there's an unattributed gap,
+  the gap is attributed back to that silent device with a "best
+  estimate from bank" sub-label. One tile, clearly labelled,
+  maths still balances.
+
 ## [0.1.38] · 2026-05-21
 
 ### Changed · appliance ships device snapshot in heartbeat extras

@@ -615,9 +615,21 @@ class CloudService:
                 # install we just surface "any active charger's mode",
                 # which is the headline customer-facing answer ("bulk?
                 # absorption? float?"). 16-char cap stays cheap.
+                #
+                # Skip silent devices: a charger that hasn't broadcast
+                # in 10+ min is showing stale state. Better to emit no
+                # pill at all than a misleading "bulk" badge while the
+                # BLE radio has gone dark. Same 10-min threshold the
+                # devices snapshot uses for the online flag.
                 try:
+                    now_ts = int(time.time())
                     for _label, dev in latest_for_extras.items():
-                        st = dev.get("charging_state") if isinstance(dev, dict) else None
+                        if not isinstance(dev, dict):
+                            continue
+                        last_seen = int(dev.get("_last_seen") or 0)
+                        if (now_ts - last_seen) >= 600:
+                            continue
+                        st = dev.get("charging_state")
                         if st:
                             extras["charger_state"] = str(st).lower()[:16]
                             break

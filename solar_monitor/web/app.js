@@ -1184,17 +1184,38 @@ function buildFlowModel() {
         sub: "estimated",
       });
     } else if (inferred < -INFERRED_NOISE_W) {
-      const visibleSourcesActive = sources.length > 0;
-      sources.push({
-        id: visibleSourcesActive ? "_bus_source" : "_source",
-        label: visibleSourcesActive ? "Other source" : "Source",
-        color: "grid",
-        icon: "feed",
-        power: -inferred,
-        active: -inferred > 50,
-        inferred: visibleSourcesActive,
-        sub: "estimated",
-      });
+      // Before falling back to a phantom "Other source" tile,
+      // check whether we have exactly one silent source already.
+      // That's the common Victron BLE case: the charger went
+      // quiet on BLE but is still physically pushing watts that
+      // the bank is measuring.  Attributing the gap back to the
+      // silent device is more honest than rendering a separate
+      // "Other source" alongside — the user sees one tile, knows
+      // why it's marked estimated, and the maths still balances.
+      const silentSources = sources.filter((s) => s.silent && (+s.power || 0) === 0);
+      if (silentSources.length === 1) {
+        const silent = silentSources[0];
+        silent.power    = -inferred;
+        silent.active   = -inferred > 50;
+        silent.inferred = true;  // dashed border + asterisk
+        // Keep the "Silent — last heard …" sub-label so the user
+        // still sees why the value is estimated rather than measured.
+        silent.sub = silent.sub
+          ? `${silent.sub} · estimated from bank`
+          : "estimated from bank";
+      } else {
+        const visibleSourcesActive = sources.length > 0;
+        sources.push({
+          id: visibleSourcesActive ? "_bus_source" : "_source",
+          label: visibleSourcesActive ? "Other source" : "Source",
+          color: "grid",
+          icon: "feed",
+          power: -inferred,
+          active: -inferred > 50,
+          inferred: visibleSourcesActive,
+          sub: "estimated",
+        });
+      }
     } else if (!visibleLoadsActive) {
       // True idle: |inferred| ≤ noise floor and nothing measured.
       // Placeholder tile keeps the strip symmetric with the always-
