@@ -3177,7 +3177,11 @@ function drawEnergyChart(root, ts, series) {
       { stroke: pal.axis, scale: "y2", side: 1, grid: { show: false },
         values: (_u, splits) => splits.map(v => v == null ? "" : v.toFixed(0) + "%") },
     ],
-    legend: { live: true },
+    // No built-in legend — mobile has no hover, so uPlot's live
+    // legend just shows "·" placeholders forever. The static
+    // colour-chip legend rendered in HTML below the chart serves
+    // the labelling job; cursor scrubbing is desktop-only.
+    legend: { show: false },
   };
 
   const dataCols = [ts, series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc];

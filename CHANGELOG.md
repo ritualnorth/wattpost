@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.55] · 2026-05-22
+
+### Fixed · Dark labels + uPlot legend placeholders
+
+Two small things from the broker / mobile view:
+
+- All references to `var(--text-1)` across `styles.css` were
+  resolving to `unset` (the real variable is `--text`). The
+  Power-flow node W labels and a handful of other accents
+  rendered in a dark colour against the dark surface, hard to
+  read. Replaced every `--text-1` with `--text` (also fixes
+  half a dozen pre-existing dark-text spots dating from May 16
+  that nobody had flagged).
+- The Energy chart's built-in uPlot legend was showing
+  permanent `·` placeholders on touch devices (no hover, so
+  the live legend never updates). Hidden — the static
+  colour-chip legend below the chart already labels every
+  series.
+
 ## [0.1.54] · 2026-05-22
 
 ### Fixed · Broker Exit-kiosk button kept showing
