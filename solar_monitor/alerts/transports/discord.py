@@ -40,11 +40,15 @@ class DiscordWebhookTransport(NotificationTransport):
     async def send(self, event: AlertEvent) -> None:
         if self._client is None:
             return
+        from ..base import humanise_metric, humanise_op, fmt_value
+        metric_label = humanise_metric(event.metric)
         embed = {
             "title": event.name,
             "description": (
-                f"`{event.metric}` = **{event.value:.2f}**  "
-                f"({event.op} {event.threshold:.2f})"
+                f"**{metric_label}** is "
+                f"**{fmt_value(event.metric, event.value)}**  "
+                f"(threshold {humanise_op(event.op)} "
+                f"{fmt_value(event.metric, event.threshold)})"
             ),
             "color": _SEVERITY_COLOR.get(event.severity, 0xD29922),
             "footer": {"text": f"WattPost · {event.severity}"},

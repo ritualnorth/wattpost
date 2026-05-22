@@ -54,14 +54,12 @@ class PushoverTransport(NotificationTransport):
     async def send(self, event: AlertEvent) -> None:
         if self._client is None:
             return
+        from ..base import render_alert_summary
         data = {
             "token": self.app_token,
             "user": self.user_key,
             "title": f"WattPost · {event.name}",
-            "message": (
-                f"{event.metric} = {event.value:.2f} "
-                f"({event.op} {event.threshold:.2f})"
-            ),
+            "message": render_alert_summary(event),
             "priority": _SEVERITY_PRIORITY.get(event.severity, 0),
             "timestamp": event.ts,
         }

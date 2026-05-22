@@ -40,10 +40,9 @@ class NtfyTransport(NotificationTransport):
         if self._client is None:
             return
         url = f"{self.server}/{self.topic}"
-        body = (
-            f"{event.metric} = {event.value:.2f} "
-            f"({event.op} threshold {event.threshold:.2f})"
-        )
+        from ..base import render_alert_summary
+        # e.g. "State of charge is 18.5% (threshold < 20%)"
+        body = render_alert_summary(event)
         try:
             # ntfy headers are sent as HTTP headers and must be ASCII —
             # no fancy bullets. Body can be UTF-8 freely. Explicit
