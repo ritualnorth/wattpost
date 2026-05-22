@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.53] · 2026-05-22
+
+### Fixed · Energy chart cleanup
+
+Two readability bugs in v0.1.52's Energy-today chart:
+
+- SoC line drew a misleading drop-to-zero when a poll bucket missed.
+  Now treat any SoC ≤ 0 as null so the line shows a gap instead
+  (0% is physically impossible — BMS would have cut off long
+  before).
+- Load (purple) area was vanishing behind Solar / AC-charger areas
+  on heavy-source days. Switched Load from filled area to a
+  thicker line drawn on top — clearly legible against everything.
+
 ## [0.1.52] · 2026-05-22
 
 ### Added · Energy-today overview (top of /history)

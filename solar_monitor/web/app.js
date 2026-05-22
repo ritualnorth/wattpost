@@ -3064,7 +3064,10 @@ async function refreshEnergyOverview() {
   });
   const batIn  = bank.map(v => v == null ? 0 : Math.max(0,  v));
   const batOut = bank.map(v => v == null ? 0 : Math.min(0,  v)); // negative
-  const soc    = (s.soc_pct || []).map(v => v == null ? null : v);
+  // SoC ≤ 0 is physically impossible (BMS would have cut off first).
+  // When a poll bucket misses, the average can land at 0 and produce
+  // a misleading drop-to-zero line. Treat those as gaps.
+  const soc    = (s.soc_pct || []).map(v => (v == null || v <= 0) ? null : v);
 
   drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc });
 
@@ -3149,9 +3152,12 @@ function drawEnergyChart(root, ts, series) {
       // Charger — grey filled area, ≥0.
       { label: "Charger",     stroke: "#b1b9c2", width: 1.0, fill: "rgba(177,185,194,0.25)",
         value: (_u, v) => fmtW(v) },
-      // Load — purple filled area, ≥0. Drawn on top of sources so the
-      // overlap visualises where load is being met live.
-      { label: "Load",        stroke: "#7c5cff", width: 1.2, fill: "rgba(124,92,255,0.30)",
+      // Load — purple LINE (no fill) drawn on top of sources so the
+      // line is legible against the yellow/grey area overlap. Earlier
+      // versions filled this too, but on heavy-source days the load
+      // line vanished behind the charger area; line-on-top reads
+      // better at glance.
+      { label: "Load",        stroke: "#a48cff", width: 1.8,
         value: (_u, v) => fmtW(v) },
       // Battery in — green filled area, ≥0.
       { label: "Into battery", stroke: "#56d364", width: 1.0, fill: "rgba(86,211,100,0.30)",
