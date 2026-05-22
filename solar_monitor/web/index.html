@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=125" />
+  <link rel="stylesheet" href="/web/styles.css?v=126" />
   <script>
     // Detect the WattPost mobile shell (sets a UA marker via
     // capacitor.config.ts.{ios,android}.appendUserAgent). When set,
@@ -477,13 +477,65 @@
          ROUTE: History
          ===================================================== -->
     <section class="route" data-route="history">
+
+      <!-- ENERGY TODAY — Powerwall-style overview chart. Multi-series
+           area + SoC line, four kWh totals, self-powered breakdown.
+           Backed by /api/energy/today which returns aligned series in
+           a single request. -->
+      <section class="panel energy-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/>
+            </svg>
+            Energy today
+          </h2>
+          <div class="panel-sub" id="energy-sub">·</div>
+        </div>
+
+        <div id="energy-chart" class="energy-chart-host"></div>
+
+        <div class="energy-legend" id="energy-legend">
+          <span class="chip"><span class="swatch" style="background:#f0c849"></span>Solar</span>
+          <span class="chip"><span class="swatch" style="background:#7c5cff"></span>Load</span>
+          <span class="chip"><span class="swatch" style="background:#56d364"></span>Into battery</span>
+          <span class="chip"><span class="swatch" style="background:#f06292"></span>Out of battery</span>
+          <span class="chip"><span class="swatch line" style="background:#ff5e57"></span>SoC</span>
+        </div>
+
+        <div class="energy-stats">
+          <div class="estat pv">
+            <div class="estat-k">Solar today</div>
+            <div class="estat-v"><span id="es-solar">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat load">
+            <div class="estat-k">Load today</div>
+            <div class="estat-v"><span id="es-load">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat in">
+            <div class="estat-k">Into battery</div>
+            <div class="estat-v"><span id="es-batin">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat out">
+            <div class="estat-k">Out of battery</div>
+            <div class="estat-v"><span id="es-batout">·</span><span class="unit">kWh</span></div>
+          </div>
+        </div>
+
+        <div class="energy-self">
+          <div class="energy-self-k">Self-powered breakdown</div>
+          <div class="energy-self-bars" id="energy-self-bars"></div>
+          <div class="energy-self-legend" id="energy-self-legend"></div>
+        </div>
+      </section>
+
       <section class="panel chart-panel">
         <div class="panel-header">
           <h2>
             <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/>
             </svg>
-            History
+            Detailed metrics
           </h2>
           <div class="chart-controls">
             <select id="sel-device" aria-label="Device"></select>
@@ -1118,6 +1170,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=191"></script>
+  <script src="/web/app.js?v=192"></script>
 </body>
 </html>

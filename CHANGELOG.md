@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.52] · 2026-05-22
+
+### Added · Energy-today overview (top of /history)
+
+Powerwall-Dashboard-inspired overview replacing the History page's
+front. Stacked-area chart showing solar / load / into-battery /
+out-of-battery as signed kW over the local calendar day, with SoC
+overlaid on a right-side % axis. Below: four kWh totals (solar,
+load, into battery, out of battery) and a self-powered breakdown
+bar (what % of today's load came from solar vs battery vs charger).
+
+The existing per-metric line chart (with device + metric selector,
+range buttons, CSV export) is preserved as "Detailed metrics" below.
+Load-profile heatmap stays below that.
+
+Backed by a new `/api/energy/today` endpoint that returns all five
+series aligned to one shared `ts` grid + pre-computed kWh totals
+in a single request. Buckets at 5 min for the default day window.
+
+Slice 2 follow-ups: weather overlay (temp + cloud cover lines on
+the right axis), range buttons (1h/6h/24h/7d/30d) tied to this
+chart, and animated draw-in on poll updates.
+
 ## [0.1.51] · 2026-05-22
 
 ### Changed · Power flow: Powerwall-style SVG diagram
