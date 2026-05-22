@@ -1404,6 +1404,51 @@ main {
 .donut-state.discharging .flow-donut-arrow { color: var(--amber); }
 .donut-state.critical    .flow-donut-arrow { color: var(--red); }
 
+/* ───── Energy-today overview (top of /history) ───── */
+.energy-panel { padding: 1.1rem 1rem; }
+.energy-chart-host { width: 100%; min-height: 280px; }
+.energy-legend {
+  display: flex; flex-wrap: wrap; gap: .25rem .85rem;
+  font-size: .68rem; color: var(--text-2);
+  margin: .55rem .25rem 0; justify-content: center;
+}
+.energy-legend .chip { display: inline-flex; align-items: center; gap: .3rem; }
+.energy-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.energy-legend .swatch.line { width: 14px; height: 2px; border-radius: 0; }
+
+.energy-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+  margin-top: 1rem;
+}
+.estat {
+  padding: .75rem .85rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.estat-k { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: .25rem; }
+.estat-v { font-size: 1.3rem; font-weight: 700; }
+.estat-v .unit { font-size: .8rem; font-weight: 500; color: var(--text-2); margin-left: .15rem; }
+.estat.pv  .estat-v { color: var(--pv,    #f0c849); }
+.estat.load .estat-v { color: var(--load, #7c5cff); }
+.estat.in  .estat-v { color: var(--batt,  #56d364); }
+.estat.out .estat-v { color: var(--amber, #f0c849); }
+
+.energy-self {
+  margin-top: .75rem;
+  padding: .8rem .9rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.energy-self-k { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: .55rem; }
+.energy-self-bars { display: flex; gap: .35rem; height: 8px; border-radius: 999px; overflow: hidden; margin-bottom: .55rem; }
+.energy-self-bars span { display: block; height: 100%; }
+.energy-self-legend { display: grid; gap: .25rem; font-size: .72rem; }
+.energy-self-legend .self-row { display: flex; align-items: center; gap: .4rem; color: var(--text-2); }
+.energy-self-legend .self-row .dot { width: 8px; height: 8px; border-radius: 50%; }
+.energy-self-legend .self-row .pct { margin-left: auto; color: var(--text-1); font-weight: 600; }
+
 /* ───── v2 SVG flow diagram (Powerwall-style) ─────
    Replaces the old flow-col / flow-conn layout. Sources/loads arc
    around a notional bus point; particles travel along bezier paths.

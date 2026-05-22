@@ -3022,6 +3022,167 @@ function drawCompareChart(metric, datasets) {
   }
 }
 
+// ───────── Energy-today overview (top of /history) ─────────
+//
+// One request fetches all five series aligned to the same ts grid +
+// kWh totals + self-powered breakdown. Then a single uPlot draws:
+//   solar (yellow area, ≥0), charger (grey area, ≥0), load (purple
+//   area, derived from sources−bank), battery-in (green area, ≥0),
+//   battery-out (pink area, ≤0), SoC (red line on right axis).
+// Caption + four stat cards + self-powered bar update from the same
+// payload.
+
+let energyChart = null;
+
+async function refreshEnergyOverview() {
+  const host = document.getElementById("energy-chart");
+  if (!host) return;
+  let payload;
+  try {
+    const r = await fetch("/api/energy/today");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    payload = await r.json();
+  } catch (e) {
+    host.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">Couldn't load today's energy (${e.message}).</div>`;
+    return;
+  }
+
+  const s = payload.series || {};
+  const ts = s.ts || [];
+  const solar   = (s.solar_w   || []).map(v => v == null ? 0 : Math.max(0, v));
+  const charger = (s.charger_w || []).map(v => v == null ? 0 : Math.max(0, v));
+  const bank    = s.bank_w || [];
+  // Load = sources − bank (when bank charging, eats sources; when
+  // discharging, adds to load). Clip ≥ 0 since we render as a
+  // positive area; the "out of battery" series captures discharge
+  // separately for the green-on-pink Powerwall look.
+  const load = ts.map((_, i) => {
+    const so = solar[i]   || 0;
+    const ch = charger[i] || 0;
+    const bk = bank[i] == null ? 0 : bank[i];
+    return Math.max(0, so + ch - bk);
+  });
+  const batIn  = bank.map(v => v == null ? 0 : Math.max(0,  v));
+  const batOut = bank.map(v => v == null ? 0 : Math.min(0,  v)); // negative
+  const soc    = (s.soc_pct || []).map(v => v == null ? null : v);
+
+  drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc });
+
+  // Sub-line: time range.
+  const sub = document.getElementById("energy-sub");
+  if (sub && payload.since_ts && payload.until_ts) {
+    const fmt = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    sub.textContent = `${fmt(payload.since_ts)} → ${fmt(payload.until_ts)}`;
+  }
+
+  // Stat cards.
+  const totals = payload.totals || {};
+  const kwh = (wh) => wh == null ? "·" : (wh / 1000).toFixed(1);
+  setText("es-solar",  kwh(totals.solar_wh));
+  setText("es-load",   kwh(totals.load_wh));
+  setText("es-batin",  kwh(totals.bank_charged_wh));
+  setText("es-batout", kwh(totals.bank_discharged_wh));
+
+  // Self-powered breakdown — bar + legend rows.
+  const bd = payload.self_powered || {};
+  const bars = document.getElementById("energy-self-bars");
+  const leg  = document.getElementById("energy-self-legend");
+  if (bars && leg) {
+    bars.innerHTML = "";
+    leg.innerHTML = "";
+    const slices = [
+      { k: "solar",   label: "From solar",   color: "#f0c849", pct: bd.solar   || 0 },
+      { k: "battery", label: "From battery", color: "#56d364", pct: bd.battery || 0 },
+      { k: "charger", label: "From charger", color: "#b1b9c2", pct: bd.charger || 0 },
+    ];
+    for (const sl of slices) {
+      if (sl.pct < 0.5) continue;
+      const span = document.createElement("span");
+      span.style.background = sl.color;
+      span.style.width = `${sl.pct}%`;
+      bars.appendChild(span);
+      const row = document.createElement("div");
+      row.className = "self-row";
+      row.innerHTML = `<span class="dot" style="background:${sl.color}"></span>${sl.label}<span class="pct">${sl.pct.toFixed(0)}%</span>`;
+      leg.appendChild(row);
+    }
+    if (!bars.children.length) {
+      bars.innerHTML = `<span style="background:#3a4351; width:100%"></span>`;
+      leg.innerHTML = `<div class="self-row" style="color:var(--text-3)">No load detected today yet</div>`;
+    }
+  }
+}
+
+function setText(id, t) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = t;
+}
+
+function drawEnergyChart(root, ts, series) {
+  if (energyChart) { energyChart.destroy(); energyChart = null; }
+  if (!ts.length) {
+    root.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">No samples yet today.</div>`;
+    return;
+  }
+  const width = Math.max(root.clientWidth, 320);
+  const pal = chartPalette();
+
+  const fmtW = (v) => v == null ? "·" : (Math.abs(v) >= 1000 ? (v/1000).toFixed(1) + " kW" : v.toFixed(0) + " W");
+  const fmtPct = (v) => v == null ? "·" : v.toFixed(0) + " %";
+
+  const opts = {
+    width, height: 280,
+    cursor: { drag: { x: true, y: false } },
+    scales: {
+      x: { time: true },
+      // Power axis (signed — battery discharge dips below 0).
+      y: { auto: true },
+      // SoC % on right axis, fixed 0..100 so the line is comparable
+      // across days regardless of power magnitudes.
+      y2: { range: [0, 100], auto: false },
+    },
+    series: [
+      {},
+      // Solar — yellow filled area, ≥0.
+      { label: "Solar",       stroke: "#f0c849", width: 1.2, fill: "rgba(240,200,73,0.35)",
+        value: (_u, v) => fmtW(v) },
+      // Charger — grey filled area, ≥0.
+      { label: "Charger",     stroke: "#b1b9c2", width: 1.0, fill: "rgba(177,185,194,0.25)",
+        value: (_u, v) => fmtW(v) },
+      // Load — purple filled area, ≥0. Drawn on top of sources so the
+      // overlap visualises where load is being met live.
+      { label: "Load",        stroke: "#7c5cff", width: 1.2, fill: "rgba(124,92,255,0.30)",
+        value: (_u, v) => fmtW(v) },
+      // Battery in — green filled area, ≥0.
+      { label: "Into battery", stroke: "#56d364", width: 1.0, fill: "rgba(86,211,100,0.30)",
+        value: (_u, v) => fmtW(v) },
+      // Battery out — pink filled area, ≤0 (drawn below zero).
+      { label: "Out of battery", stroke: "#f06292", width: 1.0, fill: "rgba(240,98,146,0.30)",
+        value: (_u, v) => v == null ? "·" : fmtW(-v) },
+      // SoC — red line on right axis.
+      { label: "SoC", stroke: "#ff5e57", width: 1.6, scale: "y2",
+        value: (_u, v) => fmtPct(v) },
+    ],
+    axes: [
+      { stroke: pal.axis, grid: { stroke: pal.grid }, ticks: { stroke: pal.gridStrong }, space: 50, size: 36 },
+      { stroke: pal.axis, grid: { stroke: pal.grid }, ticks: { stroke: pal.gridStrong }, space: 36,
+        values: (_u, splits) => splits.map(v => v == null ? "" :
+          (Math.abs(v) >= 1000 ? (v/1000).toFixed(1) + "kW" : v.toFixed(0) + " W")) },
+      { stroke: pal.axis, scale: "y2", side: 1, grid: { show: false },
+        values: (_u, splits) => splits.map(v => v == null ? "" : v.toFixed(0) + "%") },
+    ],
+    legend: { live: true },
+  };
+
+  const dataCols = [ts, series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc];
+  try {
+    energyChart = new uPlot(opts, dataCols, root);
+  } catch (e) {
+    console.error("uPlot energy failed:", e);
+    root.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:.85rem;">Chart render failed: ${e.message}</div>`;
+  }
+}
+
 function updateStatStrip(metric, data) {
   const unit = unitFromKey(metric);
   const s = data?.stats || {};
@@ -3638,7 +3799,7 @@ function setRoute(_unused) {
     t.classList.toggle("active", match);
   });
   if (route.name === "history") {
-    requestAnimationFrame(() => { refreshChart(); refreshHeatmap(); });
+    requestAnimationFrame(() => { refreshEnergyOverview(); refreshChart(); refreshHeatmap(); });
   }
   if (route.name === "settings") { renderSettings(); startDiagTimer(); }
   else { stopDiagTimer(); }

@@ -55,6 +55,7 @@ from .weather_admin import (
     test_weather_fetch,
 )
 from .gps_admin import get_gps_status
+from .energy import energy_today
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
     unpair_appliance, trigger_heartbeat,
@@ -1466,6 +1467,7 @@ def build_app(
             device_latest,
             device_history,
             device_history_csv,
+            energy_today,
             device_lifetime,
             device_efficiency,
             device_charger_stats,
