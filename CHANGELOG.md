@@ -8,6 +8,48 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.42] · 2026-05-22
+
+### Added · BLE adapter "wedged" detection + auto-recovery (#244)
+
+Follow-up to v0.1.41's orchestrator-reopen-loop fix. Two adjacent
+gaps closed:
+
+**Orchestrator retries failed transport opens.** If a transport's
+`open()` raises (e.g. `org.bluez.Error.InProgress` after a USB
+state hiccup), the orchestrator now schedules a retry with
+exponential backoff (5s → 10s → 20s → 40s → 80s → 160s → cap
+at 5 min). Previously a one-time open() failure stranded the
+transport until container restart. The Garage Stack VM hit this
+exact case post-USB-reset and would otherwise have stayed dark
+for hours.
+
+**BLE-adapter-wedged surfacing.** The shared Victron scanner now
+tracks "did we receive ANY advertisement since scan-start" (not
+just Victron payloads — any advert proves the dongle is delivering
+data). After 30s of zero callbacks the adapter is flagged
+`wedged`. Heartbeat extras carries the state field
+(`ble_adapter_state ∈ {ok, warming, wedged, idle}`); the cloud's
+per-site dashboard renders a red banner explaining the situation
+and how to recover ("Unplug the USB Bluetooth dongle, wait 10s,
+plug it back in.") instead of showing every Victron device
+independently going silent.
+
+### Recovery note for Realtek dongle users
+
+If you've been running v0.1.40 or earlier with a Realtek-based
+BLE dongle (the popular TP-Link UB500, ASUS USB-BT500, and most
+sub-£15 dongles use the RTL8761B), the pre-v0.1.41 reopen loop
+was firing thousands of `HCI_LE_Set_Scan_Enable` cycles per day
+against firmware that handles that poorly. Symptom: Victron
+devices show "Silent" or stale-data even after pulling
+v0.1.41/0.1.42.
+
+**Fix once:** unplug the USB Bluetooth dongle from the appliance,
+wait 10 seconds, plug it back in. Soft resets (`systemctl restart
+bluetooth`, container restart, even VM reboots) often don't fully
+clear Realtek firmware state — a physical power-cycle does.
+
 ## [0.1.41] · 2026-05-22
 
 ### Fixed · Victron BLE adverts dropped by orchestrator reopen loop

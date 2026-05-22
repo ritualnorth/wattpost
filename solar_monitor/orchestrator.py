@@ -58,6 +58,12 @@ class Poller:
     def __init__(self, config: Config) -> None:
         self.config = config
         self._transports: dict[str, Transport] = {}
+        # Transports whose last open() raised — retried on subsequent
+        # _ensure_open() calls with backoff so a flaky USB BLE dongle
+        # or a wedged BlueZ doesn't strand the appliance until the
+        # next container restart. Maps id → (next_attempt_monotonic,
+        # consecutive_fail_count).
+        self._retry_state: dict[str, tuple[float, int]] = {}
 
     async def open(self) -> None:
         """Build + open every configured transport."""
@@ -77,10 +83,13 @@ class Poller:
                 await t.open()
             except Exception:
                 log.exception(
-                    "transport %s failed to open at startup — kept "
-                    "registered so callers can retry .open()",
+                    "transport %s failed to open at startup — will "
+                    "retry on next poll",
                     tcfg.get("id"),
                 )
+                # Schedule a retry. Initial backoff is short — we want
+                # the BLE adapter to come back as soon as it's ready.
+                self._retry_state[t.id] = (time.monotonic() + 5.0, 1)
 
     async def close(self) -> None:
         for t in self._transports.values():
@@ -143,6 +152,31 @@ class Poller:
             except Exception:
                 log.exception("transport %s reopen failed", transport_id)
                 return None
+        # Retry transports whose open() previously failed (e.g. BlueZ
+        # InProgress on a wedged Realtek dongle). Backoff doubles each
+        # consecutive failure, capped at 5 minutes — keeps us from
+        # hammering a truly dead adapter but recovers fast once the
+        # user replugs / power-cycles.
+        retry = self._retry_state.get(transport_id)
+        if retry is not None:
+            next_at, fails = retry
+            if time.monotonic() >= next_at:
+                try:
+                    log.info("retrying transport %s open (attempt %d)",
+                             transport_id, fails + 1)
+                    await t.open()
+                    self._retry_state.pop(transport_id, None)
+                    log.info("transport %s recovered after %d failed attempt(s)",
+                             transport_id, fails)
+                except Exception:
+                    log.warning("transport %s open retry %d failed",
+                                transport_id, fails + 1)
+                    # 5s → 10s → 20s → 40s → 80s → 160s → 300s (cap)
+                    backoff = min(300.0, 5.0 * (2 ** fails))
+                    self._retry_state[transport_id] = (
+                        time.monotonic() + backoff, fails + 1,
+                    )
+                    return None
         return t
 
     async def poll(self) -> dict:

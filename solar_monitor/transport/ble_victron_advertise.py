@@ -68,6 +68,14 @@ class _SharedVictronScanner:
         self._subscribers: dict[str, "BleVictronAdvertiseTransport"] = {}
         self._scanner: BleakScanner | None = None
         self._lock = asyncio.Lock()
+        # Adapter-health tracking (#244). When the BLE dongle wedges
+        # (Realtek firmware bug on the RTL8761B family is the common
+        # case) the scanner still reports "running" but no callbacks
+        # ever fire. Compare _last_any_advert_at against
+        # _scan_started_at to tell "we've been listening but heard
+        # nothing in N seconds" from "we just started, give it time".
+        self._scan_started_at: float = 0.0
+        self._last_any_advert_at: float = 0.0
 
     async def register(self, transport: "BleVictronAdvertiseTransport") -> None:
         async with self._lock:
@@ -79,6 +87,10 @@ class _SharedVictronScanner:
                 # discovery. Active is fine on the dongle.
                 self._scanner = BleakScanner(detection_callback=self._on_detection)
                 await self._scanner.start()
+                self._scan_started_at = time.monotonic()
+                # Reset on every start — we're tracking "did we hear
+                # ANY advert since the most recent scan-start".
+                self._last_any_advert_at = 0.0
                 log.info("victron scanner started (subscribers=%d)",
                          len(self._subscribers))
 
@@ -125,6 +137,8 @@ class _SharedVictronScanner:
             self._scanner = BleakScanner(detection_callback=self._on_detection)
             try:
                 await self._scanner.start()
+                self._scan_started_at = time.monotonic()
+                self._last_any_advert_at = 0.0
                 log.info("victron scanner resumed (subscribers=%d)",
                          len(self._subscribers))
             except Exception:
@@ -132,6 +146,12 @@ class _SharedVictronScanner:
                 self._scanner = None
 
     def _on_detection(self, device, ad_data) -> None:
+        # Stamp adapter-alive marker before any filtering — receiving
+        # ANY advert means the dongle is delivering data, even if
+        # none of them are Victron right now. Used by adapter_health()
+        # to distinguish "wedged dongle" from "no Victron devices in
+        # range".
+        self._last_any_advert_at = time.monotonic()
         # Cheap fast-path filter first — most advertisements on a
         # crowded RF environment have nothing to do with Victron.
         mfr = getattr(ad_data, "manufacturer_data", None) or {}
@@ -147,6 +167,40 @@ class _SharedVictronScanner:
         except Exception:
             log.exception("[%s] advertisement decode crashed", t.id)
 
+    def adapter_health(self) -> str:
+        """Snapshot of the BLE adapter's state, from the scanner's
+        perspective. Returns one of:
+
+          "ok"      — scanner running, received an advert recently
+          "wedged"  — scanner running ≥30s, but no callbacks at all.
+                      Classic Realtek RTL8761B firmware lockup.
+          "idle"    — no subscribers / scanner not running
+          "warming" — scanner just started, hasn't been long enough
+                      to call it wedged yet
+
+        Heartbeat extras surface this so the cloud dashboard can
+        render a "Bluetooth dongle not responding — try a power-cycle"
+        banner instead of the user seeing every Victron device
+        independently appear silent."""
+        if self._scanner is None or self._scan_started_at == 0.0:
+            return "idle"
+        now = time.monotonic()
+        running_for = now - self._scan_started_at
+        if self._last_any_advert_at > 0.0:
+            since = now - self._last_any_advert_at
+            # Within the last 90s — adapter is delivering.  Adverts
+            # from non-Victron devices are common enough in any
+            # populated RF environment that even rural installs
+            # should see *something*.
+            if since < 90.0:
+                return "ok"
+        # No callbacks at all yet.  Give the dongle 30s to warm up
+        # before declaring it wedged — BlueZ filter rearm + first
+        # scan window takes 5-10s on slow hosts.
+        if running_for < 30.0:
+            return "warming"
+        return "wedged"
+
 
 _GLOBAL_SCANNER: _SharedVictronScanner | None = None
 
@@ -156,6 +210,16 @@ def _scanner() -> _SharedVictronScanner:
     if _GLOBAL_SCANNER is None:
         _GLOBAL_SCANNER = _SharedVictronScanner()
     return _GLOBAL_SCANNER
+
+
+def adapter_health() -> str:
+    """Module-level shortcut for the cloud heartbeat to query without
+    instantiating the singleton if it doesn't already exist. Returns
+    "idle" when no scanner has ever been built (no Victron devices
+    configured)."""
+    if _GLOBAL_SCANNER is None:
+        return "idle"
+    return _GLOBAL_SCANNER.adapter_health()
 
 
 # ---------- transport ----------
