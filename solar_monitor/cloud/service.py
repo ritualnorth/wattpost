@@ -210,6 +210,16 @@ class CloudService:
             await self._dispatch_restore_from_cloud(cmd_id, cmd)
             return
 
+        # #261 slice 2 — bidirectional rules sync. Cloud edits to a
+        # local rule arrive as set_local_rule / delete_local_rule
+        # commands carrying the rule spec in `payload_json`.
+        if kind == "set_local_rule":
+            await self._dispatch_set_local_rule(cmd_id, cmd)
+            return
+        if kind == "delete_local_rule":
+            await self._dispatch_delete_local_rule(cmd_id, cmd)
+            return
+
         if kind != "update":
             await self._patch_command_status(
                 cmd_id, "failed",
@@ -418,6 +428,119 @@ class CloudService:
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
         asyncio.create_task(_delayed_exec())
+
+    async def _dispatch_set_local_rule(self, cmd_id: int, cmd: dict[str, Any]) -> None:
+        """#261 slice 2 — apply a cloud-edited rule to the local engine.
+
+        Payload mirrors the appliance's /api/alerts/rules POST shape
+        (id, name, metric, op, threshold, severity, cooldown_seconds,
+        transports). We upsert into config.alerts in-place, atomic-
+        write config.yaml, and reload the engine. No daemon restart.
+        """
+        import json as _json
+        await self._patch_command_status(cmd_id, "picked_up")
+        try:
+            raw = cmd.get("payload_json") or "{}"
+            payload = _json.loads(raw) if isinstance(raw, str) else dict(raw)
+            rid     = str(payload.get("id") or "")
+            if not rid:
+                raise ValueError("missing rule id")
+            from ..config import AlertRuleCfg
+            new_rule = AlertRuleCfg(
+                id               = rid,
+                name             = str(payload.get("name") or rid),
+                metric           = str(payload.get("metric") or ""),
+                op               = str(payload.get("op") or "lt"),
+                threshold        = float(payload.get("threshold") or 0),
+                severity         = str(payload.get("severity") or "warn"),
+                cooldown_seconds = int(payload.get("cooldown_seconds") or 1800),
+                transports       = list(payload.get("transports") or []),
+            )
+            # In-place replace or append
+            self.cfg.alerts = [
+                new_rule if r.id == rid else r for r in (self.cfg.alerts or [])
+            ]
+            if not any(r.id == rid for r in self.cfg.alerts):
+                self.cfg.alerts.append(new_rule)
+            await self._persist_alerts_to_yaml()
+            self._reload_alerts_engine()
+            await self._patch_command_status(cmd_id, "success")
+            log.info("set_local_rule applied: %s", rid)
+        except Exception as e:
+            log.exception("set_local_rule failed")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"{type(e).__name__}: {e}",
+            )
+
+    async def _dispatch_delete_local_rule(self, cmd_id: int, cmd: dict[str, Any]) -> None:
+        """#261 slice 2 — remove a rule the cloud deleted. Idempotent:
+        if it's already gone (e.g. user also deleted on the appliance)
+        we still report success."""
+        import json as _json
+        await self._patch_command_status(cmd_id, "picked_up")
+        try:
+            raw = cmd.get("payload_json") or "{}"
+            payload = _json.loads(raw) if isinstance(raw, str) else dict(raw)
+            rid     = str(payload.get("id") or "")
+            if not rid:
+                raise ValueError("missing rule id")
+            before = len(self.cfg.alerts or [])
+            self.cfg.alerts = [r for r in (self.cfg.alerts or []) if r.id != rid]
+            await self._persist_alerts_to_yaml()
+            self._reload_alerts_engine()
+            await self._patch_command_status(cmd_id, "success")
+            log.info("delete_local_rule applied: %s (was %d, now %d)",
+                     rid, before, len(self.cfg.alerts))
+        except Exception as e:
+            log.exception("delete_local_rule failed")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"{type(e).__name__}: {e}",
+            )
+
+    async def _persist_alerts_to_yaml(self) -> None:
+        """Atomic-write config.yaml's `alerts:` section. Mirrors the
+        pattern in api/alerts_admin._save_config — same backup +
+        tmp+replace dance so a crash mid-write doesn't truncate.
+
+        Resolves the config path via the scheduler — `build_app` stashes
+        it on the scheduler so background services (us, BackupService)
+        can mutate config.yaml without needing Litestar state."""
+        import shutil
+        from pathlib import Path
+        import yaml
+        config_path = getattr(self.scheduler, "config_path", None)
+        if not config_path:
+            raise RuntimeError("scheduler has no config_path; "
+                               "set in build_app() per #148 pattern")
+        path = Path(config_path)
+        raw = yaml.safe_load(path.read_text()) or {}
+        raw["alerts"] = [
+            {
+                "id":               r.id,
+                "name":             r.name,
+                "metric":           r.metric,
+                "op":               r.op,
+                "threshold":        r.threshold,
+                "severity":         r.severity,
+                "cooldown_seconds": r.cooldown_seconds,
+                "transports":       list(r.transports or []),
+            }
+            for r in (self.cfg.alerts or [])
+        ]
+        backup = path.with_suffix(path.suffix + ".bak")
+        shutil.copy2(path, backup)
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+        tmp.replace(path)
+
+    def _reload_alerts_engine(self) -> None:
+        """Hot-reload the alerts engine with the current config.alerts.
+        Same call path Settings → Alerts uses on rule add/edit."""
+        engine = getattr(self.scheduler, "_alerts", None)
+        if engine is not None and hasattr(engine, "reload_rules"):
+            engine.reload_rules(self.cfg.alerts or [])
 
     async def _patch_command_status(
         self, cmd_id: int, status: str, *, error: str | None = None,
