@@ -5,7 +5,35 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0a0d12" id="meta-theme-color" />
   <title>WattPost</title>
-  <!-- PWA: install-to-home-screen + offline shell. -->
+  <!-- Suppress PWA hints when this HTML is served via the cloud
+       broker (<slug>.wattpost.cloud). Push notifications register
+       against the page's origin; if a user "Add to Home Screen"s
+       from a broker URL they'd get a per-appliance PWA scoped to
+       that single broker subdomain — alerts wouldn't reach it
+       (cloud sends push from wattpost.cloud origin), and the
+       multi-site picker wouldn't exist. The canonical install
+       target is wattpost.cloud/app. LAN access (192.168.x.x etc.)
+       still installs the appliance PWA — that's still valid for
+       offline-first / no-cloud customers. -->
+  <script>
+    (function () {
+      try {
+        if (location.hostname.endsWith('.wattpost.cloud')) {
+          // Tag for the SW block below + any other code that wants
+          // to know it's running in broker context.
+          window._wp_no_pwa = true;
+          var sel = 'link[rel="manifest"], link[rel="apple-touch-icon"], '
+                  + 'meta[name="apple-mobile-web-app-capable"], '
+                  + 'meta[name="apple-mobile-web-app-status-bar-style"], '
+                  + 'meta[name="apple-mobile-web-app-title"]';
+          var nodes = document.querySelectorAll(sel);
+          for (var i = 0; i < nodes.length; i++) nodes[i].remove();
+        }
+      } catch (_) { /* ignore — non-fatal */ }
+    })();
+  </script>
+  <!-- PWA: install-to-home-screen + offline shell. Stripped above
+       when accessed via the cloud broker. -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/web/icon-192.png" />
   <link rel="icon" type="image/svg+xml" href="/web/icon.svg" />
@@ -13,7 +41,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WattPost" />
   <script>
-    if ('serviceWorker' in navigator) {
+    // Skip SW registration when the HTML was served via the cloud
+    // broker — the cloud's own SW (at wattpost.cloud/wp-sw.js)
+    // owns push delivery for paired users. Registering a second SW
+    // on the broker subdomain would just compete for the alerts
+    // inbox notification flow.
+    if (!window._wp_no_pwa && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         // updateViaCache: 'none' tells the browser to bypass the
         // HTTP cache when fetching sw.js itself. Without it, iOS

@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.43] · 2026-05-22
+
+### Fixed · appliance PWA hints suppressed under cloud broker
+
+When the appliance's HTML was served via the cloud broker
+(`<slug>.wattpost.cloud/`), the page advertised `manifest.web-
+manifest` + apple-touch-icon + apple-mobile-web-app meta tags
+and registered its own service worker. A user who "Add to Home
+Screen"d while viewing the broker view ended up with a PWA
+scoped to that single broker subdomain — push notifications
+register against the page's origin, so cloud-delivered alerts
+(sent from `wattpost.cloud`) never arrived, and there was no
+multi-site picker or alerts inbox inside the PWA.
+
+The canonical install target is `wattpost.cloud/app` — that
+PWA's start_url is the fleet dashboard, push registers at the
+SaaS origin so alerts from any paired appliance fire, and the
+alerts inbox + account live inside the same install.
+
+Now: when `location.hostname.endsWith('.wattpost.cloud')` (i.e.
+served via the broker), an early head-script strips the manifest
+link, apple-touch-icon, apple-mobile-web-app meta tags, and
+sets a flag that blocks SW registration further down the page.
+LAN access (192.168.x.x, .local, etc.) still installs the
+appliance PWA — that's still valid for the offline-first /
+no-cloud user.
+
 ## [0.1.42] · 2026-05-22
 
 ### Added · BLE adapter "wedged" detection + auto-recovery (#244)
