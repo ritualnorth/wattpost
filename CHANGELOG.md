@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.45] · 2026-05-22
+
+### Fixed · SD-image build (pi-gen) — broken since v0.1.32
+
+Every tagged SD-image build since v0.1.32 (the slot-directory
+refactor, #219) failed in the pi-gen chroot at the very last
+step with
+
+```
+ERROR: Invalid requirement: '/opt/wattpost-src'
+Hint: It looks like a path. File '/opt/wattpost-src' does not exist.
+```
+
+Root cause was in `packaging/install.sh`: the migration block
+moves `/opt/wattpost-src` → `/opt/wattpost-slots/a/src/`, but
+when invoked from pi-gen (which sets `WATTPOST_SOURCE=
+/opt/wattpost-src`) the `SOURCE` variable still pointed at the
+now-moved legacy path. The final `pip install ${SOURCE}` then
+errored looking for the directory we'd just relocated.
+
+Fix is to refresh `SOURCE` inside the migration block when it
+matches `LEGACY_SRC`. Docker and curl-bash installs are
+unaffected (their `SOURCE` defaults to `REPO_ROOT`, never to
+the legacy path).
+
+Customer impact: `/download` on wattpost.cloud had been serving
+the v0.1.31 SD image since 21 April. Anyone who fresh-installed
+in that window had to run `wattpost-update` on first boot to
+catch up. v0.1.45's SD image will be the first new one in
+a month.
+
 ## [0.1.44] · 2026-05-22
 
 ### Changed · plain-English alert copy across every local transport (#249)
