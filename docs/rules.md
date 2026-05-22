@@ -6,7 +6,10 @@ on every poll, with a tight set of triggers and actions covering
 ~95% of what off-grid operators actually want to automate.
 
 Available on the **Pro tier** in the cloud and on every appliance
-that's paired to a Pro account.
+that's paired to a Pro account. Like alerts, rules you set on the
+appliance show up in your cloud Rules page and are editable from
+anywhere — see [/docs/cloud-alerts-and-notifications](/docs/cloud-alerts-and-notifications)
+for how local + cloud rules fit together.
 
 ## Anatomy of a rule
 
