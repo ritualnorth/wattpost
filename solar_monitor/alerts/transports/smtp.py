@@ -50,18 +50,28 @@ class SmtpTransport(NotificationTransport):
         self.use_ssl = use_ssl
 
     async def send(self, event: AlertEvent) -> None:
+        from ..base import (
+            humanise_metric, humanise_op, fmt_value,
+        )
         tag = _SEVERITY_TAG.get(event.severity, "WARN")
-        subject = f"[WattPost {tag}] {event.name}"
+        metric_label = humanise_metric(event.metric)
+        cur          = fmt_value(event.metric, event.value)
+        thr          = fmt_value(event.metric, event.threshold)
+        op_word      = humanise_op(event.op)
+        # Subject leads with the metric + current value so a phone
+        # lock-screen preview answers "what?" + "how bad?" without
+        # opening the message.  Rule name in parens to identify it.
+        subject = f"WattPost {tag.lower()}: {metric_label.lower()} {cur} ({event.name})"
         body = (
-            f"WattPost alert · {event.severity.upper()}\n"
+            f"Your WattPost appliance fired the \"{event.name}\" rule.\n"
             f"\n"
-            f"Rule:      {event.name}\n"
-            f"Metric:    {event.metric}\n"
-            f"Value:     {event.value:.4f}\n"
-            f"Condition: {event.op} {event.threshold:.4f}\n"
-            f"Fired at:  {time.strftime('%Y-%m-%d %H:%M:%S %z', time.localtime(event.ts))}\n"
+            f"  {metric_label} is now {cur}\n"
+            f"  Rule threshold: {op_word} {thr}\n"
+            f"  Severity: {event.severity.upper()}\n"
+            f"  Fired at: {time.strftime('%Y-%m-%d %H:%M:%S %z', time.localtime(event.ts))}\n"
             f"\n"
             f"This is an automated notification from your local appliance.\n"
+            f"Open the dashboard for live data and to manage alert rules.\n"
         )
 
         msg = EmailMessage()
