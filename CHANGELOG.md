@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.56] · 2026-05-22
+
+### Fixed · Placeholder legend on all History charts
+
+v0.1.55 only killed the live-legend on the new Energy chart, but
+the per-metric chart and the compare-packs chart both had the
+same `legend: { live: true }` config — and the same "Time: --,
+min: ·, max: ·" placeholder row appearing on touch devices where
+there's no hover. The stat strip above each chart already shows
+NOW/MIN/AVG/MAX, so the live legend was always redundant. Hidden
+everywhere.
+
 ## [0.1.55] · 2026-05-22
 
 ### Fixed · Dark labels + uPlot legend placeholders

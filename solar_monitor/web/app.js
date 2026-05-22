@@ -3011,7 +3011,7 @@ function drawCompareChart(metric, datasets) {
           + (unit ? " " + unit : "")),
       },
     ],
-    legend: { live: true },
+    legend: { show: false },
   };
 
   try {
@@ -3411,7 +3411,7 @@ function drawChart(label, metric, data, forecast = null) {
         },
       },
     ],
-    legend: { live: true },
+    legend: { show: false },
   };
 
   try {
