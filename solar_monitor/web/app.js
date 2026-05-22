@@ -1246,9 +1246,14 @@ function renderFlow(targetHost) {
   host.innerHTML = "";
 
   const model = buildFlowModel();
+  // Caption div lives outside the #flow host. Clear it from the
+  // early-return paths so stale text from the previous frame doesn't
+  // linger when the system goes idle.
+  const cap = host === $("#flow") ? document.getElementById("flow-cap") : null;
   if (!model.bank && model.sources.length === 0 && model.loads.length === 0) {
     host.innerHTML = `<div class="flow-empty">No active devices yet.</div>`;
     if (sub) sub.textContent = "";
+    if (cap) cap.textContent = "";
     return;
   }
 
@@ -1279,6 +1284,7 @@ function renderFlow(targetHost) {
     }
     host.appendChild(battCol);
     if (sub) sub.textContent = "no sources or loads configured";
+    if (cap) cap.textContent = "";
     return;
   }
   host.classList.remove("flow--idle");
@@ -1367,22 +1373,50 @@ function renderFlow(targetHost) {
     host.appendChild(loadsCol);
   }
 
-  // Sub-header summary — describe whatever's actually present.
-  // Include battery contribution so totals reconcile: a discharging
-  // bank counts as power "in" to the bus, a charging bank as "out".
-  // Without this the line looked broken when solar < load and the
-  // battery covered the gap (e.g. 94 W in · 99 W out, with no hint
-  // that the missing 5 W came from the bank).
+  // Sub-header summary — short totals for sources and loads. We
+  // tried squeezing a battery pill in here ("battery N W in/out")
+  // but the bus-perspective wording was backwards from how users
+  // read it, so the story moved to the caption below the diagram.
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
-  const battW = Math.round(model.batteryNetW || 0);
-  if (model.bank && Math.abs(battW) >= 1) {
-    parts.push(battW < 0
-      ? `battery ${Math.abs(battW)} W in`
-      : `battery ${battW} W out`);
-  }
   if (hasLoads)   parts.push(`${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ${totalLoadW.toFixed(0)} W out`);
   if (sub) sub.textContent = parts.join(" · ") || "system idle";
+
+  // Plain-English caption under the diagram — tells the story so
+  // users don't have to mentally reconcile source/load/battery
+  // numbers. "Battery losing juice while 6 A is flowing about" is
+  // exactly the kind of confusion this replaces. `cap` was looked
+  // up at the top of renderFlow alongside `sub` so the kiosk-view
+  // path (different host) doesn't write to it.
+  if (cap) cap.textContent = flowCaption(model, totalSourceW, totalLoadW);
+}
+
+function flowCaption(model, totalSourceW, totalLoadW) {
+  if (!model.bank) return "";
+  const battW = Math.round(model.batteryNetW || 0);
+  const sourcesActive = totalSourceW >= 1;
+  const loadsActive   = totalLoadW   >= 1;
+
+  // Battery is meaningfully charging (sources > loads, excess into bank).
+  if (battW >= 1) {
+    if (sourcesActive && loadsActive) return `Sources covering load · charging battery at ${battW} W`;
+    if (sourcesActive)                return `Charging battery at ${battW} W`;
+    return "";
+  }
+
+  // Battery is meaningfully discharging (sources < loads, bank fills gap).
+  if (battW <= -1) {
+    const out = Math.abs(battW);
+    if (sourcesActive && loadsActive) return `Load is ${out} W more than sources · battery making up the difference`;
+    if (loadsActive)                  return `Running off battery · ${out} W to load`;
+    return `Battery draining at ${out} W`;
+  }
+
+  // Battery at rest.
+  if (sourcesActive && loadsActive) return `Sources matched to load · battery resting`;
+  if (sourcesActive)                return `Sources idle to a full battery · no load drawing`;
+  if (loadsActive)                  return `Running off battery · no draw beyond idle`;
+  return `System idle`;
 }
 
 function makeFlowTile(t, muted = false) {
