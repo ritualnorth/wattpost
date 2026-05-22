@@ -3011,7 +3011,7 @@ function drawCompareChart(metric, datasets) {
           + (unit ? " " + unit : "")),
       },
     ],
-    legend: { show: false },
+    legend: { live: false },
   };
 
   try {
@@ -3177,10 +3177,9 @@ function drawEnergyChart(root, ts, series) {
       { stroke: pal.axis, scale: "y2", side: 1, grid: { show: false },
         values: (_u, splits) => splits.map(v => v == null ? "" : v.toFixed(0) + "%") },
     ],
-    // No built-in legend — mobile has no hover, so uPlot's live
-    // legend just shows "·" placeholders forever. The static
-    // colour-chip legend rendered in HTML below the chart serves
-    // the labelling job; cursor scrubbing is desktop-only.
+    // No built-in legend on the Energy chart — we render a static
+    // colour-chip legend below the chart in HTML, so the uPlot one
+    // would duplicate it.
     legend: { show: false },
   };
 
@@ -3411,7 +3410,7 @@ function drawChart(label, metric, data, forecast = null) {
         },
       },
     ],
-    legend: { show: false },
+    legend: { live: false },
   };
 
   try {
@@ -3472,7 +3471,7 @@ async function refreshDriftSparkline() {
       height: 90,
       scales: { x: { time: true } },
       cursor: { show: false },
-      legend: { show: false },
+      legend: { live: false },
       series: [
         {},
         { stroke: pal.amber, width: 1.5, fill: pal.amberFill, points: { show: false } },
