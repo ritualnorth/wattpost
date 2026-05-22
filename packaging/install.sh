@@ -138,6 +138,17 @@ LEGACY_SRC=/opt/wattpost-src
 if [ -d "${LEGACY_SRC}" ] && [ ! -e "${ACTIVE_SLOT}/src" ]; then
     step "migrating ${LEGACY_SRC}/ → ${ACTIVE_SLOT}/src/"
     mv "${LEGACY_SRC}" "${ACTIVE_SLOT}/src"
+    # If SOURCE was pointing at the legacy path (the pi-gen chroot
+    # invokes us with WATTPOST_SOURCE=/opt/wattpost-src, see
+    # packaging/pi-gen/stage-wattpost/01-install/00-run-chroot.sh),
+    # update SOURCE now — otherwise the pip install below will fail
+    # with "Hint: It looks like a path. File '/opt/wattpost-src'
+    # does not exist." Every tagged SD-image build since v0.1.32
+    # was failing here.
+    if [ "${SOURCE}" = "${LEGACY_SRC}" ]; then
+        SOURCE="${ACTIVE_SLOT}/src"
+        step "rewriting SOURCE → ${SOURCE} (pi-gen path migrated)"
+    fi
 fi
 
 chown -R "${APP_USER}:${APP_GROUP}" "${SLOTS_DIR}" "${STATE_DIR}"
