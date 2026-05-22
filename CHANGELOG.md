@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.61] · 2026-05-22
+
+### Fixed · Renogy DCC50S/DCC30S — alternator side was showing 0 W
+
+Latent bug since #123: the Power-flow model read `alt_power_w` but
+the Renogy DCC driver publishes `alternator_power_w`. DCC owners
+have been seeing 0 W on the alternator side and not knowing why.
+
+### Changed · DCC combos now prong into two source nodes
+
+The DCC50S / DCC30S et al. are alternator + MPPT in one box. They
+used to render as a single "Alternator" node, hiding the solar
+contribution entirely (or worse — counting it as alternator).
+Now they split into two source nodes on the Power-flow tile:
+
+- **Alternator** — engine-driven DC, amber, alternator icon
+- **Solar** — built-in MPPT, yellow, sun icon
+
+Both feed into the bus independently, with their own particles +
+W reading + voltage/current sub-line. Customers who wired panels
+into a DCC will now see the harvest where they expect it.
+
 ## [0.1.60] · 2026-05-22
 
 ### Changed · Power-flow source colours distinguish DC-DC from AC, battery discharge is pink
