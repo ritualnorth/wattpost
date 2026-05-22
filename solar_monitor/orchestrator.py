@@ -119,10 +119,23 @@ class Poller:
             return t
 
         # Was built; check liveness via the underlying client where possible.
-        # For BLE transport, the bleak client tracks is_connected. We use
-        # duck typing to avoid coupling to one transport implementation.
+        # For BLE Modbus / GATT transports, the bleak client tracks
+        # is_connected. We use duck typing to avoid coupling to one
+        # transport implementation.
+        #
+        # Passive transports (BLE advertisement listeners — Victron
+        # Instant Readout etc.) deliberately don't have a `_client`.
+        # They subscribe to a shared scanner and have no per-device
+        # connection to check. Skipping them here is the correct
+        # call: tearing down + reopening the scanner subscriber every
+        # poll cycle (60s) was causing BlueZ to drop adverts during
+        # the filter-settle window — Garage Stack appliance went
+        # 2+ hours without a single decoded Victron advert while
+        # this loop hammered the scanner. Trust the transport's own
+        # lifecycle here; reopen logic kicks in only when there IS a
+        # client we can confidently say went stale.
         client = getattr(t, "_client", None)
-        if client is None or not getattr(client, "is_connected", True):
+        if client is not None and not getattr(client, "is_connected", True):
             try:
                 log.info("reopening transport %s", transport_id)
                 await t.close()
