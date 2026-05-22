@@ -514,6 +514,35 @@ class CloudService:
             extras["alert_count"] = alert_count
         except Exception:
             pass
+
+        # Local alert rules snapshot (#261 unification slice 1).
+        # Surfaces this appliance's currently-configured rules in the
+        # cloud Rules UI as read-only rows with a "Runs locally" chip.
+        # Editing them from the cloud (slice 2) writes back via the
+        # appliance_commands queue; for now this is just the read path.
+        # Schema mirrors AlertRulePayload so cloud can render without
+        # a translation layer.
+        try:
+            engine = getattr(self.scheduler, "_alerts", None)
+            last_fired = getattr(engine, "_last_fired", {}) if engine else {}
+            rules = list(getattr(self.cfg, "alerts", []) or [])
+            if rules:
+                extras["local_alert_rules"] = [
+                    {
+                        "id":               r.id,
+                        "name":             r.name,
+                        "metric":           r.metric,
+                        "op":               r.op,
+                        "threshold":        r.threshold,
+                        "severity":         r.severity,
+                        "cooldown_seconds": r.cooldown_seconds,
+                        "transports":       list(r.transports or []),
+                        "last_fired_ts":    int(last_fired.get(r.id, 0)) or None,
+                    }
+                    for r in rules
+                ]
+        except Exception:
+            log.exception("cloud heartbeat: local_alert_rules collection failed")
         # Cloud alerts inbox (#206): ship recent events from the engine's
         # ring buffer so the cloud can render a per-account feed across
         # every site. Cap to last 20 since the previous successful
