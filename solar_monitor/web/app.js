@@ -1238,18 +1238,19 @@ function buildFlowModel() {
 }
 
 function renderFlow(targetHost) {
-  // Default to the dashboard's flow strip. The kiosk view passes its own
-  // host so we can mount a second copy of the strip inside the kiosk
-  // layout — same components, just scaled up by CSS.
+  // v2 Power-flow tile: SVG with animated particles along curves,
+  // icon-only nodes at the perimeter, watts as labels *outside* the
+  // nodes, and a separate battery card below the diagram. Modelled
+  // on the Powerwall-Dashboard / Tesla-app aesthetic. The kiosk view
+  // passes its own host so we can mount a second copy inside the
+  // kiosk layout — the SVG scales with the host width.
   const host = targetHost || $("#flow");
   const sub  = host === $("#flow") ? $("#flow-sub") : null;
+  const cap  = host === $("#flow") ? document.getElementById("flow-cap") : null;
   host.innerHTML = "";
+  host.classList.remove("flow--idle");
 
   const model = buildFlowModel();
-  // Caption div lives outside the #flow host. Clear it from the
-  // early-return paths so stale text from the previous frame doesn't
-  // linger when the system goes idle.
-  const cap = host === $("#flow") ? document.getElementById("flow-cap") : null;
   if (!model.bank && model.sources.length === 0 && model.loads.length === 0) {
     host.innerHTML = `<div class="flow-empty">No active devices yet.</div>`;
     if (sub) sub.textContent = "";
@@ -1257,115 +1258,261 @@ function renderFlow(targetHost) {
     return;
   }
 
-  const hasSources = model.sources.length > 0;
-  const hasLoads   = model.loads.length > 0;
   const totalSourceW = model.sources.reduce((a, s) => a + s.power, 0);
   const totalLoadW   = model.loads.reduce((a, l) => a + l.power, 0);
+  const hasSources = model.sources.length > 0;
+  const hasLoads   = model.loads.length > 0;
+  const battNetW   = Math.round(model.batteryNetW || 0);
 
-  // With configured sources always present, "no sources AND no loads" is
-  // only true when the user genuinely hasn't set up any source/load
-  // devices (e.g. battery-only topology — bank shunt and dumb packs).
-  // In that case still show a clean centered battery tile.
+  // Show the battery as a node in the SVG when its flow is
+  // meaningful (≥10 W). Otherwise it lives only in the card below —
+  // keeps the diagram uncluttered for the common float / resting
+  // case. Card is always present when bank exists.
+  const showBattInSvg = !!model.bank && Math.abs(battNetW) >= 10;
+
+  // Battery-only topology — no sources, no loads (e.g. bank shunt + dumb packs).
   if (!hasSources && !hasLoads) {
     host.classList.add("flow--idle");
-    const battCol = document.createElement("div");
-    battCol.className = "flow-col flow-col--solo";
-    if (model.bank) {
-      battCol.appendChild(makeFlowDonut(model.bank, model.batteryNetW));
-    }
-    host.appendChild(battCol);
+    if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
     if (sub) sub.textContent = "no sources or loads configured";
     if (cap) cap.textContent = "";
     return;
   }
-  host.classList.remove("flow--idle");
 
-  // Busbar voltage = bank's measured voltage. Every source's output
-  // AND every load's input sit at this same voltage on the busbar,
-  // so dividing pill-W by it gives the actual amperage flowing across
-  // that connection. Hoisted out of the per-block scopes so both
-  // sources and loads pills can compute it.
-  const busbarV = model.bank?.meanV || 0;
+  host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
+  if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
 
-  // ----- Sources column (only when present) -----
-  if (hasSources) {
-    const sourcesCol = document.createElement("div");
-    sourcesCol.className = "flow-col flow-sources";
-    for (const s of model.sources) sourcesCol.appendChild(makeFlowTile(s));
-    host.appendChild(sourcesCol);
-
-    // Connector annotation is bus-side: watts contributed by sources.
-    // We deliberately drop amperage when the bank is present — the
-    // pill A was `totalSourceW / busbarV`, i.e. "what 94 W of solar
-    // looks like as amps on the bus". It read as "amps into the
-    // battery", which is wrong: only the bank's own shunt current
-    // (shown on the bank tile, `sumI`) is actually entering or
-    // leaving the bank. Without bank we still show A because there's
-    // nowhere else to put it.
-    const sourcesPillA = !model.bank && busbarV > 0 ? totalSourceW / busbarV : null;
-    host.appendChild(makeConnector({
-      label: sourcesPillA != null
-        ? `${totalSourceW.toFixed(0)} W · ${sourcesPillA.toFixed(1)} A`
-        : `${totalSourceW.toFixed(0)} W`,
-      fromColor: model.sources[0]?.color || "neutral",
-      toColor: "batt",
-      active: totalSourceW > 1,
-    }));
-  }
-
-  // ----- Battery donut (always) -----
-  // Replaces the old rectangular battery tile. The donut becomes the
-  // single visual anchor: SoC arc colour-coded by state, percentage
-  // big in the middle, direction arrow + magnitude as a sub-line.
-  // Topology is unchanged (battery still sits between sources and
-  // loads visually) but the donut anchors the eye on the most-watched
-  // number — SoC — instead of a "−5 W" that confused users.
-  const battCol = document.createElement("div");
-  battCol.className = "flow-col";
-  if (model.bank) {
-    battCol.appendChild(makeFlowDonut(model.bank, model.batteryNetW));
-  } else {
-    battCol.appendChild(makeFlowTile({ label: "Battery", color: "neutral", icon: "battery", power: 0, sub: "—" }, true));
-  }
-  host.appendChild(battCol);
-
-  // ----- Loads column (only when present) -----
-  if (hasLoads) {
-    // Same reasoning as the sources connector: bus-side amperage
-    // reads as "out of the battery" when the bank is present, which
-    // is wrong. Bank's own shunt current is on the bank tile.
-    const loadsPillA = !model.bank && busbarV > 0 ? totalLoadW / busbarV : null;
-    host.appendChild(makeConnector({
-      label: loadsPillA != null
-        ? `${totalLoadW.toFixed(0)} W · ${loadsPillA.toFixed(1)} A`
-        : `${totalLoadW.toFixed(0)} W`,
-      fromColor: "batt",
-      toColor: model.loads[0]?.color || "neutral",
-      active: totalLoadW > 1,
-    }));
-
-    const loadsCol = document.createElement("div");
-    loadsCol.className = "flow-col flow-loads";
-    for (const lo of model.loads) loadsCol.appendChild(makeFlowTile(lo));
-    host.appendChild(loadsCol);
-  }
-
-  // Sub-header summary — short totals for sources and loads. We
-  // tried squeezing a battery pill in here ("battery N W in/out")
-  // but the bus-perspective wording was backwards from how users
-  // read it, so the story moved to the caption below the diagram.
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
   if (hasLoads)   parts.push(`${model.loads.length} load${model.loads.length === 1 ? "" : "s"} · ${totalLoadW.toFixed(0)} W out`);
   if (sub) sub.textContent = parts.join(" · ") || "system idle";
-
-  // Plain-English caption under the diagram — tells the story so
-  // users don't have to mentally reconcile source/load/battery
-  // numbers. "Battery losing juice while 6 A is flowing about" is
-  // exactly the kind of confusion this replaces. `cap` was looked
-  // up at the top of renderFlow alongside `sub` so the kiosk-view
-  // path (different host) doesn't write to it.
   if (cap) cap.textContent = flowCaption(model, totalSourceW, totalLoadW);
+}
+
+// ───────── v2 SVG flow diagram builders ─────────
+//
+// Layout: 400×260 viewBox. Sources arc across the top, the bus is a
+// notional point at (200, 145), loads (and the battery node when
+// shown) arc across the bottom. Smooth bezier connectors between
+// each node and the bus. Particles travel along active paths via
+// SMIL <animateMotion>; speed scales with W magnitude so heavy
+// flows visibly stream faster.
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const FLOW_W = 400, FLOW_H = 260;
+const FLOW_BUS_X = FLOW_W / 2, FLOW_BUS_Y = 145;
+const FLOW_SRC_Y = 60, FLOW_BOT_Y = 220;
+
+function buildFlowSvgV2(model, opts) {
+  const { showBattInSvg, battNetW } = opts;
+
+  // Position sources across the top, loads (+ battery when shown)
+  // across the bottom. When the battery node is in the SVG it takes
+  // the left slot and loads pack to the right.
+  const srcPos = positionFlowNodes(model.sources.length, FLOW_SRC_Y, [70, FLOW_W - 70]);
+  let loadPos, batPos = null;
+  if (showBattInSvg) {
+    batPos  = [80, FLOW_BOT_Y];
+    loadPos = positionFlowNodes(model.loads.length, FLOW_BOT_Y, [180, FLOW_W - 70]);
+  } else {
+    loadPos = positionFlowNodes(model.loads.length, FLOW_BOT_Y, [70, FLOW_W - 70]);
+  }
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", "flow-svg-v2");
+  svg.setAttribute("viewBox", `0 0 ${FLOW_W} ${FLOW_H}`);
+  svg.setAttribute("aria-hidden", "true");
+
+  // Stable, scoped path IDs so multiple flow tiles (dashboard +
+  // kiosk) don't collide their mpath references.
+  const idPrefix = `fv2-${++FLOW_PATH_SEQ}`;
+  const activePaths = [];
+
+  // Source → bus (each source).
+  model.sources.forEach((s, i) => {
+    const [x, y] = srcPos[i];
+    const pathId = `${idPrefix}-s${i}`;
+    const active = (s.power || 0) >= 1 && !s.silent;
+    addFlowPath(svg, pathId, x, y + 22, FLOW_BUS_X, FLOW_BUS_Y, active);
+    if (active) activePaths.push({ id: pathId, color: colorKeyOf(s) || "pv", w: s.power });
+  });
+
+  // Battery <-> bus when shown. Direction encodes charge state.
+  if (showBattInSvg) {
+    const [bx, by] = batPos;
+    const charging = battNetW > 0;
+    const pathId = `${idPrefix}-bat`;
+    const x1 = charging ? FLOW_BUS_X : bx;
+    const y1 = charging ? FLOW_BUS_Y : by - 22;
+    const x2 = charging ? bx : FLOW_BUS_X;
+    const y2 = charging ? by - 22 : FLOW_BUS_Y;
+    addFlowPath(svg, pathId, x1, y1, x2, y2, true);
+    activePaths.push({ id: pathId, color: charging ? "batt" : "amber", w: Math.abs(battNetW) });
+  }
+
+  // Bus → load (each load).
+  model.loads.forEach((l, i) => {
+    const [x, y] = loadPos[i];
+    const pathId = `${idPrefix}-l${i}`;
+    const active = (l.power || 0) >= 1;
+    addFlowPath(svg, pathId, FLOW_BUS_X, FLOW_BUS_Y, x, y - 22, active);
+    if (active) activePaths.push({ id: pathId, color: colorKeyOf(l) || "load", w: l.power });
+  });
+
+  // Particles on each active path. Two per path, half-phase offset.
+  activePaths.forEach(p => addFlowParticles(svg, p.id, p.color, p.w));
+
+  // Nodes (rendered last so they sit on top of path ends).
+  model.sources.forEach((s, i) => addFlowNode(svg, srcPos[i][0], srcPos[i][1], s, true));
+  if (showBattInSvg) {
+    const [bx, by] = batPos;
+    addFlowNode(svg, bx, by, {
+      label: "Battery",
+      color: battNetW > 0 ? "batt" : "amber",
+      icon: "battery",
+      power: Math.abs(battNetW),
+    }, false);
+  }
+  model.loads.forEach((l, i) => addFlowNode(svg, loadPos[i][0], loadPos[i][1], l, false));
+
+  return svg;
+}
+
+let FLOW_PATH_SEQ = 0;
+
+function positionFlowNodes(n, y, [xMin, xMax]) {
+  if (n === 0) return [];
+  if (n === 1) return [[(xMin + xMax) / 2, y]];
+  if (n === 2) return [[xMin + 30, y], [xMax - 30, y]];
+  const step = (xMax - xMin) / (n - 1);
+  return Array.from({length: n}, (_, i) => [xMin + i * step, y]);
+}
+
+function addFlowPath(svg, id, x1, y1, x2, y2, active) {
+  // Smooth bezier between two points. Control points are vertically
+  // stretched so the curve enters/exits the nodes pointing up/down
+  // — keeps source-to-bus arcs feeling like a real wiring diagram.
+  const midY = (y1 + y2) / 2;
+  const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+  const el = document.createElementNS(SVG_NS, "path");
+  el.setAttribute("id", id);
+  el.setAttribute("d", d);
+  el.setAttribute("class", `flow-conn-v2${active ? " active" : ""}`);
+  svg.appendChild(el);
+}
+
+function addFlowParticles(svg, pathId, colorKey, w) {
+  // Two particles, half-phase offset. Period scales with W so heavy
+  // flows visibly stream faster — capped so even kW doesn't blur.
+  const dur = Math.max(0.5, Math.min(2.2, 2.0 - Math.log10(Math.max(1, w)) * 0.4));
+  for (let i = 0; i < 2; i++) {
+    const dot = document.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("r", "3");
+    dot.setAttribute("class", `flow-particle-v2 ${colorKey}`);
+    const motion = document.createElementNS(SVG_NS, "animateMotion");
+    motion.setAttribute("dur", `${dur.toFixed(2)}s`);
+    motion.setAttribute("repeatCount", "indefinite");
+    motion.setAttribute("begin", `${(i * dur / 2).toFixed(2)}s`);
+    const mpath = document.createElementNS(SVG_NS, "mpath");
+    mpath.setAttributeNS("http://www.w3.org/1999/xlink", "href", `#${pathId}`);
+    motion.appendChild(mpath);
+    dot.appendChild(motion);
+    svg.appendChild(dot);
+  }
+}
+
+function addFlowNode(svg, x, y, t, isSource) {
+  const color = colorKeyOf(t);
+  const silent = t.silent && (t.power || 0) < 1;
+  const tone = silent ? "silent" : color;
+
+  // Watt label — above for sources, below for loads/battery.
+  const lbl = document.createElementNS(SVG_NS, "text");
+  lbl.setAttribute("x", x);
+  lbl.setAttribute("y", isSource ? y - 36 : y + 40);
+  lbl.setAttribute("class", `flow-node-w ${silent ? "silent" : ""}`);
+  lbl.setAttribute("text-anchor", "middle");
+  lbl.textContent = `${Math.round(t.power || 0)} W`;
+  svg.appendChild(lbl);
+
+  // Ring (single stroked circle).
+  const ring = document.createElementNS(SVG_NS, "circle");
+  ring.setAttribute("cx", x);
+  ring.setAttribute("cy", y);
+  ring.setAttribute("r", "22");
+  ring.setAttribute("class", `flow-node-ring ${tone}`);
+  svg.appendChild(ring);
+
+  // Icon (foreignObject with the inline SVG so we don't rebuild the
+  // path data here — ICONS is the single source of truth).
+  const iconKey = t.icon || COLOR_TO_ICON[color] || "unknown";
+  const iconSvg = ICONS[iconKey] || ICONS.unknown;
+  const g = document.createElementNS(SVG_NS, "g");
+  g.setAttribute("transform", `translate(${x - 11} ${y - 11})`);
+  g.setAttribute("class", `flow-node-icon ${tone}`);
+  // Inline the icon's inner content scaled to 22×22. Strip the wrapper
+  // <svg> since we're nesting; the inner paths get our stroke colour
+  // via CSS `currentColor`.
+  const inner = iconSvg.replace(/<\/?svg[^>]*>/g, "");
+  const innerSvg = document.createElementNS(SVG_NS, "svg");
+  innerSvg.setAttribute("viewBox", "0 0 24 24");
+  innerSvg.setAttribute("width", "22");
+  innerSvg.setAttribute("height", "22");
+  innerSvg.innerHTML = inner;
+  g.appendChild(innerSvg);
+  svg.appendChild(g);
+}
+
+function colorKeyOf(t) {
+  // Map flow-model colour tag to a tone class shared with CSS.
+  const c = (t && t.color) || "";
+  if (c === "pv" || c === "batt" || c === "load" || c === "grid" || c === "ac" || c === "dc") return c;
+  return "neutral";
+}
+
+function buildBatCard(bank, battNetW) {
+  // Battery card lives below the SVG. Slim, Tesla-app style:
+  // icon-circle on the left, big SoC + state label in the middle,
+  // signed flow on the right, thin horizontal fill bar underneath.
+  const soc   = Math.max(0, Math.min(100, bank.soc || 0));
+  const aNetW = Math.abs(battNetW);
+
+  // State drives the icon-ring + fill colours. "Full" wins over a
+  // tiny float trickle so users don't see amber discharging at 100 %.
+  let state, tone;
+  if (soc < 15 && battNetW > 0)      { state = "Low · Charging"; tone = "red"; }
+  else if (soc < 15)                 { state = "Low";            tone = "red"; }
+  else if (soc >= 98)                { state = "Full";           tone = "blue"; }
+  else if (aNetW < 5)                { state = "Resting";        tone = "blue"; }
+  else if (battNetW > 0)             { state = "Charging";       tone = "green"; }
+  else                               { state = "Discharging";    tone = "amber"; }
+
+  let flowText, flowClass;
+  if (aNetW < 1)         { flowText = "Idle";                                              flowClass = ""; }
+  else if (battNetW > 0) { flowText = `↓ ${aNetW} W in`;                                   flowClass = "charging"; }
+  else                   { flowText = `↑ ${aNetW} W out`;                                  flowClass = "discharging"; }
+
+  const subParts = [];
+  if (typeof bank.meanV === "number") subParts.push(`${bank.meanV.toFixed(2)} V`);
+  if (typeof bank.sumI  === "number" && Math.abs(bank.sumI) >= 0.1) {
+    subParts.push(`${bank.sumI >= 0 ? "+" : ""}${bank.sumI.toFixed(1)} A`);
+  }
+
+  const card = document.createElement("div");
+  card.className = "bat-card";
+  card.innerHTML = `
+    <div class="bat-icon-wrap ${tone}">${ICONS.battery}</div>
+    <div class="bat-headline">
+      <div class="bat-soc">${soc.toFixed(0)}<span class="bat-soc-unit">%</span></div>
+      <div class="bat-state">${state}</div>
+    </div>
+    <div class="bat-power ${flowClass}">
+      <div>${flowText}</div>
+      <div class="bat-power-sub">${subParts.join(" · ")}</div>
+    </div>
+    <div class="bat-fill"><div class="bat-fill-inner ${tone}" style="width:${soc.toFixed(0)}%"></div></div>
+  `;
+  return card;
 }
 
 function flowCaption(model, totalSourceW, totalLoadW) {

@@ -8,6 +8,27 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.51] · 2026-05-22
+
+### Changed · Power flow: Powerwall-style SVG diagram
+
+Replaces v0.1.50's central donut with a Tesla / Powerwall-Dashboard
+inspired layout:
+
+- Icon-only nodes at the perimeter — sun for solar, plug for AC
+  charger, house for load, battery for the bank when active
+- Watts as labels *outside* each node (not crammed inside)
+- Curved bezier connectors with animated particles flowing along
+  them in real time, particle speed scales with W
+- Battery sits in a slim card below the diagram: big SoC %,
+  state label (Full / Charging / Discharging / Resting / Low),
+  signed W with direction arrow, slim horizontal fill bar
+- Silent / zero-W sources go grey, no particles
+- Battery joins the diagram as a node only when its flow is ≥10 W
+  (small float trickles stay in the card to keep the diagram clean)
+- Respects prefers-reduced-motion (replaces SMIL particles with a
+  dashed line so direction is still implied)
+
 ## [0.1.50] · 2026-05-22
 
 ### Changed · Power flow: battery centerpiece is now a SoC donut
