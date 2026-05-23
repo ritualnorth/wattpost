@@ -45,7 +45,19 @@ local_telemetry:
 
 … and restart the daemon. The 24-hour update check still fires (we still need to know whether to show the "Update available" badge), but the `install_id` POST is suppressed. Your existing beacon row on our side will fall off the "active in 30 days" cohort within a month and stop being counted.
 
-### 5. Discovery telemetry — *opt-in, default OFF*
+### 5. Location sharing — *opt-in, default OFF, three modes*
+
+If — and only if — you flip `location.share_with_cloud` to `approx` or `precise` (from Settings → Location or directly in `config.yaml`), the appliance ships coordinates in its heartbeat. **Default is `off`** — even a paired appliance with a working GPS will not transmit location until you flip this.
+
+Three modes:
+
+- **off** (default) — cloud receives no location data at all. Your local dashboard still knows where you are; this gate is purely about transmission.
+- **approx** — coordinates snapped to a ~10&nbsp;km grid on the appliance *before* transmission. The cloud literally never sees the precise number. Good for "show roughly where my fleet is" without precise tracking.
+- **precise** — real lat/lon. Required for geofences, anchor-watch, and the moving-van trail.
+
+The toggle is customer-side and authoritative: nothing on the cloud — admin, installer, or builder — can override it remotely.
+
+### 6. Discovery telemetry — *opt-in, default OFF*
 
 If — and only if — you flip `discovery.enabled: true` in `config.yaml`, the appliance forwards anonymised fingerprints of Bluetooth devices it scans but does not yet recognise. This feeds our driver-add pipeline. Even when on, we strip serial numbers, truncate the MAC to its vendor prefix (first 3 octets / OUI), and never associate the fingerprint with your account or install_id. Off by default precisely because we'd rather you opt in.
 

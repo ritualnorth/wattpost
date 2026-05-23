@@ -968,6 +968,33 @@
               <span class="settings-foot" id="kiosk-msg"></span>
             </div>
           </div>
+          <div class="settings-block">
+            <h3>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Where this appliance shows up on the cloud fleet map &mdash; or whether it shows up at all.
+              <strong>Off</strong> by default. Your dashboard always knows where you are; this toggle only controls what gets shared to wattpost.cloud.
+            </p>
+            <div id="settings-location-current" class="settings-row">
+              <span>Current</span>
+              <span class="v" id="settings-location-current-v">·</span>
+            </div>
+            <fieldset class="settings-share-fieldset" style="border:0;padding:0;margin:.5rem 0 0">
+              <legend class="settings-foot" style="padding:0;margin-bottom:.35rem">Share with cloud</legend>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="off" style="margin-top:.3rem"/>
+                <span><strong>Off</strong><br/><span class="settings-foot">Cloud receives no location data at all. Default for new installs.</span></span>
+              </label>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="approx" style="margin-top:.3rem"/>
+                <span><strong>Approximate</strong><br/><span class="settings-foot">Snapped to ~10&nbsp;km grid before transmission &mdash; "near Keswick", not your exact pitch.</span></span>
+              </label>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="precise" style="margin-top:.3rem"/>
+                <span><strong>Precise</strong><br/><span class="settings-foot">Real lat/lon. Required for geofences and the moving-van trail.</span></span>
+              </label>
+            </fieldset>
+            <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
+          </div>
           <div class="settings-block settings-block--backup">
             <h3>Backup &amp; restore</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
@@ -1169,6 +1196,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=200"></script>
+  <script src="/web/app.js?v=201"></script>
 </body>
 </html>

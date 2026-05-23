@@ -8,6 +8,43 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.76] · 2026-05-23
+
+### Added · Fleet map + per-site location tile (#263) with opt-in privacy gate
+
+New cloud `/app/map` page renders one pin per appliance on an
+OpenStreetMap base layer (Leaflet, BSD-2-clause, SRI-pinned).
+Click a pin to drop into the site. Per-site `/app/site/{id}` gets
+a Location card showing the appliance's current position.
+
+**Privacy is the headline.** A new `LocationCfg` block on the
+appliance gates cloud transmission with three modes:
+
+- `off` (default) — cloud receives no location data at all. Local
+  dashboard still knows where it is; only transmission is gated.
+- `approx` — coordinates snapped to a ~10km grid ON the appliance
+  before transmission. The cloud literally never sees the precise
+  number.
+- `precise` — real lat/lon. Required for geofences and the moving-
+  van trail (future).
+
+Customer-side toggle in Settings → Location is authoritative. The
+cloud cannot override it — important for the upcoming OEM/builder
+GTM where a camper-build company shouldn't be able to track
+customer vans from their own fleet view.
+
+Existing GPS hardware (#125) feeds the live position when present;
+otherwise the static `forecast.lat`/`lon` is used. Either way the
+share mode gate fires before transmission.
+
+CHANGED: Heartbeat extras now include `location` field (only when
+opted in). Cloud `/api/sites` lifts the location summary out of
+extras for fast map rendering across the fleet.
+
+NOT YET: appliance-side "Where am I" dashboard tile (#264) — to
+come in a follow-up release; the per-site cloud tile covers the
+"see where my van is" use-case for now.
+
 ## [0.1.75] · 2026-05-23
 
 ### Added · Cloud device-health view (#267)

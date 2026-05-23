@@ -184,6 +184,37 @@ class BankCfg(msgspec.Struct, kw_only=True):
     disagreement_threshold_pct: float = 5.0
 
 
+class LocationCfg(msgspec.Struct, kw_only=True):
+    """Privacy gate for shipping location to the cloud (#263/#264).
+
+    Location plumbing (GpsCfg or ForecastCfg.lat/lon) exists for local
+    use regardless — forecasts, the appliance's own map tile, weather.
+    Cloud transmission is a SEPARATE decision the customer makes here,
+    OPT-IN, default OFF. Three modes:
+
+      off     — cloud receives no location data at all (default)
+      approx  — appliance rounds to ~10km grid before transmission
+      precise — real lat/lon
+
+    Why three modes:  precise enables the cool features (fleet map,
+    geofences, anchor watch).  approx supports "show roughly where my
+    fleet is" without precise tracking — useful for vanlife customers
+    who want fleet visibility but not constant pinpoint surveillance.
+    off is the default so a fresh install never leaks location until
+    the customer explicitly opts in.
+
+    Customer-side is authoritative: even if the cloud's UI shows a
+    fleet map, this toggle controls whether THIS appliance contributes.
+    Bob Smith (the OEM builder pattern) cannot override it remotely —
+    see project-oem-builder-gtm memory.
+    """
+    share_with_cloud: str = "off"   # "off" | "approx" | "precise"
+    # Snap-to-grid size for approx mode, in km. ~10km is a good
+    # privacy/utility tradeoff: shows "in the Lake District" not
+    # "in their driveway." Customers in dense areas can crank it up.
+    approx_grid_km: float = 10.0
+
+
 class GpsCfg(msgspec.Struct, kw_only=True):
     """USB GPS receiver (#125). Off by default — opt in by adding a
     `gps:` block to config.yaml. The daemon reads NMEA at `baudrate`
@@ -349,6 +380,7 @@ class Config(msgspec.Struct, kw_only=True):
     weather: WeatherCfg | None = None    # optional
     cloud: CloudCfg | None = None        # optional
     gps: GpsCfg | None = None            # optional (USB GPS — #125)
+    location: LocationCfg | None = None  # optional — cloud-share gate (#263/#264). Default-off when absent.
     bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
     backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
     discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)

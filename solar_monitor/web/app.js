@@ -3979,7 +3979,66 @@ function renderSettings() {
   refreshDiscoveryToggle();
   refreshHistorySettings();  // #172 — editable poll interval + retention
   refreshSolarPauseSettings();  // #163 — solar-aware charger pause
+  refreshLocationPanel();    // #263/#264 — share-with-cloud toggle
   wireResetToDefaults();     // #138 — Danger zone
+}
+
+async function refreshLocationPanel() {
+  const currentEl = document.getElementById("settings-location-current-v");
+  const msgEl     = document.getElementById("settings-location-msg");
+  const radios    = document.querySelectorAll('input[name="settings-location-share"]');
+  if (!currentEl || !radios.length) return;
+  let s;
+  try { s = await api("/api/location/status"); }
+  catch (e) {
+    currentEl.textContent = "·";
+    if (msgEl) msgEl.textContent = "Couldn't load location status: " + e.message;
+    return;
+  }
+  if (s.current) {
+    const lat = Number(s.current.lat).toFixed(4);
+    const lon = Number(s.current.lon).toFixed(4);
+    const src = s.current.source === "gps" ? "GPS" : "static";
+    const age = s.current.fix_age_s != null ? ` · fix ${Math.round(s.current.fix_age_s)}s old` : "";
+    currentEl.textContent = `${lat}, ${lon} (${src}${age})`;
+  } else {
+    currentEl.textContent = "No location configured. Add `forecast.lat`/`lon` or plug in a USB GPS to enable.";
+  }
+  // Pre-select the current mode.
+  const mode = (s.share_with_cloud || "off").toLowerCase();
+  for (const r of radios) {
+    r.checked = (r.value === mode);
+    r.disabled = !s.current;  // can't share what we don't have
+    r.onchange = () => updateLocationShare(r.value);
+  }
+  if (!s.current && msgEl) {
+    msgEl.textContent = "Sharing is disabled until a location source is configured.";
+  } else if (msgEl) {
+    msgEl.textContent = "";
+  }
+}
+
+async function updateLocationShare(mode) {
+  const msgEl = document.getElementById("settings-location-msg");
+  if (msgEl) { msgEl.textContent = "Saving…"; msgEl.style.color = ""; }
+  try {
+    const r = await fetch(_withKiosk("/api/location/share"), {
+      method: "PATCH",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({share_with_cloud: mode}),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+    const data = await r.json();
+    if (msgEl) {
+      msgEl.textContent = mode === "off"
+        ? "Off — cloud will receive no location data from the next heartbeat."
+        : (mode === "approx"
+            ? "Approximate — coordinates rounded to ~10km before transmission."
+            : "Precise — exact lat/lon will be shared on the next heartbeat.");
+    }
+  } catch (e) {
+    if (msgEl) { msgEl.style.color = "var(--red)"; msgEl.textContent = "Save failed: " + e.message; }
+  }
 }
 
 // Solar-pause panel (#163). Pulls /api/outputs/solar_pause for the live
