@@ -8,6 +8,30 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.77] · 2026-05-23
+
+### Fixed · Phantom rollback when duplicate update cmds queued (#283)
+
+Real bug caught on Garage today: two `update` cmds with the same
+`target_version` queued back-to-back. Cmd A succeeded and bumped
+the appliance. Cmd B's dispatch then saw the appliance already on
+the target, never produced a "version-bumped" heartbeat for the
+watchdog to observe, so the watchdog marked cmd B failed and
+auto-queued a downgrading rollback to `pre_update_version`. Caught
++ manually cancelled before dispatch — but a customer wouldn't
+have, and would have woken up to their box silently downgraded.
+
+Belt + braces fix:
+- **Watchdog** checks `appliance.appliance_version == target_version`
+  BEFORE marking a stale cmd failed. If equal, marks it success
+  instead and skips the rollback queue.
+- **Daemon dispatcher** short-circuits incoming `update` cmds whose
+  target matches the running version with an immediate `success`
+  transition. Stops the race at source.
+
+Either change alone closes the loop; both means the bug can't
+re-manifest via a different path.
+
 ## [0.1.76] · 2026-05-23
 
 ### Added · Fleet map + per-site location tile (#263) with opt-in privacy gate
