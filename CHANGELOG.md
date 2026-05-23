@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.81] · 2026-05-23
+
+### Added · Map / Satellite toggle on all map surfaces
+
+Tesla Powerwall + Victron VRM both let you flip between a map view
+and a satellite-photo view. We do the same now: a layer-control
+button in the top-right corner of every WattPost map (cloud
+`/app/map`, cloud per-site Location card, appliance dashboard
+"Where you are" tile). Default stays **Map** (Dark Matter — matches
+app theme). Satellite uses **Esri World Imagery** — free, no API
+key, no rate limit at our scale.
+
+Choice persists in `localStorage` under `wp-map-mode`, shared
+across all surfaces so once you pick Satellite on the fleet map
+the per-site tile and appliance dashboard remember.
+
 ## [0.1.80] · 2026-05-23
 
 ### Fixed · Build-only: swap python base image to AWS Public ECR mirror
