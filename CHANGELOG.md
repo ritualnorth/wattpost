@@ -8,6 +8,21 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.74] · 2026-05-23
+
+### Fixed · Backup tables overflowing the card on mobile
+
+Both Local snapshots and Cloud backups tables on Settings were
+busting the right edge of the card on phones — Restore button
+clipped to "Resto…", and the Uploaded + From column headers
+smashed together as "UploadedFrom" because column padding was
+vertical-only. Both tables now sit in an overflow-x: auto wrapper
+(keeps natural column widths, scrolls horizontally inside the card
+on narrow screens), every cell gets `white-space: nowrap` so the
+long filename + age + version + button stay on one line each, and
+header padding adds horizontal room so the column labels separate
+visually.
+
 ## [0.1.73] · 2026-05-23
 
 ### Added · Rules trilogy — defaults, cloud transport, empty-state nudge

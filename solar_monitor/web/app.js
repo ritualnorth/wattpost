@@ -4377,21 +4377,22 @@ async function refreshBackupSchedule() {
     return;
   }
   list.innerHTML = `
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
     <table style="width:100%;border-collapse:collapse;font-size:.88rem">
       <thead><tr style="text-align:left;opacity:.7">
-        <th style="padding:.3rem 0">Name</th>
-        <th style="padding:.3rem 0">Size</th>
-        <th style="padding:.3rem 0">Created</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Name</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Size</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Created</th>
         <th></th>
       </tr></thead>
       <tbody>
         ${s.snapshots.map(snap => {
           const sizeMb = (snap.size_bytes / (1024 * 1024)).toFixed(1);
           return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
-            <td style="padding:.35rem .4rem .35rem 0"><code>${snap.name}</code></td>
-            <td style="padding:.35rem .4rem .35rem 0">${sizeMb} MB</td>
-            <td style="padding:.35rem .4rem .35rem 0">${fmt.ago(snap.mtime_ts)}</td>
-            <td style="padding:.35rem 0;text-align:right">
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap"><code>${snap.name}</code></td>
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${sizeMb} MB</td>
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${fmt.ago(snap.mtime_ts)}</td>
+            <td style="padding:.35rem 0;text-align:right;white-space:nowrap">
               <a class="btn-action" style="padding:.15rem .5rem"
                  href="/api/system/backup/file/${encodeURIComponent(snap.name)}" download>Download</a>
               <button class="btn-action" style="padding:.15rem .5rem"
@@ -4400,7 +4401,8 @@ async function refreshBackupSchedule() {
           </tr>`;
         }).join("")}
       </tbody>
-    </table>`;
+    </table>
+    </div>`;
   list.querySelectorAll("[data-snap-del]").forEach(b => {
     b.addEventListener("click", async () => {
       const name = b.dataset.snapDel;
@@ -4570,12 +4572,13 @@ async function refreshCloudBackups() {
     return;
   }
   list.innerHTML = `
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
     <table style="width:100%;border-collapse:collapse;font-size:.88rem">
       <thead><tr style="text-align:left;opacity:.7">
-        <th style="padding:.3rem 0">Name</th>
-        <th style="padding:.3rem 0">Size</th>
-        <th style="padding:.3rem 0">Uploaded</th>
-        <th style="padding:.3rem 0">From</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Name</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Size</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Uploaded</th>
+        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">From</th>
         <th></th>
       </tr></thead>
       <tbody>
@@ -4583,18 +4586,19 @@ async function refreshCloudBackups() {
           const sizeMb = (b.size_bytes / (1024 * 1024)).toFixed(1);
           const uploaded = b.uploaded_at ? fmt.ago(new Date(b.uploaded_at).getTime() / 1000) : "·";
           return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
-            <td style="padding:.35rem .4rem .35rem 0"><code>${b.filename}</code></td>
-            <td style="padding:.35rem .4rem .35rem 0">${sizeMb} MB</td>
-            <td style="padding:.35rem .4rem .35rem 0">${uploaded}</td>
-            <td style="padding:.35rem .4rem .35rem 0">${b.manifest_version || "·"}</td>
-            <td style="padding:.35rem 0;text-align:right">
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap"><code>${b.filename}</code></td>
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${sizeMb} MB</td>
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${uploaded}</td>
+            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${b.manifest_version || "·"}</td>
+            <td style="padding:.35rem 0;text-align:right;white-space:nowrap">
               <button class="btn-action" style="padding:.15rem .5rem" type="button"
                       data-cloud-restore="${b.id}" data-cloud-name="${b.filename}">Restore</button>
             </td>
           </tr>`;
         }).join("")}
       </tbody>
-    </table>`;
+    </table>
+    </div>`;
   list.querySelectorAll("[data-cloud-restore]").forEach(b => {
     b.addEventListener("click", async () => {
       const id = b.dataset.cloudRestore;
