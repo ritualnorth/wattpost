@@ -1801,11 +1801,54 @@ main {
   text-overflow: ellipsis;
 }
 .cs-cell--now .cs-v { color: var(--accent); font-size: 1.15rem; }
-.cs-cell--res .cs-v { font-size: .82rem; color: var(--text-2); }
 @media (max-width: 720px) {
-  .chart-statstrip { grid-template-columns: repeat(3, 1fr); gap: .35rem; }
+  .chart-statstrip { grid-template-columns: repeat(2, 1fr); gap: .35rem; }
   .cs-cell + .cs-cell { border-left: none; }
   .cs-cell { padding: .35rem .35rem; background: var(--surface-2); border-radius: var(--r-sm); }
+}
+
+/* Resolution subtitle — small grey line under the stat strip telling
+   the user what bucket the chart is in (raw / 1-min avg / 1-hour avg
+   / 1-day avg) and how many points are visible. Used to live in the
+   stat strip but it's debug context, not a stat. */
+.chart-resbar {
+  font-size: .72rem;
+  color: var(--text-3);
+  margin: .25rem 0 .5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Floating value-at-cursor tooltip on every uPlot chart. Anchored
+   absolutely inside u.over by valueTooltipPlugin() — left/top set
+   in JS each setCursor frame. */
+.chart-value-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .45rem .65rem;
+  font-size: .76rem;
+  line-height: 1.45;
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 5;
+  max-width: 240px;
+  white-space: nowrap;
+}
+.chart-value-tip strong {
+  display: block; margin-bottom: .3rem;
+  font-size: .72rem; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.chart-value-tip div { color: var(--text-2); }
+.chart-value-tip em {
+  font-style: normal; font-weight: 700; color: var(--text);
+}
+.chart-value-tip-sw {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  margin-right: .35rem; vertical-align: middle;
 }
 
 /* ----- The chart itself ----- */

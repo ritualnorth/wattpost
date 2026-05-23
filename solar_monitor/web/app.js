@@ -322,6 +322,69 @@ function applyTheme(pref) {
   if (route === "history") { refreshChart?.(); refreshHeatmap?.(); }
   else if (route === "dashboard") { refreshDriftSparkline?.(); refreshBatteryHealth?.(); refreshRuntimeForecast?.(); }
 }
+// Floating value-at-cursor tooltip for every uPlot chart. Without
+// this, tap/hover puts uPlot's cursor on a point but the value just
+// vanishes into the (hidden / live:false) legend. With it, every
+// chart answers "what was that bump at 14:23?" in-place.
+//
+// Reads the same series.value() formatters the legend would use, so
+// units + decimal places stay consistent across the page.
+function valueTooltipPlugin() {
+  let tip;
+  return {
+    hooks: {
+      init: (u) => {
+        tip = document.createElement('div');
+        tip.className = 'chart-value-tip';
+        tip.style.display = 'none';
+        u.over.appendChild(tip);
+      },
+      setCursor: (u) => {
+        if (!tip) return;
+        const { idx, left, top } = u.cursor;
+        if (idx == null || left == null || left < 0) {
+          tip.style.display = 'none';
+          return;
+        }
+        const xVal = u.data[0]?.[idx];
+        if (xVal == null) { tip.style.display = 'none'; return; }
+        const d = new Date(xVal * 1000);
+        const head = d.toLocaleString([], {
+          month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        });
+        const rows = [];
+        for (let s = 1; s < u.series.length; s++) {
+          const ser = u.series[s];
+          if (!ser.label || ser.show === false) continue;
+          const v = u.data[s]?.[idx];
+          if (v == null) continue;
+          const fmt = (typeof ser.value === 'function')
+            ? ser.value(u, v, s, idx)
+            : String(v);
+          const color = typeof ser.stroke === 'string' ? ser.stroke : 'currentColor';
+          rows.push(`<div><span class="chart-value-tip-sw" style="background:${color}"></span>${ser.label}: <em>${fmt}</em></div>`);
+        }
+        if (!rows.length) { tip.style.display = 'none'; return; }
+        tip.innerHTML = `<strong>${head}</strong>${rows.join('')}`;
+        tip.style.display = 'block';
+        // Flip to the left of the cursor near the right edge so the
+        // tip never escapes the chart bounds.
+        const tw = tip.offsetWidth;
+        const cw = u.over.clientWidth;
+        const x = (left + tw + 16 > cw) ? Math.max(0, left - tw - 8) : (left + 12);
+        const y = Math.max(4, Math.min((top ?? 12) - 8, u.over.clientHeight - tip.offsetHeight - 4));
+        tip.style.left = `${x}px`;
+        tip.style.top = `${y}px`;
+      },
+      destroy: () => {
+        if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
+        tip = null;
+      },
+    },
+  };
+}
+
 function chartPalette() {
   const s = getComputedStyle(document.documentElement);
   const read = k => s.getPropertyValue(k).trim();
@@ -3028,6 +3091,7 @@ function drawCompareChart(metric, datasets) {
       },
     ],
     legend: { live: false },
+    plugins: [valueTooltipPlugin()],
   };
 
   try {
@@ -3197,6 +3261,7 @@ function drawEnergyChart(root, ts, series) {
     // colour-chip legend below the chart in HTML, so the uPlot one
     // would duplicate it.
     legend: { show: false },
+    plugins: [valueTooltipPlugin()],
   };
 
   const dataCols = [ts, series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc];
@@ -3212,20 +3277,23 @@ function updateStatStrip(metric, data) {
   const unit = unitFromKey(metric);
   const s = data?.stats || {};
   const fmtV = (v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`;
-  $("#cs-now").textContent   = fmtV(s.now);
-  $("#cs-min").textContent   = fmtV(s.min);
-  $("#cs-avg").textContent   = fmtV(s.avg);
-  $("#cs-max").textContent   = fmtV(s.max);
-  $("#cs-range").textContent = s.range == null ? "·" : `${(+s.range).toFixed(2)}${unit ? " " + unit : ""}`;
+  $("#cs-now").textContent = fmtV(s.now);
+  $("#cs-min").textContent = fmtV(s.min);
+  $("#cs-avg").textContent = fmtV(s.avg);
+  $("#cs-max").textContent = fmtV(s.max);
 
-  // Resolution = bucket / table info: tell the user how dense the data is
+  // Resolution = bucket / table info: tell the user how dense the data
+  // is. Moved out of the stat strip — it's debug context, not a stat —
+  // into a small subtitle line under the chart controls. The Range
+  // cell (max - min) was redundant with Min + Max and got dropped.
   const tableLabel = {
     samples: "raw",
     samples_1min: "1-min avg",
     samples_1hour: "1-hour avg",
     samples_1day: "1-day avg",
   }[data?.table] || "·";
-  $("#cs-res").textContent = `${s.count ?? 0} pts · ${tableLabel}`;
+  const res = $("#cs-res");
+  if (res) res.textContent = `${s.count ?? 0} points · ${tableLabel}`;
 }
 
 function drawChart(label, metric, data, forecast = null) {
@@ -3427,6 +3495,7 @@ function drawChart(label, metric, data, forecast = null) {
       },
     ],
     legend: { live: false },
+    plugins: [valueTooltipPlugin()],
   };
 
   try {
@@ -7715,6 +7784,7 @@ function wireDeviceDetailChart(dev) {
               return unit ? `${txt} ${unit}` : txt;
             }) },
         ],
+        plugins: [valueTooltipPlugin()],
       }, [data.ts, data.values], host);
     } catch (e) { console.error(e); }
   }
