@@ -56,6 +56,19 @@ class CloudService:
             return self._config.cloud
         return self._direct_cfg
 
+    # Top-level Config.alerts (NOT a CloudCfg attribute — getattr
+    # against self.cfg silently returns [] and every alert-related
+    # cloud feature no-ops). All rule-unification paths (#261) read
+    # / write through this accessor so the same mistake can't recur.
+    @property
+    def _all_rules(self) -> list:
+        return (self._config.alerts if self._config is not None else None) or []
+
+    @_all_rules.setter
+    def _all_rules(self, val: list) -> None:
+        if self._config is not None:
+            self._config.alerts = val
+
     async def start(self) -> None:
         if not self.cfg.bearer_token:
             log.info("cloud: no bearer_token configured — skipping heartbeat loop")
@@ -457,12 +470,14 @@ class CloudService:
                 cooldown_seconds = int(payload.get("cooldown_seconds") or 1800),
                 transports       = list(payload.get("transports") or []),
             )
-            # In-place replace or append
-            self.cfg.alerts = [
-                new_rule if r.id == rid else r for r in (self.cfg.alerts or [])
-            ]
-            if not any(r.id == rid for r in self.cfg.alerts):
-                self.cfg.alerts.append(new_rule)
+            # In-place replace or append, via _all_rules accessor —
+            # writing to self.cfg.alerts silently no-ops (CloudCfg has
+            # no .alerts attribute, that lives on top-level Config).
+            rules = list(self._all_rules)
+            rules = [new_rule if r.id == rid else r for r in rules]
+            if not any(r.id == rid for r in rules):
+                rules.append(new_rule)
+            self._all_rules = rules
             await self._persist_alerts_to_yaml()
             self._reload_alerts_engine()
             await self._patch_command_status(cmd_id, "success")
@@ -486,13 +501,14 @@ class CloudService:
             rid     = str(payload.get("id") or "")
             if not rid:
                 raise ValueError("missing rule id")
-            before = len(self.cfg.alerts or [])
-            self.cfg.alerts = [r for r in (self.cfg.alerts or []) if r.id != rid]
+            rules = list(self._all_rules)
+            before = len(rules)
+            self._all_rules = [r for r in rules if r.id != rid]
             await self._persist_alerts_to_yaml()
             self._reload_alerts_engine()
             await self._patch_command_status(cmd_id, "success")
             log.info("delete_local_rule applied: %s (was %d, now %d)",
-                     rid, before, len(self.cfg.alerts))
+                     rid, before, len(self._all_rules))
         except Exception as e:
             log.exception("delete_local_rule failed")
             await self._patch_command_status(
@@ -528,7 +544,7 @@ class CloudService:
                 "cooldown_seconds": r.cooldown_seconds,
                 "transports":       list(r.transports or []),
             }
-            for r in (self.cfg.alerts or [])
+            for r in self._all_rules
         ]
         backup = path.with_suffix(path.suffix + ".bak")
         shutil.copy2(path, backup)
@@ -541,7 +557,7 @@ class CloudService:
         Same call path Settings → Alerts uses on rule add/edit."""
         engine = getattr(self.scheduler, "_alerts", None)
         if engine is not None and hasattr(engine, "reload_rules"):
-            engine.reload_rules(self.cfg.alerts or [])
+            engine.reload_rules(self._all_rules)
 
     async def _patch_command_status(
         self, cmd_id: int, status: str, *, error: str | None = None,
@@ -649,7 +665,7 @@ class CloudService:
         try:
             engine = getattr(self.scheduler, "_alerts", None)
             last_fired = getattr(engine, "_last_fired", {}) if engine else {}
-            rules = list(getattr(self.cfg, "alerts", []) or [])
+            rules = list(self._all_rules)
             if rules:
                 extras["local_alert_rules"] = [
                     {

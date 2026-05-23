@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.64] · 2026-05-23
+
+### Fixed · Appliance alert rules now actually sync up to the cloud
+
+#261 rule unification shipped weeks ago but no local rules were
+ever appearing on `/app/rules` in the cloud, because the heartbeat
+ship-code (and the cloud-driven write-back paths) were reading
+`self.cfg.alerts` — and `self.cfg` resolves to `CloudCfg`, which
+has no `.alerts` attribute. `getattr(self.cfg, "alerts", [])`
+silently returned `[]`, the `if rules:` guard skipped the
+`local_alert_rules` ship, every alert sync no-opped.
+
+`alerts` lives on the top-level `Config`, not on `CloudCfg`.
+Added a `_all_rules` property + setter on `CloudHeartbeatService`
+that resolves through `self._config.alerts`, and rewired every
+touch point through it. Read-side ship now works; cloud-driven
+set/delete dispatchers (slice 2 of #261) are also fixed by the
+same change.
+
+Next heartbeat after upgrade ships the appliance's configured
+rules; cloud's `/app/rules` renders them with "Runs locally"
+chips as originally intended.
+
 ## [0.1.63] · 2026-05-23
 
 ### Fixed · Chart taps now show the value at the cursor
