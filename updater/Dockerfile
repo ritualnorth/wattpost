@@ -4,7 +4,13 @@
 # Built on docker:27-cli (alpine + docker CLI + compose plugin) so the
 # container can shell out to `docker compose pull && up -d` against
 # the user's bind-mounted compose file. ~50 MB image.
-FROM docker:27-cli
+#
+# Pulled via AWS Public ECR's mirror of docker.io/library/docker —
+# identical bits to the upstream, no Docker Hub rate limit on
+# anonymous pulls (the self-hosted runner's IP gets 429'd by docker.io
+# after a busy release day). See #283 for the migration rationale;
+# Dockerfile.appliance + cloud/Dockerfile got swapped the same way.
+FROM public.ecr.aws/docker/library/docker:27-cli
 
 RUN apk add --no-cache python3 docker-cli-compose
 
