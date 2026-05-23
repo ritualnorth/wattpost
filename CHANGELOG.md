@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.63] · 2026-05-23
+
+### Fixed · Chart taps now show the value at the cursor
+
+Tapping anywhere on a History chart used to highlight a point but
+display nothing — the legend that would normally show the value
+was hidden (or set to `live: false` from the iOS-Safari tooltip
+work). Now every chart on the page has a floating tooltip that
+follows the cursor and lists each series' value at that x-position
+plus a date/time header. Works on tap (mobile) and hover (desktop).
+
+Applied to: per-metric history chart, Energy overview chart,
+compare-packs overlay, and the per-device drill-down chart on
+Devices.
+
+### Changed · Stat strip is leaner
+
+Range (max − min, derivable from Min + Max) was dropped from the
+chart stat strip. Resolution (raw / 1-min avg / 1-hour avg / 1-day
+avg) moved out of the strip into a small right-aligned subtitle
+above the chart — it's debug context, not a stat. Strip is now
+four cells: Now, Min, Avg, Max.
+
 ## [0.1.62] · 2026-05-22
 
 ### Added · Energy data shipped to cloud (#252 slice 1)
