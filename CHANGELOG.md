@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.80] · 2026-05-23
+
+### Fixed · Build-only: swap python base image to AWS Public ECR mirror
+
+Docker Hub blocked three consecutive appliance image builds from the
+self-hosted runner's IP with 429 Too Many Requests on
+`python:3.12-slim`. Switched the `FROM` line in both Dockerfile.appliance
+and cloud/Dockerfile to `public.ecr.aws/docker/library/python:3.12-slim` —
+AWS's free no-rate-limit mirror of the same image bits Docker Inc.
+publishes to Docker Hub. No runtime change; just gets us unblocked.
+The longer-term fix (Docker Hub auth in the workflow → 200 pulls/6h
+instead of 100 unauthenticated) is backlogged as #283.
+
 ## [0.1.79] · 2026-05-23
 
 ### Changed · Prettier map tiles — CartoDB Dark Matter

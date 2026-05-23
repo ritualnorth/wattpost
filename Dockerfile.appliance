@@ -15,7 +15,12 @@
 # Updates: `docker compose pull && docker compose up -d`. No source-
 # tarball swap, no Update-now button — image replacement is the update.
 
-FROM python:3.12-slim
+# Mirror via AWS Public ECR. Identical bits to docker.io/library/python
+# (Docker Inc. publishes both); no rate limit on anonymous pulls. Switched
+# 2026-05-23 after Docker Hub blocked three appliance builds in a row
+# from the self-hosted runner's IP. Docker Hub auth in the workflow is
+# the right long-term fix (#283); this gets us unblocked today.
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 LABEL org.opencontainers.image.source="https://github.com/ritualnorth/offgrid-monitor"
 LABEL org.opencontainers.image.description="WattPost appliance — off-grid solar monitor daemon for Renogy gear over Bluetooth"
