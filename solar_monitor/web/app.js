@@ -8632,6 +8632,12 @@ async function wizFindDongle() {
       // Mopeka tank sensor — plaintext, no key dance. Single-tap pair.
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Mopeka tank sensor</span>`;
       actionHtml = `<button class="btn-action btn-action--primary" data-pair-mopeka="${escHtml(d.address)}">Pair Mopeka</button>`;
+    } else if (vendor === "govee") {
+      hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Govee thermometer</span>`;
+      actionHtml = `<button class="btn-action btn-action--primary" data-pair-govee="${escHtml(d.address)}">Pair Govee</button>`;
+    } else if (vendor === "ruuvi") {
+      hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">RuuviTag</span>`;
+      actionHtml = `<button class="btn-action btn-action--primary" data-pair-ruuvi="${escHtml(d.address)}">Pair Ruuvi</button>`;
     } else if (vendor === "jkbms") {
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">JK BMS</span>`;
       // JK BMS wizard support isn't built yet (driver shipped in v0.0.21);
@@ -8662,6 +8668,21 @@ async function wizFindDongle() {
       b.disabled = true;
       b.textContent = "Saving…";
       wizAddTransportFromMopeka(b.dataset.pairMopeka, b);
+    });
+  });
+  // Govee + Ruuvi — same single-tap, different transport type.
+  list.querySelectorAll("[data-pair-govee]").forEach(b => {
+    b.addEventListener("click", () => {
+      b.disabled = true;
+      b.textContent = "Saving…";
+      wizAddPassiveBleTransport("ble_govee_advertise", b.dataset.pairGovee, "Pair Govee", b);
+    });
+  });
+  list.querySelectorAll("[data-pair-ruuvi]").forEach(b => {
+    b.addEventListener("click", () => {
+      b.disabled = true;
+      b.textContent = "Saving…";
+      wizAddPassiveBleTransport("ble_ruuvi_advertise", b.dataset.pairRuuvi, "Pair Ruuvi", b);
     });
   });
   // Victron pairing — show + wire the key-entry form.
@@ -8809,6 +8830,35 @@ async function wizAddTransportFromVictron(mac, key, deviceClass) {
   }
   if (status) status.textContent = `Added · ${res.label || res.id}. Polling now.`;
   // Refresh the transport list so the new Victron row appears.
+  await new Promise(r => setTimeout(r, 1200));
+  await wizLoadTransports();
+}
+
+// Generic single-tap MAC-only passive BLE transport pair flow. Used
+// by Govee + Ruuvi; Mopeka kept its own function for symmetry with
+// the Victron pairing UX text it borrows.
+async function wizAddPassiveBleTransport(type, mac, restoreLabel, button) {
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({type, address: mac}),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = restoreLabel;
+    }
+    alert("Couldn't add transport: " + (e.message || String(e)));
+    return;
+  }
+  if (button) button.textContent = `Added · ${res.label || res.id}`;
   await new Promise(r => setTimeout(r, 1200));
   await wizLoadTransports();
 }

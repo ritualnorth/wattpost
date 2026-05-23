@@ -479,6 +479,18 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
             mopeka_was_running = await _mopeka_scanner().pause()
         except Exception:
             log.debug("ble_scan: mopeka scanner pause skipped (not in use)")
+        govee_was_running = False
+        try:
+            from ..transport.ble_govee_advertise import _scanner as _govee_scanner
+            govee_was_running = await _govee_scanner().pause()
+        except Exception:
+            log.debug("ble_scan: govee scanner pause skipped (not in use)")
+        ruuvi_was_running = False
+        try:
+            from ..transport.ble_ruuvi_advertise import _scanner as _ruuvi_scanner
+            ruuvi_was_running = await _ruuvi_scanner().pause()
+        except Exception:
+            log.debug("ble_scan: ruuvi scanner pause skipped (not in use)")
         try:
             # `return_adv=True` makes BleakScanner give us each device's
             # latest advertisement_data alongside the BLEDevice object.
@@ -510,6 +522,18 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
                     await _mopeka_scanner().resume()
                 except Exception:
                     log.warning("ble_scan: mopeka scanner resume failed")
+            if govee_was_running:
+                try:
+                    from ..transport.ble_govee_advertise import _scanner as _govee_scanner
+                    await _govee_scanner().resume()
+                except Exception:
+                    log.warning("ble_scan: govee scanner resume failed")
+            if ruuvi_was_running:
+                try:
+                    from ..transport.ble_ruuvi_advertise import _scanner as _ruuvi_scanner
+                    await _ruuvi_scanner().resume()
+                except Exception:
+                    log.warning("ble_scan: ruuvi scanner resume failed")
     import time as _time
     now = int(_time.time())
     out = []
@@ -522,6 +546,10 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     # by the hardware-id byte at offset 0 (see ble_mopeka_advertise._HW_KINDS).
     NORDIC_MFR_ID = 0x0059
     MOPEKA_HW_IDS = {0x03, 0x05, 0x06, 0x08, 0x09}
+    # Govee thermo-hygrometers (H507x / H510x) share a single manufacturer ID.
+    GOVEE_MFR_ID = 0xEC88
+    # Ruuvi Innovations — RuuviTag environmental sensors.
+    RUUVI_MFR_ID = 0x0499
     for mac, (d, ad) in devices_with_adv.items():
         mac = (mac or "").upper()
         if not mac:
@@ -560,6 +588,14 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
                 rec["protocol"] = "mopeka_tank"
                 rec["vendor"]   = "mopeka"
                 rec["mopeka_hw_id"] = mp[0]
+        # Govee H507x / H510x thermometer-hygrometers.
+        if not rec.get("vendor") and GOVEE_MFR_ID in mfr_data:
+            rec["protocol"] = "govee_ambient"
+            rec["vendor"]   = "govee"
+        # RuuviTag environmental sensor (format 5 payload).
+        if not rec.get("vendor") and RUUVI_MFR_ID in mfr_data:
+            rec["protocol"] = "ruuvi_ambient"
+            rec["vendor"]   = "ruuvi"
 
         # Name-based hints stay as before — covers Renogy BT-* and
         # any other vendor identifiable by advertised name.
@@ -1209,6 +1245,52 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         }
         default_label = f"Victron VE.Direct {leaf}"
 
+    elif data.type == "ble_govee_advertise":
+        # Govee H507x / H510x. Passive BLE, plaintext payload, no key.
+        mac = (data.address or "").strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
+            raise HTTPException(
+                status_code=400,
+                detail="address must be a Bluetooth MAC (e.g. A4:C1:38:AA:BB:CC)",
+            )
+        for t in current_transports:
+            if (t.get("address") or "").upper() == mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"address {mac} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        suffix = mac.replace(":", "").lower()[-4:]
+        new_id = f"govee_{suffix[:2]}_{suffix[2:]}"
+        block = {
+            "type":    "ble_govee_advertise",
+            "address": mac,
+        }
+        default_label = f"Govee {mac[-5:]}"
+
+    elif data.type == "ble_ruuvi_advertise":
+        # RuuviTag — passive BLE, format-5 plaintext payload, no key.
+        mac = (data.address or "").strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
+            raise HTTPException(
+                status_code=400,
+                detail="address must be a Bluetooth MAC",
+            )
+        for t in current_transports:
+            if (t.get("address") or "").upper() == mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"address {mac} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        suffix = mac.replace(":", "").lower()[-4:]
+        new_id = f"ruuvi_{suffix[:2]}_{suffix[2:]}"
+        block = {
+            "type":    "ble_ruuvi_advertise",
+            "address": mac,
+        }
+        default_label = f"Ruuvi {mac[-5:]}"
+
     elif data.type == "ble_mopeka_advertise":
         # Mopeka tank-level sensor — passive BLE, plaintext payload,
         # NO encryption key. Just a MAC. Auto-creates the device row
@@ -1277,8 +1359,9 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
             status_code=400,
             detail=f"unsupported transport type {data.type!r} — wizard "
                    f"supports 'ble_modbus', 'serial_modbus', "
-                   f"'ble_victron_advertise', 've_direct' and "
-                   f"'ble_mopeka_advertise'",
+                   f"'ble_victron_advertise', 've_direct', "
+                   f"'ble_mopeka_advertise', 'ble_govee_advertise' and "
+                   f"'ble_ruuvi_advertise'",
         )
 
     # Bump id if collision (rare — different MAC, same tail).
@@ -1348,6 +1431,27 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         log.info("setup wizard: auto-added mopeka tank device for transport %s",
                  new_id)
 
+    # Same pattern for Govee + Ruuvi — passive transports, one
+    # device row per MAC.
+    if data.type == "ble_govee_advertise":
+        raw.setdefault("devices", []).append({
+            "vendor":    "govee",
+            "kind":      "ambient",
+            "transport": new_id,
+            "label":     label,
+        })
+        log.info("setup wizard: auto-added govee ambient device for transport %s",
+                 new_id)
+    if data.type == "ble_ruuvi_advertise":
+        raw.setdefault("devices", []).append({
+            "vendor":    "ruuvi",
+            "kind":      "ambient",
+            "transport": new_id,
+            "label":     label,
+        })
+        log.info("setup wizard: auto-added ruuvi ambient device for transport %s",
+                 new_id)
+
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1399,7 +1503,10 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
         # Class-aware open-state probe.
         is_open = False
         if t is not None:
-            if ttype in ("ble_victron_advertise", "ble_mopeka_advertise"):
+            if ttype in (
+                "ble_victron_advertise", "ble_mopeka_advertise",
+                "ble_govee_advertise", "ble_ruuvi_advertise",
+            ):
                 # Passive: registered + recent advertisement = "open".
                 # Mopeka broadcasts every ~10s by default; the 60s
                 # freshness window is generous enough that we don't
