@@ -27,6 +27,14 @@ try:
 except ImportError:
     pass
 try:
+    from . import ble_govee_advertise  # noqa: F401
+except ImportError:
+    pass
+try:
+    from . import ble_ruuvi_advertise  # noqa: F401
+except ImportError:
+    pass
+try:
     from . import ble_jkbms  # noqa: F401
 except ImportError:
     pass

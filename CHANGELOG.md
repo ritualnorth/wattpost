@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.86] · 2026-05-23
+
+### Added · Govee + Ruuvi ambient sensor drivers (#255)
+
+Second piece of the Van Mode sensor wave. Two new vendors via the
+same passive-BLE pattern as Mopeka.
+
+**Govee** (H5074, H5075, H5101, H5102) — cheap thermo-hygrometer,
+£10-15 on Amazon. Two payload encodings:
+
+- H5074-style: explicit int16 temp + uint16 humidity + battery byte
+- H5075-style: 3-byte packed encoding (temp×10000 + humid×10), with
+  the top bit as the temperature sign for sub-zero readings
+
+Emits `temperature_c`, `humidity_pct`, `battery_pct`, `hardware_kind`.
+
+**Ruuvi** (RuuviTag, RAWv2/format-5) — open-hardware environmental
+sensor, ~£25-35, much longer battery life than Govee. Adds
+**barometric pressure** which feeds future storm-warning rules.
+Format 3 (legacy) and format 8 (encrypted) deliberately rejected
+with a clear error so the user knows to flip RAWv2 in the Ruuvi
+Station app.
+
+Emits `temperature_c`, `humidity_pct`, `pressure_pa`, `pressure_hpa`,
+`battery_mv`, `battery_pct`.
+
+Both wire into the existing BLE-scan wizard with single-tap pair
+(no encryption key, no slave-ID scan — one MAC = one device).
+Scanner pause/resume is integrated so adding a Govee while a Mopeka
+is already advertising doesn't break either listener.
+
 ## [0.1.85] · 2026-05-23
 
 ### Added · Mopeka Pro / Pro Check tank-level driver (#254)
