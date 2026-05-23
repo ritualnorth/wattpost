@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.72] · 2026-05-23
+
+### Fixed · Don't show "Update to vX" after the user already clicked it (#275)
+
+The orange Update button on the dashboard fleet card and the
+Update-now button on /app/site/{id} stayed clickable while the
+cloud-triggered update was queued / picked_up / applying — so the
+user could double-fire the command (5-minute heartbeat interval
+makes the misclick window meaningful). Both buttons now check the
+appliance's in-flight command state and render as a disabled
+"Update queued…" pill when an update is already in flight. The
+fleet card uses a new server-side `pending_update` flag on the
+`/api/sites` payload (single batched query across the user's
+fleet); the per-site page derives it from the existing commands
+list. Auto re-enables once the cmd reaches success / failed.
+
 ## [0.1.71] · 2026-05-23
 
 ### Fixed · Don't snapshot twice when an update retries (#274)
