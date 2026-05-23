@@ -17,6 +17,7 @@ from .forecast import ForecastService
 from .weather import WeatherService
 from .cloud import CloudService
 from .gps import GpsService
+from .mqtt_in import MqttInService
 from .tunnel import TunnelService
 from .update import UpdateChecker
 from .config import Config
@@ -156,6 +157,18 @@ class PollScheduler:
         # it on the dashboard without re-evaluating per request.
         self._last_solar_pause: dict[str, Any] | None = None
 
+        # MQTT-IN (#256). Optional; only spun up when config.mqtt_in
+        # has enabled=true. Maintains a registry of latest readings
+        # off the user's MQTT broker which we fold into each poll
+        # result so MQTT-fed devices appear on /api/devices identical
+        # to BLE/Modbus ones.
+        self._mqtt_in: MqttInService | None = None
+        if config.mqtt_in is not None and config.mqtt_in.enabled:
+            try:
+                self._mqtt_in = MqttInService(config.mqtt_in)
+            except Exception:
+                log.exception("mqtt_in service failed to initialise")
+
         # USB GPS (#125). Optional; off entirely when config.gps is
         # absent. On significant movement we mutate the weather +
         # forecast cfg in-memory and trigger one-shot re-fetches so
@@ -189,6 +202,13 @@ class PollScheduler:
         """Expose the GPS service for the /api/gps status endpoint
         (returns None when not configured)."""
         return self._gps
+
+    @property
+    def mqtt_in(self) -> MqttInService | None:
+        """Expose the MQTT-IN ingest service for the
+        /api/mqtt_in/status endpoint. Returns None when the user
+        hasn't configured a broker."""
+        return self._mqtt_in
 
     async def _on_gps_move(self, lat: float, lon: float) -> None:
         """Called by GpsService when a fresh fix moves the daemon's
@@ -350,6 +370,8 @@ class PollScheduler:
             await self._weather.start()
         if self._cloud is not None:
             await self._cloud.start()
+        if self._mqtt_in is not None:
+            await self._mqtt_in.start()
         if self._tunnel is not None:
             await self._tunnel.start()
         if self._updater is not None:
@@ -407,6 +429,8 @@ class PollScheduler:
             await self._weather.stop()
         if self._cloud is not None:
             await self._cloud.stop()
+        if self._mqtt_in is not None:
+            await self._mqtt_in.stop()
         if self._tunnel is not None:
             await self._tunnel.stop()
         if self._updater is not None:
@@ -430,6 +454,19 @@ class PollScheduler:
             try:
                 assert self._poller is not None
                 result = await self._poller.poll()
+                # Fold MQTT-IN devices into the same result so the
+                # dashboard, alert engine and exporters all treat them
+                # identically to BLE/Modbus reads. Collisions resolve
+                # in favour of the BLE/Modbus poll (real-device data
+                # wins over MQTT-bus echo of the same metric).
+                if self._mqtt_in is not None:
+                    try:
+                        for label, snap in self._mqtt_in.current_snapshots().items():
+                            result.setdefault("devices", {})
+                            if label not in result["devices"]:
+                                result["devices"][label] = snap
+                    except Exception:
+                        log.exception("mqtt_in: merge into poll result failed")
                 self._last_result = result
                 await self.store.record_poll(result)
                 # Output adapters (#104) — discover-on-first-poll and

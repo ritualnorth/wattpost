@@ -337,6 +337,60 @@ class SolarPauseCfg(msgspec.Struct, kw_only=True):
     cooldown_minutes: int   = 30
 
 
+class MqttInTopicCfg(msgspec.Struct, kw_only=True):
+    """One manual topic→metric mapping. The escape hatch for devices
+    that don't publish HA-discovery configs (Shelly gen1, bespoke
+    ESPHome, custom microcontrollers, etc.). Power users edit the
+    YAML directly; the wizard offers HA-discovery first."""
+    topic: str                        # MQTT topic, may include + / # wildcards
+    label: str                        # virtual device label (becomes its row id)
+    metric: str = "value"             # snapshot key under that device
+    vendor: str = "mqtt"              # surfaced via _vendor
+    kind: str = "sensor"              # surfaced via _kind
+    # How to interpret the payload bytes:
+    #   "scalar" — payload is the raw number / string (default)
+    #   "json"   — payload is JSON; extract `json_path` (dotted, e.g.
+    #              `value.temperature` for `{"value": {"temperature": 21.3}}`)
+    value_type: str = "scalar"
+    json_path: str = ""               # required when value_type == "json"
+
+
+class MqttInCfg(msgspec.Struct, kw_only=True):
+    """Ingest external MQTT broker → virtual devices on the dashboard.
+
+    When configured, the daemon connects to the user's broker (e.g.
+    their Home Assistant Mosquitto, an industrial broker, or a Shelly
+    gateway), subscribes to either HA-discovery topics (auto-find
+    every entity HA already knows about) or a manual `topics:` list,
+    and folds the latest values into the same `/api/devices` response
+    that BLE/Modbus devices land in.
+
+    Privacy note: only OUTBOUND connection to the user's own broker.
+    Nothing leaves the LAN unless the user explicitly points us at a
+    remote broker. Same model as the [[project_cloud_tier]] gate.
+    """
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 1883
+    username: str = ""
+    password: str = ""
+    client_id: str = "wattpost-in"
+    # HA MQTT-discovery autopopulate. Subscribes to
+    # `<ha_discovery_prefix>/+/+/config` and friends; turns each
+    # `state_topic` into a virtual device on the dashboard. This is
+    # the single highest-leverage toggle — most existing HA users
+    # already have hundreds of entities ready to surface.
+    ha_discovery: bool = True
+    ha_discovery_prefix: str = "homeassistant"
+    # Manual fallback: explicit topic mappings for devices outside HA.
+    topics: list[MqttInTopicCfg] = []
+    # How long a virtual device stays in the result with no fresh
+    # advertisement before we drop it from `/api/devices`. Mirrors
+    # the BLE STALE_AFTER_SECONDS pattern but longer — MQTT devices
+    # can be quiet for minutes between state changes.
+    stale_after_seconds: int = 600
+
+
 class HistoryCfg(msgspec.Struct, kw_only=True):
     """Polling cadence + how long each retention tier keeps data.
 
@@ -388,6 +442,7 @@ class Config(msgspec.Struct, kw_only=True):
     history: HistoryCfg | None = None    # optional — poll cadence + retention (#172)
     solar_pause: SolarPauseCfg | None = None  # optional — auto-pause AC charger when PV covers (#163)
     smart_plugs: list[SmartPlugCfg] = []      # optional — LAN-attached smart plugs for solar-pause to drive
+    mqtt_in: MqttInCfg | None = None     # optional — ingest from user's MQTT broker (#256)
 
 
 # #258 — default alert rules seeded on first boot. System-voltage-
