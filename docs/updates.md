@@ -1,17 +1,57 @@
 # Updates
 
-How you take updates depends on which install path you're on.
+WattPost ships fast — updates come weekly. You have three ways to take them.
+The cloud-driven path is the safe one: snapshot before, auto-rollback after,
+restore from cloud if anything goes really wrong.
 
-## On the SD-card install (Pi)
+## 1. Cloud "Update now" button (recommended)
+
+The per-site dashboard at `/app/site/{id}` has an **Update** button. One click
+fires the full safety chain — same flow on Pi and on Docker:
+
+1. **Local snapshot.** The appliance writes a fresh tarball of config + DB.
+2. **24h cloud-backup check.** If your most recent cloud-stored backup is
+   older than 24 hours (or doesn't exist), the cloud queues a `backup_now`
+   first. The appliance uploads the archive before any update touches the box.
+3. **Update.** Pi runs `wattpost-update` (atomic slot swap); Docker hits the
+   `wattpost-updater` sidecar (pulls + restart via the local docker socket).
+4. **Watch for the new-version heartbeat.** The cloud reconciles
+   automatically once the upgraded daemon checks in with a bumped version.
+5. **Auto-rollback if it wedges.** If no new-version heartbeat arrives within
+   10 minutes, the cloud marks the update failed AND queues a rollback to
+   the previous version automatically. Pi uses `wattpost-rollback` (slot
+   symlink swap); Docker pins the previous image tag.
+6. **Cloud-restore as the last-resort safety net.** If autorollback doesn't
+   recover the box, your snapshot from step 1 is restorable in one click
+   from **/app/site/{id} → Cloud backups**.
+
+You also get a permanent **Update history** card on the per-site page
+showing every update, every rollback, and a one-click "Roll back to v0.X.Y"
+button for any past version.
+
+**Installer tier** gets the same chain in bulk: **Update all out-of-date
+sites** queues the full snapshot → check → update → watchdog → auto-rollback
+sequence per site independently. Per-site progress surfaces in the response.
+
+## 2. Watchtower / auto-poll (Docker)
+
+The `wattpost-updater` sidecar polls GHCR daily on its own. If you toggle
+`auto_apply_updates` ON for the appliance (cloud dashboard), this becomes
+fully hands-off: new image → snapshot → restart → cloud watches → auto-
+rollback if it goes wrong. No clicks.
+
+## 3. Manual
+
+### On the SD-card install (Pi)
 
 1. The cloud manifest at [`releases.wattpost.io/img/manifest.json`](https://releases.wattpost.io/img/manifest.json) names the current published version.
 2. Your appliance polls that manifest every 24 hours.
 3. If a newer version is available, **Settings → About** shows "v0.0.X available".
-4. Click **Update now** → the daemon downloads the source tarball from `releases.wattpost.io/source/latest.tar.gz`, verifies SHA256, swaps into `/opt/wattpost-src`, runs `install.sh`, and restarts.
+4. Click **Update now** in the appliance's local dashboard → `wattpost-update`
+   downloads the tarball, verifies SHA256, builds into the inactive slot,
+   health-probes, swaps the symlink, and restarts.
 
-Dashboard polls the update log and reconnects when the new daemon comes back up. ~30 seconds total.
-
-## On the Docker install
+### On the Docker install
 
 ```
 cd ~/wattpost
@@ -19,7 +59,9 @@ docker compose pull   # fetch newest image
 docker compose up -d  # roll the container
 ```
 
-That's the update. The `latest` tag follows main; for traceability, pin to a `sha-<short>` tag in your compose file. Your config + history persist via the bind-mounted volumes.
+That's the update. The `latest` tag follows main; for traceability, pin to a
+`sha-<short>` tag in your compose file. Your config + history persist via the
+bind-mounted volumes.
 
 ## What changes between updates
 
@@ -42,15 +84,25 @@ That's the update. The `latest` tag follows main; for traceability, pin to a `sh
 
 ## What if an update breaks something?
 
-For v0.0.x, the upgrade is **non-atomic**. If `install.sh` partially fails, the appliance can be in a half-upgraded state. SSH in and:
+The cloud-driven path (option 1 above) is layered defence in depth — multiple
+things have to fail before you lose data or end up with a broken appliance.
 
-```
-sudo /opt/wattpost-src.old/packaging/install.sh
-```
+| Layer | What protects you | Where it lives |
+|---|---|---|
+| 1. Local snapshot before update | Tarball of config + DB sits next to the appliance on its local disk | Pi: `wattpost-update`; Docker: cloud dispatcher |
+| 2. 24h cloud-backup check | Cloud guarantees a fresh off-box copy exists before letting an update touch the appliance | Cloud-side, automatic |
+| 3. Atomic update | Pi: slot-swap with health probe; Docker: image pull + restart through compose | `wattpost-update` / `wattpost-updater` |
+| 4. Auto-rollback on failure | If no new-version heartbeat in 10 min, cloud queues a rollback automatically | Cloud-side watchdog |
+| 5. Manual 1-click rollback | "Roll back to v0.X.Y" button on **/app/site/{id}** for any successful past update | Cloud UI |
+| 6. Restore from cloud backup | Pull the snapshot from step 1 + step 2 back onto the appliance from **/app/site/{id} → Cloud backups** | Cloud UI |
 
-… to roll back to the previous source tree (we keep `.old/` around for exactly this).
+Pi also keeps the previous slot on disk after every update; `wattpost-rollback`
+(or the cloud's auto-rollback) swings the symlink back in seconds.
 
-A fully atomic-swap updater (parallel venv, post-install health check, automatic rollback) is on the roadmap once we have customers who can't be expected to SSH-recover. For now, "SSH and re-run" is the escape hatch.
+If you ran the manual path (option 3) and it broke, SSH in and re-run
+`wattpost-update` to get the previous slot back, or run `wattpost-rollback`.
+On Docker, pin the previous image tag in your `docker-compose.yml` and
+`docker compose up -d`.
 
 ## Beta channel
 
