@@ -8,6 +8,45 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.65] · 2026-05-23
+
+### Added · Cloud "Update now" for Docker installs (#265)
+
+Docker installs can now apply updates from the cloud, with a
+backup-before-update safety net. Previously the cloud's update
+command was refused on Docker with a "do it manually" error —
+the only way to update remotely was to SSH in.
+
+How it works:
+
+  1. Cloud queues `kind=update` (existing heartbeat command queue).
+  2. Appliance takes an immediate snapshot (DB + config) and
+     uploads it to cloud storage if `cloud_upload` is on — same
+     code path as "Take backup now".
+  3. Appliance POSTs `http://localhost:8080/v1/update` on the
+     Watchtower sidecar with a shared bearer token.
+  4. Watchtower pulls the new image and restarts the wattpost
+     container. The daemon dies mid-flight; the new container
+     heartbeats with the new version; the cloud's existing
+     10-minute reconciler marks the command success.
+
+Pre-update snapshot is best-effort — if the backup service isn't
+running we log and continue rather than blocking the update.
+
+If a Docker install gets the update command without `WATCHTOWER_URL`
++ `WATCHTOWER_TOKEN` env set, the command fails cleanly with a docs
+link instead of going silent.
+
+Same Watchtower sidecar also runs scheduled auto-polls on its own
+`WATCHTOWER_POLL_INTERVAL` (default 86400 = daily) — set
+`auto_apply_updates` ON in the cloud per-appliance to fully
+hands-off, or OFF and trigger manually.
+
+`docker-compose.example.yml` now ships the Watchtower service +
+all required env vars. Existing Docker users have a copy-paste
+migration snippet in
+[`docs/docker-install.md`](docs/docker-install.md#adding-the-watchtower-sidecar-existing-installs).
+
 ## [0.1.64] · 2026-05-23
 
 ### Fixed · Appliance alert rules now actually sync up to the cloud

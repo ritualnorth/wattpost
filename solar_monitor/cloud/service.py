@@ -241,18 +241,70 @@ class CloudService:
             )
             return
 
-        # Docker installs can't run wattpost-update — that helper
-        # only exists on Pi installs (where it's bundled by pi-gen).
-        # Fail fast and visibly rather than letting the user think
-        # we're "applying…" for an action we can't take.
+        # Docker installs go via a Watchtower sidecar (#265). The
+        # daemon takes a snapshot first (gives the user a rollback
+        # path if the new image is bad — Pi has slot-based atomic
+        # swap, Docker doesn't), then POSTs the watchtower HTTP API
+        # to pull + restart. Container restart kills this process
+        # mid-flight, so we don't await; cloud reconciles via the
+        # version-bump heartbeat (same path as Pi).
         import os
         if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
-            await self._patch_command_status(
-                cmd_id, "failed",
-                error="cloud-triggered updates are not supported on "
-                      "Docker installs — run `docker compose pull && "
-                      "docker compose up -d` on the host instead",
-            )
+            wt_url   = (os.environ.get("WATCHTOWER_URL")   or "").strip()
+            wt_token = (os.environ.get("WATCHTOWER_TOKEN") or "").strip()
+            if not (wt_url and wt_token):
+                await self._patch_command_status(
+                    cmd_id, "failed",
+                    error="cloud-triggered updates need the watchtower "
+                          "sidecar. Add it to docker-compose.yml (see "
+                          "https://wattpost.io/docs/docker-update) and "
+                          "set WATCHTOWER_URL + WATCHTOWER_TOKEN on the "
+                          "wattpost service.",
+                )
+                return
+
+            await self._patch_command_status(cmd_id, "picked_up")
+            # Snapshot first — best-effort. If backup service isn't
+            # configured we log and continue: blocking updates on
+            # backup wedge would be worse than letting the update
+            # proceed with no rollback safety net (the user gets the
+            # warning surface on the cloud detail page anyway).
+            backup_svc = getattr(self.scheduler, "backup_service", None)
+            snapshot_name = None
+            if backup_svc is not None:
+                try:
+                    out_path = await backup_svc.snapshot_now()
+                    snapshot_name = out_path.name if out_path else None
+                    log.info("cloud update: pre-update snapshot %s for cmd %d",
+                             snapshot_name, cmd_id)
+                except Exception:
+                    log.exception("cloud update: pre-update snapshot "
+                                  "failed; proceeding with update anyway "
+                                  "for cmd %d", cmd_id)
+
+            await self._patch_command_status(cmd_id, "applying")
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    r = await client.post(
+                        f"{wt_url.rstrip('/')}/v1/update",
+                        headers={"Authorization": f"Bearer {wt_token}"},
+                    )
+                if r.status_code >= 400:
+                    await self._patch_command_status(
+                        cmd_id, "failed",
+                        error=f"watchtower returned HTTP {r.status_code}: "
+                              f"{r.text[:200]}",
+                    )
+                    return
+                log.info("cloud update: watchtower fired for cmd %d "
+                         "(snapshot=%s)", cmd_id, snapshot_name or "skipped")
+            except Exception as e:
+                log.exception("cloud update: watchtower call failed")
+                await self._patch_command_status(
+                    cmd_id, "failed",
+                    error=f"could not reach watchtower at {wt_url}: "
+                          f"{type(e).__name__}: {e}",
+                )
             return
 
         await self._patch_command_status(cmd_id, "picked_up")
