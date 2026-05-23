@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.75] · 2026-05-23
+
+### Added · Cloud device-health view (#267)
+
+New "Device health" card on /app/site/{id} surfaces disk, memory,
+CPU load, uptime, hostname, and LAN IP straight from the appliance
+heartbeat. Lets you triage "why's this offline?" without SSHing in.
+
+Appliance side: stdlib-only `host_health.snapshot()` reads
+/proc/meminfo + os.getloadavg + shutil.disk_usage + a connected-
+socket trick for LAN IP. Ships as `host_health` in heartbeat extras,
+no schema change cloud-side — site_detail just parses it out of the
+existing `extras_json` blob.
+
+Tiles colour-code: amber when disk ≥75% or mem ≥75% or 1m load ≥1×
+cores, red at ≥90% or ≥1.5× cores. Card hides itself on older
+appliance versions that don't ship the field, so pre-v0.1.75 sites
+gracefully render the rest of the page unchanged.
+
 ## [0.1.74] · 2026-05-23
 
 ### Fixed · Backup tables overflowing the card on mobile

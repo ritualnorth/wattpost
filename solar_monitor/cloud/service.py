@@ -837,6 +837,15 @@ class CloudService:
         # 'pi'.
         import os as _os
         extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
+        # #267 — host-health snapshot (disk, memory, load, uptime,
+        # hostname, LAN IP). Cheap stdlib reads; the cloud renders
+        # this as a Device-health card on /app/site/{id} and uses it
+        # for fleet-view "disk almost full" warnings.
+        try:
+            from .. import host_health as _hh
+            extras["host_health"] = _hh.snapshot()
+        except Exception:
+            log.exception("cloud heartbeat: host_health snapshot failed")
         # Kiosk share-token (Option C of the kiosk security model).
         # The cloud dashboard's "Kiosk" button reads this and builds
         # the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`.
