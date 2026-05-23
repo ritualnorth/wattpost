@@ -8,6 +8,63 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.87] · 2026-05-23
+
+### Added · MQTT-IN: ingest external broker into the dashboard (#256)
+
+Third piece of the Van Mode sensor wave. WattPost can now subscribe
+to the user's own MQTT broker (Home Assistant Mosquitto, an
+industrial broker, anything that speaks MQTT 3.1.1) and fold the
+results into the same `/api/devices` payload that BLE/Modbus
+devices land in. Every dashboard tile, alert rule, exporter, and
+cloud heartbeat sees MQTT-fed devices identical to native ones.
+
+Two ingest paths:
+
+- **HA-discovery (default on)** — subscribe to
+  `homeassistant/+/+/config` + `homeassistant/+/+/+/config`, parse
+  each config payload, register the `state_topic`, then merge
+  every state message as a metric on a virtual device named after
+  the HA `device.identifier`. Most existing HA users will see
+  dozens to hundreds of entities populate automatically with no
+  per-sensor config.
+- **Manual `topics:` list** — escape hatch for devices that don't
+  publish HA-discovery (Shelly gen1, custom ESP firmware, bespoke
+  industrial gateways). Configure topic + label + metric +
+  scalar/JSON extraction in YAML.
+
+Supports the two HA `value_template` shapes that cover ~95% of
+real entities: bare `{{ value }}` and dotted `{{ value_json.X }}`.
+More exotic Jinja (filters, arithmetic, conditionals) logs a
+one-shot info and skips that entity rather than failing silently.
+
+New config block (off by default — `mqtt_in: { enabled: false }`):
+
+```yaml
+mqtt_in:
+  enabled: true
+  host: 192.168.1.10
+  port: 1883
+  username: ""
+  password: ""
+  ha_discovery: true
+  topics:
+    - topic: garage/sensor/temp
+      label: garage
+      metric: temp_c
+```
+
+New `/api/mqtt_in/status` endpoint surfaces broker state +
+route counts for a future Settings panel (panel UI follows in a
+later release; for now power users edit YAML directly).
+
+Privacy: only OUTBOUND connection to the broker the user picks.
+No data leaves the LAN unless they point us at a remote broker.
+
+Deferred to follow-ups: Shelly gen1/gen2-specific topic parsers,
+in-app Settings → MQTT panel, MQTT writes (the existing MQTT-out
+exporter is unchanged).
+
 ## [0.1.86] · 2026-05-23
 
 ### Added · Govee + Ruuvi ambient sensor drivers (#255)
