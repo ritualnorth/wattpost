@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.84] · 2026-05-23
+
+### Added · Cloud inbox auto-notify email (#246)
+
+New "Email me on new alerts" toggle in the `/app/alerts` header.
+When on, every heartbeat that brings new alerts into the cloud
+inbox fires one batched digest email to the user. Default off
+(matches the daily-recap pattern — alert email is borderline-
+spammy without explicit consent).
+
+Per-heartbeat batching means several alerts firing in the same
+poll cycle (e.g. low SoC + critical SoC tripping together) get
+ONE combined notification instead of three. Heartbeats are
+5min apart so even noisy fleets cap at 12 emails/h per user.
+
+New `users.email_alert_inbox` column (migration 0044); opt-in
+saved via the existing `/api/account/email-prefs` PATCH endpoint.
+
 ## [0.1.83] · 2026-05-23
 
 ### Added · Cloud-orchestrated disk cleanup (#279)
