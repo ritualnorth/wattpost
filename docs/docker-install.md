@@ -101,6 +101,34 @@ ship the least-privilege path.
 
 ## Updates
 
+Three paths, pick one:
+
+**1. Cloud "Update now" button (recommended for paired appliances)**
+
+The cloud's per-site "Update now" button drives a Watchtower sidecar
+on your host — one click, no SSH. The appliance takes a snapshot of
+its DB and config first, then triggers the pull + restart. If the
+new image fails to come up cleanly, restore from that snapshot via
+**/app/site/{id} → Cloud backups**.
+
+Needs the Watchtower service in your compose. The current
+[`docker-compose.example.yml`](https://github.com/ritualnorth/wattpost/blob/main/docker-compose.example.yml)
+includes it; if you installed before May 2026 you'll need to add it
+yourself — see **"Adding the Watchtower sidecar"** below.
+
+**2. Watchtower auto-poll**
+
+Same sidecar, no button. Watchtower polls GHCR daily by default
+(`WATCHTOWER_POLL_INTERVAL=86400` seconds) and restarts the wattpost
+container whenever a new image lands. Set the per-appliance
+`auto_apply_updates` toggle in the cloud to ON if you want this fully
+hands-off, or leave it OFF and trigger via the button when you're
+ready.
+
+**3. Manual**
+
+The old way. Always works.
+
 ```bash
 cd ~/wattpost
 docker compose pull   # fetch newest image
@@ -113,6 +141,53 @@ The `latest` tag follows `main`. For traceability, pin to a
 ```yaml
 image: ghcr.io/ritualnorth/wattpost-appliance:sha-abc1234
 ```
+
+### Adding the Watchtower sidecar (existing installs)
+
+Generate a token once:
+
+```bash
+openssl rand -hex 32
+```
+
+Add this block to your `docker-compose.yml`, under the existing
+`services:` map (alongside `wattpost:`):
+
+```yaml
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: wattpost-watchtower
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_HTTP_API_UPDATE: "true"
+      WATCHTOWER_HTTP_API_PERIODIC_POLLS: "true"
+      WATCHTOWER_POLL_INTERVAL: "86400"
+      WATCHTOWER_HTTP_API_TOKEN: "PASTE_THE_TOKEN_FROM_OPENSSL"
+```
+
+And add three env vars + a label to the existing `wattpost:` service:
+
+```yaml
+    environment:
+      WATTPOST_DEPLOYMENT: docker
+      WATCHTOWER_URL:   "http://localhost:8080"
+      WATCHTOWER_TOKEN: "PASTE_THE_SAME_TOKEN"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+```
+
+Then `docker compose up -d`. The cloud "Update now" button starts
+working from the next heartbeat.
+
+The token gives anyone with network reach to port 8080 full control
+of the labelled containers, so don't expose that port outside the
+host.
 
 ## What's mounted
 

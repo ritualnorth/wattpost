@@ -4,8 +4,12 @@
 #   docker compose up -d
 #   open http://localhost:8000   (or http://<this-host-ip>:8000)
 #
-# Updates:
-#   docker compose pull && docker compose up -d
+# Updates: the watchtower sidecar at the bottom polls GHCR daily and
+#   restarts wattpost when a new tag lands. Same sidecar is what the
+#   cloud's "Update now" button drives — it POSTs to the local
+#   watchtower HTTP API and gets an instant pull + restart.
+#   To control updates manually instead, comment out the watchtower
+#   service and run `docker compose pull && docker compose up -d`.
 #
 # Linux host only — macOS / Windows / WSL2 can't pass host Bluetooth
 # through to a container. For those, use the SD-card image (Pi) or
@@ -50,7 +54,57 @@ services:
     # the first time the volume is empty, then runs `solar-monitor serve`.
     restart: unless-stopped
 
-    # Pull image updates daily — equivalent of the "Update now" button.
-    # Comment this out if you'd rather control upgrades manually.
+    environment:
+      # Tells the daemon to find the watchtower sidecar at this URL
+      # for cloud-triggered updates. If unset, cloud Update-now is
+      # refused with "no updater available". Match the token in the
+      # watchtower service below — generate once with
+      #   openssl rand -hex 32
+      # and paste the same value in both places. Keep it secret; it
+      # gives anyone who reaches the watchtower port full control of
+      # this container.
+      WATTPOST_DEPLOYMENT: docker
+      WATCHTOWER_URL:   "http://localhost:8080"
+      WATCHTOWER_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
+
+    # Pulled by watchtower below — the label tells it to watch this
+    # container specifically and ignore anything else on the host.
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+
+  # ────────────────────────────────────────────────────────────────
+  # Watchtower sidecar — drives both scheduled auto-updates and the
+  # cloud's "Update now" button.
+  #
+  # Without this service, cloud Update-now is refused (Pi installs use
+  # wattpost-update; Docker has no equivalent helper otherwise) and
+  # the appliance only gets new image tags when the human runs
+  # `docker compose pull` by hand.
+  #
+  # With it:
+  #   - Cloud "Update now" → daemon POSTs http://localhost:8080/v1/update
+  #     with the bearer token → watchtower pulls + restarts wattpost.
+  #   - Auto-apply: polls GHCR every WATCHTOWER_POLL_INTERVAL seconds
+  #     (default 86400 = daily) for the wattpost image and restarts
+  #     on new tag. Disable by setting WATCHTOWER_HTTP_API_PERIODIC_POLLS=false.
+  # ────────────────────────────────────────────────────────────────
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: wattpost-watchtower
+    restart: unless-stopped
+    # Host networking so the daemon can reach localhost:8080 cleanly
+    # (the wattpost container also uses host networking above).
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"        # only touch labelled containers
+      WATCHTOWER_CLEANUP: "true"             # prune old images after restart
+      WATCHTOWER_INCLUDE_RESTARTING: "true"  # don't stall on container restart loops
+      WATCHTOWER_HTTP_API_UPDATE: "true"     # enable POST /v1/update
+      WATCHTOWER_HTTP_API_PERIODIC_POLLS: "true"
+      WATCHTOWER_POLL_INTERVAL: "86400"      # daily auto-poll
+      # Match the token in the wattpost service above. Anyone with
+      # this token + network reach to :8080 can force-restart any
+      # labelled container — don't expose this port outside the box.
+      WATCHTOWER_HTTP_API_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
