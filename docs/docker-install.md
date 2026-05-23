@@ -161,7 +161,9 @@ Add this block to your `docker-compose.yml`, under the existing
     network_mode: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker-compose.yml:/host-compose/docker-compose.yml:ro
+      # Read-write so the updater can rewrite the `image:` tag line
+      # during auto-rollback (#270). Read-only would block rollback.
+      - ./docker-compose.yml:/host-compose/docker-compose.yml
     environment:
       COMPOSE_FILE:  "/host-compose/docker-compose.yml"
       SERVICE_NAME:  "wattpost"

@@ -37,10 +37,12 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
 
 PORT          = int(os.environ.get("PORT", "8080"))
 TOKEN         = (os.environ.get("WATTPOST_UPDATER_TOKEN")
@@ -67,9 +69,78 @@ if not TOKEN:
 _lock = threading.Lock()
 
 
-def do_update() -> tuple[bool, str]:
+_VERSION_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
+
+
+def _pin_tag_in_compose(version: str) -> tuple[bool, str]:
+    """Rewrite the image: line of SERVICE_NAME in COMPOSE_FILE to use
+    the given version tag, leaving repo + everything else alone.
+    Bound under the same _lock as do_update() to prevent concurrent
+    writers.
+
+    Implementation: parse the file as text (not YAML) so comments
+    and quirks survive. Find the SERVICE_NAME block, then the first
+    `image:` line beneath it, then rewrite its tag. Re-runnable;
+    idempotent if the tag's already pinned."""
+    if not _VERSION_RE.match(version):
+        return False, f"invalid version format: {version!r}"
+    try:
+        with open(COMPOSE_FILE, "r") as f:
+            lines = f.readlines()
+    except OSError as e:
+        return False, f"can't read {COMPOSE_FILE}: {e}"
+
+    svc_header_re = re.compile(rf"^\s+{re.escape(SERVICE_NAME)}:\s*$")
+    in_service = False
+    service_indent = None
+    rewrote = False
+    for i, ln in enumerate(lines):
+        if svc_header_re.match(ln):
+            in_service = True
+            service_indent = len(ln) - len(ln.lstrip())
+            continue
+        if in_service:
+            # Bail out if we hit a sibling service (same/lesser indent
+            # AND ends with ":" — a new top-level under services).
+            stripped = ln.rstrip("\n")
+            if stripped and not stripped.startswith(" " * (service_indent + 2)):
+                if stripped.startswith(" " * service_indent) and stripped.endswith(":"):
+                    break
+            m = re.match(r"^(\s+image:\s*)(\S+?)(\s*(?:#.*)?)$", ln)
+            if m:
+                head, ref, tail = m.group(1), m.group(2), m.group(3)
+                # Strip any existing tag; default to ":latest" if there
+                # was none. We replace EVERYTHING after the last colon
+                # that's part of the tag, being careful of sha256: digests.
+                if "@" in ref:
+                    # digest — strip it; we're moving to a tag pin.
+                    repo = ref.split("@", 1)[0].rsplit(":", 1)[0]
+                elif ":" in ref:
+                    repo = ref.rsplit(":", 1)[0]
+                else:
+                    repo = ref
+                new_ref = f"{repo}:{version}"
+                if new_ref == ref:
+                    log.info("pin: already on %s, no rewrite needed", new_ref)
+                    return True, "no-op"
+                lines[i] = f"{head}{new_ref}{tail}\n" if not tail.endswith("\n") else f"{head}{new_ref}{tail}"
+                log.info("pin: rewrote image %r → %r", ref, new_ref)
+                rewrote = True
+                break
+    if not rewrote:
+        return False, f"no image: line found under service {SERVICE_NAME!r}"
+    try:
+        with open(COMPOSE_FILE, "w") as f:
+            f.writelines(lines)
+    except OSError as e:
+        return False, f"can't write {COMPOSE_FILE}: {e}"
+    return True, "ok"
+
+
+def do_update(version: str | None = None) -> tuple[bool, str]:
     """Pull + restart the configured service via docker compose CLI.
-    Returns (ok, message). Holds the global lock so concurrent
+    If `version` is set, pin that image tag in the compose file first
+    (used by #270 auto-rollback). Holds the global lock so concurrent
     triggers don't race."""
     if not _lock.acquire(blocking=False):
         log.info("update: already in progress, skipping")
@@ -79,7 +150,13 @@ def do_update() -> tuple[bool, str]:
             msg = f"compose file not found at {COMPOSE_FILE} — bind-mount missing?"
             log.error("update: %s", msg)
             return False, msg
-        log.info("update: pull %s service=%s", COMPOSE_FILE, SERVICE_NAME)
+        if version:
+            ok, msg = _pin_tag_in_compose(version)
+            if not ok:
+                log.error("update: tag pin failed: %s", msg)
+                return False, f"tag pin failed: {msg}"
+        log.info("update: pull %s service=%s%s", COMPOSE_FILE, SERVICE_NAME,
+                 f" (pinned v{version})" if version else "")
         pull = subprocess.run(
             ["docker", "compose", "-f", COMPOSE_FILE, "pull", SERVICE_NAME],
             capture_output=True, text=True, timeout=600,
@@ -122,7 +199,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(404); self.end_headers()
 
     def do_POST(self):  # noqa: N802
-        if self.path != "/v1/update":
+        parsed = urlparse(self.path)
+        if parsed.path != "/v1/update":
             self.send_response(404); self.end_headers(); return
         if not self._ok_auth():
             self.send_response(401)
@@ -131,13 +209,18 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b'{"error":"unauthorized"}\n')
             return
+        # Optional ?version=X.Y.Z — pins that tag in the compose file
+        # before pulling. Used by #270 cloud-orchestrated rollback;
+        # daemon constructs the right image ref for our updater.
+        qs = parse_qs(parsed.query or "")
+        version = (qs.get("version") or [None])[0]
         # Fire-and-forget. The caller's container is about to be
         # restarted by us, so any awaited response would never arrive.
         self.send_response(202)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(b'{"status":"queued"}\n')
-        threading.Thread(target=do_update, daemon=True).start()
+        threading.Thread(target=do_update, args=(version,), daemon=True).start()
 
     def log_message(self, format, *args):  # noqa: A002
         log.info("http %s %s", self.address_string(), format % args)

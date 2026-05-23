@@ -8,6 +8,49 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.67] · 2026-05-23
+
+### Added · Auto-rollback for failed updates (#270)
+
+If an update wedges, the cloud now restores the appliance to its
+previous version automatically — for both Pi and Docker. No more
+"appliance offline, time to SSH in" follow-up.
+
+**Cloud-side**:
+  - Migration 0043 adds `pre_update_version` to `appliance_commands`,
+    captured at queue-time so the rollback target survives a partial-
+    boot heartbeat from the broken new version.
+  - New `update_watchdog` background sweep (60-second cadence) marks
+    `update` commands stuck in `applying` past `STALE_AFTER_SECONDS`
+    (default 600) as failed.
+  - Failed updates trigger an auto-queued rollback:
+      Pi    → `kind=rollback` (daemon spawns wattpost-rollback,
+              swings the slot symlink back).
+      Docker→ `kind=pin_image_tag` (daemon hits the wattpost-updater
+              sidecar with the previous version's tag; updater
+              rewrites compose's `image:` line and pulls + restarts).
+  - Skipped when a rollback's already queued/in-flight (manual user
+    rollback wins; sweep doesn't pile up).
+
+**Appliance daemon** (`solar_monitor/cloud/service.py`):
+  - `_dispatch_pin_image_tag` POSTs the updater sidecar with
+    `?version=<X>`, same Bearer auth as the regular update path.
+  - `_dispatch_rollback` spawns `/usr/local/bin/wattpost-rollback`
+    via the same setsid+sudo pattern as `wattpost-update`.
+
+**Updater container** (`updater/updater.py`):
+  - `POST /v1/update?version=X` now pins that tag in the compose
+    `image:` line before pulling + restarting. Strips any existing
+    `:tag` or `@digest`, rewrites to `repo:version`, leaves
+    comments and surrounding whitespace untouched. Idempotent.
+  - Compose bind-mount needs to be **read-write** for the rollback
+    rewrite to land — `docker-compose.example.yml` + docs updated.
+
+This is the second-to-last layer of the safety story shipped over
+the last few hours: backup before update (#269) → atomic update
+(#265 / pi-slots) → auto-rollback if it goes wrong (this) → cloud
+restore as final fallback (#146/164/165 — already exists).
+
 ## [0.1.66] · 2026-05-23
 
 ### Added · Pre-update safety chain (#269)

@@ -234,6 +234,19 @@ class CloudService:
             await self._dispatch_delete_local_rule(cmd_id, cmd)
             return
 
+        # #270 auto-rollback. Cloud queues these when the update
+        # watchdog times out an `applying` update. Per install_method:
+        #   pin_image_tag  — Docker: tell wattpost-updater to pull a
+        #                    specific image tag instead of :latest.
+        #   rollback       — Pi: spawn /usr/local/bin/wattpost-rollback
+        #                    which swings the slot symlink.
+        if kind == "pin_image_tag":
+            await self._dispatch_pin_image_tag(cmd_id, cmd)
+            return
+        if kind == "rollback":
+            await self._dispatch_rollback(cmd_id, cmd)
+            return
+
         if kind != "update":
             await self._patch_command_status(
                 cmd_id, "failed",
@@ -328,6 +341,120 @@ class CloudService:
             await self._patch_command_status(
                 cmd_id, "failed",
                 error=f"failed to start updater: {type(e).__name__}: {e}",
+            )
+
+    async def _dispatch_pin_image_tag(
+        self, cmd_id: int, cmd: dict[str, Any],
+    ) -> None:
+        """#270 — Docker auto-rollback. Cloud queues this when the
+        update watchdog times out a failed update; we pin the wattpost
+        container back to the previous image tag via the wattpost-
+        updater sidecar. Same Bearer auth + HTTP shape as the regular
+        update path; the difference is the `?version=` query param
+        which the updater interprets as "use this tag instead of
+        whatever's in compose's image: line"."""
+        import json as _json
+        import os
+        if os.environ.get("WATTPOST_DEPLOYMENT") != "docker":
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="pin_image_tag is Docker-only — Pi rollbacks use "
+                      "kind=rollback (wattpost-rollback slot revert)",
+            )
+            return
+        wt_url   = (os.environ.get("WATCHTOWER_URL")   or "").strip()
+        wt_token = (os.environ.get("WATCHTOWER_TOKEN") or "").strip()
+        if not (wt_url and wt_token):
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="WATCHTOWER_URL/TOKEN not configured — sidecar "
+                      "missing from compose; can't auto-rollback",
+            )
+            return
+
+        # Cloud sends the version string; updater needs the full image
+        # ref. Constructing it here lets the cloud stay agnostic of
+        # the GHCR path, and lets us honour an explicit `image` in
+        # payload_json for future cross-registry support.
+        raw = cmd.get("payload_json") or "{}"
+        try:
+            payload = _json.loads(raw) if isinstance(raw, str) else dict(raw)
+        except Exception:
+            payload = {}
+        version = (payload.get("version")
+                   or cmd.get("target_version") or "").lstrip("v")
+        if not version:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="pin_image_tag has no target version",
+            )
+            return
+
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(
+                    f"{wt_url.rstrip('/')}/v1/update",
+                    params={"version": version},
+                    headers={"Authorization": f"Bearer {wt_token}"},
+                )
+            if r.status_code >= 400:
+                await self._patch_command_status(
+                    cmd_id, "failed",
+                    error=f"updater returned HTTP {r.status_code}: "
+                          f"{r.text[:200]}",
+                )
+                return
+            log.info("cloud rollback: updater fired for cmd %d (pin v%s)",
+                     cmd_id, version)
+        except Exception as e:
+            log.exception("cloud rollback: updater call failed")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"could not reach updater at {wt_url}: "
+                      f"{type(e).__name__}: {e}",
+            )
+
+    async def _dispatch_rollback(
+        self, cmd_id: int, cmd: dict[str, Any],
+    ) -> None:
+        """#270 — Pi auto-rollback. Spawns the existing wattpost-
+        rollback helper that the OnFailure watchdog (#221) uses.
+        Detached + best-effort: the helper restarts the daemon at the
+        end, so the terminal status reconciles via the next heartbeat
+        coming from the previous-slot's binary."""
+        import os
+        if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="kind=rollback is Pi-only — Docker uses "
+                      "kind=pin_image_tag (sidecar tag-pin)",
+            )
+            return
+        if not os.path.exists("/usr/local/bin/wattpost-rollback"):
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error="wattpost-rollback helper not found — reinstall to fix",
+            )
+            return
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        try:
+            await asyncio.create_subprocess_exec(
+                "/usr/bin/setsid", "sudo", "-n",
+                "/usr/local/bin/wattpost-rollback",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            log.info("cloud rollback: wattpost-rollback spawned for cmd %d", cmd_id)
+        except Exception as e:
+            log.exception("cloud rollback: failed to spawn wattpost-rollback")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"failed to start rollback: {type(e).__name__}: {e}",
             )
 
     async def _dispatch_backup_now(self, cmd_id: int) -> None:
