@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.71] · 2026-05-23
+
+### Fixed · Don't snapshot twice when an update retries (#274)
+
+When a cloud-triggered Docker update failed at the watchtower-call
+step, the daemon would re-dispatch on the next heartbeat — and take
+a *fresh* pre-update snapshot every time, cluttering the cloud
+backup list with near-duplicate uploads. Now the daemon caches the
+snapshot path per cmd id and reuses it on retry. Cache is in-memory
+only (daemon restart re-snapshots, which is correct: the on-disk
+snapshot file may be gone).
+
+Doesn't touch the always-on baseline (the daemon still takes one
+guaranteed pre-update snapshot per update event — that's the
+rollback safety net and shouldn't depend on cloud-backup freshness).
+
 ## [0.1.70] · 2026-05-23
 
 ### Fixed · wattpost-updater container-name collision (#273)

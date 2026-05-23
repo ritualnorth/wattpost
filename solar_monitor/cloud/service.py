@@ -45,6 +45,14 @@ class CloudService:
         self.scheduler = scheduler
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+        # Per-cmd-id snapshot cache: if a Docker update dispatch fails at
+        # the watchtower / swap step, the cloud watchdog keeps the cmd in
+        # `applying` and the daemon re-dispatches on the next heartbeat.
+        # Without this cache each retry takes a *new* pre-update snapshot,
+        # cluttering the cloud backup list with near-duplicates. Cache
+        # lives in-memory only; a daemon restart legitimately invalidates
+        # it (the snapshot file might be gone) so re-snapshot is correct.
+        self._update_snapshots: dict[int, str] = {}
 
     @property
     def cfg(self) -> CloudCfg:
@@ -282,12 +290,22 @@ class CloudService:
             # backup wedge would be worse than letting the update
             # proceed with no rollback safety net (the user gets the
             # warning surface on the cloud detail page anyway).
+            # On retry within the same cmd, reuse the snapshot from
+            # the first attempt — otherwise each watchtower-call
+            # failure would multiply pre-update snapshots in the
+            # cloud backup list.
             backup_svc = getattr(self.scheduler, "backup_service", None)
-            snapshot_name = None
-            if backup_svc is not None:
+            snapshot_name = self._update_snapshots.get(cmd_id)
+            if snapshot_name:
+                log.info("cloud update: reusing pre-update snapshot %s "
+                         "from earlier attempt for cmd %d",
+                         snapshot_name, cmd_id)
+            elif backup_svc is not None:
                 try:
                     out_path = await backup_svc.snapshot_now()
                     snapshot_name = out_path.name if out_path else None
+                    if snapshot_name:
+                        self._update_snapshots[cmd_id] = snapshot_name
                     log.info("cloud update: pre-update snapshot %s for cmd %d",
                              snapshot_name, cmd_id)
                 except Exception:
@@ -308,6 +326,7 @@ class CloudService:
                         error=f"watchtower returned HTTP {r.status_code}: "
                               f"{r.text[:200]}",
                     )
+                    self._update_snapshots.pop(cmd_id, None)
                     return
                 log.info("cloud update: watchtower fired for cmd %d "
                          "(snapshot=%s)", cmd_id, snapshot_name or "skipped")
@@ -318,6 +337,7 @@ class CloudService:
                     error=f"could not reach watchtower at {wt_url}: "
                           f"{type(e).__name__}: {e}",
                 )
+                self._update_snapshots.pop(cmd_id, None)
             return
 
         await self._patch_command_status(cmd_id, "picked_up")
