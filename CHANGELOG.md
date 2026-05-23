@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.79] · 2026-05-23
+
+### Changed · Prettier map tiles — CartoDB Dark Matter
+
+Swapped all three maps (cloud fleet, cloud per-site, appliance
+dashboard) from default OSM tiles to CartoDB Dark Matter. Dark
+base layer that matches the app theme — same OSM data underneath,
+CARTO just restyles + serves. Free, no API key, 4-subdomain
+parallelism + `@2x` retina tiles for crisper rendering on phones.
+
 ## [0.1.78] · 2026-05-23
 
 ### Added · "Where you are" map tile on the appliance dashboard (#264)
