@@ -8,6 +8,32 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.68] · 2026-05-23
+
+### Added · Per-site update history + 1-click rollback (#272)
+
+New "Update history" card on `/app/site/{id}` shows every cloud-
+triggered update, rollback, and auto-pin attempt for the appliance.
+Each row shows when, what kind, the version (and the previous-
+version captured in #270's `pre_update_version` column), status,
+and any error message inline.
+
+Successful update rows get a **Rollback to v0.X.Y** button. Click
+queues the right command kind for the install_method:
+  - Docker → `kind=pin_image_tag` with `payload_json={"version": …}`
+    so the wattpost-updater rewrites the compose image tag.
+  - Pi     → `kind=rollback` so the daemon spawns wattpost-rollback.
+
+Same mechanism as #270's auto-rollback; users get the manual flavour
+of the same machinery. Confirmation dialog explains what'll happen
+(brief offline window during swap, cloud backups still available
+as the last-resort path).
+
+New endpoint: `GET /api/sites/{id}/commands?limit=N` returns recent
+commands for that appliance — owner-scoped, uniform NotFound for
+unowned IDs. `payload_json` added to the QueueCommandRequest msgspec
+so the rollback button can pass it through.
+
 ## [0.1.67] · 2026-05-23
 
 ### Added · Auto-rollback for failed updates (#270)
