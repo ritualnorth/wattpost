@@ -138,6 +138,35 @@ def cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_snapshot(args: argparse.Namespace) -> int:
+    """Take a local-only backup snapshot synchronously. No cloud
+    upload from this path (the daemon's scheduler handles that on its
+    own cadence, and #269's cloud-side chain ensures a cloud backup
+    exists separately). Pure belt-and-braces: a local tarball that
+    wattpost-update can fall back to if the new slot or its DB
+    migration goes wrong."""
+    import asyncio as _asyncio
+    from pathlib import Path as _Path
+    from .config import load_config as _load_config
+    from .backup.service import BackupService as _BackupService
+    cfg = _load_config(args.config)
+    db_path = _Path(_resolve_db_path(args, cfg))
+    svc = _BackupService(
+        cfg=cfg.backup,
+        db_path=db_path,
+        config_path=_Path(args.config),
+        cloud_uploader=None,  # local-only on this path
+    )
+    svc.backup_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out = _asyncio.run(svc.snapshot_now())
+    except Exception as e:
+        print(f"snapshot failed: {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    print(out)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="solar-monitor")
     parser.add_argument("--log-level", default="INFO")
@@ -155,6 +184,16 @@ def main() -> int:
     p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--interval", type=int, default=60, help="Poll interval (seconds)")
     p_serve.set_defaults(func=cmd_serve)
+
+    p_snap = sub.add_parser("snapshot",
+        help="Take an immediate local snapshot (DB + config) without "
+             "going through the daemon's HTTP API. Used by wattpost-"
+             "update before a slot swap (#269) so the user always has "
+             "a one-shot rollback path even if the slot machinery "
+             "itself goes wrong.")
+    p_snap.add_argument("--config", required=True)
+    p_snap.add_argument("--db", default=_DEFAULT_DB_ARG)
+    p_snap.set_defaults(func=cmd_snapshot)
 
     args = parser.parse_args()
     return args.func(args)

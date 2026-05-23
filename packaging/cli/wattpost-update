@@ -97,6 +97,26 @@ log "==> WattPost atomic-swap update starting"
 log "    source: ${SRC_URL}"
 log "    active=${ACTIVE_NAME} → installing into inactive=${INACTIVE_NAME}"
 
+# ----- pre-update snapshot (#269) -----
+# Slot atomic-swap already protects against a bad binary, but DB
+# schema migrations are forward-only — a slot rollback brings old
+# code back with new schema = bad. A local snapshot before any work
+# starts gives the user a one-shot restore path even if the slot
+# machinery itself goes wrong. Best-effort: if snapshot fails we log
+# loudly but proceed; blocking updates on a snapshot wedge is worse
+# than letting an update proceed with no extra safety net.
+log "    taking pre-update snapshot..."
+SNAP_PATH=""
+if sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
+        snapshot --config /etc/wattpost/config.yaml 2>&1 | tee -a "${LOG}" \
+        | tail -1 > /tmp/wattpost-update-snap.$$; then
+    SNAP_PATH=$(cat /tmp/wattpost-update-snap.$$)
+    log "    pre-update snapshot ok: ${SNAP_PATH}"
+else
+    log "    WARN pre-update snapshot failed — proceeding without local rollback safety net"
+fi
+rm -f /tmp/wattpost-update-snap.$$
+
 # ----- prepare inactive slot -----
 rm -rf "${INACTIVE_TARGET}"
 mkdir -p "${INACTIVE_TARGET}/src" "${INACTIVE_TARGET}/venv"
