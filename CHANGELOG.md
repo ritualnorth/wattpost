@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.78] · 2026-05-23
+
+### Added · "Where you are" map tile on the appliance dashboard (#264)
+
+Completes the maps Phase 1 trilogy (#263 cloud map + per-site cloud
+tile + this appliance-side tile). Small Leaflet map on the dashboard,
+between Weather and Daily outlook, pinned at the appliance's current
+location. Reads `/api/location/status` so it shows the LIVE GPS fix
+(when present) or static `forecast.lat/lon` fallback.
+
+The local tile always renders if there's any location available —
+it's never gated by the share-with-cloud privacy toggle (you can
+see where YOU are; only TRANSMISSION is gated). Coordinates
+unchanged below ~11m skip the heavy re-paint to avoid GPS-jitter
+churn.
+
 ## [0.1.77] · 2026-05-23
 
 ### Fixed · Phantom rollback when duplicate update cmds queued (#283)

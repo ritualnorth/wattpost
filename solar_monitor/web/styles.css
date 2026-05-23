@@ -2014,6 +2014,22 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
   transition: --panel-tint .8s ease, border-color .8s ease;
 }
+
+/* #264 — "Where you are" location panel. Fixed-height map area; Leaflet
+ * controls + tile imagery handle their own colours. Border + tint match
+ * the dashboard's panel family so it doesn't look pasted-in. */
+.location-panel {
+  border-color: rgba(132, 204, 22, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(132,204,22,0.05), rgba(132,204,22,0) 70%);
+}
+.location-map {
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: .25rem;
+  background: rgba(255, 255, 255, .03);
+}
 /* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
  * by renderWeather() based on WMO code + is_day. All intentionally
  * gentle (<=8% alpha) — the dashboard's information density is the

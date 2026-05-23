@@ -536,6 +536,7 @@ function applySnapshot(frame) {
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
   renderWeather();
+  renderLocationTile();  // #264 — "Where you are" map
   renderWeek();
   renderCells();
   renderDeviceCards();
@@ -1938,6 +1939,66 @@ function weatherTintClass(code, isDay) {
   if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "wx-bg-snow";
   if (code >= 95) return "wx-bg-thunder";
   return "wx-bg-cloudy";
+}
+
+// #264 — "Where you are" location tile. Pulled from /api/location/status
+// (LOCAL view, never gated by share-with-cloud). Cached + only re-painted
+// when coordinates actually move so we don't churn Leaflet on every dashboard
+// poll. Leaflet is defer-loaded; if it's not ready when this runs we just
+// retry on the next frame.
+let _locTileCache = null;     // last rendered {lat, lon, source}
+let _locTileMap = null;
+let _locTileMarker = null;
+let _locTileFetching = false;
+async function renderLocationTile() {
+  const panel = document.getElementById("location-panel");
+  if (!panel) return;
+  if (_locTileFetching) return;       // single-flight; next dashboard poll
+  _locTileFetching = true;
+  let s;
+  try { s = await api("/api/location/status"); }
+  catch (_) { _locTileFetching = false; return; }
+  _locTileFetching = false;
+  const loc = s && s.current;
+  if (!loc || loc.lat == null || loc.lon == null) {
+    panel.hidden = true;
+    return;
+  }
+  if (typeof L === "undefined") {
+    // Leaflet still loading; try again on next dashboard frame.
+    setTimeout(() => renderLocationTile(), 500);
+    return;
+  }
+  panel.hidden = false;
+  const sub = document.getElementById("location-sub");
+  if (sub) {
+    const src = loc.source === "gps" ? "GPS" : "static";
+    const age = loc.fix_age_s != null ? ` · fix ${Math.round(loc.fix_age_s)}s` : "";
+    sub.textContent = `${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)} (${src}${age})`;
+  }
+  // Skip the heavy re-paint if coords are basically unchanged. <0.0001°
+  // (~11m) is well within GPS jitter, no point re-fitting the map.
+  const moved = !_locTileCache
+              || Math.abs(_locTileCache.lat - loc.lat) > 0.0001
+              || Math.abs(_locTileCache.lon - loc.lon) > 0.0001;
+  if (_locTileMap === null) {
+    _locTileMap = L.map("location-map", {
+      zoomControl: true, scrollWheelZoom: false, attributionControl: true,
+    });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+    }).addTo(_locTileMap);
+  }
+  if (moved) {
+    _locTileMap.setView([loc.lat, loc.lon], 13);
+    if (_locTileMarker) _locTileMap.removeLayer(_locTileMarker);
+    _locTileMarker = L.marker([loc.lat, loc.lon]).addTo(_locTileMap);
+    _locTileCache = { lat: loc.lat, lon: loc.lon, source: loc.source };
+  }
+  // Leaflet needs a size-invalidate after the panel unhides, otherwise
+  // tiles render as a grey square until the user resizes.
+  setTimeout(() => { try { _locTileMap.invalidateSize(); } catch (_) {} }, 100);
 }
 
 function renderWeather() {
