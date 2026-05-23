@@ -942,16 +942,27 @@ class CloudService:
             if engine is not None and hasattr(engine, "recent_events_since"):
                 events = engine.recent_events_since(since_ts, limit=20)
                 if events:
+                    # Map rule_id → transports so cloud knows which
+                    # events the user wants fanned out via cloud
+                    # channels (web push + native push + email). When
+                    # the rule's transports include "cloud" (#259),
+                    # the cloud's existing notification fan-out fires
+                    # on ingest using the user's notification prefs.
+                    rule_transports = {
+                        r.id: list(r.transports or [])
+                        for r in self._all_rules
+                    }
                     extras["recent_alerts"] = [
                         {
-                            "rule_id":   e.rule_id,
-                            "name":      e.name,
-                            "severity":  e.severity,
-                            "metric":    e.metric,
-                            "value":     e.value,
-                            "threshold": e.threshold,
-                            "op":        e.op,
-                            "ts":        e.ts,
+                            "rule_id":    e.rule_id,
+                            "name":       e.name,
+                            "severity":   e.severity,
+                            "metric":     e.metric,
+                            "value":      e.value,
+                            "threshold":  e.threshold,
+                            "op":         e.op,
+                            "ts":         e.ts,
+                            "transports": rule_transports.get(e.rule_id, []),
                         }
                         for e in events
                     ]
