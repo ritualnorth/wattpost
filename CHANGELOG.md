@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.83] · 2026-05-23
+
+### Added · Cloud-orchestrated disk cleanup (#279)
+
+New `disk_cleanup` command kind bundles non-destructive housekeeping
+that customers would otherwise have to SSH in for:
+
+- Prune local snapshots beyond `backup.keep_count`
+- `journalctl --vacuum-size=500M` (Pi only)
+- `apt-get clean` + `apt-get autoremove -y` (Pi only)
+
+Triggered from a new **"Free up disk"** button on the Device-health
+card at `/app/site/{id}`. Reports freed bytes + per-op result in
+the cmd completion message, surfaces in the Update history table.
+Docker installs only get snapshot pruning here (journal vacuum +
+apt aren't applicable inside the container; docker image prune
+needs updater-sidecar access which is a Phase 1b follow-up).
+
+Explicitly does NOT do `apt upgrade` or anything that touches
+running software — see `[[security-patches-surface]]` (#280) for
+the right safety chain we'd need first.
+
+Auto-queue trigger (when `host_health.disk.percent ≥ 90`) is
+Phase 1b; for now the user clicks the button.
+
 ## [0.1.82] · 2026-05-23
 
 ### Changed · Update history paginates instead of dumping everything
