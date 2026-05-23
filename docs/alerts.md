@@ -12,6 +12,17 @@ Concrete example: *when **soc_pct** on **bank** is below **30** for 5 minutes, f
 
 Rules are defined in `config.yaml` under `alerts:` or, more typically, edited via the dashboard's **Settings → Alerts** panel.
 
+## Out of the box
+
+A fresh appliance starts with four sensible defaults so you get useful alerts without any setup:
+
+- **Low battery** — SoC below 30%, warn
+- **Critical battery** — SoC below 15%, alarm
+- **Bank temperature high** — above 45°C, warn
+- **Bank temperature critical** — above 55°C, alarm
+
+These fire to the **local ring buffer** and your **cloud inbox** (via heartbeat extras) by default. Add transports — ntfy, Discord, email, etc. — from Settings → Alerts to also get push / chat / email notifications. Delete or edit any of them; the appliance won't re-seed once you've taken control. Set `alerts_seeded: false` in `config.yaml` if you ever want the defaults back.
+
 ## Severity
 
 | Level | When to use | Quiet-hours behaviour |
