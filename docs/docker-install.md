@@ -142,7 +142,7 @@ The `latest` tag follows `main`. For traceability, pin to a
 image: ghcr.io/ritualnorth/wattpost-appliance:sha-abc1234
 ```
 
-### Adding the Watchtower sidecar (existing installs)
+### Adding the updater sidecar (existing installs)
 
 Generate a token once:
 
@@ -154,20 +154,18 @@ Add this block to your `docker-compose.yml`, under the existing
 `services:` map (alongside `wattpost:`):
 
 ```yaml
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: wattpost-watchtower
+  wattpost-updater:
+    image: ghcr.io/ritualnorth/wattpost-updater:latest
+    container_name: wattpost-updater
     restart: unless-stopped
     network_mode: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker-compose.yml:/host-compose/docker-compose.yml:ro
     environment:
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_INCLUDE_RESTARTING: "true"
-      WATCHTOWER_HTTP_API_UPDATE: "true"
-      WATCHTOWER_HTTP_API_PERIODIC_POLLS: "true"
-      WATCHTOWER_POLL_INTERVAL: "86400"
+      COMPOSE_FILE:  "/host-compose/docker-compose.yml"
+      SERVICE_NAME:  "wattpost"
+      POLL_INTERVAL: "86400"
       WATCHTOWER_HTTP_API_TOKEN: "PASTE_THE_TOKEN_FROM_OPENSSL"
 ```
 
@@ -185,9 +183,14 @@ And add three env vars + a label to the existing `wattpost:` service:
 Then `docker compose up -d`. The cloud "Update now" button starts
 working from the next heartbeat.
 
-The token gives anyone with network reach to port 8080 full control
-of the labelled containers, so don't expose that port outside the
-host.
+The token gives anyone with network reach to port 8080 the ability
+to force-pull and restart the wattpost container, so don't expose
+that port outside the host.
+
+> Why not `containrrr/watchtower`? Its Docker SDK client is rejected
+> by Docker engine 29+ (the default on Ubuntu 24.04 LTS), so we ship
+> a thin Wattpost-owned alternative with the same HTTP API shape.
+> Drop-in replacement; same env var names.
 
 ## What's mounted
 

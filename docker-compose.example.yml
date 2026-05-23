@@ -55,56 +55,62 @@ services:
     restart: unless-stopped
 
     environment:
-      # Tells the daemon to find the watchtower sidecar at this URL
-      # for cloud-triggered updates. If unset, cloud Update-now is
-      # refused with "no updater available". Match the token in the
-      # watchtower service below — generate once with
+      # Tells the daemon to find the updater sidecar at this URL for
+      # cloud-triggered updates. If unset, cloud Update-now is refused
+      # with "no updater available". Match the token in the updater
+      # service below — generate once with
       #   openssl rand -hex 32
       # and paste the same value in both places. Keep it secret; it
-      # gives anyone who reaches the watchtower port full control of
+      # gives anyone who reaches the updater port full control of
       # this container.
       WATTPOST_DEPLOYMENT: docker
       WATCHTOWER_URL:   "http://localhost:8080"
       WATCHTOWER_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
 
-    # Pulled by watchtower below — the label tells it to watch this
-    # container specifically and ignore anything else on the host.
+    # Pulled by the updater below — the label tells it which
+    # container(s) to update and ignore everything else on the host.
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # ────────────────────────────────────────────────────────────────
-  # Watchtower sidecar — drives both scheduled auto-updates and the
+  # Updater sidecar — drives both scheduled auto-updates and the
   # cloud's "Update now" button.
+  #
+  # This is a Wattpost-owned image (ghcr.io/ritualnorth/wattpost-updater)
+  # because the obvious choice, containrrr/watchtower, doesn't work
+  # with Docker engine 29+ (Ubuntu 24.04 LTS default) — its Docker
+  # SDK client is rejected by Docker's MinAPIVersion gate. Our
+  # updater shells out to the docker compose CLI against your bind-
+  # mounted compose file, so it inherits whatever compose version is
+  # in the base image and stays compat with modern Docker.
+  #
+  # Same HTTP API shape as Watchtower (POST /v1/update + Bearer),
+  # same env var names → drop-in replacement.
   #
   # Without this service, cloud Update-now is refused (Pi installs use
   # wattpost-update; Docker has no equivalent helper otherwise) and
   # the appliance only gets new image tags when the human runs
   # `docker compose pull` by hand.
-  #
-  # With it:
-  #   - Cloud "Update now" → daemon POSTs http://localhost:8080/v1/update
-  #     with the bearer token → watchtower pulls + restarts wattpost.
-  #   - Auto-apply: polls GHCR every WATCHTOWER_POLL_INTERVAL seconds
-  #     (default 86400 = daily) for the wattpost image and restarts
-  #     on new tag. Disable by setting WATCHTOWER_HTTP_API_PERIODIC_POLLS=false.
   # ────────────────────────────────────────────────────────────────
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: wattpost-watchtower
+  wattpost-updater:
+    image: ghcr.io/ritualnorth/wattpost-updater:latest
+    container_name: wattpost-updater
     restart: unless-stopped
     # Host networking so the daemon can reach localhost:8080 cleanly
     # (the wattpost container also uses host networking above).
     network_mode: host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Bind-mount THIS compose file read-only so the updater can run
+      # `docker compose pull wattpost && docker compose up -d wattpost`
+      # against it. The path inside the container is what
+      # COMPOSE_FILE points at below.
+      - ./docker-compose.yml:/host-compose/docker-compose.yml:ro
     environment:
-      WATCHTOWER_LABEL_ENABLE: "true"        # only touch labelled containers
-      WATCHTOWER_CLEANUP: "true"             # prune old images after restart
-      WATCHTOWER_INCLUDE_RESTARTING: "true"  # don't stall on container restart loops
-      WATCHTOWER_HTTP_API_UPDATE: "true"     # enable POST /v1/update
-      WATCHTOWER_HTTP_API_PERIODIC_POLLS: "true"
-      WATCHTOWER_POLL_INTERVAL: "86400"      # daily auto-poll
+      COMPOSE_FILE:  "/host-compose/docker-compose.yml"
+      SERVICE_NAME:  "wattpost"
+      POLL_INTERVAL: "86400"      # daily auto-poll; 0 disables
       # Match the token in the wattpost service above. Anyone with
-      # this token + network reach to :8080 can force-restart any
-      # labelled container — don't expose this port outside the box.
+      # this token + network reach to :8080 can force-restart this
+      # container — don't expose this port outside the box.
       WATCHTOWER_HTTP_API_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
