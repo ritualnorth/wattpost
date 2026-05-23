@@ -468,11 +468,17 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     from ..transport.ble_modbus import HCI_DISCOVER_LOCK
     async with HCI_DISCOVER_LOCK:
         victron_was_running = False
+        mopeka_was_running = False
         try:
             from ..transport.ble_victron_advertise import _scanner as _victron_scanner
             victron_was_running = await _victron_scanner().pause()
         except Exception:
             log.debug("ble_scan: victron scanner pause skipped (not in use)")
+        try:
+            from ..transport.ble_mopeka_advertise import _scanner as _mopeka_scanner
+            mopeka_was_running = await _mopeka_scanner().pause()
+        except Exception:
+            log.debug("ble_scan: mopeka scanner pause skipped (not in use)")
         try:
             # `return_adv=True` makes BleakScanner give us each device's
             # latest advertisement_data alongside the BLEDevice object.
@@ -498,6 +504,12 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
                     await _victron_scanner().resume()
                 except Exception:
                     log.warning("ble_scan: victron scanner resume failed")
+            if mopeka_was_running:
+                try:
+                    from ..transport.ble_mopeka_advertise import _scanner as _mopeka_scanner
+                    await _mopeka_scanner().resume()
+                except Exception:
+                    log.warning("ble_scan: mopeka scanner resume failed")
     import time as _time
     now = int(_time.time())
     out = []
@@ -506,6 +518,10 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     # under this key in manufacturer_data is one of their Instant
     # Readout devices (SmartShunt, SmartSolar, Orion-Tr/XS, etc.).
     VICTRON_MFR_ID = 0x02E1
+    # Mopeka uses Nordic Semiconductor's manufacturer ID and disambiguates
+    # by the hardware-id byte at offset 0 (see ble_mopeka_advertise._HW_KINDS).
+    NORDIC_MFR_ID = 0x0059
+    MOPEKA_HW_IDS = {0x03, 0x05, 0x06, 0x08, 0x09}
     for mac, (d, ad) in devices_with_adv.items():
         mac = (mac or "").upper()
         if not mac:
@@ -535,6 +551,16 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
                     rec["victron_device_class"] = dc.__name__
             except Exception:
                 pass
+        # Mopeka tank sensors broadcast under the generic Nordic
+        # manufacturer ID. The first byte of payload tells us if it's
+        # actually a Mopeka vs some unrelated Nordic nRF device.
+        if not rec.get("vendor"):
+            mp = mfr_data.get(NORDIC_MFR_ID)
+            if mp and len(mp) >= 1 and mp[0] in MOPEKA_HW_IDS:
+                rec["protocol"] = "mopeka_tank"
+                rec["vendor"]   = "mopeka"
+                rec["mopeka_hw_id"] = mp[0]
+
         # Name-based hints stay as before — covers Renogy BT-* and
         # any other vendor identifiable by advertised name.
         nm = (d.name or "").lower()
@@ -1183,6 +1209,32 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         }
         default_label = f"Victron VE.Direct {leaf}"
 
+    elif data.type == "ble_mopeka_advertise":
+        # Mopeka tank-level sensor — passive BLE, plaintext payload,
+        # NO encryption key. Just a MAC. Auto-creates the device row
+        # so the user doesn't have to (Mopeka has no slave-ID concept
+        # any more than Victron does — one MAC, one device).
+        mac = (data.address or "").strip().upper()
+        if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
+            raise HTTPException(
+                status_code=400,
+                detail="address must be a Bluetooth MAC (e.g. EC:1B:BD:0A:12:34)",
+            )
+        for t in current_transports:
+            if (t.get("address") or "").upper() == mac:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"address {mac} is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        suffix = mac.replace(":", "").lower()[-4:]
+        new_id = f"mopeka_{suffix[:2]}_{suffix[2:]}"
+        block = {
+            "type":    "ble_mopeka_advertise",
+            "address": mac,
+        }
+        default_label = f"Mopeka {mac[-5:]}"
+
     elif data.type == "serial_modbus":
         port = (data.port or "").strip()
         # Tolerant validation: accept any /dev/* path; pyserial will
@@ -1225,7 +1277,8 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
             status_code=400,
             detail=f"unsupported transport type {data.type!r} — wizard "
                    f"supports 'ble_modbus', 'serial_modbus', "
-                   f"'ble_victron_advertise' and 've_direct'",
+                   f"'ble_victron_advertise', 've_direct' and "
+                   f"'ble_mopeka_advertise'",
         )
 
     # Bump id if collision (rare — different MAC, same tail).
@@ -1281,6 +1334,20 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         log.info("setup wizard: auto-added victron device kind=%s for transport %s",
                  kind, new_id)
 
+    # Same auto-create logic for Mopeka: one MAC = one tank sensor,
+    # no slave-ID scan possible. Without this row the listener decodes
+    # adverts into the void.
+    if data.type == "ble_mopeka_advertise":
+        device_block = {
+            "vendor":    "mopeka",
+            "kind":      "tank",
+            "transport": new_id,
+            "label":     label,
+        }
+        raw.setdefault("devices", []).append(device_block)
+        log.info("setup wizard: auto-added mopeka tank device for transport %s",
+                 new_id)
+
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1332,8 +1399,11 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
         # Class-aware open-state probe.
         is_open = False
         if t is not None:
-            if ttype == "ble_victron_advertise":
+            if ttype in ("ble_victron_advertise", "ble_mopeka_advertise"):
                 # Passive: registered + recent advertisement = "open".
+                # Mopeka broadcasts every ~10s by default; the 60s
+                # freshness window is generous enough that we don't
+                # flap on a single missed advert.
                 registered = bool(getattr(t, "_registered", False))
                 last_at = float(getattr(t, "_latest_at", 0.0) or 0.0)
                 fresh = (time.time() - last_at) < 60 if last_at else False

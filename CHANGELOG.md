@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.85] · 2026-05-23
+
+### Added · Mopeka Pro / Pro Check tank-level driver (#254)
+
+First piece of the Van Mode sensor wave. Mopeka makes the dominant
+after-market BLE tank sensors for vanlife propane / water bottles;
+this release adds passive-listen support for all five hardware
+variants (Pro Check, Pro Plus, Pro Check H2O, bottom-mounted Pro,
+Universal). Plaintext advertisements — no encryption key needed,
+unlike Victron's Instant Readout.
+
+What the driver emits:
+
+- `hardware_kind` — which Mopeka variant (`pro_check`, `pro_plus`, …)
+- `battery_pct` — CR2032 coin-cell SoC (so users replace before death)
+- `temperature_c` — sensor body temp (NOT fluid)
+- `signal_quality` — 0-3 (0 = no clean ultrasonic reflection)
+- `raw_distance_mm` — uncalibrated ultrasonic time-of-flight
+- `tilted` — derived from accelerometer; flag for ignore-this-reading
+- `advertisement_age_s` — Silent badge support, same pattern as Victron
+
+Fluid level percentage is deliberately NOT computed here — that
+needs per-install tank geometry + fluid speed-of-sound calibration
+which lands with #257 (Tank + Ambient tile category).
+
+Setup wizard auto-detects Mopeka adverts during BLE scan (Nordic
+manufacturer ID 0x0059 + hardware-id byte). Single-tap pair —
+no key entry. Auto-creates the device row on save, no slave-ID
+scan needed (Mopeka is one MAC = one tank, same as Victron BLE).
+
 ## [0.1.84] · 2026-05-23
 
 ### Added · Cloud inbox auto-notify email (#246)

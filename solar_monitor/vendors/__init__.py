@@ -21,6 +21,7 @@ from . import daly  # noqa: F401
 from . import epever  # noqa: F401
 from . import aili  # noqa: F401
 from . import junctek  # noqa: F401
+from . import mopeka  # noqa: F401
 
 __all__ = [
     "DeviceDriver",

@@ -8628,6 +8628,10 @@ async function wizFindDongle() {
     } else if (vendor === "renogy") {
       hintHtml = `<span class="wiz-vendor-hint">Renogy BT-2 / BT-1</span>`;
       actionHtml = `<button class="btn-action btn-action--primary" data-use-mac="${escHtml(d.address)}" data-use-name="${escHtml(d.name || '')}">Use this</button>`;
+    } else if (vendor === "mopeka") {
+      // Mopeka tank sensor — plaintext, no key dance. Single-tap pair.
+      hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Mopeka tank sensor</span>`;
+      actionHtml = `<button class="btn-action btn-action--primary" data-pair-mopeka="${escHtml(d.address)}">Pair Mopeka</button>`;
     } else if (vendor === "jkbms") {
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">JK BMS</span>`;
       // JK BMS wizard support isn't built yet (driver shipped in v0.0.21);
@@ -8651,6 +8655,14 @@ async function wizFindDongle() {
   // Renogy / fallback path — unchanged.
   list.querySelectorAll("[data-use-mac]").forEach(b => {
     b.addEventListener("click", () => wizAddTransportFromMac(b.dataset.useMac, b.dataset.useName));
+  });
+  // Mopeka pairing — single-tap, no key prompt.
+  list.querySelectorAll("[data-pair-mopeka]").forEach(b => {
+    b.addEventListener("click", () => {
+      b.disabled = true;
+      b.textContent = "Saving…";
+      wizAddTransportFromMopeka(b.dataset.pairMopeka, b);
+    });
   });
   // Victron pairing — show + wire the key-entry form.
   list.querySelectorAll("[data-pair-victron]").forEach(b => {
@@ -8797,6 +8809,35 @@ async function wizAddTransportFromVictron(mac, key, deviceClass) {
   }
   if (status) status.textContent = `Added · ${res.label || res.id}. Polling now.`;
   // Refresh the transport list so the new Victron row appears.
+  await new Promise(r => setTimeout(r, 1200));
+  await wizLoadTransports();
+}
+
+async function wizAddTransportFromMopeka(mac, button) {
+  let res;
+  try {
+    const r = await fetch("/api/setup/transports/add", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        type: "ble_mopeka_advertise",
+        address: mac,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+    res = await r.json();
+  } catch (e) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Pair Mopeka";
+    }
+    alert("Couldn't add Mopeka: " + (e.message || String(e)));
+    return;
+  }
+  if (button) button.textContent = `Added · ${res.label || res.id}`;
   await new Promise(r => setTimeout(r, 1200));
   await wizLoadTransports();
 }
