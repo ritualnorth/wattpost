@@ -1985,11 +1985,28 @@ async function renderLocationTile() {
     _locTileMap = L.map("location-map", {
       zoomControl: true, scrollWheelZoom: false, attributionControl: true,
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    // Map / Satellite toggle — same wp-map-mode key as the cloud
+    // surfaces so the user's preference is consistent across both.
+    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 20,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &middot; &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    }).addTo(_locTileMap);
+    });
+    const satLayer = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: 'Tiles &copy; <a href="https://www.esri.com">Esri</a>',
+    });
+    const savedMode = (localStorage.getItem("wp-map-mode") || "map").toLowerCase();
+    (savedMode === "satellite" ? satLayer : darkLayer).addTo(_locTileMap);
+    L.control.layers(
+      { "Map": darkLayer, "Satellite": satLayer },
+      null,
+      { collapsed: true, position: "topright" },
+    ).addTo(_locTileMap);
+    _locTileMap.on("baselayerchange", (e) => {
+      localStorage.setItem("wp-map-mode",
+        e.layer === satLayer ? "satellite" : "map");
+    });
   }
   if (moved) {
     _locTileMap.setView([loc.lat, loc.lon], 13);
