@@ -262,6 +262,21 @@ class CloudService:
             )
             return
 
+        # Defense-in-depth against the duplicate-cmd race ([[watchdog
+        # fix in #283]]): if we're picking up an `update` cmd whose
+        # target_version is already what we're running, treat it as a
+        # success without actually firing watchtower / wattpost-update.
+        # Stops sibling cmds from queuing a spurious rollback when the
+        # appliance already reached the target via another path.
+        target = (cmd.get("target_version") or "").strip()
+        from .. import __version__ as _running
+        if target and target == _running:
+            log.info("cloud update: cmd %d already at target v%s — "
+                     "no-op", cmd_id, target)
+            await self._patch_command_status(cmd_id, "picked_up")
+            await self._patch_command_status(cmd_id, "success")
+            return
+
         # Docker installs go via a Watchtower sidecar (#265). The
         # daemon takes a snapshot first (gives the user a rollback
         # path if the new image is bad — Pi has slot-based atomic
