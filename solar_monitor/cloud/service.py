@@ -255,6 +255,14 @@ class CloudService:
             await self._dispatch_rollback(cmd_id, cmd)
             return
 
+        # #279 Phase 1 — non-destructive housekeeping. Prunes local
+        # snapshots, vacuums journal, clears apt cache. Run on demand
+        # from the cloud "Free up disk" button or auto-queued by the
+        # watchdog when host_health.disk.percent ≥ 90.
+        if kind == "disk_cleanup":
+            await self._dispatch_disk_cleanup(cmd_id)
+            return
+
         if kind != "update":
             await self._patch_command_status(
                 cmd_id, "failed",
@@ -491,6 +499,38 @@ class CloudService:
                 cmd_id, "failed",
                 error=f"failed to start rollback: {type(e).__name__}: {e}",
             )
+
+    async def _dispatch_disk_cleanup(self, cmd_id: int) -> None:
+        """Cloud-triggered disk housekeeping (#279). Non-destructive:
+        snapshot prune to retention, journal vacuum, apt clean +
+        autoremove (Pi only). Reports freed bytes + per-op result via
+        the command's completion message."""
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        try:
+            from .. import disk_cleanup as _dc
+            report = await _dc.run(self.scheduler)
+        except Exception as e:
+            log.exception("cloud disk_cleanup: dispatch failed")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"disk_cleanup failed: {type(e).__name__}: {e}",
+            )
+            return
+        freed_mb = report["freed_bytes"] / (1024 * 1024)
+        op_names = ", ".join(o["op"] for o in report["ops"] if o.get("ok"))
+        msg = f"freed {freed_mb:.1f} MB · ran: {op_names or 'no ops'}"
+        # Per-op errors are downgraded to a warning in the message rather
+        # than failing the whole cmd — if snapshot_prune worked but
+        # apt_autoremove timed out, the user still got value.
+        if report["errors"]:
+            err_names = ", ".join(
+                f"{o['op']}: {o.get('error') or o.get('note', '')}"
+                for o in report["errors"]
+            )
+            msg += f" · partial errors → {err_names}"
+        log.info("cloud disk_cleanup cmd %d: %s", cmd_id, msg)
+        await self._patch_command_status(cmd_id, "success", error=msg)
 
     async def _dispatch_backup_now(self, cmd_id: int) -> None:
         """Cloud-triggered immediate snapshot (#165).
