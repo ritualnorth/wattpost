@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.73] · 2026-05-23
+
+### Added · Rules trilogy — defaults, cloud transport, empty-state nudge
+
+Three companion changes that finish the Unified Rules story (#261).
+
+**#258 — Default rules on first boot.** Fresh appliance starts with
+Low SoC (30%/warn), Critical SoC (15%/alarm), High Temp (45°C/warn),
+Critical Temp (55°C/alarm) — system-voltage-agnostic so they work
+on 12/24/48V installs without auto-detection. `alerts_seeded: true`
+gets persisted so a user who deletes all rules won't get them
+silently re-added. Defaults ship with empty transports; the events
+still land in the local ring buffer and (for paired appliances) the
+cloud inbox via heartbeat extras.
+
+**#259 — Cloud transport for local rules.** A magic `cloud` transport
+id on any local rule routes the event to the user's cloud
+notification channels (web push + native app push + email via Resend)
+using whatever they've already enabled in their cloud notification
+prefs. The appliance does nothing locally for `cloud` transports —
+the heartbeat ingest reads the per-event `transports` list and fans
+out post-commit. ON-CONFLICT dedup means flaky-link retransmits
+never double-page.
+
+**#260 — Empty-state nudge.** `/app/alerts` now distinguishes "no
+alerts" from "no rules". When the user has zero rules across their
+fleet (or for the selected site filter), the inbox renders a CTA
+to add their first rule instead of the misleading "no alerts yet"
+copy. `rules_count` added to `/api/alerts` to drive the branch.
+
 ## [0.1.72] · 2026-05-23
 
 ### Fixed · Don't show "Update to vX" after the user already clicked it (#275)
