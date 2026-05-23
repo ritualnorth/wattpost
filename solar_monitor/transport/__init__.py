@@ -23,6 +23,10 @@ try:
 except ImportError:
     pass
 try:
+    from . import ble_mopeka_advertise  # noqa: F401
+except ImportError:
+    pass
+try:
     from . import ble_jkbms  # noqa: F401
 except ImportError:
     pass
