@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.69] · 2026-05-23
+
+### Changed · Fleet bulk update now runs the full safety chain (#271)
+
+`POST /api/sites/commands/bulk_update` (the Installer-tier "update
+every site that's out of date" button from #80) used to just queue
+a bare `update` command per site. Now it runs the same per-site
+safety chain shipped in #269 + #270 for single-appliance updates:
+
+  - Pre-update local snapshot via `wattpost-update` / dispatcher
+    (universally — Pi + Docker)
+  - 24 h cloud-backup-fresh check; queues `backup_now` first if
+    none exists (per site, independently)
+  - `update` command captures `pre_update_version` so the cloud
+    watchdog can auto-rollback if any individual site wedges
+
+Docker installs no longer get skipped — #265 + #268 + #270 give
+them feature parity. The response shape gains per-site
+`install_method`, `backup_queued`, and `previous_version` so the
+fleet UI can show "Smith family: backup queued → updating →
+success. Jones residence: backup queued → updating → FAILED →
+rolled back automatically." per-row progress.
+
 ## [0.1.68] · 2026-05-23
 
 ### Added · Per-site update history + 1-click rollback (#272)
