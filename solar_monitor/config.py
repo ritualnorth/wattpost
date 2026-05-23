@@ -340,6 +340,10 @@ class Config(msgspec.Struct, kw_only=True):
     exporters: list[dict[str, Any]] = []  # optional
     notification_transports: list[dict[str, Any]] = []  # optional
     alerts: list[AlertRuleCfg] = []  # optional
+    # Set to True after first-boot seeding so we don't re-seed defaults
+    # if the user intentionally cleared all rules. Flip to False (or
+    # delete the key) to trigger a re-seed on next start.
+    alerts_seeded: bool = False
     quiet_hours: QuietHoursCfg | None = None  # optional
     forecast: ForecastCfg | None = None  # optional
     weather: WeatherCfg | None = None    # optional
@@ -354,9 +358,56 @@ class Config(msgspec.Struct, kw_only=True):
     smart_plugs: list[SmartPlugCfg] = []      # optional — LAN-attached smart plugs for solar-pause to drive
 
 
+# #258 — default alert rules seeded on first boot. System-voltage-
+# agnostic (SoC + temperature only; voltage rules would need to know
+# 12V/24V/48V which we don't at first boot). Empty `transports` list
+# means they fire to the local ring buffer + cloud inbox via heartbeat
+# extras — the user gets visibility immediately, and can attach SMTP /
+# MQTT / Cloud push from the Alerts settings later.
+_DEFAULT_ALERT_RULES: list[dict[str, Any]] = [
+    {
+        "id": "low-soc", "name": "Low battery (30%)",
+        "metric": "bank.soc_pct", "op": "lt", "threshold": 30.0,
+        "severity": "warn", "cooldown_seconds": 1800, "transports": [],
+    },
+    {
+        "id": "critical-soc", "name": "Critical battery (15%)",
+        "metric": "bank.soc_pct", "op": "lt", "threshold": 15.0,
+        "severity": "alarm", "cooldown_seconds": 900, "transports": [],
+    },
+    {
+        "id": "high-temp", "name": "Bank temperature high (45°C)",
+        "metric": "bank.temperature_c", "op": "gt", "threshold": 45.0,
+        "severity": "warn", "cooldown_seconds": 1800, "transports": [],
+    },
+    {
+        "id": "critical-temp", "name": "Bank temperature critical (55°C)",
+        "metric": "bank.temperature_c", "op": "gt", "threshold": 55.0,
+        "severity": "alarm", "cooldown_seconds": 900, "transports": [],
+    },
+]
+
+
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
     cfg = msgspec.convert(raw, Config)
+
+    # #258 — first-boot default rules. Only seeds when:
+    #   1. `alerts:` is empty (or absent), AND
+    #   2. `alerts_seeded:` is missing or False.
+    # Persists alerts_seeded=true on disk so a user who intentionally
+    # clears all rules later doesn't get them silently re-added on the
+    # next start. Best-effort write — if the config is read-only the
+    # in-memory seed still works for this session.
+    if not cfg.alerts and not cfg.alerts_seeded:
+        cfg.alerts = msgspec.convert(_DEFAULT_ALERT_RULES, list[AlertRuleCfg])
+        cfg.alerts_seeded = True
+        try:
+            raw["alerts"] = _DEFAULT_ALERT_RULES
+            raw["alerts_seeded"] = True
+            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+        except Exception:
+            pass
 
     # Legacy endpoint auto-upgrade. Appliances paired before the
     # rebrand have `cloud.endpoint: https://app.wattpost.io` saved.
