@@ -51,6 +51,15 @@ TOKEN         = (os.environ.get("WATTPOST_UPDATER_TOKEN")
 COMPOSE_FILE  = os.environ.get("COMPOSE_FILE", "/host-compose/docker-compose.yml")
 SERVICE_NAME  = os.environ.get("SERVICE_NAME", "wattpost")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "86400"))
+# Compose infers the project name from the directory containing the
+# compose file. From inside the updater container that's "host-compose"
+# (the bind-mount path), but on the host the user's stack was started
+# from their actual directory (typically "wattpost"). Without an explicit
+# project name, `compose up -d` thinks no containers exist, tries to
+# create fresh ones, and collides on container names. Auto-detect from
+# the running service's compose label; fall back to an env override;
+# final fallback "wattpost" matches the convention in our docs.
+PROJECT_NAME  = os.environ.get("COMPOSE_PROJECT_NAME", "").strip()
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +79,31 @@ _lock = threading.Lock()
 
 
 _VERSION_RE = re.compile(r"^[A-Za-z0-9._-]{1,32}$")
+
+
+def _detect_project_name() -> str:
+    """Read the compose project name from the running service container's
+    `com.docker.compose.project` label. If we can't reach docker or the
+    container isn't running yet, fall back to the env override and then
+    the "wattpost" convention. Cached after first successful read."""
+    if PROJECT_NAME:
+        return PROJECT_NAME
+    try:
+        out = subprocess.run(
+            ["docker", "inspect", "--format",
+             '{{index .Config.Labels "com.docker.compose.project"}}',
+             SERVICE_NAME],
+            capture_output=True, text=True, timeout=10,
+        )
+        name = (out.stdout or "").strip()
+        if name:
+            log.info("project: auto-detected %r from running %s container",
+                     name, SERVICE_NAME)
+            return name
+    except (subprocess.SubprocessError, OSError) as e:
+        log.warning("project: docker inspect failed (%s) — falling back", e)
+    log.info("project: defaulting to 'wattpost' (override via COMPOSE_PROJECT_NAME)")
+    return "wattpost"
 
 
 def _pin_tag_in_compose(version: str) -> tuple[bool, str]:
@@ -155,10 +189,12 @@ def do_update(version: str | None = None) -> tuple[bool, str]:
             if not ok:
                 log.error("update: tag pin failed: %s", msg)
                 return False, f"tag pin failed: {msg}"
-        log.info("update: pull %s service=%s%s", COMPOSE_FILE, SERVICE_NAME,
-                 f" (pinned v{version})" if version else "")
+        project = _detect_project_name()
+        log.info("update: pull %s project=%s service=%s%s", COMPOSE_FILE,
+                 project, SERVICE_NAME, f" (pinned v{version})" if version else "")
         pull = subprocess.run(
-            ["docker", "compose", "-f", COMPOSE_FILE, "pull", SERVICE_NAME],
+            ["docker", "compose", "-p", project, "-f", COMPOSE_FILE,
+             "pull", SERVICE_NAME],
             capture_output=True, text=True, timeout=600,
         )
         if pull.returncode != 0:
@@ -166,8 +202,11 @@ def do_update(version: str | None = None) -> tuple[bool, str]:
             log.error("update: pull failed rc=%d: %s", pull.returncode, tail)
             return False, f"pull failed: {tail}"
         log.info("update: up -d %s", SERVICE_NAME)
+        # `--no-deps` so we never recreate ourselves; `--pull never` because
+        # we already pulled and don't want a stale-cache surprise.
         up = subprocess.run(
-            ["docker", "compose", "-f", COMPOSE_FILE, "up", "-d", SERVICE_NAME],
+            ["docker", "compose", "-p", project, "-f", COMPOSE_FILE,
+             "up", "-d", "--no-deps", "--pull", "never", SERVICE_NAME],
             capture_output=True, text=True, timeout=180,
         )
         if up.returncode != 0:

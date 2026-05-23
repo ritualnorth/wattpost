@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.70] · 2026-05-23
+
+### Fixed · wattpost-updater container-name collision (#273)
+
+`docker compose up -d` from inside the updater container ran with
+project name `host-compose` (the bind-mount directory) instead of
+the user's actual project name (typically `wattpost`). Compose then
+believed the existing `wattpost` container belonged to a different
+project, tried to create a fresh one, and Docker rejected the name
+collision — so cloud Update-now succeeded on `pull` but failed on
+the actual swap. The updater now reads the compose project name
+straight from the running service container's
+`com.docker.compose.project` label, with `COMPOSE_PROJECT_NAME` env
+override and a final `wattpost` fallback. Adds `--no-deps` so the
+swap can never recreate the updater itself, plus `--pull never` on
+`up` (we already pulled in the previous step — no need for the
+implicit re-pull to race with the explicit one).
+
+Verified end-to-end on Garage Stack (Ubuntu 24.04 LTS + Docker
+29.1.3): cloud-triggered update queues the pre-update local
+snapshot, uploads the cloud-backup-fresh prelude, then the
+updater pulls and recreates `wattpost` cleanly in one cycle.
+
 ## [0.1.69] · 2026-05-23
 
 ### Changed · Fleet bulk update now runs the full safety chain (#271)
