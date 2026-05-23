@@ -41,6 +41,7 @@ All are free + local:
 - **Email** (SMTP). Your relay, your Gmail app password, your ISP, etc.
 - **MQTT**. Publish to a topic; Home Assistant / Node-RED / your own scripts can subscribe
 - **Generic webhook** · `POST` JSON to any URL
+- **Cloud** · one switch, fans out to your **cloud inbox** + **web push** + **mobile app push** + **email** using your wattpost.cloud notification prefs. No SMTP credentials, no separate Pushover account — uses whatever channels you've already enabled in the cloud. Add `cloud` to a rule's `transports:` list, or pick "Cloud" in the Settings → Alerts editor.
 
 The Cloud tier adds:
 

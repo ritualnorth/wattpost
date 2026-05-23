@@ -319,6 +319,12 @@ class AlertEngine:
         self, event: AlertEvent, transport_ids: list[str],
     ) -> None:
         for tid in transport_ids:
+            # #259 — "cloud" is a magic transport id. The fan-out
+            # (web push, native push, email) happens in the cloud
+            # when the heartbeat ingest sees the event has "cloud"
+            # in its transports list. Nothing to do appliance-side.
+            if tid == "cloud":
+                continue
             t = self._transports.get(tid)
             if t is None:
                 log.warning("rule %s references unknown transport %r", event.rule_id, tid)
