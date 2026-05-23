@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.82] · 2026-05-23
+
+### Changed · Update history paginates instead of dumping everything
+
+`/api/sites/{id}/commands` now defaults to 10 rows (was 30) and
+accepts `before_id` for cursor pagination. The Update history card
+on `/app/site/{id}` renders the first 10 and shows a "Load more"
+button below — click to fetch the next batch and append. Removes
+the wall-of-rows on appliances that have seen a lot of update
+churn (today's session pushed Garage past 15 entries). Fetch
+returns `has_more: true|false` so the button removes itself when
+there's nothing left.
+
 ## [0.1.81] · 2026-05-23
 
 ### Added · Map / Satellite toggle on all map surfaces
