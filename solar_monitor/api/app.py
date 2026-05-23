@@ -55,6 +55,7 @@ from .weather_admin import (
     test_weather_fetch,
 )
 from .gps_admin import get_gps_status
+from .location_admin import get_location_status, update_location_share
 from .energy import energy_today
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
@@ -1528,6 +1529,8 @@ def build_app(
             get_forecast_accuracy,
             get_current_weather,
             get_gps_status,
+            get_location_status,
+            update_location_share,
             get_weather_config,
             update_weather_config,
             test_weather_fetch,

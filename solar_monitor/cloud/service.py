@@ -846,6 +846,18 @@ class CloudService:
             extras["host_health"] = _hh.snapshot()
         except Exception:
             log.exception("cloud heartbeat: host_health snapshot failed")
+        # #263/#264 — location (lat/lon) gated by LocationCfg.
+        # OPT-IN by default; returns None unless the customer has
+        # explicitly set share_with_cloud to "approx" or "precise".
+        # Approx mode rounds on this side BEFORE transmission so the
+        # cloud never sees precise coords from an approx user.
+        try:
+            from .. import location as _loc
+            loc_payload = _loc.location_for_cloud(self.scheduler, self._config)
+            if loc_payload is not None:
+                extras["location"] = loc_payload
+        except Exception:
+            log.exception("cloud heartbeat: location resolution failed")
         # Kiosk share-token (Option C of the kiosk security model).
         # The cloud dashboard's "Kiosk" button reads this and builds
         # the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`.
