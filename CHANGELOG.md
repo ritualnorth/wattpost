@@ -8,6 +8,39 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.66] · 2026-05-23
+
+### Added · Pre-update safety chain (#269)
+
+Cloud-orchestrated belt-and-braces around every cloud-triggered
+update. Same chain runs on Pi and on Docker.
+
+**Cloud side** (`cloud/wattpost_cloud/api/appliance_commands.py`):
+when you queue `kind=update`, the cloud now checks whether you
+already have a cloud-stored backup younger than 24 hours. If not,
+it queues a `backup_now` command FIRST. The appliance processes
+commands in id order, so the fresh snapshot completes and uploads
+to cloud storage before the update fires. Response includes a
+`prelude` object so the UI can show "Backup taken, then update"
+instead of a bare "Update queued".
+
+Also drops the now-stale "Docker can't update from cloud" 409 —
+#268's wattpost-updater sidecar gives Docker installs feature
+parity, so the cloud no longer pre-refuses.
+
+**Appliance side** (`packaging/cli/wattpost-update`): the Pi update
+helper now takes a local snapshot before touching the inactive
+slot. Slot atomic-swap protects against a bad binary, but DB
+schema migrations are forward-only — slot rollback brings old code
+back against a new schema. A snapshot before any work starts gives
+the user a clean restore path even if the slot machinery itself
+goes wrong.
+
+New `solar-monitor snapshot --config <path>` CLI command — local-
+only backup invocation without going through the daemon's HTTP API
+(no auth dance). Used by wattpost-update; can also be called by
+operators directly.
+
 ## [0.1.65] · 2026-05-23
 
 ### Added · Cloud "Update now" for Docker installs (#265)
