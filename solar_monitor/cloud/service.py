@@ -170,6 +170,34 @@ class CloudService:
                 log.info("identity v2 upgrade %s: appliance keypair "
                          "registered with cloud (fingerprint=%s)",
                          body.get("result"), keypair.fingerprint)
+
+                # Phase 3 (#305): persist OIDC client config the cloud
+                # handed back. We capture all four fields atomically so
+                # downstream code can assume "if oidc_config.load() is
+                # not None, all fields are present and consistent".
+                # Older clouds (pre-Phase 2) won't return these fields
+                # — skip silently in that case so we don't churn the
+                # disk on partial upgrade.
+                if all(body.get(k) for k in (
+                    "oidc_client_id", "oidc_redirect_uri",
+                    "jwks_url", "oidc_discovery_url",
+                )):
+                    try:
+                        from ..auth import oidc_config as _oidc_cfg
+                        _oidc_cfg.save(
+                            client_id=body["oidc_client_id"],
+                            redirect_uri=body["oidc_redirect_uri"],
+                            jwks_url=body["jwks_url"],
+                            discovery_url=body["oidc_discovery_url"],
+                        )
+                    except Exception:
+                        # Non-fatal — Phase 3 OIDC client is additive;
+                        # legacy cookie auth still works without it.
+                        log.exception(
+                            "identity v2 phase 3: failed to persist OIDC "
+                            "config; LAN OIDC login will fall back to "
+                            "the legacy password flow",
+                        )
         except Exception as e:
             log.warning("identity v2: cloud round-trip failed: %s — "
                         "will retry on next boot", e)
