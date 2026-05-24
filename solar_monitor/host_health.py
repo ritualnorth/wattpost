@@ -118,15 +118,85 @@ def _lan_ip() -> str | None:
         return None
 
 
+def _security_updates() -> dict[str, Any]:
+    """OS security-patch backlog (#280). Reads APT cache stamp + the
+    unattended-upgrades run log. Returns a small dict suitable for
+    cloud rendering. Cheap (a couple of stat()s + line counts; no
+    apt-get update fork). Returns empty dict on non-Debian hosts /
+    Docker containers without apt.
+
+    Fields:
+      pending_count:    int   — packages with security pending
+      pending_security: int   — subset that are explicit security uploads
+      last_apt_update:  int   — unix ts of /var/cache/apt/pkgcache.bin mtime
+      last_uu_run:      int   — unix ts of last successful unattended-
+                                upgrades run (from its log)
+      uu_active:        bool  — apt-config tells us unattended-upgrades
+                                is enabled for this host
+    """
+    import os as _os
+    import re as _re
+
+    out: dict[str, Any] = {}
+
+    # APT cache freshness — easy proxy for "are we seeing fresh
+    # vuln advisories?". Stale by >2 days = patches we don't know
+    # about yet.
+    try:
+        st = _os.stat("/var/cache/apt/pkgcache.bin")
+        out["last_apt_update"] = int(st.st_mtime)
+    except OSError:
+        pass
+
+    # Pending updates: parse `/var/lib/update-notifier/updates-available`
+    # if present (set by update-notifier-common), else count files in
+    # /var/lib/apt/lists/*_security_*. Both cheap.
+    try:
+        body = open("/var/lib/update-notifier/updates-available").read()
+        # Format: "N packages can be updated.\nM are security updates."
+        m1 = _re.search(r"^(\d+)\s+\S+\s+can be (updated|upgraded|applied)", body, _re.M)
+        m2 = _re.search(r"^(\d+)\s+\S+\s+(are|is)\s+security", body, _re.M)
+        if m1:
+            out["pending_count"] = int(m1.group(1))
+        if m2:
+            out["pending_security"] = int(m2.group(1))
+    except OSError:
+        pass
+
+    # Unattended-upgrades enabled? `apt-config dump` is the canonical
+    # check but it's a shell-out; cheap heuristic instead — look for
+    # 20auto-upgrades in /etc/apt/apt.conf.d/.
+    try:
+        body = open("/etc/apt/apt.conf.d/20auto-upgrades").read()
+        out["uu_active"] = "1" in body and "Update-Package-Lists" in body
+    except OSError:
+        out["uu_active"] = False
+
+    # Last unattended-upgrades run from its log. We only care that
+    # the file got touched recently; not parsing line content.
+    for cand in (
+        "/var/log/unattended-upgrades/unattended-upgrades.log",
+        "/var/log/unattended-upgrades.log",
+    ):
+        try:
+            out["last_uu_run"] = int(_os.stat(cand).st_mtime)
+            break
+        except OSError:
+            continue
+
+    return out
+
+
 def snapshot() -> dict[str, Any]:
     """Single dict suitable for inclusion in heartbeat extras under
     the `host_health` key. Cheap (<5ms typical); safe to call once
     per heartbeat (~5min)."""
     return {
-        "uptime_seconds": int(_uptime_seconds()),
-        "hostname":       _hostname(),
-        "lan_ip":         _lan_ip(),
-        "disk":           _disk("/"),
-        "memory":         _memory(),
-        "loadavg":        _loadavg(),
+        "uptime_seconds":   int(_uptime_seconds()),
+        "hostname":         _hostname(),
+        "lan_ip":           _lan_ip(),
+        "disk":             _disk("/"),
+        "memory":           _memory(),
+        "loadavg":          _loadavg(),
+        "security_updates": _security_updates(),
     }

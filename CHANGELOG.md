@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.103] · 2026-05-24
+
+### Added · OS security patches surface (#280)
+
+Appliance host_health now reports OS patch state — pending package
+count, security-specific subset, apt cache age, unattended-upgrades
+last-run + enabled flag. Cloud site-detail's Device Health card
+renders a new "Security patches" tile that turns amber when apt is
+>7 days stale or there are non-security updates, red when there are
+security updates or apt is >14 days stale.
+
+Cheap (a couple of stat()s + a regex against the update-notifier
+file); no apt-get update fork on every heartbeat. Returns empty on
+non-Debian hosts and Docker containers without apt — the tile
+auto-hides in those cases (Docker users' host OS handles its own
+patching).
+
 ## [0.1.102] · 2026-05-24
 
 ### Security · Appliance-side signed audit log + cloud sync (Phase 8B, #310)
