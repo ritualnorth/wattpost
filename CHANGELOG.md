@@ -8,6 +8,32 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.99] · 2026-05-24
+
+### Security · Sign cloud backups with appliance keypair (#297-3)
+
+Every backup uploaded to cloud is now ed25519-signed with the
+appliance's Identity v2 keypair (#303). At restore time the
+appliance verifies the signature against its OWN public key
+before unpacking — if a compromised cloud account swaps the
+tarball under a victim appliance's row, the victim refuses to
+apply it because the bytes weren't signed by its keypair.
+
+* Cloud `appliance_backups` gains `signature_b64`,
+  `signing_pubkey_fp`, `signature_alg` columns (migration 0051).
+* Cloud upload + download endpoints carry the three values as
+  `X-WP-Backup-Signature` / `X-WP-Backup-Pubkey-Fp` /
+  `X-WP-Backup-Sig-Alg` headers.
+* Restore-from-cloud command verifies the signature first; on
+  mismatch the command fails with a clear "either this isn't
+  our backup or the keypair has rotated" error.
+* Pre-0.1.99 backups (no signature) are grandfathered — restore
+  logs a warning and proceeds, relying on the #297-1 config
+  sanitiser + #297-2 fresh-install pw regen as defences.
+
+`WATTPOST_KEYS_DIR` env var now honoured by the keypair module
+too (was already honoured by oidc_rp / signing).
+
 ## [0.1.98] · 2026-05-24
 
 ### Security · Harden cloud restore against compromised cloud account (#297-1, #297-2)

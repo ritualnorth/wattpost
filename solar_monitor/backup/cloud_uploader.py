@@ -48,6 +48,23 @@ def make_uploader(
             "X-WP-Backup-Keep": str(keep_count),
             "X-WP-Backup-Version": __version__,
         }
+        # #297-3 — sign the archive with the appliance ed25519 keypair
+        # so restore-time verification can refuse a swapped tarball.
+        # Best-effort: if signing fails (no keypair, sealed-file
+        # broken, etc.) we still upload — old appliances without
+        # keypairs and pre-Identity-v2 installs need the upload path
+        # to keep working. Restore-side warning surfaces the absence.
+        try:
+            from . import signing as _sig
+            sig = await asyncio.to_thread(_sig.sign_archive, data)
+            headers["X-WP-Backup-Signature"]  = sig.sig_b64
+            headers["X-WP-Backup-Pubkey-Fp"]  = sig.pubkey_fp
+            headers["X-WP-Backup-Sig-Alg"]    = sig.alg
+        except Exception as e:
+            log.warning(
+                "cloud backup: signing skipped (%s) — uploading "
+                "unsigned; restore from this row will warn", e,
+            )
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT_S) as client:
             r = await client.post(url, content=data, headers=headers)
         if r.status_code == 402:
