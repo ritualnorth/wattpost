@@ -71,6 +71,11 @@ ANONYMOUS_PATH_PREFIXES = (
     "/service-worker.js",
     "/api/login",
     "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
+    # Identity v2 Phase 3 (#305) — OIDC redirect endpoints. /auth/lan/login
+    # initiates the flow; /auth/callback completes it. Both verify their
+    # own state before issuing a session, so they're safe-anon.
+    "/auth/lan/login",
+    "/auth/callback",
     # /api/system/auth-status is a read-only, no-PII "are you authed?"
     # signal the SPA uses to gate the Sign In button. It HAS to be
     # anonymous-accessible — if it required a session, the unauthed
