@@ -8,6 +8,21 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.104] · 2026-05-24
+
+### Fixed · Sign out on cloud-broker session: explain + redirect to cloud sign-out
+
+When you access your appliance via wattpost.cloud (the broker
+path), every request carries a Caddy-injected HMAC header — so
+clearing the local LAN cookie did nothing; the next request would
+re-authenticate immediately, making "Sign out" look broken.
+
+Previously the Sign out button was hidden on broker sessions
+(silent fail). Now it's shown with the label "Exit cloud session"
+and a short note explaining that ending the broker session means
+ending the wattpost.cloud session; the click navigates to
+wattpost.cloud's sign-out.
+
 ## [0.1.103] · 2026-05-24
 
 ### Added · OS security patches surface (#280)
