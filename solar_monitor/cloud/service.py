@@ -320,7 +320,42 @@ class CloudService:
         try:
             body = r.json()
             commands = body.get("commands") or []
+            # #299 — verify cloud-signed commands BEFORE dispatching.
+            # Reject paths refuse to fire the command (it stays in the
+            # cloud queue marked queued; cloud admins can investigate).
+            # Grandfather paths (unsigned cmd) log + dispatch with a
+            # warning so transitional appliances don't brick.
+            from . import command_verify as _cverify
+            from .. import signed_audit as _sa
             for cmd in commands:
+                # Each cmd carries its own appliance_id so the
+                # verifier doesn't need an out-of-band hint.
+                appliance_id = int(cmd.get("appliance_id") or 0)
+                try:
+                    ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
+                except Exception:
+                    log.exception("command verify raised — treating as untrusted")
+                    ok = False
+                if not ok:
+                    # Record the rejection in our signed-audit chain
+                    # (Phase 8B) so an attacker can't quietly probe by
+                    # feeding malformed commands without leaving a
+                    # trace.
+                    try:
+                        store = self.scheduler.store
+                        if store is not None and store._db is not None:
+                            await _sa.write_event(store._db,
+                                event_type="cloud_command_rejected",
+                                payload={
+                                    "cmd_id":   cmd.get("id"),
+                                    "kind":     cmd.get("kind"),
+                                    "reason":   "signature verify failed",
+                                },
+                            )
+                            await store._db.commit()
+                    except Exception:
+                        pass
+                    continue
                 # Spawn as a task so a long-running command (e.g. an
                 # update that takes 30s) doesn't block the next
                 # scheduled heartbeat. The dispatcher does its own
