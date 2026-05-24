@@ -8,6 +8,48 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.92] · 2026-05-24
+
+### Added · Identity v2 Phase 1 — appliance keypair foundation (#303)
+
+First code slice of the enterprise-grade auth rebuild (RFC at
+`docs/architecture/identity-v2.md`, EPIC #301). Lays the trust
+root that every later phase stands on.
+
+**On the appliance:** new `solar_monitor.auth` package generates
+an ed25519 keypair on first boot under `/var/lib/wattpost/keys/`.
+Private key is sealed with libsodium `SecretBox` keyed off a
+machine-id-derived secret — pulling the SD card alone won't reveal
+the key without also having the machine-id. Idempotent: subsequent
+boots load the existing key rather than mint a new one.
+
+**On the cloud:** new `appliance_keypairs` table (migration 0045)
+stores per-appliance public keys + fingerprints. Two new
+internal endpoints:
+
+- `POST /api/internal/identity/v2/upgrade` — bearer-authed,
+  receives the appliance's public key + fingerprint, flips
+  `appliances.identity_v2_enabled = TRUE`. Idempotent + handles
+  key rotation with audit-trail continuity.
+- `GET /api/internal/identity/v2/status` — bearer-authed, returns
+  current registration state so the appliance can check before
+  re-uploading.
+
+**Migration UX (v1→v2):** appliance boot now runs a background
+upgrade check — if the cloud doesn't know our fingerprint, it
+posts the public key. Best-effort + non-blocking: a failed upload
+logs + retries next boot. v1 bearer-token auth keeps working
+during the transition; v2 only takes over for the new endpoints
+that are added in later phases.
+
+**No behaviour change yet** for existing users. Phase 1 plants
+the trust anchor; Phases 2-10 build the cloud OIDC server,
+WebAuthn login, JWT-signed commands, mTLS heartbeat, and the
+rest of the design on top.
+
+Added `pynacl>=1.5` to appliance dependencies. ~150KB extra in
+the appliance image.
+
 ## [0.1.91] · 2026-05-24
 
 ### Changed · Battery node tone-down
