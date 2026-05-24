@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.108] · 2026-05-24
+
+### Changed · Map tiles: CARTO Dark Matter → CARTO Voyager
+
+Ritual North called the maps "shite" — the old Dark Matter style had
+washed-out labels against our dark card backgrounds. Switched
+all three map render sites (appliance Location tile, cloud
+Sites map, cloud per-site detail map) to CARTO Voyager — same
+provider, no API key, free tier. Voyager has more colour, clearer
+labels at every zoom, and is what Wikipedia + Foursquare use.
+
+Satellite alternative (Esri World Imagery) unchanged — the "Map /
+Satellite" toggle still works, the dark-themed road map just got
+better.
+
+`darkLayer` variable renamed `mapLayer` across all three files
+for honesty.
+
 ### Security · Cloud-side at-rest backup encryption (#300 Tier 1)
 
 Cloud-only change: every backup tarball is now wrapped in a
