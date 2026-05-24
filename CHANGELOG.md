@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.101] · 2026-05-24
+
+### Security · Appliance mTLS client cert (Identity v2 Phase 6B-A, #308)
+
+After identity-v2 upgrade succeeds, the appliance now requests an
+mTLS leaf cert from cloud (`/api/internal/identity/v2/mtls/issue`)
+and persists it alongside its keypair under
+`/var/lib/wattpost/keys/`:
+
+* `appliance_cert.pem` — leaf cert binding the appliance ed25519
+  pubkey to its identity (CN=apl_<id>, SPIFFE URI, slug DNS SAN).
+* `appliance_cert_key.pem` — ed25519 private key in PKCS#8 PEM
+  (hand-built from the raw seed; avoids adding `cryptography` as
+  a heavy appliance dep).
+* `cloud_ca_chain.pem` — CA chain to verify cloud's TLS.
+* `appliance_cert_meta.json` — serial, fingerprint, not_after.
+
+Auto-renewal when <30 days remain on the leaf; idempotent if cert
+is fresh. Best-effort: failures log + move on (heartbeats stay on
+the bearer-token path until Phase 6B-B coordinates Caddy listener
++ cloud middleware so the mTLS handshake is actually consumed).
+
 ## [0.1.100] · 2026-05-24
 
 ### Security · XSS escape DB-derived strings in device detail UI (#297-4)
