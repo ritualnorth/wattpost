@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.95] · 2026-05-24
+
+### Added · Sensors panel — Mopeka tanks + Govee/Ruuvi ambient (#257)
+
+New dashboard panel that renders the BLE-paired tank + ambient
+sensors from the #254 (Mopeka) and #255 (Govee/Ruuvi) drivers.
+Auto-hides when no such devices are paired — cabin / non-vanlife
+users never see the panel.
+
+* Tank cards: distance-to-liquid (raw mm; per-tank level%
+  calibration in a follow-up), onboard temperature, battery %,
+  tilt status, silent-advert detection.
+* Ambient cards: temperature, humidity, battery % when reported.
+
+Lives next to the weather + location tiles — environmental data
+kept separate from the power-flow tile.
+
 ## [0.1.94] · 2026-05-24
 
 ### Fixed · Identity v2 keypair survives Docker container recreate
