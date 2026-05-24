@@ -146,6 +146,27 @@ class CloudService:
                     if body.get("fingerprint") == keypair.fingerprint:
                         log.info("identity v2: already registered (fingerprint=%s)",
                                  keypair.fingerprint)
+                        # Phase 3 (#305): /status now also returns OIDC
+                        # client config — capture it so existing v2
+                        # appliances pick up LAN OIDC on boot without
+                        # having to re-trigger /upgrade.
+                        if all(body.get(k) for k in (
+                            "oidc_client_id", "oidc_redirect_uri",
+                            "jwks_url", "oidc_discovery_url",
+                        )):
+                            try:
+                                from ..auth import oidc_config as _oidc_cfg
+                                _oidc_cfg.save(
+                                    client_id=body["oidc_client_id"],
+                                    redirect_uri=body["oidc_redirect_uri"],
+                                    jwks_url=body["jwks_url"],
+                                    discovery_url=body["oidc_discovery_url"],
+                                )
+                            except Exception:
+                                log.exception(
+                                    "identity v2: failed to persist OIDC "
+                                    "config from /status response",
+                                )
                         return
                 elif r.status_code == 404:
                     # Cloud doesn't have the endpoint yet (older cloud
