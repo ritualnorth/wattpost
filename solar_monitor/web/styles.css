@@ -1674,6 +1674,42 @@ main {
   margin-top: .2rem;
 }
 
+/* ---------------- tank + ambient sensors (#257) ---------------- */
+.sensors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: .75rem;
+}
+.sensor-card {
+  background: var(--surface-2);
+  border-radius: var(--r);
+  padding: .85rem 1rem;
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.sensor-card-head {
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+}
+.sensor-card-kind {
+  font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-2);
+}
+.sensor-card-name {
+  font-weight: 600; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sensor-card-metric {
+  display: flex; align-items: baseline; gap: .35rem;
+}
+.sensor-card-metric strong { font-size: 1.4rem; font-weight: 700; }
+.sensor-card-metric span    { font-size: .85rem; color: var(--text-2); }
+.sensor-card-row {
+  display: flex; gap: 1rem; font-size: .8rem; color: var(--text-2);
+}
+.sensor-card-row > div { flex: 1; }
+.sensor-card-stale {
+  font-size: .72rem; color: #d29922; margin-top: .2rem;
+}
+
 /* ---------------- cell grid ---------------- */
 .cells-grid { display: flex; flex-direction: column; gap: .5rem; }
 .cell-row {

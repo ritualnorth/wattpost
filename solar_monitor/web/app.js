@@ -539,6 +539,7 @@ function applySnapshot(frame) {
   renderLocationTile();  // #264 — "Where you are" map
   renderWeek();
   renderCells();
+  renderSensors();
   renderDeviceCards();
   populateChartSelectors();
   renderAlerts();
@@ -3058,6 +3059,98 @@ async function deleteDeviceFromList(label, slaveId, transport) {
   } catch (e) {
     alert(`Delete failed: ${e.message || e}`);
   }
+}
+
+// ---- Tank + Ambient sensors panel (#257) ----
+//
+// Renders the Mopeka / Govee / Ruuvi readings as a separate panel
+// rather than mixing them into the power flow tile. The flow tile
+// is about energy in/out — sensors are environmental state, kept
+// visually distinct. Panel auto-hides when no tank/ambient devices
+// are paired so non-vanlife users never see it.
+function renderSensors() {
+  const panel = document.getElementById("panel-sensors");
+  const grid  = document.getElementById("sensors-grid");
+  const sub   = document.getElementById("sensors-summary");
+  if (!panel || !grid) return;
+
+  const sensors = devices.filter(
+    (d) => d.kind === "tank" || d.kind === "ambient",
+  );
+  if (!sensors.length) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+
+  const tanks    = sensors.filter((d) => d.kind === "tank").length;
+  const ambients = sensors.filter((d) => d.kind === "ambient").length;
+  const parts = [];
+  if (tanks)    parts.push(`${tanks} tank${tanks === 1 ? "" : "s"}`);
+  if (ambients) parts.push(`${ambients} ambient`);
+  sub.textContent = parts.join(" · ");
+
+  grid.innerHTML = sensors.map((d) => _renderSensorCard(d)).join("");
+}
+
+function _renderSensorCard(dev) {
+  const latest = dev.latest || {};
+  const age    = +latest.advertisement_age_s;
+  const stale  = !isFinite(age) || age > 600;
+  const safe   = (s) => String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const label  = safe(dev.display_name || dev.label || dev.address || "Sensor");
+  const kindL  = dev.kind === "tank" ? "Tank" : "Ambient";
+
+  // Primary metric per kind: tank → distance to liquid (raw mm
+  // until per-tank calibration ships in #257 follow-up); ambient
+  // → temperature.
+  let primary = "";
+  let secondaryRows = [];
+  if (dev.kind === "tank") {
+    const dist = latest.raw_distance_mm;
+    primary = (typeof dist === "number")
+      ? `<strong>${Math.round(dist)}</strong><span>mm to liquid</span>`
+      : `<strong>—</strong><span>no reading</span>`;
+    const t = latest.temperature_c;
+    const b = latest.battery_pct;
+    const tilt = latest.tilted ? "tilted" : "level";
+    secondaryRows.push(
+      `<div>${typeof t === "number" ? t.toFixed(1) + "°C" : "—"} ambient</div>`,
+      `<div>${typeof b === "number" ? Math.round(b) + "%" : "—"} battery · ${tilt}</div>`,
+    );
+  } else {
+    const t = latest.temperature_c;
+    const h = latest.humidity_pct;
+    primary = (typeof t === "number")
+      ? `<strong>${t.toFixed(1)}</strong><span>°C</span>`
+      : `<strong>—</strong><span>°C</span>`;
+    secondaryRows.push(
+      `<div>${typeof h === "number" ? h.toFixed(0) + "% RH" : "— RH"}</div>`,
+    );
+    const b = latest.battery_pct;
+    if (typeof b === "number") {
+      secondaryRows.push(`<div>${Math.round(b)}% battery</div>`);
+    }
+  }
+
+  const staleNote = stale
+    ? `<div class="sensor-card-stale">no fresh advert — last seen ${
+        isFinite(age) ? fmt.ago(Math.floor(Date.now() / 1000) - age) : "never"
+      }</div>`
+    : "";
+
+  return `
+    <div class="sensor-card">
+      <div class="sensor-card-head">
+        <div class="sensor-card-name">${label}</div>
+        <div class="sensor-card-kind">${kindL}</div>
+      </div>
+      <div class="sensor-card-metric">${primary}</div>
+      <div class="sensor-card-row">${secondaryRows.join("")}</div>
+      ${staleNote}
+    </div>
+  `;
 }
 
 function renderDeviceCards() {
