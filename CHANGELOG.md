@@ -8,6 +8,55 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.88] · 2026-05-24
+
+### Changed · Power flow tile v3 — visual overhaul
+
+Twelve improvements landed in one pass after a UX review session.
+
+**Layout + sizing.** ViewBox 400×260 → 440×290, node radius 22 →
+28. The diagram now reads as a hero, not a footer chart. Icon
+scaling, label offsets and edge insets all moved in lockstep so
+the proportions stay clean.
+
+**Animation.**
+
+- Particle speed scales harder with W (`0.45-1.8s` period vs
+  `0.5-2.2s`). A trickle creeps, a kW visibly rushes.
+- Particle density scales too: 2 normal, 3 at >250W, 4 at >1kW.
+  Inverter-on becomes instantly visible.
+- Connection strokes transition over 450ms so charge↔discharge
+  flips morph instead of snapping.
+- Per-segment linear gradients tint each line from its source
+  colour to its destination colour — solar→bus is yellow-to-grey,
+  battery→bus when discharging is pink-to-grey.
+
+**New visual elements.**
+
+- **Explicit junction node** at the bus point. Pulses softly when
+  sources ≈ loads (system is humming along).
+- **SoC ring** around the battery node — thin coloured arc
+  outside the main ring showing current SoC %. Same colour
+  language as the hero SoC donut. Two pieces of info on one node.
+- **Dominant-source halo** — whichever node is contributing the
+  most W gets a soft 2.6s pulse. Solar pulses at midday, battery
+  at night.
+- **Mid-line W labels** on installs with 3+ active edges (skipped
+  on simple 2-edge layouts where node labels already say enough).
+- **Time-of-day sun fade** — PV icon opacity follows local clock
+  (full 08-17, fading at dawn/dusk, dim overnight).
+
+**Interactivity.**
+
+- Tap any node → drill in. Battery → /devices (→ Battery detail
+  page once #292 lands). Sources → /devices. Loads → /history.
+  Keyboard-focusable for kiosk installs.
+- Hover/focus expands the ring stroke; cursor:pointer signal.
+
+**Idle source dimming.** Sources reading 0W dim to 32% opacity
+(rather than full chrome). The AC plug at 0W still says "yes
+it's wired up" without competing for attention.
+
 ## [0.1.87] · 2026-05-23
 
 ### Added · MQTT-IN: ingest external broker into the dashboard (#256)
