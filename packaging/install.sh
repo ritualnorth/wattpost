@@ -149,6 +149,24 @@ if [ -d "${LEGACY_SRC}" ] && [ ! -e "${ACTIVE_SLOT}/src" ]; then
         SOURCE="${ACTIVE_SLOT}/src"
         step "rewriting SOURCE → ${SOURCE} (pi-gen path migrated)"
     fi
+    # v0.1.45 patched SOURCE after the move but missed SCRIPT_DIR /
+    # REPO_ROOT (both captured at line 38-39 from BASH_SOURCE before
+    # the slot dance). When the chroot ran us out of /opt/wattpost-src,
+    # SCRIPT_DIR was /opt/wattpost-src/packaging; after the mv that
+    # path is gone, so the `install -m 0644 "${SCRIPT_DIR}/systemd/
+    # wattpost.service"` ~250 lines down errors with "cannot stat".
+    # Every tagged SD-image build since v0.1.45 failed silently here
+    # (the earlier wattpost-rollback + wattpost-config install lines
+    # have `if [ -f ]` guards so they no-op'd; wattpost.service had
+    # no guard and crashed the build). Re-derive both vars when the
+    # captured path is under LEGACY_SRC.
+    case "${SCRIPT_DIR}" in
+        "${LEGACY_SRC}"/*|"${LEGACY_SRC}")
+            SCRIPT_DIR="${ACTIVE_SLOT}/src/packaging"
+            REPO_ROOT="${ACTIVE_SLOT}/src"
+            step "rewriting SCRIPT_DIR → ${SCRIPT_DIR} (pi-gen path migrated)"
+            ;;
+    esac
 fi
 
 chown -R "${APP_USER}:${APP_GROUP}" "${SLOTS_DIR}" "${STATE_DIR}"
