@@ -288,6 +288,31 @@ class CloudService:
             log.warning("cloud heartbeat HTTP %s: %s", r.status_code, r.text[:200])
             return False
 
+        # Phase 8B (#310) — flip uploaded_at on any audit rows the
+        # cloud confirmed it ingested, so they drop out of the next
+        # heartbeat's pending list. Best-effort: if this fails we'll
+        # just re-ship them next time (idempotent on the cloud side
+        # too — duplicate signed_repr would fail the UNIQUE
+        # constraint on the cloud SignedAuditLogEntry.signed_repr
+        # path, which currently doesn't exist; cloud uses prev_hash
+        # chain check instead, also idempotent in effect).
+        try:
+            body = r.json()
+            acked = body.get("audit_acked_ids") or []
+            if isinstance(acked, list) and acked:
+                try:
+                    from .. import signed_audit as _sa
+                    store = self.scheduler.store
+                    if store is not None and store._db is not None:
+                        await _sa.mark_uploaded(
+                            store._db, ids=[int(i) for i in acked if isinstance(i, int)],
+                        )
+                        await store._db.commit()
+                except Exception:
+                    log.exception("signed_audit: mark_uploaded failed")
+        except Exception:
+            pass
+
         # Dispatch any commands the cloud queued for us. Best-effort
         # — failures dispatching one command shouldn't stop the
         # heartbeat from being considered successful, since the
@@ -1129,6 +1154,21 @@ class CloudService:
             extras["alert_count"] = alert_count
         except Exception:
             pass
+
+        # Phase 8B (#310) — appliance-signed audit log entries waiting
+        # to sync to cloud. Cloud verifies signature + hash chain +
+        # ingests; ack list comes back in the heartbeat response so
+        # we can flip uploaded_at. Cap at 50 per heartbeat to keep
+        # extras under the 2KiB ceiling on busy-event days.
+        try:
+            from .. import signed_audit as _sa
+            store = self.scheduler.store
+            if store is not None and store._db is not None:
+                pending = await _sa.fetch_pending(store._db, limit=50)
+                if pending:
+                    extras["signed_audit_pending"] = pending
+        except Exception:
+            log.exception("signed_audit: fetch_pending failed")
 
         # Local alert rules snapshot (#261 unification slice 1).
         # Surfaces this appliance's currently-configured rules in the
