@@ -8,6 +8,51 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.93] · 2026-05-24
+
+### Added · Identity v2 Phase 3 + 4 — LAN OIDC login (#305, #306)
+
+Lets cloud-paired appliances delegate LAN-side login to
+wattpost.cloud. User clicks "Sign in with WattPost cloud" on the
+appliance's `/login` page → standard OAuth2 PKCE redirect → cloud
+authenticates against the user's cloud account → appliance
+receives + verifies an ed25519-signed id_token → issues a local
+session cookie.
+
+**Appliance:**
+- new `solar_monitor.auth.oidc_config` — atomic JSON persistence
+  of the cloud-returned OIDC client params under `/var/lib/wattpost/keys/`
+- new `solar_monitor.auth.oidc_rp` — RP primitives: JWKS fetch +
+  in-memory + on-disk cache, EdDSA JWT verify via PyNaCl, PKCE
+  S256 generation, in-memory state store, /oidc/token exchange
+- new `solar_monitor.api.auth_oidc` — `/auth/lan/login` initiates
+  the OIDC redirect; `/auth/callback` completes it; both 404
+  cleanly when OIDC isn't configured (pre-v2 firmware path is
+  unchanged)
+- `/api/system/oidc-available` — lightweight status probe the
+  login page uses to decide whether to surface the cloud button
+- login page now renders "Sign in with WattPost cloud" above the
+  password form when OIDC is configured; password stays as the
+  offline/legacy fallback
+
+**Cloud side (no version bump — auto-deploys):**
+- `identity_v2_upgrade` endpoint now auto-registers a per-appliance
+  OIDC client (`apl_<id>_lan`) and returns the client_id,
+  redirect_uri (broker hostname), jwks_url, and discovery_url in
+  the upgrade response. Idempotent on re-upgrade.
+
+**Feature-flag-by-presence:** an appliance that has never reached
+the cloud, or whose cloud is on an older deploy, simply doesn't get
+an OIDC config — the cloud button stays hidden and the password
+form is the only path. No flag to toggle; the feature lights up the
+moment the upgrade round-trip succeeds.
+
+This pairs with Identity v2 Phase 2 (cloud OIDC server, shipped to
+wattpost.cloud earlier today) — together they implement the LAN-SSO
+sequence in `docs/architecture/identity-v2.md`. Phases 5-10 (WebAuthn,
+mTLS, kiosk JWT unification, signed audit log, re-auth gate,
+hardware-backed keys) ship as separate releases.
+
 ## [0.1.92] · 2026-05-24
 
 ### Added · Identity v2 Phase 1 — appliance keypair foundation (#303)
