@@ -1495,18 +1495,17 @@ main {
 .flow-svg-v2 .flow-node-clickable:hover .flow-node-ring,
 .flow-svg-v2 .flow-node-clickable:focus-visible .flow-node-ring { stroke-width: 2.6; }
 .flow-svg-v2 .flow-node-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 50%; }
-/* Battery node — fill tint by direction so "draining vs filling" reads
- * at a glance before the user looks at the arrow or SoC ring. Light
- * wash of the direction colour over the dark surface. Smooth
- * transition so a charge↔discharge flip morphs rather than snaps. */
-.flow-svg-v2 .flow-node-ring-batt          { transition: fill 0.55s ease, stroke 0.45s ease; }
-.flow-svg-v2 .flow-node-ring-batt.discharge { fill: rgba(240, 98, 146, 0.18); }
-.flow-svg-v2 .flow-node-ring-batt.batt      { fill: rgba(86, 211, 100, 0.16); }
-.flow-svg-v2 .flow-node-ring-batt.neutral,
-.flow-svg-v2 .flow-node-ring-batt.silent    { fill: var(--surface); }
-/* Direction chip + arrow — small badge in the upper-right of the
- * battery node showing ↓ charging / ↑ discharging. */
-.flow-svg-v2 .flow-node-dir-chip            { stroke: var(--surface); stroke-width: 1.4; }
+/* Battery node — keep the ring transition for smooth direction
+ * flips. The first cut at fill-tint (v0.1.90) was too busy on top
+ * of the existing ring + SoC arc + new arrow chip — pink-on-pink-
+ * on-pink. Dropped in v0.1.91; ring colour + arrow do the job
+ * cleaner. Class still applied in case we want to bring it back
+ * with a much lighter alpha later. */
+.flow-svg-v2 .flow-node-ring-batt          { transition: stroke 0.45s ease; }
+/* Direction chip + arrow — small badge just OUTSIDE the ring
+ * (past the SoC arc) showing ↓ charging / ↑ discharging. Sized
+ * to read as a badge not as a competing element. */
+.flow-svg-v2 .flow-node-dir-chip            { stroke: var(--surface); stroke-width: 1.2; }
 .flow-svg-v2 .flow-node-dir-chip.batt       { fill: var(--batt, #56d364); }
 .flow-svg-v2 .flow-node-dir-chip.discharge  { fill: #f06292; }
 .flow-svg-v2 .flow-node-dir-arrow           { fill: var(--surface); stroke: none; }
