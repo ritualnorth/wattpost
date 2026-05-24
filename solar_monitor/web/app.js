@@ -7325,14 +7325,20 @@ function renderDeviceDetail(label) {
   const fw = dev.latest?.firmware_version || dev.latest?.firmware_version_raw || "";
   const shown = dispName(dev);
   const renamed = shown !== dev.label;
+  // #297-4 — escape every DB-derived string before it lands in
+  // innerHTML. display_name + label come from user-edited rename
+  // input; vendor/kind/model from device drivers; all become tainted
+  // if a malicious backup restores a poisoned DB row. Defense in
+  // depth alongside #297-1 (config sanitiser) — even if a row slips
+  // through, rendering can't execute attacker JS.
   host.innerHTML = `
     <div class="dev-detail-head">
       <div class="dev-detail-crumb">
         <a href="#/devices">← Devices</a>
         <span class="dev-detail-title">
           <span class="dev-detail-icon">${ICONS[KIND_ICON[dev.kind] || "unknown"]}</span>
-          <span data-dev-display-name>${shown}</span>
-          <button class="dev-rename-btn" data-dev-rename="${dev.label}"
+          <span data-dev-display-name>${escHtml(shown)}</span>
+          <button class="dev-rename-btn" data-dev-rename="${escHtml(dev.label)}"
                   title="Rename this device"
                   aria-label="Rename"
                   style="background:none;border:none;cursor:pointer;padding:.15rem .3rem;opacity:.55;color:inherit">
@@ -7344,12 +7350,12 @@ function renderDeviceDetail(label) {
           </button>
         </span>
         <span class="dev-detail-meta">
-          ${dev.vendor} · ${dev.kind}${dev.slave_id != null ? " · slave " + dev.slave_id : ""}${fw ? " · fw " + fw : ""}${dev.latest?.model ? " · " + dev.latest.model : ""}${renamed ? ` · label <code>${dev.label}</code>` : ""}
+          ${escHtml(dev.vendor)} · ${escHtml(dev.kind)}${dev.slave_id != null ? " · slave " + Number(dev.slave_id) : ""}${fw ? " · fw " + escHtml(fw) : ""}${dev.latest?.model ? " · " + escHtml(dev.latest.model) : ""}${renamed ? ` · label <code>${escHtml(dev.label)}</code>` : ""}
         </span>
       </div>
       <div class="dev-detail-nav">
-        ${prev ? `<a class="btn-action" href="#/device/${encodeURIComponent(prev.label)}">← ${dispName(prev)}</a>` : ""}
-        ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${dispName(next)} →</a>` : ""}
+        ${prev ? `<a class="btn-action" href="#/device/${encodeURIComponent(prev.label)}">← ${escHtml(dispName(prev))}</a>` : ""}
+        ${next ? `<a class="btn-action" href="#/device/${encodeURIComponent(next.label)}">${escHtml(dispName(next))} →</a>` : ""}
       </div>
     </div>
     ${inner}
@@ -8304,7 +8310,10 @@ function wireDeviceDetailChart(dev) {
     .filter(([k, v]) => typeof v === "number" && !k.startsWith("_"))
     .map(([k]) => k)
     .sort();
-  select.innerHTML = keys.map(k => `<option value="${k}">${prettyKey(k)}</option>`).join("");
+  // #297-4 defense-in-depth — escape driver-supplied metric keys
+  // even though they're code-defined today, in case a restored DB
+  // surfaces an attacker-supplied row through latest.* somehow.
+  select.innerHTML = keys.map(k => `<option value="${escHtml(k)}">${escHtml(prettyKey(k))}</option>`).join("");
   if (keys.includes(defaultMetric)) select.value = defaultMetric;
 
   let range = "24h";
@@ -8915,7 +8924,8 @@ function wizExpandRow(row) {
       const data = await r.json();
       wizState.knownKeys.add(wizKnownKey(wizState.transport, slave));
       row.classList.add("known");
-      row.querySelector(".wiz-row-action").innerHTML = `<span class="wiz-saved">Saved · ${data.label}</span>`;
+      // #297-4 — data.label is user-supplied; escape before innerHTML.
+      row.querySelector(".wiz-row-action").innerHTML = `<span class="wiz-saved">Saved · ${escHtml(data.label)}</span>`;
       if (data.restart_required) showRestartBanner();
     } catch (e) {
       save.disabled = false;

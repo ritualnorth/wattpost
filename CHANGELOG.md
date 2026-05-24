@@ -8,6 +8,21 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.100] · 2026-05-24
+
+### Security · XSS escape DB-derived strings in device detail UI (#297-4)
+
+Closes the medium-impact XSS path from the #297 restore-pivot
+audit: a poisoned `devices` row (e.g. `display_name =
+<script>...`) injected via a malicious cloud restore would have
+executed JS in the LAN dashboard session. Fixed by `escHtml()`
+wrapping every `dev.label` / `dispName()` interpolation that
+goes through `innerHTML` on the device-detail view + the wizard
+"Saved" badge + the metric-dropdown options.
+
+`docs/security/restore-pivot-audit.md` updated with the
+classification of the ~120 `innerHTML` callers surveyed.
+
 ## [0.1.99] · 2026-05-24
 
 ### Security · Sign cloud backups with appliance keypair (#297-3)
