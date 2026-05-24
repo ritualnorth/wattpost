@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.109] · 2026-05-24
+
+### Added · Battery detail page — drill in from the SoC donut (#292)
+
+The hero SoC donut is now clickable. Tapping it opens a Battery
+detail page that breaks the bank aggregate down to per-pack mini-
+cards (voltage, current, temperature, cell-drift colour, last
+seen) and adds a 24h history chart. Bank-level summary stats —
+total Ah, total kWh, current SoC, current power — sit across the
+top so you don't lose context.
+
+Cell drift is colour-coded: green &lt;30mV, amber 30-80mV, red
+&gt;80mV. That's the headline number for spotting a sagging cell
+before it pulls the bank under load.
+
+### Changed · Cleaner Leaflet maps — kill the in-tile attribution strip
+
+The little `🇺🇦 Leaflet | © OpenStreetMap` text glued to the
+bottom-left of every map tile is gone. Attribution is still
+rendered (OSM + CARTO + Esri credit is part of the tile licenses
+and stays as a small caption underneath the map), it just doesn't
+bleed into the map graphic any more. Applied to all three render
+sites — appliance Location tile, cloud Fleet map, cloud per-site
+detail map.
+
 ## [0.1.108] · 2026-05-24
 
 ### Changed · Map tiles: CARTO Dark Matter → CARTO Voyager

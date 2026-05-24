@@ -2325,7 +2325,12 @@ async function renderLocationTile() {
               || Math.abs(_locTileCache.lon - loc.lon) > 0.0001;
   if (_locTileMap === null) {
     _locTileMap = L.map("location-map", {
-      zoomControl: true, scrollWheelZoom: false, attributionControl: true,
+      // Drop the in-map attribution bar (the "🇺🇦 Leaflet | © OSM ·
+      // © CARTO" strip). It clutters small map cards and the Ukraine
+      // flag isn't on-brand. License-compliance attribution still
+      // lives in the panel footer (added below where the Location
+      // card renders).
+      zoomControl: true, scrollWheelZoom: false, attributionControl: false,
     });
     // Map / Satellite toggle — same wp-map-mode key as the cloud
     // surfaces so the user's preference is consistent across both.
@@ -7017,6 +7022,25 @@ if (rotatePwBtn) {
     }
   });
 }
+// #292 — Make the SoC donut click into the bank detail page.
+// The bank device's label is the literal string "bank" — set by
+// the aggregator. Clicking the donut routes to /#/device/bank
+// where buildBankDetail() renders per-pack mini-cards + summary
+// stats. cursor:pointer + role=button + ARIA so it's discoverable.
+(function wireDonutTap() {
+  const wrap = document.getElementById("donut-wrap");
+  if (!wrap) return;
+  wrap.style.cursor = "pointer";
+  wrap.setAttribute("role", "link");
+  wrap.setAttribute("aria-label", "Open bank detail");
+  wrap.tabIndex = 0;
+  const go = () => { window.location.hash = "#/device/bank"; };
+  wrap.addEventListener("click", go);
+  wrap.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
+  });
+})();
+
 // Sign-out button — lives inside Settings → System (the only place
 // where being signed in actually matters; mutations require a
 // session, everything else on LAN is anonymous read-only). Hidden
@@ -7328,6 +7352,7 @@ function renderDeviceDetail(label) {
   else if (dev.kind === "charge_controller") inner = buildControllerDetail(dev);
   else if (dev.kind === "shunt") inner = buildShuntDetail(dev);
   else if (dev.kind === "ac_charger") inner = buildAcChargerDetail(dev);
+  else if (dev.kind === "bank") inner = buildBankDetail(dev);
   else inner = buildGenericDetail(dev);
 
   // Prev/next nav between devices of the same kind makes "compare packs"
@@ -8241,6 +8266,99 @@ async function wireDeviceRename(dev) {
       window.alert("Rename failed: " + e.message);
     }
   });
+}
+
+// #292 — Battery detail page. Tap the SoC donut on the dashboard
+// and you land here. Three sections stacked:
+//   1. Bank summary stats (SoC, V, A, W, capacity, source)
+//   2. Per-pack mini-card grid — each pack is a tap target into
+//      its own smart_battery detail page for cells/temps/firmware
+//   3. Standard history chart for any bank metric
+//
+// Reuses the rest of the renderDeviceDetail chrome (title, prev/next,
+// chart wiring) so the bank view feels native vs. a one-off page.
+function buildBankDetail(dev) {
+  const l = dev.latest || {};
+  const packs = devices.filter((d) => d.kind === "smart_battery");
+
+  const summaryCell = (k, v) =>
+    `<div class="bank-sum-cell"><span class="meta-k">${escHtml(k)}</span><strong class="bank-sum-v">${v}</strong></div>`;
+
+  const stats = [
+    ["State of charge", l.soc_pct != null ? `${fmt.num(l.soc_pct, 1)}%` : "·"],
+    ["Voltage",         l.voltage_v != null ? `${fmt.num(l.voltage_v, 2)} V` : "·"],
+    ["Current",         l.current_a != null ? `${fmt.signed(l.current_a, 2)} A` : "·"],
+    ["Power",           l.power_w != null ? `${fmt.signed(l.power_w, 0)} W` : "·"],
+    ["Capacity",        l.capacity_ah != null ? `${fmt.num(l.capacity_ah, 0)} Ah` : "·"],
+    ["Source",          l.source ? escHtml(l.source) : "·"],
+  ];
+
+  const driftMv = l.worst_pack_drift_v != null ? Math.round(l.worst_pack_drift_v * 1000) : null;
+  const driftLine = driftMv != null
+    ? `<span class="panel-sub">Worst pack drift: <strong>${driftMv} mV</strong></span>`
+    : "";
+
+  const summary = `
+    <section class="panel">
+      <div class="panel-header"><h2>Bank summary</h2>${driftLine}</div>
+      <div class="bank-sum-grid">
+        ${stats.map(([k, v]) => summaryCell(k, v)).join("")}
+      </div>
+    </section>
+  `;
+
+  const packsBlock = packs.length === 0 ? "" : `
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Packs (${packs.length})</h2>
+        <span class="panel-sub">Tap a pack for cells, temps, firmware</span>
+      </div>
+      <div class="pack-grid">
+        ${packs.map((p) => _renderPackMiniCard(p)).join("")}
+      </div>
+    </section>
+  `;
+
+  return summary + packsBlock + buildHistoryBlock(dev, "soc_pct");
+}
+
+function _renderPackMiniCard(pack) {
+  const l = pack.latest || {};
+  // BMSes don't always report soc_pct directly; rely on what the
+  // driver surfaces. Voltage is universal — show it as the primary.
+  const v = l.voltage_v;
+  const a = l.current_a;
+  const drift = l.cell_drift_v != null ? Math.round(l.cell_drift_v * 1000) : null;
+  // Average pack temp if temperature_0_c .. temperature_N_c exist.
+  const temps = Object.entries(l)
+    .filter(([k, v]) => /^temperature_\d+_c$/.test(k) && typeof v === "number")
+    .map(([, v]) => v);
+  const tAvg = temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
+
+  // Cell drift colour: <30mV green, 30-80 amber, >80 red. LFP packs
+  // should stay well under 30mV at rest.
+  let driftCls = "pack-drift-ok";
+  if (drift != null) {
+    if (drift > 80) driftCls = "pack-drift-bad";
+    else if (drift > 30) driftCls = "pack-drift-warn";
+  }
+
+  return `
+    <a class="pack-card" href="#/device/${encodeURIComponent(pack.label)}">
+      <div class="pack-card-head">
+        <span class="pack-card-name">${escHtml(dispName(pack))}</span>
+        <span class="pack-card-soc">${l.soc_pct != null ? fmt.num(l.soc_pct, 0) + "%" : "·"}</span>
+      </div>
+      <div class="pack-card-meta">
+        <span>${v != null ? fmt.num(v, 2) + " V" : "·"}</span>
+        <span>${a != null ? fmt.signed(a, 1) + " A" : "·"}</span>
+        ${tAvg != null ? `<span>${fmt.num(tAvg, 0)} °C</span>` : ""}
+      </div>
+      ${drift != null
+        ? `<div class="pack-card-drift ${driftCls}">cell drift ${drift} mV</div>`
+        : `<div class="pack-card-drift pack-drift-na">cell drift unavailable</div>`}
+    </a>
+  `;
 }
 
 function buildGenericDetail(dev) {

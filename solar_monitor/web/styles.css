@@ -4321,3 +4321,64 @@ html.in-wattpost-app .container {
    is served on its own origin (<slug>.wattpost.cloud) so the cloud's
    /app tab bar isn't reachable from here. Native back-gesture
    returns the user to Sites. */
+
+
+/* #292 — Battery detail page. Bank summary grid + per-pack mini-cards.
+   Drilled into from the SoC donut on the dashboard. */
+.bank-sum-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: .65rem;
+}
+.bank-sum-cell {
+  display: flex; flex-direction: column;
+  gap: .2rem;
+  padding: .6rem .7rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bank-sum-v { font-size: 1.05rem; color: var(--text); }
+
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .75rem;
+}
+.pack-card {
+  display: flex; flex-direction: column;
+  gap: .35rem;
+  padding: .75rem .85rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.pack-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.pack-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+}
+.pack-card-name {
+  font-weight: 600; font-size: .9rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pack-card-soc { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.pack-card-meta {
+  display: flex; gap: .75rem;
+  font-size: .82rem; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.pack-card-drift {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding-top: .15rem;
+  border-top: 1px solid var(--border);
+}
+.pack-drift-ok   { color: var(--green, #56d364); }
+.pack-drift-warn { color: var(--amber, #f0c849); }
+.pack-drift-bad  { color: var(--red,   #ff7b72); }
+.pack-drift-na   { color: var(--text-3); opacity: .65; }
+
