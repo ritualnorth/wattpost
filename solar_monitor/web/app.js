@@ -2329,7 +2329,7 @@ async function renderLocationTile() {
     });
     // Map / Satellite toggle — same wp-map-mode key as the cloud
     // surfaces so the user's preference is consistent across both.
-    const darkLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    const mapLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
       maxZoom: 20,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &middot; &copy; <a href="https://carto.com/attributions">CARTO</a>',
@@ -2339,9 +2339,9 @@ async function renderLocationTile() {
       attribution: 'Tiles &copy; <a href="https://www.esri.com">Esri</a>',
     });
     const savedMode = (localStorage.getItem("wp-map-mode") || "map").toLowerCase();
-    (savedMode === "satellite" ? satLayer : darkLayer).addTo(_locTileMap);
+    (savedMode === "satellite" ? satLayer : mapLayer).addTo(_locTileMap);
     L.control.layers(
-      { "Map": darkLayer, "Satellite": satLayer },
+      { "Map": mapLayer, "Satellite": satLayer },
       null,
       { collapsed: true, position: "topright" },
     ).addTo(_locTileMap);
