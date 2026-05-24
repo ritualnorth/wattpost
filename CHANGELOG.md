@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.96] · 2026-05-24
+
+### Added · Dashboard battery health badge + honest empty states (#293, #294)
+
+* New one-liner health pill under the SoC donut. Aggregates the
+  worst current signal (cell drift > SoC critical > SoC low >
+  healthy) into a green/amber/red badge so you see status at a
+  glance without scrolling to the Battery health panel.
+* Battery health panel's BMS-only fields (Cycles, Lifetime
+  energy) now read "BMS only" instead of the opaque "·" when no
+  BMS is reporting — tooltips name the BMSes (JK / Lynx) that
+  surface those metrics.
+
 ## [0.1.95] · 2026-05-24
 
 ### Added · Sensors panel — Mopeka tanks + Govee/Ruuvi ambient (#257)
