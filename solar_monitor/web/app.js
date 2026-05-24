@@ -1782,27 +1782,31 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
   group.appendChild(ring);
 
   // Direction arrow — battery node only. ↓ for charging (energy
-  // INTO the bank), ↑ for discharging (energy OUT). Idle = no arrow.
-  // Sits in the upper-right of the ring on a small background chip
-  // so it stays legible over the tinted fill. Tesla / Powerwall apps
-  // use the same affordance — removes any "which way is power
-  // flowing" ambiguity for users still learning the system.
+  // INTO the bank), ↑ for discharging (energy OUT). Tone-down from
+  // v0.1.90's first cut: chip sits just OUTSIDE the ring (not
+  // overlapping the SoC arc) and shrank from r=9 to r=7 so it reads
+  // as a badge rather than a competing element. Fill-wash dropped
+  // entirely — the ring colour + arrow already say everything;
+  // pink-on-pink-on-pink was colour soup.
   if (isBattery && (t.power || 0) >= 1) {
     const charging = tone === "batt";
-    const ax = x + FLOW_NODE_R * 0.68;
-    const ay = y - FLOW_NODE_R * 0.68;
+    // 45° upper-right, just past the SoC arc (r = FLOW_BATT_SOC_R).
+    // sqrt(2)/2 ≈ 0.707 for clean 45° placement.
+    const off = (FLOW_BATT_SOC_R + 4) * 0.707;
+    const ax = x + off;
+    const ay = y - off;
     const chip = document.createElementNS(SVG_NS, "circle");
     chip.setAttribute("cx", ax);
     chip.setAttribute("cy", ay);
-    chip.setAttribute("r", 9);
+    chip.setAttribute("r", 7);
     chip.setAttribute("class", `flow-node-dir-chip ${tone}`);
     group.appendChild(chip);
-    // Triangle path — pointing down (charging) or up (discharging).
-    // Sized to sit comfortably inside r=9 chip.
+    // Triangle — points down (charging, going INTO bank) or up
+    // (discharging, going OUT). Sized for r=7 chip.
     const arrow = document.createElementNS(SVG_NS, "path");
     const d = charging
-      ? `M ${ax - 4} ${ay - 3} L ${ax + 4} ${ay - 3} L ${ax} ${ay + 4} Z`
-      : `M ${ax - 4} ${ay + 3} L ${ax + 4} ${ay + 3} L ${ax} ${ay - 4} Z`;
+      ? `M ${ax - 3} ${ay - 2} L ${ax + 3} ${ay - 2} L ${ax} ${ay + 3} Z`
+      : `M ${ax - 3} ${ay + 2} L ${ax + 3} ${ay + 2} L ${ax} ${ay - 3} Z`;
     arrow.setAttribute("d", d);
     arrow.setAttribute("class", `flow-node-dir-arrow ${tone}`);
     group.appendChild(arrow);

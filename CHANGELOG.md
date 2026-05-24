@@ -8,6 +8,25 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.91] · 2026-05-24
+
+### Changed · Battery node tone-down
+
+v0.1.90's first cut at direction signal was too busy — pink ring +
+pink fill wash + pink arrow chip overlapping the SoC arc was
+colour soup. Dropped the fill tint entirely (ring colour already
+says direction); shrank the arrow chip from r=9 to r=7 and moved
+it just outside the ring at the 45° upper-right so it sits as a
+badge instead of overlapping the SoC arc.
+
+### Changed · Cloud per-site card "History" → "Manage"
+
+The per-site card on the cloud dashboard had a "History" button
+that took you to the site management hub (updates, snapshots,
+device health, location). The label undersold what the page does
+and gets less true with every release. Renamed to "Manage" so
+the affordance matches the destination.
+
 ## [0.1.90] · 2026-05-24
 
 ### Fixed · Battery node was grey when discharging (since v2)
