@@ -8,6 +8,35 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.90] · 2026-05-24
+
+### Fixed · Battery node was grey when discharging (since v2)
+
+`colorKeyOf()`'s allowlist accepted `pv/batt/load/grid/ac/dc` but
+not `"discharge"` — so the battery node fell through to the
+`"neutral"` (grey) class every time the bank was draining, even
+though `.flow-node-ring.discharge { stroke: #f06292 }` was shipped
+in the CSS expecting that class. Result: card-below shouts pink
+DISCHARGING, node above stays grey. Spotted while adding the v3
+fill-tint work. Added `"discharge"` to the allowlist.
+
+### Added · Battery node colour-codes direction more dramatically
+
+Three layers of signal so users see at a glance whether their
+bank is filling or draining:
+
+- **Fill tint inside the ring** — pink-wash (`rgba(240,98,146,0.18)`)
+  when discharging, green-wash (`rgba(86,211,100,0.16)`) when
+  charging. Smooth 550ms transition so direction flips morph
+  instead of snapping.
+- **Direction-arrow chip** in the upper-right of the battery
+  node — ↓ for charging (energy INTO the bank), ↑ for discharging
+  (energy OUT). Tesla / Powerwall app affordance; removes any
+  ambiguity about which way the energy is moving.
+- The SoC ring around the node already changes colour with
+  direction (shipped v0.1.88). Now the whole node speaks in one
+  visual voice.
+
 ## [0.1.89] · 2026-05-24
 
 ### Fixed · SD-image pi-gen build (silently broken since v0.1.45)
