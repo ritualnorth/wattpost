@@ -32,6 +32,7 @@ from urllib.parse import urlencode
 from litestar import Request, Response, get
 from litestar.exceptions import HTTPException
 from litestar.response import Redirect
+from typing import Any
 
 from ..auth import oidc_config, oidc_rp
 
@@ -46,6 +47,16 @@ def _safe_return_to(raw: str | None) -> str:
     if not raw.startswith("/") or raw.startswith("//"):
         return "/"
     return raw
+
+
+@get("/api/system/oidc-available", sync_to_thread=False)
+async def oidc_available() -> dict[str, Any]:
+    """Lightweight status the login page polls to decide whether to
+    show the "Sign in with WattPost cloud" button. Returns {ok: bool,
+    available: bool}. Anonymous-readable; reveals no PII (just whether
+    the appliance has completed v2 upgrade + got an OIDC client)."""
+    cfg = oidc_config.load()
+    return {"ok": True, "available": cfg is not None}
 
 
 @get("/auth/lan/login", sync_to_thread=False)

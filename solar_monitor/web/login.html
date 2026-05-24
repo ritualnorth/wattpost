@@ -72,6 +72,21 @@
     </div>
     <h1>Sign in</h1>
     <p class="sub">Local admin access for this appliance.</p>
+
+    <!-- Identity v2 Phase 3/4 (#305/#306). OIDC sign-in via wattpost.cloud.
+         Hidden by default; the JS below probes /api/system/oidc-available
+         on load and reveals this block only when the appliance has
+         completed v2 upgrade. Local password stays visible as the
+         offline fallback. -->
+    <a id="oidc-btn" href="#" hidden style="display:block;text-align:center;padding:.7rem 1rem;background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:8px;text-decoration:none;font-weight:600;margin-bottom:1rem">
+      Sign in with WattPost cloud
+    </a>
+    <div id="oidc-divider" hidden style="display:flex;align-items:center;gap:.6rem;color:var(--text-2);font-size:.78rem;margin:0 0 1rem">
+      <span style="flex:1;height:1px;background:var(--border)"></span>
+      <span>or local password</span>
+      <span style="flex:1;height:1px;background:var(--border)"></span>
+    </div>
+
     <label for="password">Password</label>
     <input id="password" name="password" type="password" required autocomplete="current-password" autofocus/>
     <button type="submit" id="submit">Sign in</button>
@@ -86,6 +101,30 @@
     const btn  = document.getElementById("submit");
     const params = new URLSearchParams(location.search);
     const nxt = params.get("next") || "/";
+
+    // Probe whether OIDC is configured on this appliance. If yes,
+    // surface the "Sign in with WattPost cloud" button + divider.
+    // If no (older firmware, no cloud upgrade yet, offline), leave
+    // the local-password form as the only path.
+    (async () => {
+      try {
+        const r = await fetch("/api/system/oidc-available", { cache: "no-store" });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!d.available) return;
+        const btn = document.getElementById("oidc-btn");
+        const div = document.getElementById("oidc-divider");
+        btn.href = "/auth/lan/login?next=" + encodeURIComponent(nxt);
+        btn.hidden = false;
+        btn.style.display = "block";
+        div.hidden = false;
+        div.style.display = "flex";
+      } catch (_) {
+        // Network blip — silently leave the local-password form as the
+        // only sign-in path. The user can still get in.
+      }
+    })();
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       err.textContent = "";

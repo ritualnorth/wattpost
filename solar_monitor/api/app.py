@@ -92,7 +92,7 @@ from .backup import (
     discovery_state, discovery_toggle,
 )
 from ..backup import BackupService
-from .auth_oidc import auth_callback, auth_lan_login
+from .auth_oidc import auth_callback, auth_lan_login, oidc_available
 
 
 def _web_dir() -> Path:
@@ -1578,6 +1578,7 @@ def build_app(
             # registering them is safe even on pre-v2 appliances.
             auth_lan_login,
             auth_callback,
+            oidc_available,
             static_router,
         ],
         on_startup=[on_startup],

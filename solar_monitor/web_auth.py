@@ -76,6 +76,7 @@ ANONYMOUS_PATH_PREFIXES = (
     # own state before issuing a session, so they're safe-anon.
     "/auth/lan/login",
     "/auth/callback",
+    "/api/system/oidc-available",
     # /api/system/auth-status is a read-only, no-PII "are you authed?"
     # signal the SPA uses to gate the Sign In button. It HAS to be
     # anonymous-accessible — if it required a session, the unauthed
