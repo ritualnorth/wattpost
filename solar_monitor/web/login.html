@@ -73,6 +73,14 @@
     <h1>Sign in</h1>
     <p class="sub">Local admin access for this appliance.</p>
 
+    <!-- Friendly banner when /auth/callback bounced the user back here
+         because the state token expired or was unknown (e.g. tab left
+         open >5min, daemon restart in flight, or the user clicked an
+         old callback URL from history). #305 follow-up. -->
+    <p id="reauth-banner" hidden style="display:none;margin:0 0 1rem;padding:.6rem .75rem;background:rgba(217,159,73,0.12);border:1px solid rgba(217,159,73,0.35);border-radius:8px;color:var(--text);font-size:.85rem;line-height:1.4">
+      Your cloud sign-in took too long. Tap <strong>Sign in with WattPost cloud</strong> again to try once more.
+    </p>
+
     <!-- Identity v2 Phase 3/4 (#305/#306). OIDC sign-in via wattpost.cloud.
          Hidden by default; the JS below probes /api/system/oidc-available
          on load and reveals this block only when the appliance has
@@ -101,6 +109,11 @@
     const btn  = document.getElementById("submit");
     const params = new URLSearchParams(location.search);
     const nxt = params.get("next") || "/";
+
+    if (params.get("reauth") === "expired") {
+      const banner = document.getElementById("reauth-banner");
+      if (banner) { banner.hidden = false; banner.style.display = "block"; }
+    }
 
     // Probe whether OIDC is configured on this appliance. If yes,
     // surface the "Sign in with WattPost cloud" button + divider.

@@ -266,7 +266,75 @@ class _PendingAuth:
 
 
 # state-token → _PendingAuth. Cleared on consume or after TTL.
+# Disk-persisted across daemon restarts (see _persist_pending /
+# _load_pending). The original in-memory-only version of this store
+# would lose every in-flight OIDC flow on a container recreate —
+# which Docker installs hit on every pull. Ritual North caught this with
+# the "OIDC state token unknown or expired" 400 after I pulled
+# v0.1.96 onto Garage; this is the fix.
 _pending: dict[str, _PendingAuth] = {}
+_PENDING_PATH = _KEY_DIR / "oidc_pending.json"
+
+
+def _persist_pending() -> None:
+    """Atomically write the current pending dict to disk. Tiny file
+    (typically 0-2 entries), so we just rewrite on every change."""
+    try:
+        _KEY_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = _PENDING_PATH.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({
+            state: {
+                "pkce_verifier": v.pkce_verifier,
+                "nonce":         v.nonce,
+                "return_to":     v.return_to,
+                "created_at":    v.created_at,
+            }
+            for state, v in _pending.items()
+        }))
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, _PENDING_PATH)
+    except OSError as e:
+        # Disk-full / RO-fs: keep going with in-memory state. A
+        # restart will lose in-flight flows but we're not blocking
+        # the current click.
+        log.warning("oidc_rp: pending persist failed (%s) — in-flight "
+                    "flows won't survive a daemon restart this cycle", e)
+
+
+def _load_pending() -> None:
+    if not _PENDING_PATH.is_file():
+        return
+    try:
+        raw = json.loads(_PENDING_PATH.read_text())
+        if not isinstance(raw, dict):
+            return
+        now = _now()
+        for state, rec in raw.items():
+            if not isinstance(rec, dict):
+                continue
+            created = rec.get("created_at")
+            if not isinstance(created, (int, float)):
+                continue
+            # Drop already-expired entries during load so we don't
+            # bring junk back from a long-stopped daemon.
+            if (now - float(created)) > STATE_TTL_SECONDS:
+                continue
+            _pending[state] = _PendingAuth(
+                pkce_verifier=str(rec.get("pkce_verifier", "")),
+                nonce=str(rec.get("nonce", "")),
+                return_to=str(rec.get("return_to", "/")),
+                created_at=float(created),
+            )
+    except (OSError, ValueError):
+        # Corrupt / missing — start with empty store. Worst case the
+        # one in-flight OIDC flow that's mid-air fails and the user
+        # gets bounced back to /login. Acceptable.
+        pass
+
+
+# Slurp persisted state at module-import time so the FIRST callback
+# after a restart finds its state.
+_load_pending()
 
 
 def stash_pending(*, pkce_verifier: str, nonce: str, return_to: str) -> str:
@@ -280,6 +348,7 @@ def stash_pending(*, pkce_verifier: str, nonce: str, return_to: str) -> str:
         return_to=return_to,
         created_at=_now(),
     )
+    _persist_pending()
     return state
 
 
@@ -289,7 +358,9 @@ def consume_pending(state: str) -> _PendingAuth | None:
     _gc_pending()
     entry = _pending.pop(state, None)
     if entry is None:
+        _persist_pending()
         return None
+    _persist_pending()
     if (_now() - entry.created_at) > STATE_TTL_SECONDS:
         return None
     return entry
@@ -298,8 +369,10 @@ def consume_pending(state: str) -> _PendingAuth | None:
 def _gc_pending() -> None:
     cutoff = _now() - STATE_TTL_SECONDS
     expired = [k for k, v in _pending.items() if v.created_at < cutoff]
-    for k in expired:
-        _pending.pop(k, None)
+    if expired:
+        for k in expired:
+            _pending.pop(k, None)
+        _persist_pending()
 
 
 # ---------------------------------------------------------------- #
