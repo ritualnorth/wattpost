@@ -8,6 +8,32 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Security · Cloud-side at-rest backup encryption (#300 Tier 1)
+
+Cloud-only change: every backup tarball is now wrapped in a
+`WPENC0` + AES-GCM envelope before being written to disk, and
+unwrapped on download. Key derived from `SESSION_SECRET` via HKDF
+(same kek-sealing pattern as OIDC signing key / sso_secret /
+mTLS CA, with a per-purpose info salt).
+
+- Customer UX: zero. Backups continue exactly as before.
+- Closes: random Postgres dump leaking, filesystem snapshot
+  leaking, "give me the backup files" subpoena where the cloud
+  env isn't in scope.
+- Doesn't close: full VPS compromise where attacker also
+  exfiltrates `SESSION_SECRET`. Tier 2 (Pro+ opt-in, customer-
+  held key, scoped in #323) covers that.
+- Plaintext backups uploaded before this rollout pass through
+  unchanged via magic-byte sniff. Tier 2 blobs (WPENC1, ship
+  in #323) are stored as-is cloud-side.
+- Site-detail "Cloud backups" card now shows: "Encrypted at
+  rest in our cloud. Pro tier adds Advanced Data Protection —
+  encrypted with a key only you hold."
+
+Smoke-tested 5/5: roundtrip exact, legacy plaintext
+grandfathered, empty body passes, tamper raises InvalidTag,
+Tier 2 blobs correctly skipped.
+
 ## [0.1.107] · 2026-05-24
 
 ### Security · Heartbeat signing (Phase 6B alternative, #308)
