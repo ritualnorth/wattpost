@@ -8,6 +8,38 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.98] · 2026-05-24
+
+### Security · Harden cloud restore against compromised cloud account (#297-1, #297-2)
+
+The "Restore from cloud" path now treats the restored config.yaml
+as untrusted bytes from a (potentially) compromised cloud account:
+
+* **Top-level allowlist.** Only keys the appliance Config schema
+  knows about survive a restore (`transports`, `devices`,
+  `cloud`, `mqtt_in`, etc.). Anything else — e.g. an attacker
+  `mqtt_out:` or `webhooks:` block crafted to exfil telemetry
+  or fire alert payloads at an attacker URL — is dropped, logged,
+  and listed in the restore summary.
+* **Credential redaction.** Any nested dict key containing
+  `password`, `token`, `secret`, `bearer`, `api_key`,
+  `private_key`, `hmac`, or `credential` is zeroed out at restore
+  time. Operator re-enters credentials via Settings on next
+  sign-in. Closes the exfil path where an attacker could supply
+  their own MQTT broker password / webhook secret embedded in a
+  malicious backup.
+* **Fresh-install password regen.** On a true fresh install (no
+  existing web-password.hash AND no plaintext), restore now
+  *declines* to write the backup's password hash. The first-boot
+  generator mints a new random one instead — closes the attack
+  where a compromised cloud supplies an attacker-chosen password
+  to a freshly-flashed appliance.
+
+Direct RCE on the restore path was already blocked (member-name
+allowlist, `yaml.safe_load`, integrity_check). These changes
+close the indirect-exfil and credential-substitution paths
+identified in `docs/security/restore-pivot-audit.md`.
+
 ## [0.1.97] · 2026-05-24
 
 ### Fixed · Cloud sign-in survives appliance restart (#305 follow-up)
