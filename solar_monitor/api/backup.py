@@ -208,6 +208,82 @@ def _verify_archive(tar_bytes: bytes) -> dict[str, Any]:
     }
 
 
+# #297 mitigation 1 — allowlist for top-level config.yaml keys when
+# restoring from cloud. Anything not on this list is dropped silently
+# (logged + listed in the restore summary). Defensive against a
+# compromised cloud account uploading a backup with an arbitrary
+# `mqtt_out:` block, an attacker `webhooks:` block, or any other new
+# key designed to exfil data via a future config-reader.
+#
+# Source of truth: solar_monitor.config.Config dataclass fields.
+# Keep in sync if a top-level key is added there.
+_RESTORE_ALLOWED_TOPLEVEL = frozenset({
+    "db_path", "transports", "devices", "exporters",
+    "notification_transports", "alerts", "alerts_seeded",
+    "quiet_hours", "forecast", "weather", "cloud", "gps",
+    "location", "bank", "backup", "discovery", "local_telemetry",
+    "history", "solar_pause", "smart_plugs", "mqtt_in",
+})
+
+# Substring patterns matched (case-insensitive) against any dict key.
+# Hit → the value is zeroed out so the operator re-enters it via the
+# Settings UI. Substring-matching catches both `password` and
+# `smtp_password`, both `token` and `bearer_token` / `api_token`,
+# `secret` and `client_secret` etc. Defensive against a compromised
+# cloud account uploading a backup with operator credentials.
+_RESTORE_REDACT_SUBSTRINGS: tuple[str, ...] = (
+    "password", "passwd", "secret", "token", "bearer", "api_key",
+    "private_key", "hmac", "credential",
+)
+
+
+def _sanitize_restored_config(raw: dict, *, dropped: list, redacted: list) -> dict:
+    """Apply #297 mitigation 1 to a parsed config dict. Returns a new
+    dict containing ONLY allowlisted top-level keys, with credential
+    fields recursively redacted (replaced with empty string so the
+    schema still validates but the operator is forced to re-enter).
+
+    Mutates the supplied `dropped` / `redacted` lists with breadcrumbs
+    for the restore summary so operators know what to re-set."""
+    out: dict = {}
+    for k, v in raw.items():
+        if k not in _RESTORE_ALLOWED_TOPLEVEL:
+            dropped.append(k)
+            continue
+        out[k] = _redact_credentials(v, path=k, redacted=redacted)
+    return out
+
+
+def _redact_credentials(value: Any, *, path: str, redacted: list) -> Any:
+    """Recurse the value and zero-out any key whose name looks like a
+    credential. Lists are walked; non-dict/list values pass through."""
+    if isinstance(value, dict):
+        out_d: dict = {}
+        for k, v in value.items():
+            looks_secret = (
+                isinstance(k, str)
+                and any(s in k.lower() for s in _RESTORE_REDACT_SUBSTRINGS)
+            )
+            if looks_secret:
+                # Only redact non-empty strings — preserves boolean
+                # toggles and blank defaults so the user only sees
+                # "re-enter this" for fields that were actually set.
+                if isinstance(v, str) and v != "":
+                    redacted.append(f"{path}.{k}")
+                    out_d[k] = ""
+                else:
+                    out_d[k] = v
+            else:
+                out_d[k] = _redact_credentials(v, path=f"{path}.{k}", redacted=redacted)
+        return out_d
+    if isinstance(value, list):
+        return [
+            _redact_credentials(item, path=f"{path}[{i}]", redacted=redacted)
+            for i, item in enumerate(value)
+        ]
+    return value
+
+
 def _stage_and_swap(
     tar_bytes: bytes, db_target: Path, config_target: Path,
 ) -> dict[str, Any]:
@@ -279,23 +355,50 @@ def _stage_and_swap(
                 if f is None:
                     continue
                 raw_bytes = f.read()
-                if preserved_cloud is not None:
-                    try:
-                        raw_restored = _yaml.safe_load(raw_bytes) or {}
+                # #297-1 — ALWAYS sanitize the restored config.yaml
+                # regardless of pairing-preserve path. Drop unknown
+                # top-level keys + redact credential-shaped fields so
+                # a compromised cloud account can't re-aim mqtt_out,
+                # webhooks, or smuggle a future-key it didn't have at
+                # backup time. Operator re-enters credentials via the
+                # Settings UI on next sign-in.
+                dropped: list = []
+                redacted: list = []
+                try:
+                    raw_restored = _yaml.safe_load(raw_bytes) or {}
+                    if not isinstance(raw_restored, dict):
+                        raise ValueError("config.yaml is not a mapping")
+                    raw_restored = _sanitize_restored_config(
+                        raw_restored, dropped=dropped, redacted=redacted,
+                    )
+                    if preserved_cloud is not None:
                         raw_restored["cloud"] = preserved_cloud
-                        cfg_new.write_text(
-                            _yaml.safe_dump(raw_restored, sort_keys=False)
-                        )
                         summary["preserved_pairing"] = True
-                    except Exception:
-                        # Pair-preserve failed — fall back to wholesale
-                        # replace so the operator at least gets their
-                        # DB back. They'll need to re-pair.
-                        log.exception(
-                            "pairing-preserve failed; restoring config.yaml as-is"
+                    cfg_new.write_text(
+                        _yaml.safe_dump(raw_restored, sort_keys=False)
+                    )
+                    if dropped:
+                        log.warning(
+                            "restore: dropped %d unknown top-level config keys: %s",
+                            len(dropped), dropped,
                         )
-                        cfg_new.write_bytes(raw_bytes)
-                else:
+                        summary["dropped_config_keys"] = dropped
+                    if redacted:
+                        log.warning(
+                            "restore: redacted %d credential field(s) "
+                            "from restored config: %s — operator must "
+                            "re-enter via Settings",
+                            len(redacted), redacted,
+                        )
+                        summary["redacted_credentials"] = redacted
+                except Exception:
+                    # Sanitizer / parse failed — fall back to wholesale
+                    # replace so the operator at least gets their DB
+                    # back. Pairing-preserve also lost. Logged loudly.
+                    log.exception(
+                        "config.yaml sanitize/restore failed; falling "
+                        "back to as-is replace (pairing-preserve lost)"
+                    )
                     cfg_new.write_bytes(raw_bytes)
                 have_cfg = True
             elif member.name == "config/web-password.hash":
@@ -304,6 +407,21 @@ def _stage_and_swap(
                 # they may not remember.
                 if existing_pw_hash:
                     continue
+                # #297-2 — on a true fresh install (no hash AND no
+                # plaintext exist), DO NOT trust the restored hash.
+                # A compromised cloud could supply an attacker-chosen
+                # password. Instead leave the password files absent
+                # and let the daemon's first-boot generator mint a
+                # new random one on next start. Operator gets it via
+                # `wattpost-config` / SSH MOTD as on any fresh install.
+                if not existing_pw_plain:
+                    summary["fresh_install_password_regen"] = True
+                    log.warning(
+                        "restore: fresh install detected — declining to "
+                        "restore web-password.hash from backup; first-"
+                        "boot password generator will mint a new one"
+                    )
+                    continue
                 f = tar.extractfile(member)
                 if f is None:
                     continue
@@ -311,6 +429,10 @@ def _stage_and_swap(
                 have_pw_hash = True
             elif member.name == "config/web-password":
                 if existing_pw_plain:
+                    continue
+                if not existing_pw_hash:
+                    # Same #297-2 rationale — don't trust restored
+                    # plaintext on a true fresh install.
                     continue
                 f = tar.extractfile(member)
                 if f is None:
