@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.105] · 2026-05-24
+
+### Security · Cloud signs commands; appliance verifies (#299)
+
+Every cloud→appliance command (Update, Restore from cloud, Set
+rule, etc.) is now ed25519-signed by the active cloud OIDC key
+at queue time. Appliance verifies the signature against its
+cached JWKS BEFORE dispatching. Closes the threat where a cloud
+DB compromise lets an attacker INSERT a forged appliance_commands
+row — without ALSO having the kek-sealed signing key, the
+appliance refuses the command and writes a `cloud_command_rejected`
+entry to its signed audit log.
+
+* Cloud `appliance_commands` gains `signature_b64`, `signing_kid`,
+  `nonce` columns (migration 0052).
+* Heartbeat response carries the four signing fields plus
+  `appliance_id` per command so the appliance can reconstruct the
+  exact canonical_repr that was signed.
+* New `cloud/wattpost_cloud/command_signing.py` +
+  `solar_monitor/cloud/command_verify.py` — canonical_repr defined
+  identically in both, must be kept in lockstep (any drift = every
+  cloud-signed command fails verify silently).
+* Replay defense: appliance_id is bound into the signature so a
+  command signed for appliance A can't be replayed against
+  appliance B; nonce ensures two commands with identical fields
+  produce different signatures.
+* Grandfather: pre-0.1.105 commands (no sig) dispatch with a
+  warning; partial signature data (some fields present, others
+  NULL) is treated as tampering and rejected.
+
+Smoke-tested 4/4: canonical_repr identical byte-for-byte between
+writer + verifier; sign/verify roundtrip OK; kind-tamper rejected;
+appliance-id replay rejected; nonce-swap rejected.
+
 ## [0.1.104] · 2026-05-24
 
 ### Fixed · Sign out on cloud-broker session: explain + redirect to cloud sign-out
