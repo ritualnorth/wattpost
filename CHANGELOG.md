@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.89] · 2026-05-24
+
+### Fixed · SD-image pi-gen build (silently broken since v0.1.45)
+
+Every tagged SD-image build since v0.1.45 has failed inside the
+chroot at `install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service"`
+with "cannot stat /opt/wattpost-src/packaging/systemd/wattpost.service".
+Docker + source-tarball builds were fine; only the SD image was
+affected, so it slipped past — until I noticed the inbox.
+
+Root cause: v0.1.45's slot-migration block does
+`mv /opt/wattpost-src ${ACTIVE_SLOT}/src` and patches `SOURCE` to
+the new path, but missed `SCRIPT_DIR` / `REPO_ROOT` (both captured
+at install.sh boot via `BASH_SOURCE`). Three earlier file installs
+in the script have `if [ -f ]` guards and silently no-op'd; the
+wattpost.service install at line 373 didn't, and crashed the build.
+
+Fix: re-derive `SCRIPT_DIR` + `REPO_ROOT` inside the same migration
+block whenever the captured paths point under the legacy
+`/opt/wattpost-src` location. One-line `case` after the existing
+SOURCE rewrite.
+
 ## [0.1.88] · 2026-05-24
 
 ### Changed · Power flow tile v3 — visual overhaul
