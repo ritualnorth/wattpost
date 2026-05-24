@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.106] · 2026-05-24
+
+### Security · Wire signed-audit at security touchpoints (Phase 8B fanout, #310)
+
+The Phase 8B plumbing now has its first batch of real call sites
+emitting hash-chained, ed25519-signed entries that sync to cloud:
+
+* `/api/login` → `login_failed` (with client IP) on bad password;
+  `login_succeeded` (with client IP) on success. Brute-force
+  probes now leave a tamper-evident trail.
+* `_dispatch_restore_from_cloud` → `restore_applied` (with cmd_id
+  + backup_id) immediately before re-exec, so the swap is recorded
+  in the chain before the process image is replaced.
+* `command_verify` rejection path → `cloud_command_rejected`
+  (already shipped in #299). Listed here for completeness.
+
+Each entry chains onto the previous, so cloud verifying the
+appliance chain can detect both tampering (sig fails) and
+truncation (prev_hash mismatch). More touchpoints (password
+change, pair/unpair, mTLS cert rotation, kiosk-share create/
+revoke) ship in follow-up commits as those features see security
+work.
+
 ## [0.1.105] · 2026-05-24
 
 ### Security · Cloud signs commands; appliance verifies (#299)

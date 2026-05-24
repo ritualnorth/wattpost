@@ -1,2 +1,2 @@
 """Local-first multi-vendor solar/battery telemetry appliance."""
-__version__ = "0.1.105"
+__version__ = "0.1.106"
