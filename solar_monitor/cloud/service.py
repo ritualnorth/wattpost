@@ -943,6 +943,20 @@ class CloudService:
             "cloud restore_from_cloud: cmd %d applied backup %d, re-execing",
             cmd_id, backup_id,
         )
+        # Phase 8B (#310) — record the restore in the signed audit
+        # log BEFORE re-exec, otherwise the in-flight write would die
+        # with the process image. Best-effort.
+        try:
+            from .. import signed_audit as _sa
+            store = self.scheduler.store
+            if store is not None and store._db is not None:
+                await _sa.write_event(store._db,
+                    event_type="restore_applied",
+                    payload={"cmd_id": cmd_id, "backup_id": backup_id},
+                )
+                await store._db.commit()
+        except Exception:
+            log.exception("signed_audit: restore_applied write failed")
         # Report success BEFORE re-exec — once execv runs the process
         # image is replaced and any in-flight PATCH dies with it.
         await self._patch_command_status(cmd_id, "success")

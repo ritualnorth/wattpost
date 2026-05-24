@@ -1018,8 +1018,22 @@ def sso_redirect(request: Request, state: State, token: str = "") -> Response:
     return resp
 
 
+async def _audit(state, *, event_type: str, payload: dict | None = None) -> None:
+    """Helper: write_event to the signed audit log (Phase 8B).
+    Best-effort — never raises into the caller, since security
+    touchpoints must not break when audit logging hiccups."""
+    try:
+        from .. import signed_audit as _sa
+        store = state["store"]
+        if store is not None and store._db is not None:
+            await _sa.write_event(store._db, event_type=event_type, payload=payload or {})
+            await store._db.commit()
+    except Exception:
+        log.exception("signed_audit: write_event(%s) failed", event_type)
+
+
 @post("/api/login", status_code=200)
-async def do_login(data: dict, request: Request) -> Response:
+async def do_login(data: dict, request: Request, state: State) -> Response:
     """Verify the supplied password, drop a session cookie. Returns
     the URL the caller should redirect to (the `next` query param if
     safe, else `/`). Demo-mode + no-password installs short-circuit
@@ -1029,7 +1043,11 @@ async def do_login(data: dict, request: Request) -> Response:
     valid via tunnel anyway (the middleware rejects them); accepting
     the password here would issue a useless session and confuse the
     user. The /login page itself shows a tunnel-specific message
-    when it detects tunnel origin, so this is belt-and-braces."""
+    when it detects tunnel origin, so this is belt-and-braces.
+
+    Phase 8B (#310) — login outcomes recorded in the signed audit
+    log so brute-force probes leave a tamper-evident trace and the
+    cloud's per-site security view (when wired) can flag anomalies."""
     from .. import web_auth as _wa
     if _wa.is_tunnel_origin(request.scope):
         return Response(
@@ -1040,7 +1058,14 @@ async def do_login(data: dict, request: Request) -> Response:
         )
     pw = (data or {}).get("password") or ""
     if not _wa.verify_password(pw):
+        # Record the failure with the client IP — useful for
+        # detecting attempted brute force after the fact. Don't
+        # include the attempted password (obvious anti-pattern).
+        client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+        await _audit(state, event_type="login_failed", payload={"ip": client_ip})
         return Response({"ok": False, "detail": "wrong password"}, status_code=401)
+    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    await _audit(state, event_type="login_succeeded", payload={"ip": client_ip})
     token = _wa.issue_session()
     # Validate `next` to only allow same-origin relative paths.
     nxt = (data or {}).get("next") or "/"
