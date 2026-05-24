@@ -59,7 +59,12 @@ log = logging.getLogger(__name__)
 # Where keys live on disk. /var/lib/wattpost is created by install.sh
 # with daemon ownership; Docker installs bind-mount this from the host
 # so keys survive container recreation. Pattern mirrors install_id.py.
-DEFAULT_DIR = Path("/var/lib/wattpost/keys")
+# WATTPOST_KEYS_DIR honoured so tests + Docker installs that bind-
+# mount a different keys dir don't have to thread a path through
+# every caller. Mirrors solar_monitor.auth.oidc_rp's behaviour for
+# the JWKS / OIDC pending-state files (single keys dir for all
+# Identity v2 secrets).
+DEFAULT_DIR = Path(os.environ.get("WATTPOST_KEYS_DIR") or "/var/lib/wattpost/keys")
 PRIVATE_SEALED = "appliance.ed25519.sealed"
 PUBLIC_RAW     = "appliance.ed25519.pub"
 MACHINE_ANCHOR = "machine-anchor"

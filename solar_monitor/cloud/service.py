@@ -762,6 +762,47 @@ class CloudService:
             return
 
         body = r.content
+        # #297-3 — verify the appliance-keypair signature BEFORE we
+        # touch _verify_archive (which spends real CPU on the SQLite
+        # integrity check). The signature is on the response headers
+        # echoed back from cloud's appliance_backups row.
+        sig_b64 = r.headers.get("X-WP-Backup-Signature") \
+            or r.headers.get("x-wp-backup-signature")
+        sig_fp = r.headers.get("X-WP-Backup-Pubkey-Fp") \
+            or r.headers.get("x-wp-backup-pubkey-fp")
+        sig_alg = r.headers.get("X-WP-Backup-Sig-Alg") \
+            or r.headers.get("x-wp-backup-sig-alg")
+        try:
+            from ..backup import signing as _sig
+            await asyncio.to_thread(
+                _sig.verify_archive, body,
+                sig_b64=sig_b64, pubkey_fp=sig_fp, alg=sig_alg,
+            )
+            if sig_b64:
+                log.info(
+                    "cloud restore: backup %s signature verified "
+                    "(fp=%s...)", backup_id, sig_fp[:8] if sig_fp else "?",
+                )
+            else:
+                # Grandfather path — pre-0.1.99 backup with no sig.
+                # Warn loudly + proceed (alternative would lock users
+                # out of their own pre-rollout history).
+                log.warning(
+                    "cloud restore: backup %s has NO signature "
+                    "(pre-0.1.99 row); proceeding with #297-1 config "
+                    "sanitiser + #297-2 fresh-install pw regen as the "
+                    "only defences", backup_id,
+                )
+        except _sig.BackupSigError as e:
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"backup signature verification failed: {e} — "
+                      "refusing restore. If this is a legitimate "
+                      "backup from a previous keypair, contact "
+                      "support@wattpost.io.",
+            )
+            return
+
         # Re-use the appliance's restore plumbing — same code path as
         # the user-initiated restore endpoint.
         try:
