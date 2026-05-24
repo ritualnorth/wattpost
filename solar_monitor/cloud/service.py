@@ -167,6 +167,23 @@ class CloudService:
                                     "identity v2: failed to persist OIDC "
                                     "config from /status response",
                                 )
+                        # Phase 6B (#308) — ensure mTLS leaf cert is
+                        # current. Idempotent; returns immediately if
+                        # cert is fresh. Until Phase 6B-B wires the
+                        # heartbeat to use it, the cert just sits
+                        # ready on disk.
+                        try:
+                            from . import mtls_client as _mtls
+                            await _mtls.ensure_cert(
+                                endpoint=endpoint,
+                                bearer_token=self.cfg.bearer_token,
+                            )
+                        except Exception:
+                            log.exception(
+                                "identity v2 phase 6B: mTLS cert "
+                                "issuance failed (non-fatal — heartbeat "
+                                "still uses bearer)"
+                            )
                         return
                 elif r.status_code == 404:
                     # Cloud doesn't have the endpoint yet (older cloud
@@ -219,6 +236,21 @@ class CloudService:
                             "config; LAN OIDC login will fall back to "
                             "the legacy password flow",
                         )
+
+                # Phase 6B (#308) — issue mTLS leaf cert. Runs on
+                # the SAME upgrade-bg task path so a newly-upgraded
+                # appliance has a cert by the end of its first boot.
+                try:
+                    from . import mtls_client as _mtls
+                    await _mtls.ensure_cert(
+                        endpoint=endpoint,
+                        bearer_token=self.cfg.bearer_token,
+                    )
+                except Exception:
+                    log.exception(
+                        "identity v2 phase 6B: mTLS cert issuance "
+                        "failed (non-fatal — heartbeat still uses bearer)"
+                    )
         except Exception as e:
             log.warning("identity v2: cloud round-trip failed: %s — "
                         "will retry on next boot", e)
