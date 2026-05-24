@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=137" />
+  <link rel="stylesheet" href="/web/styles.css?v=138" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -540,9 +540,16 @@
             <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/>
             </svg>
-            Energy today
+            <span id="energy-title">Energy today</span>
           </h2>
           <div class="panel-sub" id="energy-sub">·</div>
+        </div>
+
+        <div class="energy-ranges" id="energy-ranges" role="tablist" aria-label="Energy chart range">
+          <button class="erange is-active" data-range="today" role="tab">Today</button>
+          <button class="erange"           data-range="24h"   role="tab">24h</button>
+          <button class="erange"           data-range="7d"    role="tab">7 days</button>
+          <button class="erange"           data-range="30d"   role="tab">30 days</button>
         </div>
 
         <div id="energy-chart" class="energy-chart-host"></div>
@@ -553,6 +560,7 @@
           <span class="chip"><span class="swatch" style="background:#56d364"></span>Into battery</span>
           <span class="chip"><span class="swatch" style="background:#f06292"></span>Out of battery</span>
           <span class="chip"><span class="swatch line" style="background:#ff5e57"></span>SoC</span>
+          <span class="chip" id="energy-legend-weather" hidden><span class="swatch" style="background:rgba(180,190,210,.55)"></span>Cloud cover</span>
         </div>
 
         <div class="energy-stats">
@@ -1251,6 +1259,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=215"></script>
+  <script src="/web/app.js?v=216"></script>
 </body>
 </html>

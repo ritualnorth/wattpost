@@ -3631,17 +3631,70 @@ function drawCompareChart(metric, datasets) {
 // payload.
 
 let energyChart = null;
+let _energyRange = null;          // remembers user's range choice across reloads
 
-async function refreshEnergyOverview() {
+// Range key → query params for /api/energy/today + /api/weather/history.
+// Buckets balance "enough resolution to see the dips" against payload
+// size + render speed; 30d at 5min would be 8640 points which uPlot
+// can render but is wasteful when nobody reads sub-hour detail at
+// month scale anyway.
+const ENERGY_RANGES = {
+  today: { label: "today",     bucket: 300,   span: null   /* midnight→now */ },
+  "24h": { label: "last 24h",  bucket: 900,   span: 86400 },
+  "7d":  { label: "last 7 days",  bucket: 3600,  span: 7 * 86400 },
+  "30d": { label: "last 30 days", bucket: 21600, span: 30 * 86400 },
+};
+
+function _currentEnergyRange() {
+  if (_energyRange && ENERGY_RANGES[_energyRange]) return _energyRange;
+  try {
+    const saved = localStorage.getItem("wp-energy-range");
+    if (saved && ENERGY_RANGES[saved]) return (_energyRange = saved);
+  } catch (_) {}
+  return (_energyRange = "today");
+}
+
+async function refreshEnergyOverview(rangeKey) {
   const host = document.getElementById("energy-chart");
   if (!host) return;
-  let payload;
+
+  const range = ENERGY_RANGES[rangeKey] ? rangeKey : _currentEnergyRange();
+  _energyRange = range;
+  try { localStorage.setItem("wp-energy-range", range); } catch (_) {}
+
+  // Reflect selection on the range buttons + heading.
+  document.querySelectorAll(".energy-ranges .erange").forEach(b => {
+    b.classList.toggle("is-active", b.dataset.range === range);
+  });
+  const titleEl = document.getElementById("energy-title");
+  if (titleEl) {
+    titleEl.textContent = range === "today" ? "Energy today" : `Energy · ${ENERGY_RANGES[range].label}`;
+  }
+
+  const cfg = ENERGY_RANGES[range];
+  const now = Math.floor(Date.now() / 1000);
+  const qp = new URLSearchParams();
+  if (cfg.span) qp.set("since", String(now - cfg.span));
+  qp.set("bucket", String(cfg.bucket));
+  const energyUrl  = `/api/energy/today?${qp.toString()}`;
+  const weatherUrl = `/api/weather/history?${qp.toString()}`;
+
+  // Energy is the must-have; weather is best-effort (no lat/lon =
+  // empty series, upstream failure = empty series). Run both in
+  // parallel and don't fail the chart if weather rejects.
+  let payload, weather = null;
   try {
-    const r = await fetch("/api/energy/today");
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    payload = await r.json();
+    const [er, wr] = await Promise.all([
+      fetch(energyUrl),
+      fetch(weatherUrl).catch(() => null),
+    ]);
+    if (!er.ok) throw new Error(`HTTP ${er.status}`);
+    payload = await er.json();
+    if (wr && wr.ok) {
+      try { weather = await wr.json(); } catch (_) { weather = null; }
+    }
   } catch (e) {
-    host.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">Couldn't load today's energy (${e.message}).</div>`;
+    host.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">Couldn't load energy (${e.message}).</div>`;
     return;
   }
 
@@ -3667,12 +3720,26 @@ async function refreshEnergyOverview() {
   // a misleading drop-to-zero line. Treat those as gaps.
   const soc    = (s.soc_pct || []).map(v => (v == null || v <= 0) ? null : v);
 
-  drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc });
+  // Cloud cover, aligned to the chart grid by the weather endpoint.
+  // null when unavailable — drawEnergyChart skips the series rather
+  // than rendering a flat zero line.
+  const cloudAvailable = !!(weather && weather.available && weather.series?.cloud_cover_pct);
+  const cloud = cloudAvailable
+    ? (weather.series.cloud_cover_pct || []).map(v => v == null ? null : Math.max(0, Math.min(100, v)))
+    : null;
+  const legendCloud = document.getElementById("energy-legend-weather");
+  if (legendCloud) legendCloud.hidden = !cloudAvailable;
 
-  // Sub-line: time range.
+  drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc, cloud });
+
+  // Sub-line: time range. Days for multi-day windows so it reads
+  // "May 17 → 24" instead of two midnight timestamps.
   const sub = document.getElementById("energy-sub");
   if (sub && payload.since_ts && payload.until_ts) {
-    const fmt = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const wide = (payload.until_ts - payload.since_ts) > 36 * 3600;
+    const fmt = wide
+      ? (t) => new Date(t * 1000).toLocaleDateString([], { month: "short", day: "numeric" })
+      : (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     sub.textContent = `${fmt(payload.since_ts)} → ${fmt(payload.until_ts)}`;
   }
 
@@ -3731,6 +3798,19 @@ function drawEnergyChart(root, ts, series) {
   const fmtW = (v) => v == null ? "·" : (Math.abs(v) >= 1000 ? (v/1000).toFixed(1) + " kW" : v.toFixed(0) + " W");
   const fmtPct = (v) => v == null ? "·" : v.toFixed(0) + " %";
 
+  // Cloud cover (0-100%) on a hidden Y axis. Shares the same 0..100
+  // range as SoC but drawn behind everything else as a soft grey
+  // wash — looks like "shade behind the energy curves". Only added
+  // when weather data is available.
+  const hasCloud = Array.isArray(series.cloud) && series.cloud.some(v => v != null);
+
+  const cloudSeries = hasCloud ? [
+    // Drawn first so all energy lines paint on top of it.
+    { label: "Cloud cover", stroke: "rgba(180,190,210,0.55)", width: 1.0,
+      fill: "rgba(180,190,210,0.20)", scale: "y2",
+      value: (_u, v) => v == null ? "·" : v.toFixed(0) + " %" },
+  ] : [];
+
   const opts = {
     width, height: 280,
     cursor: { drag: { x: true, y: false } },
@@ -3738,12 +3818,15 @@ function drawEnergyChart(root, ts, series) {
       x: { time: true },
       // Power axis (signed — battery discharge dips below 0).
       y: { auto: true },
-      // SoC % on right axis, fixed 0..100 so the line is comparable
-      // across days regardless of power magnitudes.
+      // SoC + cloud cover share the 0..100 right axis. Both are
+      // percentages, both belong on a fixed scale so the line is
+      // comparable across days regardless of power magnitudes.
       y2: { range: [0, 100], auto: false },
     },
     series: [
       {},
+      // Cloud cover first so the energy series paint on top.
+      ...cloudSeries,
       // Solar — yellow filled area, ≥0.
       { label: "Solar",       stroke: "#f0c849", width: 1.2, fill: "rgba(240,200,73,0.35)",
         value: (_u, v) => fmtW(v) },
@@ -3782,7 +3865,9 @@ function drawEnergyChart(root, ts, series) {
     plugins: [valueTooltipPlugin()],
   };
 
-  const dataCols = [ts, series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc];
+  const dataCols = hasCloud
+    ? [ts, series.cloud, series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc]
+    : [ts,                series.solar, series.charger, series.load, series.batIn, series.batOut, series.soc];
   try {
     energyChart = new uPlot(opts, dataCols, root);
   } catch (e) {
@@ -7325,6 +7410,18 @@ window.addEventListener("resize", () => {
   if (chart && currentRouteName() === "history") {
     chart.setSize({ width: $("#chart").clientWidth, height: 340 });
   }
+});
+
+// Range buttons above the Energy chart — single delegated click
+// listener (the buttons are in static HTML so the listener can be
+// installed once, no rebinding needed when refreshEnergyOverview
+// toggles is-active classes).
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest(".energy-ranges .erange");
+  if (!btn) return;
+  const range = btn.dataset.range;
+  if (!range) return;
+  refreshEnergyOverview(range);
 });
 
 // ---------- Per-device detail page ----------
