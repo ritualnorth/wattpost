@@ -1458,12 +1458,54 @@ main {
 .flow-svg-v2 {
   width: 100%;
   height: auto;
-  max-height: 290px;
+  max-height: 320px;            /* up from 290 — bigger viewBox 440×290 */
   display: block;
   margin: -0.25rem auto 0;
 }
-.flow-svg-v2 .flow-conn-v2          { fill: none; stroke: var(--border); stroke-width: 1.4; }
-.flow-svg-v2 .flow-conn-v2.active   { stroke: var(--text-3); }
+.flow-svg-v2 .flow-conn-v2          { fill: none; stroke: var(--border); stroke-width: 1.4; transition: stroke 0.45s ease, stroke-width 0.3s ease; }
+.flow-svg-v2 .flow-conn-v2.active   { stroke: var(--text-3); stroke-width: 1.8; }
+/* Junction node — explicit centre marker. Pulses when in/out are
+ * roughly balanced so users see "the system is humming along" at a
+ * glance, even when no individual edge is dramatic. */
+.flow-svg-v2 .flow-junction         { fill: var(--text-3); opacity: 0.65; transition: opacity 0.4s ease, r 0.4s ease; }
+.flow-svg-v2 .flow-junction.balanced { animation: flow-junction-pulse 2.4s ease-in-out infinite; }
+@keyframes flow-junction-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+/* Idle source — power=0 right now but configured. Dimmed enough to
+ * step out of the user's attention without disappearing (the system
+ * shape still reads correctly: "yes the AC charger is wired up, it
+ * just isn't pulling anything"). */
+.flow-svg-v2 .flow-node-group.idle  { opacity: 0.32; transition: opacity 0.5s ease; }
+/* Dominant source — soft halo pulse. Whichever node is contributing
+ * the most W (solar at midday, battery at night) draws the eye
+ * without competing with the central junction's balance pulse. */
+.flow-svg-v2 .flow-node-group.dominant .flow-node-ring {
+  animation: flow-node-dominant 2.6s ease-in-out infinite;
+}
+@keyframes flow-node-dominant {
+  0%, 100% { stroke-width: 1.8; }
+  50%      { stroke-width: 3.2; }
+}
+/* Tap-target affordance. Cursor + slight hover ring growth so
+ * users know nodes are clickable; mobile gets touch-action so the
+ * scroll-vs-tap heuristic plays nicely. */
+.flow-svg-v2 .flow-node-clickable   { cursor: pointer; touch-action: manipulation; }
+.flow-svg-v2 .flow-node-clickable:hover .flow-node-ring,
+.flow-svg-v2 .flow-node-clickable:focus-visible .flow-node-ring { stroke-width: 2.6; }
+.flow-svg-v2 .flow-node-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 50%; }
+/* Battery SoC arc — thin coloured ring just outside the main ring.
+ * Stroke-dashoffset is set inline on the element. Same colour
+ * language as the hero SoC donut. */
+.flow-svg-v2 .flow-batt-soc-ring    { fill: none; stroke-width: 2.6; stroke-linecap: round; opacity: 0.9; transition: stroke-dasharray 0.6s ease, stroke 0.4s ease; }
+.flow-svg-v2 .flow-batt-soc-ring.batt      { stroke: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-batt-soc-ring.discharge { stroke: #f06292; }
+.flow-svg-v2 .flow-batt-soc-ring.silent    { stroke: var(--text-3); opacity: 0.4; }
+/* Mid-line W label — only rendered on 3+ active edges; uses a soft
+ * pill background so it stays legible over the gradient stroke. */
+.flow-svg-v2 .flow-segment-w        { fill: var(--text-2); font-size: 10px; font-weight: 600; pointer-events: none; }
+.flow-svg-v2 .flow-segment-w-bg     { fill: var(--surface); fill-opacity: 0.85; stroke: var(--border); stroke-width: 0.6; }
 .flow-svg-v2 .flow-node-ring        { fill: var(--surface); stroke-width: 1.6; }
 .flow-svg-v2 .flow-node-ring.pv     { stroke: var(--pv,    #f0c849); }
 .flow-svg-v2 .flow-node-ring.batt   { stroke: var(--batt,  #56d364); }
