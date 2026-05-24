@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.97] · 2026-05-24
+
+### Fixed · Cloud sign-in survives appliance restart (#305 follow-up)
+
+* The OIDC pending-state store on the appliance is now persisted to
+  disk (`/var/lib/wattpost/keys/oidc_pending.json`) instead of being
+  in-memory only. A daemon restart — including `docker compose pull
+  && up -d`, which recreates the container — no longer wipes
+  in-flight sign-in flows, so the callback from cloud completes
+  instead of dead-ending with `OIDC state token unknown or expired`.
+* When the state token IS unknown (true CSRF mismatch, or session
+  abandoned >5 min), `/auth/callback` now redirects to
+  `/login?reauth=expired` with a friendly banner instead of
+  returning a JSON 400. Users just tap "Sign in with WattPost
+  cloud" again — no more dead-end JSON page.
+
 ## [0.1.96] · 2026-05-24
 
 ### Added · Dashboard battery health badge + honest empty states (#293, #294)

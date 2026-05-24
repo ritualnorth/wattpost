@@ -122,11 +122,15 @@ async def auth_callback(request: Request) -> Response:
 
     pending = oidc_rp.consume_pending(state)
     if pending is None:
-        # state token unknown or expired — CSRF check failed
-        raise HTTPException(
-            status_code=400,
-            detail="OIDC state token unknown or expired (login flow took too long?)",
-        )
+        # state token unknown (CSRF mismatch, replay from history, or
+        # expired). Don't dead-end the user in a JSON 400 — bounce
+        # back to /login with a banner. They click again, the round-
+        # trip works. The 400 was a real bug Ritual North hit on retry after
+        # I pulled v0.1.96; state was wiped by the container recreate.
+        # Phase 3-followup: state store is now disk-persisted, so this
+        # branch should be much rarer (only true CSRF / replay).
+        log.info("auth_oidc: state %s... unknown/expired, bouncing to /login", state[:8])
+        return Redirect(path="/login?reauth=expired", status_code=302)
 
     issuer = cfg.discovery_url.rsplit("/.well-known/", 1)[0]
     try:
