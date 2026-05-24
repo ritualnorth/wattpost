@@ -1027,6 +1027,22 @@ function renderHero() {
     }
   }
 
+  // #293 — Battery health one-liner under the donut. Aggregates the
+  // worst current signal across the battery surfaces so the user
+  // sees a single status without having to scroll to the Health
+  // panel. Three colour bands match the Health panel itself.
+  const healthEl = $("#donut-health");
+  if (healthEl) {
+    const h = _bankHealthBadge(bank);
+    if (h) {
+      healthEl.hidden = false;
+      healthEl.textContent = h.text;
+      healthEl.className = `donut-health ${h.band}`;
+      healthEl.title = h.detail || "";
+    } else {
+      healthEl.hidden = true;
+    }
+  }
   // Other stats
   $("#bank-voltage").textContent = bank.meanV.toFixed(2);
   $("#bank-capacity").textContent = bank.totalCap.toFixed(0);
@@ -1047,6 +1063,29 @@ function renderHero() {
   $("#bank-meta").textContent = bank.packs > 0
     ? `${bank.packs}× ${shortModel}`
     : shortModel;
+}
+
+// One-liner battery health badge (#293). Pure — takes the bank
+// model + returns {band, text, detail} or null when there's no
+// reading worth surfacing. Worst-of-signals wins: cell spread
+// > SoC critical > SoC low > healthy.
+function _bankHealthBadge(bank) {
+  if (!bank) return null;
+  const spread = bank.cell_spread;
+  if (typeof spread === "number") {
+    if (spread >= 0.20) return { band: "alarm", text: "cells drifted",  detail: `Cell spread ${spread.toFixed(2)} V. Open Cell balance to investigate.` };
+    if (spread >= 0.10) return { band: "warn",  text: "cells drifting", detail: `Cell spread ${spread.toFixed(2)} V. Watch the Cell balance panel.` };
+  }
+  if (typeof bank.soc === "number" && bank.soc <= 15) {
+    return { band: "alarm", text: "SoC critical", detail: "Bank below 15%. Deep discharge shortens lifespan." };
+  }
+  if (typeof bank.soc === "number" && bank.soc <= 30) {
+    return { band: "warn",  text: "SoC low",      detail: "Bank below 30%. Recharge soon for longest lifespan." };
+  }
+  if (typeof bank.soc === "number") {
+    return { band: "good",  text: "healthy",      detail: "Cells balanced, SoC in range." };
+  }
+  return null;
 }
 
 // ---------- POWER FLOW ----------
@@ -4151,8 +4190,12 @@ async function refreshBatteryHealth() {
       cy.textContent = Math.round(bms.cycle_count).toLocaleString();
       cy.title = "Reported by the BMS. Typically increments per full discharge-then-charge.";
     } else {
-      cy.textContent = "·";
-      cy.title = "Add a BMS to track cycles. (Equivalent cycles from current integration shown below.)";
+      // #294 — honest empty state. The opaque "·" used to read as
+      // "broken tile"; "BMS only" tells the user a JK / Lynx is
+      // required. Equivalent-cycles below still works without one.
+      cy.textContent = "BMS only";
+      cy.classList.add("bhealth-v-empty");
+      cy.title = "Add a JK / Lynx BMS to surface manufacturer cycle count. Equivalent cycles below works without one.";
     }
   }
   if (lf) {
@@ -4162,8 +4205,11 @@ async function refreshBatteryHealth() {
                                   : `${v.toFixed(1)} kWh`;
       lf.title = "Lifetime energy moved through the bank (BMS-reported).";
     } else {
-      lf.textContent = "·";
-      lf.title = "BMS-required. Connect a JK / Lynx BMS to track lifetime throughput.";
+      // #294 — same treatment as cycles. Lifetime throughput needs
+      // a BMS that reports it (JK / Lynx do; Daly does not).
+      lf.textContent = "BMS only";
+      lf.classList.add("bhealth-v-empty");
+      lf.title = "Connect a JK / Lynx BMS to track lifetime throughput across the bank.";
     }
   }
   if (wc) {
