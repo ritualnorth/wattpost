@@ -92,6 +92,7 @@ from .backup import (
     discovery_state, discovery_toggle,
 )
 from ..backup import BackupService
+from .auth_oidc import auth_callback, auth_lan_login
 
 
 def _web_dir() -> Path:
@@ -1571,6 +1572,12 @@ def build_app(
             do_login,
             do_logout,
             sso_redirect,
+            # Identity v2 Phase 3 (#305) — LAN OIDC login. Both
+            # endpoints 404 when oidc_config.json is absent (i.e.
+            # the appliance hasn't completed v2 upgrade yet), so
+            # registering them is safe even on pre-v2 appliances.
+            auth_lan_login,
+            auth_callback,
             static_router,
         ],
         on_startup=[on_startup],
