@@ -106,46 +106,71 @@ def _machine_anchor(dir_: Path) -> bytes:
     """Source of entropy for the SecretBox key.
 
     Preference order:
-      1. /etc/machine-id     — present on systemd hosts (Pi, Docker on Linux)
-      2. /var/lib/dbus/machine-id — older systems
-      3. fallback: a random file under our own keys dir, written once
-         and re-used (no machine-id available, e.g. unusual container
-         runtimes). 32 bytes from secrets.token_bytes — never derived
-         from anything predictable.
+      1. PERSISTED anchor file under our own keys dir — wins whenever
+         present. This is what survives Docker container recreates
+         (the keys dir is bind-mounted; /etc/machine-id is NOT and
+         gets re-minted by Docker on every recreate). Pi installs
+         also benefit: /etc/machine-id is stable on Pi, but the
+         persisted anchor still wins so the two storage modes share
+         the same code path.
+      2. /etc/machine-id — used to SEED the persisted anchor on
+         first run when we have it (gives the anchor host-binding
+         entropy beyond what secrets.token_bytes provides). Once
+         persisted, we never re-read /etc/machine-id.
+      3. /var/lib/dbus/machine-id — older systems, same role as #2.
+      4. secrets.token_bytes — pure-random fallback. Used when no
+         machine-id source is available; still persisted so it
+         survives restarts.
 
-    The anchor is hashed-only, never sent over the wire. It binds the
-    sealed key to *this physical install*: cloning the disk image to
-    another host with a different machine-id breaks unsealing — which
-    is the intended behaviour (forces a re-pair on the new host).
+    Disk-clone defence: cloning a host's disk WITHOUT the keys dir
+    re-runs path #1's miss → path #2/#3/#4 → fresh anchor → can't
+    decrypt the original sealed key → forced re-pair. Cloning WITH
+    the keys dir gives the attacker decryptable keys — but that's
+    no worse than today (the sealed key is also on the disk), and
+    the proper hardware-bound defence ships in Phase 10.
+
+    PRIOR BUG (pre-v0.1.94): preferred /etc/machine-id directly,
+    which Docker re-mints on every container recreate. Result:
+    every `docker compose pull && up -d` broke unsealing and forced
+    a Phase 1 key rotation. Fixed by always preferring the
+    bind-mount-surviving anchor file.
     """
+    dir_.mkdir(parents=True, exist_ok=True)
+    anchor_file = dir_ / MACHINE_ANCHOR
+
+    # Path #1: persisted anchor wins whenever present + valid.
+    try:
+        if anchor_file.is_file():
+            data = anchor_file.read_bytes().strip()
+            if len(data) >= 16:
+                return data
+    except OSError:
+        pass
+
+    # First-run path: seed the persisted anchor from machine-id when
+    # available, else from secrets.token_bytes.
+    seed: bytes | None = None
     for candidate in (Path("/etc/machine-id"), Path("/var/lib/dbus/machine-id")):
         try:
             raw = candidate.read_text(encoding="ascii").strip()
             if raw and len(raw) >= 16:
-                return raw.encode("ascii")
+                seed = raw.encode("ascii")
+                break
         except (OSError, UnicodeDecodeError):
             continue
-    # No machine-id — write our own fallback once and reuse it forever.
-    anchor_file = dir_ / MACHINE_ANCHOR
+    if seed is None:
+        seed = secrets.token_bytes(32)
+
     try:
-        if anchor_file.is_file():
-            data = anchor_file.read_bytes().strip()
-            if len(data) >= 32:
-                return data
-    except OSError:
-        pass
-    # Generate + persist a fresh anchor.
-    dir_.mkdir(parents=True, exist_ok=True)
-    new_anchor = secrets.token_bytes(32)
-    try:
-        anchor_file.write_bytes(new_anchor)
+        anchor_file.write_bytes(seed)
         os.chmod(anchor_file, 0o600)
     except OSError as e:
-        # If we can't persist, we can still use it for this process
-        # lifetime — but any restart will mint a new key. Log loudly.
-        log.warning("machine-anchor persist failed at %s: %s — keys won't survive restart",
-                    anchor_file, e)
-    return new_anchor
+        # If we can't persist, we can still use it for THIS process
+        # lifetime — but any restart will mint a new key (and break
+        # cloud pairing). Log loudly.
+        log.warning("machine-anchor persist failed at %s: %s — keys "
+                    "won't survive restart", anchor_file, e)
+    return seed
 
 
 def _derive_box_key(anchor: bytes) -> bytes:
@@ -220,11 +245,29 @@ def load_or_create(dir_: Path | str = DEFAULT_DIR) -> Keypair:
             log.info("appliance keypair loaded (fingerprint=%s)", fp)
             return Keypair(signing_key, verify_key, fp)
         except KeypairError as e:
-            log.error("appliance keypair load failed: %s — refusing to "
-                      "regenerate. If you moved the disk to a new host, "
-                      "delete %s + %s and re-pair the appliance.",
-                      e, sealed_path, public_path)
-            raise
+            # Sealed file present but undecryptable. Pre-v0.1.94 this
+            # would refuse to regenerate, leaving the appliance stuck
+            # with no Phase 1 keypair (and no Phase 3 OIDC client).
+            # Triggered by: Docker container recreate when the prior
+            # seal used /etc/machine-id (which Docker re-mints).
+            #
+            # New behaviour: log loudly, delete the broken sealed file
+            # + public copy, fall through to fresh generation. The
+            # cloud's /upgrade endpoint handles this idempotently and
+            # records it as a key rotation in audit (rotated_from_
+            # fingerprint), so trust history isn't lost.
+            log.warning(
+                "appliance keypair decrypt failed: %s — auto-regenerating "
+                "(prior key is gone, cloud will record this as a rotation "
+                "on next /upgrade). Common cause: Docker container recreate "
+                "with the pre-v0.1.94 anchor scheme.", e,
+            )
+            for stale in (sealed_path, public_path):
+                try:
+                    stale.unlink(missing_ok=True)
+                except OSError as unlink_err:
+                    log.warning("could not unlink stale keypair file %s: %s",
+                                stale, unlink_err)
 
     # Fresh generation.
     log.info("generating new appliance ed25519 keypair")

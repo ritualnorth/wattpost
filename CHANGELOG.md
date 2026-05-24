@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.94] · 2026-05-24
+
+### Fixed · Identity v2 keypair survives Docker container recreate
+
+**Critical fix for Docker installs.** Pre-v0.1.94, the ed25519
+keypair sealed in `/var/lib/wattpost/keys/appliance.ed25519.sealed`
+was unsealed using `/etc/machine-id` as the anchor. Docker mints a
+fresh `/etc/machine-id` for every container recreate, so every
+`docker compose pull && up -d wattpost` wiped the keypair, broke
+Phase 1 trust, and left the appliance without a Phase 3 OIDC
+client. Caught by smoke-testing v0.1.93 on Garage Stack immediately
+after pulling.
+
+Fix: always prefer a persisted anchor file
+(`machine-anchor`, also in the bind-mounted keys dir) which
+survives container recreates. The first run still seeds the
+anchor from `/etc/machine-id` when available — the change is
+that subsequent runs read the persisted anchor instead of
+re-reading `/etc/machine-id`.
+
+Auto-recovery: on a decrypt failure from a pre-v0.1.94 sealed
+file, the appliance now deletes the broken seal + regenerates a
+fresh keypair. The cloud's `/upgrade` endpoint handles the
+rotation idempotently and records `rotated_from_fingerprint`
+in audit. End user impact: a one-time silent re-pair on the
+first v0.1.94 boot; no LAN OIDC config until that boot completes.
+
+Pi installs are unaffected (their `/etc/machine-id` is stable).
+The fix is no-op there. Docker installs absolutely need this.
+
 ## [0.1.93] · 2026-05-24
 
 ### Added · Identity v2 Phase 3 + 4 — LAN OIDC login (#305, #306)
