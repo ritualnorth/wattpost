@@ -82,6 +82,14 @@ class CloudService:
             log.info("cloud: no bearer_token configured — skipping heartbeat loop")
             return
         self._stop.clear()
+        # Identity v2 (#303) — fire-and-forget keypair upgrade check.
+        # If the appliance has an ed25519 keypair on disk but the cloud
+        # doesn't know about it (or no keypair at all), generate +
+        # upload. Idempotent; safe to run on every boot. Doesn't
+        # block heartbeat startup — failure here logs and moves on,
+        # since v1 bearer-token auth still works during the transition.
+        asyncio.create_task(self._identity_v2_upgrade_bg(),
+                            name="identity-v2-upgrade")
         self._task = asyncio.create_task(self._loop(), name="cloud-heartbeat")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
@@ -95,6 +103,76 @@ class CloudService:
             except (asyncio.CancelledError, Exception):
                 pass
             self._task = None
+
+    async def _identity_v2_upgrade_bg(self) -> None:
+        """Identity v2 (#303) — generate ed25519 keypair if missing,
+        register public key with cloud if cloud doesn't have it yet.
+
+        Idempotent and best-effort. Failures here log + move on —
+        v1 bearer-token auth still works during the transition, so
+        a cloud or network blip doesn't block heartbeats.
+
+        Phase 1 just registers the keypair. Phases 2+ will start
+        actually signing things with it.
+        """
+        try:
+            from ..auth import load_or_create as _kp_load
+            from ..auth.keypair import fingerprint as _kp_fp_disk
+        except ImportError as e:
+            log.debug("identity v2 module not available: %s — skipping", e)
+            return
+
+        try:
+            keypair = _kp_load()
+        except Exception:
+            log.exception("identity v2: keypair load/generate failed")
+            return
+
+        endpoint = self.cfg.endpoint.rstrip("/")
+        status_url = f"{endpoint}/api/internal/identity/v2/status"
+        upgrade_url = f"{endpoint}/api/internal/identity/v2/upgrade"
+        headers = {
+            "Authorization": f"Bearer {self.cfg.bearer_token}",
+            "Content-Type":  "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                # Check current state first. If the cloud already knows
+                # this fingerprint, there's nothing to do.
+                r = await client.get(status_url, headers=headers)
+                if r.status_code == 200:
+                    body = r.json()
+                    if body.get("fingerprint") == keypair.fingerprint:
+                        log.info("identity v2: already registered (fingerprint=%s)",
+                                 keypair.fingerprint)
+                        return
+                elif r.status_code == 404:
+                    # Cloud doesn't have the endpoint yet (older cloud
+                    # deploy than appliance). Skip silently; we'll try
+                    # again on next boot.
+                    log.debug("identity v2: cloud endpoint 404 — older deploy?")
+                    return
+
+                # Upload our public key. Cloud will either register
+                # (first time) or rotate (different fingerprint than
+                # what's stored).
+                payload = {
+                    "public_key_b64": keypair.public_key_b64(),
+                    "fingerprint":    keypair.fingerprint,
+                }
+                r = await client.post(upgrade_url, json=payload, headers=headers)
+                if r.status_code >= 400:
+                    log.warning("identity v2 upgrade HTTP %s: %s",
+                                r.status_code, r.text[:200])
+                    return
+                body = r.json()
+                log.info("identity v2 upgrade %s: appliance keypair "
+                         "registered with cloud (fingerprint=%s)",
+                         body.get("result"), keypair.fingerprint)
+        except Exception as e:
+            log.warning("identity v2: cloud round-trip failed: %s — "
+                        "will retry on next boot", e)
 
     async def heartbeat_once(self) -> bool:
         """Build + send one heartbeat. Returns True on 2xx, False on
