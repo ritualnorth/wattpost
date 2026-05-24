@@ -188,6 +188,35 @@ CREATE TABLE IF NOT EXISTS output_schedules (
     last_run_result TEXT                            -- "ok"|"skip:..."|"fail:..."
 );
 CREATE INDEX IF NOT EXISTS idx_schedules_output ON output_schedules (output_id);
+
+-- Signed audit log (Identity v2 Phase 8B, #310). Append-only.
+-- Mirrors the cloud's signed_audit_log table but for events that
+-- happen ON the appliance: local UI login attempts, password
+-- changes, device pair / unpair, mTLS cert rotation, etc.
+--
+-- Each entry is ed25519-signed by the appliance's Phase 1 keypair
+-- so an attacker with disk access can't forge an entry without the
+-- keypair (which is sealed by the machine anchor). The hash chain
+-- (prev_hash → signed_repr → next prev_hash) makes truncation +
+-- reordering tamper-evident.
+--
+-- Uploaded to cloud via heartbeat extras; `uploaded_at` flips when
+-- the cloud has confirmed ingestion. Local rows stay forever (the
+-- chain is broken if any are deleted), but the upload-pending list
+-- shrinks as rows sync.
+CREATE TABLE IF NOT EXISTS signed_audit_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at     TEXT NOT NULL,            -- ISO-8601 UTC with microseconds
+    event_type      TEXT NOT NULL,
+    event_payload   TEXT NOT NULL,            -- JSON, canonical encoding
+    prev_hash       TEXT,                     -- NULL on the very first entry
+    signed_repr     TEXT NOT NULL UNIQUE,     -- the exact bytes signed
+    signature_b64   TEXT NOT NULL,            -- urlsafe-b64, no padding
+    issuer_kid      TEXT NOT NULL,            -- appliance keypair fingerprint
+    uploaded_at     TEXT                      -- ISO-8601; NULL → still pending
+);
+CREATE INDEX IF NOT EXISTS idx_audit_pending
+    ON signed_audit_log (id) WHERE uploaded_at IS NULL;
 """
 
 # Retention windows (seconds). Each lower-resolution table keeps data for

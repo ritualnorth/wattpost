@@ -8,6 +8,35 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.102] · 2026-05-24
+
+### Security · Appliance-side signed audit log + cloud sync (Phase 8B, #310)
+
+The appliance now keeps its own hash-chained, ed25519-signed audit
+log of local security events (`solar_monitor/signed_audit.py`),
+and syncs new entries to cloud via heartbeat extras. Cloud verifies
+each entry's signature against the registered appliance pubkey,
+walks the prev_hash chain to refuse tampering or replay, and acks
+accepted ids so the appliance can flip `uploaded_at`.
+
+* Appliance SQLite table `signed_audit_log` (auto-created on next
+  boot via SCHEMA CREATE-IF-NOT-EXISTS).
+* `write_event(db, *, event_type, payload)` is the call-site API;
+  individual security touchpoints (login_failed, password_changed,
+  cert_renewed, etc.) will plumb into it over follow-up commits.
+* Heartbeat extras carry `signed_audit_pending` (max 50/batch);
+  cloud response carries `audit_acked_ids`.
+* Cloud `signed_audit.verify_chain` + `_tail_hash` now partition
+  by `issuer` so cloud-signed and appliance-signed entries don't
+  braid into a single chain under the same appliance_id.
+* Cloud `ingest_appliance_events` verifies canonical_repr, kid
+  match, signature, and prev_hash continuity before persisting.
+
+Smoke-tested 3-event round trip: hash chain integrity holds,
+canonical_repr stable byte-for-byte across appliance writer and
+cloud verifier, ed25519 verify passes, mark_uploaded correctly
+drops acked rows from the next heartbeat's pending list.
+
 ## [0.1.101] · 2026-05-24
 
 ### Security · Appliance mTLS client cert (Identity v2 Phase 6B-A, #308)
