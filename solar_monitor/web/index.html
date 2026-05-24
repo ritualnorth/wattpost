@@ -769,9 +769,12 @@
               </button>
               <button id="signout-btn" class="btn-action" type="button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-                <span>Sign out</span>
+                <span id="signout-btn-label">Sign out</span>
               </button>
             </div>
+            <p id="signout-broker-note" class="settings-block-note" hidden style="margin:.5rem 0 0;color:var(--text-2);font-size:.85rem;line-height:1.45">
+              You're signed in via wattpost.cloud. The button above takes you to cloud sign-out — ending that session ends broker access to this appliance.
+            </p>
           </div>
           <div class="settings-block settings-block--cta">
             <h3>Devices &amp; setup</h3>
@@ -1247,6 +1250,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=212"></script>
+  <script src="/web/app.js?v=213"></script>
 </body>
 </html>

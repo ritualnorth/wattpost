@@ -7028,7 +7028,16 @@ if (rotatePwBtn) {
   if (!signoutBtn) return;
   if (document.body.classList.contains("is-demo")) return;
 
+  // Click handler: behaviour branches by origin (set in the
+  // auth-status fetch below). LAN cookie sessions hit /api/logout
+  // + reload; broker sessions jump to wattpost.cloud sign-out
+  // because clearing the LAN cookie doesn't end a broker view
+  // (the broker re-injects an HMAC header on every request).
   signoutBtn.addEventListener("click", async () => {
+    if (signoutBtn.dataset.origin === "broker") {
+      window.location.href = "https://wattpost.cloud/logout";
+      return;
+    }
     try {
       await fetch("/api/logout", {
         method: "POST", credentials: "same-origin",
@@ -7041,13 +7050,10 @@ if (rotatePwBtn) {
 
   // Hide until we know the user is actually signed in. Avoids
   // showing a Sign-out button to an anonymous LAN viewer who's
-  // never authed in the first place. Also hides for broker-origin
-  // sessions — the broker re-injects an HMAC header on every
-  // request from the user's wattpost.cloud session, so there's no
-  // appliance-side session for "Sign out" to actually end. The
-  // only way to sign out of a broker view is to log out of
-  // wattpost.cloud itself; rendering a button here that does
-  // nothing useful is just confusing.
+  // never authed in the first place. For broker-origin sessions
+  // we DO show it (relabeled "Exit cloud session") + a short note
+  // that the click takes you to wattpost.cloud's sign-out, because
+  // ending the broker session requires ending the cloud session.
   signoutBtn.hidden = true;
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
@@ -7055,7 +7061,16 @@ if (rotatePwBtn) {
       const authed = !!(data && data.authed);
       const origin = data && data.origin;
       if (typeof window._setAuthState === "function") window._setAuthState(authed, origin);
-      if (authed && origin !== "broker") signoutBtn.hidden = false;
+      if (authed) {
+        signoutBtn.dataset.origin = origin || "local";
+        signoutBtn.hidden = false;
+        const label = document.getElementById("signout-btn-label");
+        const note  = document.getElementById("signout-broker-note");
+        if (origin === "broker") {
+          if (label) label.textContent = "Exit cloud session";
+          if (note)  { note.hidden = false; note.style.display = "block"; }
+        }
+      }
       // Broker-origin: skip SSE, use polling. iOS Safari serialises
       // its small per-host HTTP connection pool around a long-lived
       // EventSource through the Cloudflare tunnel, queuing every
