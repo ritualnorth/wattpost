@@ -1429,6 +1429,23 @@ main {
 .energy-legend .chip { display: inline-flex; align-items: center; gap: .3rem; }
 .energy-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
 .energy-legend .swatch.line { width: 14px; height: 2px; border-radius: 0; }
+.energy-ranges {
+  display: flex; gap: .3rem; flex-wrap: wrap;
+  margin: 0 0 .75rem; padding: .25rem; border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  width: max-content;
+}
+.energy-ranges .erange {
+  appearance: none; border: 0; cursor: pointer;
+  background: transparent; color: var(--text-2);
+  font-size: .78rem; font-weight: 500;
+  padding: .35rem .75rem; border-radius: 6px;
+  transition: background .12s ease, color .12s ease;
+}
+.energy-ranges .erange:hover { color: var(--text-1); background: rgba(255,255,255,.05); }
+.energy-ranges .erange.is-active {
+  background: var(--accent, #3a7bd5); color: #fff;
+}
 
 .energy-stats {
   display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;

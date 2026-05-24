@@ -8,6 +8,30 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.110] · 2026-05-24
+
+### Added · Energy chart — range buttons + weather overlay (#251)
+
+The Energy chart on /history was stuck on "today" and gave no
+context on why the curves looked the way they did. Two additions:
+
+- **Range buttons** above the chart: Today · 24h · 7 days · 30 days.
+  Buckets auto-scale per range (5min / 15min / 1h / 6h) to keep the
+  payload small without losing visible detail. Selection persists in
+  `localStorage` so the chart re-opens on whatever range you last
+  used.
+- **Cloud-cover overlay**: a soft grey wash behind the energy series
+  shows percent cloud cover at every point, on the same right-side
+  axis as SoC (both 0-100%). Now when you see solar dip at 2pm you
+  can tell instantly whether it was overcast or whether something
+  broke. Pulled from Open-Meteo's hourly archive (free, no key),
+  interpolated onto the chart's bucket grid. New endpoint
+  `/api/weather/history` returns the aligned series; 15-min cache
+  keeps the upstream call light.
+
+Weather overlay is best-effort — no lat/lon configured or upstream
+unreachable just hides the layer, the energy chart still renders.
+
 ## [0.1.109] · 2026-05-24
 
 ### Added · Battery detail page — drill in from the SoC donut (#292)

@@ -54,6 +54,7 @@ from .weather_admin import (
     get_current_weather, get_weather_config, update_weather_config,
     test_weather_fetch,
 )
+from .weather_history import weather_history
 from .gps_admin import get_gps_status
 from .mqtt_in_admin import get_mqtt_in_status
 from .location_admin import get_location_status, update_location_share
@@ -1562,6 +1563,7 @@ def build_app(
             get_weather_config,
             update_weather_config,
             test_weather_fetch,
+            weather_history,
             get_cloud_config,
             update_cloud_config,
             pair_appliance,
