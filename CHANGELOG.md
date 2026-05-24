@@ -8,6 +8,36 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.107] · 2026-05-24
+
+### Security · Heartbeat signing (Phase 6B alternative, #308)
+
+The appliance now ed25519-signs every heartbeat body with its
+Phase 1 keypair. Cloud verifies the signature against the
+appliance's registered pubkey before ingesting. Closes the threat
+where a leaked bearer token alone is enough to impersonate the
+appliance — an attacker now also needs the kek-sealed private key.
+
+Originally Phase 6B was going to be mTLS heartbeats (full TLS
+handshake-level proof), but our CF-fronted setup terminates TLS
+at the Cloudflare edge — the client cert never reaches Caddy.
+Payload-signing achieves the same threat closure ("leaked bearer
+is useless without the sealed key") without touching Caddy, CF
+DNS, or adding a new bypass subdomain. The Phase 6B-A cert
+materials (#319) stay useful for future on-prem / non-CF-fronted
+deployments where end-to-end mTLS makes sense.
+
+Wire:
+* Appliance: `X-WP-Heartbeat-Sig` / `Ts` / `Fp` headers carry an
+  ed25519 sig over `"v1\n<iso-ts>\n<body>"`. Body pre-serialized
+  so signed bytes match what cloud receives.
+* Cloud: verifies kid against ApplianceKeypair row, ts within
+  ±5min (replay cap), sig against the body bytes. Reject 401 on
+  any failure. Grandfather missing sig (older appliance) with an
+  INFO log so the rollout is observable.
+* Smoke-tested 5/5: good roundtrip, body tamper, ts tamper, fp
+  mismatch, wrong key — all behave correctly.
+
 ## [0.1.106] · 2026-05-24
 
 ### Security · Wire signed-audit at security touchpoints (Phase 8B fanout, #310)

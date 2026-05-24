@@ -267,10 +267,39 @@ class CloudService:
         appliance progresses through pick-up → apply → terminal."""
         payload = await self._build_payload()
         url = f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat"
+        # Pre-serialize the body so the bytes we sign are the EXACT
+        # bytes the cloud will hash. httpx's json= kw would also
+        # serialize but with its own separator policy; we sign +
+        # send the same string to guarantee a match.
+        import json as _json
+        body_bytes = _json.dumps(payload, separators=(",", ":")).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
         }
+        # Phase 6B alt-C (#308) — sign the heartbeat with the Phase 1
+        # ed25519 keypair so a leaked bearer alone is useless.
+        # Signed form: "v1\n<ts>\n<body>" — version tag pinned so a
+        # future scheme change can be rejected, ts fresh-checked
+        # cloud-side (5min window) to cap replay attacks. The cloud
+        # grandfathers heartbeats without these headers during the
+        # rollout. Best-effort: keypair load failure ships unsigned
+        # (older Identity-v1 boxes never have a keypair).
+        try:
+            from datetime import datetime, timezone
+            from ..auth import keypair as _kp
+            import base64 as _b64
+            kp = _kp.load_or_create()
+            ts = datetime.now(timezone.utc).isoformat()
+            signed = b"v1\n" + ts.encode("ascii") + b"\n" + body_bytes
+            sig = kp.sign(signed)
+            headers["X-WP-Heartbeat-Ts"]  = ts
+            headers["X-WP-Heartbeat-Fp"]  = kp.fingerprint
+            headers["X-WP-Heartbeat-Sig"] = (
+                _b64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii")
+            )
+        except Exception:
+            log.exception("heartbeat sign skipped — uploading bearer-only")
         try:
             # follow_redirects=True so an appliance still pointing at
             # an older hostname (e.g. https://wattpost.io after we
@@ -280,7 +309,7 @@ class CloudService:
             async with httpx.AsyncClient(
                 timeout=10.0, follow_redirects=True,
             ) as client:
-                r = await client.post(url, json=payload, headers=headers)
+                r = await client.post(url, content=body_bytes, headers=headers)
         except Exception as e:
             log.warning("cloud heartbeat failed: %s", e)
             return False
