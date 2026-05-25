@@ -8,6 +8,31 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.113] · 2026-05-25
+
+### Changed · Settings split into a menu + 7 sub-pages (#328)
+
+The Settings tab was 16 cards stacked in one scrolling grid — top
+of the page to "Reset to defaults" was a long scroll on mobile.
+Restructured around the same pattern as the cloud Account split:
+a menu landing at `#/settings`, with each row deep-linking to its
+own sub-page (`#/settings/devices`, `#/settings/alerts`, etc.).
+
+New IA:
+
+- **Devices** — pair / scan / edit (the existing setup wizard CTA)
+- **Alerts** — threshold rules, transports, solar-aware charger pause
+- **Backup &amp; restore** — manual + automatic
+- **Privacy &amp; sharing** — location, kiosk URL, web password, discovery telemetry
+- **Integrations** — MQTT-out, MQTT-in
+- **Advanced** — history tiers + poll interval, retention, diagnostics, appearance/theme
+- **About** — version, update-now, session/sign-out, reset to defaults
+
+Implementation is CSS-driven: each existing settings-block got a
+`data-subroute` attribute, the SPA router stamps `body[data-route-sub]`
+on entry, and a few rules hide every block not matching the current
+sub. No card was rewritten, no JS handler moved.
+
 ## [0.1.112] · 2026-05-25
 
 ### Fixed · Power-flow icon tap returned 404 over the broker tunnel

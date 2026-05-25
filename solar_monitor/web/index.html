@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=139" />
+  <link rel="stylesheet" href="/web/styles.css?v=140" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -758,13 +758,82 @@
             Settings
           </h2>
         </div>
+
+        <!-- Sub-page back link — only visible when a sub-route is
+             active (CSS hides .settings-sub-back when
+             body[data-route-sub="menu"]). -->
+        <a href="#/settings" class="settings-sub-back">← Settings</a>
+
+        <!-- Menu landing — only visible when no sub-route is selected.
+             Each row deep-links to a sub-page where the matching
+             settings-blocks render. CSS in body[data-route-sub="menu"]
+             shows this and hides the .settings-grid blocks. -->
+        <nav class="settings-menu" aria-label="Settings sections">
+          <a class="settings-menu-row" href="#/settings/devices">
+            <span class="settings-menu-icon">🔌</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Devices</span>
+              <span class="settings-menu-sub">Scan over Bluetooth · pair Renogy, Victron, JK BMS</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/alerts">
+            <span class="settings-menu-icon">🔔</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Alerts</span>
+              <span class="settings-menu-sub">Threshold rules · transports · solar-aware charger pause</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/backup">
+            <span class="settings-menu-icon">💾</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Backup &amp; restore</span>
+              <span class="settings-menu-sub">Manual + automatic snapshots</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/privacy">
+            <span class="settings-menu-icon">🔐</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Privacy &amp; sharing</span>
+              <span class="settings-menu-sub">Location · kiosk URL · web password · discovery telemetry</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/integrations">
+            <span class="settings-menu-icon">🔌</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Integrations</span>
+              <span class="settings-menu-sub">MQTT-out · MQTT-in · Home Assistant + Grafana hooks</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/advanced">
+            <span class="settings-menu-icon">⚙️</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Advanced</span>
+              <span class="settings-menu-sub">History tiers · poll interval · diagnostics · theme</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/about">
+            <span class="settings-menu-icon">ℹ️</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">About</span>
+              <span class="settings-menu-sub">Version · update · session · reset to defaults</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+        </nav>
+
         <div class="settings-grid">
           <!-- Session + system actions promoted to the top of the
                grid (#147). Sign Out specifically — easy to miss when
                buried under five blocks of config; finishing at "Sign
                out" up here means you don't accidentally walk away
                from an authed session on a shared tablet. -->
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="about">
             <h3>Session &amp; system</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Restart the daemon to apply pending changes (new transports,
@@ -785,7 +854,7 @@
               You're signed in via wattpost.cloud. The button above takes you to cloud sign-out — ending that session ends broker access to this appliance.
             </p>
           </div>
-          <div class="settings-block settings-block--cta">
+          <div class="settings-block settings-block--cta" data-subroute="devices">
             <h3>Devices &amp; setup</h3>
             <p class="settings-cta-blurb">Scan over Bluetooth and pair Renogy gear. No config files.</p>
             <a class="btn-action btn-action--primary" href="#/setup">
@@ -793,7 +862,7 @@
               <span>Run device setup</span>
             </a>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="advanced">
             <h3>Appearance</h3>
             <div class="theme-picker" role="radiogroup" aria-label="Theme">
               <button class="theme-opt" data-theme-pref="system" role="radio" aria-checked="false">
@@ -817,14 +886,14 @@
               </span>
             </label>
           </div>
-          <div class="settings-block settings-block--alerts">
+          <div class="settings-block settings-block--alerts" data-subroute="alerts">
             <h3>Alerts</h3>
             <div id="settings-alerts" class="alerts-list">
               <div class="settings-empty">Loading…</div>
             </div>
             <p class="settings-foot">Edits apply on the next daemon restart for transports; rule changes hot-reload immediately.</p>
           </div>
-          <div class="settings-block" id="settings-history-block">
+          <div class="settings-block" id="settings-history-block" data-subroute="advanced">
             <h3>History &amp; polling</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               How often the daemon polls each device and how long each
@@ -870,7 +939,7 @@
             <div class="settings-row" style="margin-top:.65rem"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
             <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
-          <div class="settings-block" id="settings-solar-pause-block">
+          <div class="settings-block" id="settings-solar-pause-block" data-subroute="alerts">
             <h3>Solar-aware charger pause <span class="settings-foot" style="font-weight:normal">· Pro</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Pause your AC charger when solar is covering the load.
@@ -940,14 +1009,14 @@
               <div class="settings-row"><span>Reason</span><span class="v" id="sp-reason">·</span></div>
             </div>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="advanced">
             <h3>Retention</h3>
             <div class="settings-row"><span>Raw samples</span><span class="v">7 days</span></div>
             <div class="settings-row"><span>1-min rollup</span><span class="v">30 days</span></div>
             <div class="settings-row"><span>1-hour rollup</span><span class="v">1 year</span></div>
             <div class="settings-row"><span>1-day rollup</span><span class="v">forever</span></div>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="integrations">
             <h3>Integrations</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Third-party data sources. Each one needs your own free credentials ·
@@ -957,7 +1026,7 @@
               <div class="settings-empty">Loading…</div>
             </div>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="about">
             <h3>About</h3>
             <div class="settings-row"><span>Version</span><span class="v" id="settings-version">·</span></div>
             <div class="settings-row" id="settings-update-row" hidden>
@@ -993,7 +1062,7 @@
           </div>
           <!-- Session & system block moved to top of the grid above. -->
 
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="privacy">
             <h3>Web password</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               The local password protects writes from the LAN. Rotate it
@@ -1007,7 +1076,7 @@
             </button>
             <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
           </div>
-          <div class="settings-block" id="kiosk-block" hidden>
+          <div class="settings-block" id="kiosk-block" data-subroute="privacy" hidden>
             <h3>Kiosk share URL</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Public chrome-free wall-display view of SoC + flow. Anyone
@@ -1031,7 +1100,7 @@
               <span class="settings-foot" id="kiosk-msg"></span>
             </div>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="privacy">
             <h3>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Where this appliance shows up on the cloud fleet map &mdash; or whether it shows up at all.
@@ -1058,7 +1127,7 @@
             </fieldset>
             <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
-          <div class="settings-block settings-block--backup">
+          <div class="settings-block settings-block--backup" data-subroute="backup">
             <h3>Backup &amp; restore</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Download a single archive containing the full SQLite
@@ -1122,7 +1191,7 @@
               <div class="settings-empty">Loading&hellip;</div>
             </div>
           </div>
-          <div class="settings-block">
+          <div class="settings-block" data-subroute="privacy">
             <h3>Discovery telemetry</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Anonymous: when you scan for BLE / Modbus devices, the
@@ -1137,7 +1206,7 @@
               <span class="settings-foot" id="discovery-toggle-msg"></span>
             </div>
           </div>
-          <div class="settings-block settings-block--diagnostics">
+          <div class="settings-block settings-block--diagnostics" data-subroute="advanced">
             <h3>Diagnostics</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Live log tail from the daemon. Newest at the bottom.
@@ -1157,7 +1226,7 @@
             </div>
             <pre id="diag-log" class="diag-log">Loading…</pre>
           </div>
-          <div class="settings-block settings-block--danger" id="settings-reset-block">
+          <div class="settings-block settings-block--danger" id="settings-reset-block" data-subroute="about">
             <h3>Reset to defaults</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Wipes all configured transports, devices, exporters, alerts
@@ -1259,6 +1328,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=218"></script>
+  <script src="/web/app.js?v=219"></script>
 </body>
 </html>
