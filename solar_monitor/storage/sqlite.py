@@ -1519,6 +1519,66 @@ class Store:
                 if val is not None:
                     bms_lifetime[metric] = float(val)
 
+        # #295 — Shunt-derived lifetime fallback. When the BMS doesn't
+        # report lifetime throughput / cycles (typical for Daly, no-BMS
+        # shunt-only installs, JBD configs that don't expose the
+        # counter), pull what the shunts themselves track. Renogy +
+        # Junctek shunts both report cumulative_charge_ah and
+        # cumulative_discharge_ah straight off the device.
+        #
+        # Summed across all shunts on the bus — covers the rare
+        # multi-shunt install (one per parallel string). Single-shunt
+        # is the normal case and the sum collapses cleanly.
+        #
+        # Returned as a separate `shunt` dict so the frontend can pick
+        # the best source per metric (BMS > shunt > integration-from-
+        # history) and surface provenance to the user.
+        shunt_devices: list[str] = []
+        async with self._db.execute(
+            "SELECT device FROM device_meta WHERE kind = 'shunt'"
+        ) as cur:
+            async for (device,) in cur:
+                shunt_devices.append(device)
+
+        shunt_lifetime: dict[str, float] = {}
+        if shunt_devices:
+            placeholders = ",".join("?" * len(shunt_devices))
+            sums: dict[str, float] = {}
+            async with self._db.execute(
+                f"SELECT metric, SUM(value_num) FROM latest "
+                f"WHERE device IN ({placeholders}) "
+                f"  AND metric IN ('cumulative_charge_ah', 'cumulative_discharge_ah', "
+                f"                 'cycle_count') "
+                f"  AND value_num IS NOT NULL "
+                f"GROUP BY metric",
+                shunt_devices,
+            ) as cur:
+                async for metric, total in cur:
+                    if total is not None:
+                        sums[metric] = float(total)
+
+            if "cumulative_charge_ah" in sums:
+                shunt_lifetime["cumulative_charge_ah"] = round(sums["cumulative_charge_ah"], 1)
+            if "cumulative_discharge_ah" in sums:
+                dis_ah = sums["cumulative_discharge_ah"]
+                shunt_lifetime["cumulative_discharge_ah"] = round(dis_ah, 1)
+                # Convert to kWh using the bank nominal voltage so the
+                # frontend can render a single "lifetime energy" value
+                # without re-doing this math.
+                if nominal_v:
+                    shunt_lifetime["lifetime_throughput_kwh"] = round(
+                        dis_ah * nominal_v / 1000.0, 2
+                    )
+                # Estimated full-cycle count = total discharged Ah ÷
+                # bank capacity. Only meaningful when we know capacity;
+                # otherwise we'd be dividing by zero.
+                if cap_ah:
+                    shunt_lifetime["estimated_cycle_count"] = round(dis_ah / cap_ah, 1)
+            # If the shunt itself reports a cycle counter (some Junctek
+            # models do), surface it as-is.
+            if "cycle_count" in sums:
+                shunt_lifetime["cycle_count"] = round(sums["cycle_count"], 0)
+
         return {
             "since_ts": since_ts,
             "until_ts": until_ts,
@@ -1527,7 +1587,8 @@ class Store:
             "window_discharged_kwh": round(discharged_wh / 1000.0, 2),
             "window_equivalent_cycles": equivalent_cycles,
             "days_online": days_online,
-            "bms": bms_lifetime,  # cycle_count, lifetime_throughput_ah/kwh (or empty if no BMS)
+            "bms": bms_lifetime,      # cycle_count, lifetime_throughput_ah/kwh (or empty if no BMS)
+            "shunt": shunt_lifetime,  # cumulative_*_ah, lifetime_throughput_kwh, estimated_cycle_count (empty if no shunt)
             "bank_capacity_ah": round(cap_ah, 1) if cap_ah else None,
         }
 
