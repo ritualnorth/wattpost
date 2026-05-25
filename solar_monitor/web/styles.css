@@ -2860,6 +2860,78 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
   gap: 1rem;
   margin-top: .5rem;
 }
+
+/* ───── Settings sub-page navigation (#328) ─────────────────────
+   Menu landing on /#/settings; sub-pages on /#/settings/<section>.
+   body[data-route-sub] is set by the router on entry/exit. CSS
+   handles all show/hide so no JS layer needed beyond the router
+   already there. */
+.settings-menu {
+  display: none;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  margin: .25rem 0 .75rem;
+}
+.settings-menu-row {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .85rem 1rem;
+  text-decoration: none;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  transition: background .12s ease;
+}
+.settings-menu-row:last-child { border-bottom: 0; }
+.settings-menu-row:hover { background: rgba(255,255,255,.04); }
+.settings-menu-icon {
+  flex: none;
+  width: 30px; height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
+.settings-menu-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  min-width: 0;
+}
+.settings-menu-title { font-weight: 600; color: var(--text); }
+.settings-menu-sub { font-size: .78rem; color: var(--text-3); }
+.settings-menu-chev { color: var(--text-3); font-size: 1.2rem; }
+
+.settings-sub-back {
+  display: none;
+  margin: 0 0 .5rem;
+  color: var(--accent, #3a7bd5);
+  text-decoration: none;
+  font-size: .9rem;
+}
+.settings-sub-back:hover { text-decoration: underline; }
+
+/* On menu landing: show menu, hide every settings-block. */
+body[data-route-sub="menu"] .settings-menu { display: flex; }
+body[data-route-sub="menu"] .settings-grid > .settings-block { display: none; }
+body[data-route-sub="menu"] .settings-sub-back { display: none; }
+
+/* On a sub-route: hide menu, show ONLY blocks for that sub. The
+   :not selector list mirrors SETTINGS_SUBROUTES in app.js. */
+body[data-route-sub]:not([data-route-sub="menu"]) .settings-menu { display: none; }
+body[data-route-sub]:not([data-route-sub="menu"]) .settings-sub-back { display: inline-block; }
+body[data-route-sub="devices"]      .settings-grid > .settings-block:not([data-subroute="devices"])      { display: none; }
+body[data-route-sub="alerts"]       .settings-grid > .settings-block:not([data-subroute="alerts"])       { display: none; }
+body[data-route-sub="backup"]       .settings-grid > .settings-block:not([data-subroute="backup"])       { display: none; }
+body[data-route-sub="privacy"]      .settings-grid > .settings-block:not([data-subroute="privacy"])      { display: none; }
+body[data-route-sub="integrations"] .settings-grid > .settings-block:not([data-subroute="integrations"]) { display: none; }
+body[data-route-sub="advanced"]     .settings-grid > .settings-block:not([data-subroute="advanced"])     { display: none; }
+body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-subroute="about"])        { display: none; }
+
 .settings-block {
   background: var(--surface-2);
   border: 1px solid var(--border);

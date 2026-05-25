@@ -4504,6 +4504,13 @@ function _setAuthState(authed, origin) {
 }
 window._setAuthState = _setAuthState;  // for wireHeaderAuth handoff
 
+// Settings sub-routes (#328). Menu landing when sub is null; each
+// sub renders only its own block group via CSS on body[data-route-sub].
+const SETTINGS_SUBROUTES = new Set([
+  "devices", "alerts", "backup", "privacy",
+  "integrations", "advanced", "about",
+]);
+
 function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
   const m = raw.match(/^device\/(.+)$/);
@@ -4512,6 +4519,12 @@ function parseRoute() {
   const d = raw.match(/^docs\/(.+)$/);
   if (d) return { name: "docs", slug: d[1] };
   if (raw === "docs") return { name: "docs", slug: null };
+  // settings or settings/<sub>
+  const s = raw.match(/^settings\/(.+)$/);
+  if (s) {
+    const sub = SETTINGS_SUBROUTES.has(s[1]) ? s[1] : null;
+    return { name: "settings", sub };
+  }
   return { name: VALID_ROUTES.has(raw) ? raw : "dashboard" };
 }
 function currentRouteName() { return parseRoute().name; }
@@ -4567,8 +4580,16 @@ function setRoute(_unused) {
   if (route.name === "history") {
     requestAnimationFrame(() => { refreshEnergyOverview(); refreshChart(); refreshHeatmap(); });
   }
-  if (route.name === "settings") { renderSettings(); startDiagTimer(); }
-  else { stopDiagTimer(); }
+  if (route.name === "settings") {
+    // Reflect the sub-route onto the body so CSS can show only the
+    // requested block-group; menu landing renders when sub is null.
+    document.body.dataset.routeSub = route.sub || "menu";
+    renderSettings();
+    startDiagTimer();
+  } else {
+    delete document.body.dataset.routeSub;
+    stopDiagTimer();
+  }
   if (route.name === "dashboard") refreshDriftSparkline();
   if (route.name === "device") renderDeviceDetail(route.label);
   if (route.name === "setup") onEnterSetup();
