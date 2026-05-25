@@ -8,6 +8,28 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.111] · 2026-05-25
+
+### Added · Lifetime cycles + energy from shunt when BMS won't report (#295)
+
+Customers with a Daly BMS, JBD that doesn't expose the counter, or
+no BMS at all used to see "BMS only" on the Cycles and Lifetime
+fields of the battery-health tile. Renogy and Junctek shunts
+already track these numbers in hardware (`cumulative_charge_ah`,
+`cumulative_discharge_ah`); now we use them.
+
+Pick order per field:
+
+1. **BMS** if it reports — cleanest, manufacturer cycle definition
+2. **Shunt counter** if the shunt exposes one (some Junctek models)
+3. **Estimated from shunt** — `cumulative_discharge_ah ÷ bank
+   capacity` for cycles, `× nominal V ÷ 1000` for kWh
+
+A small "from BMS" / "from shunt" caption sits under each value so
+the source is visible. The pre-existing "BMS or shunt only" empty
+state still fires if neither is present (e.g. AiLi-only setups,
+where the shunt doesn't track lifetime separately).
+
 ## [0.1.110] · 2026-05-24
 
 ### Added · Energy chart — range buttons + weather overlay (#251)

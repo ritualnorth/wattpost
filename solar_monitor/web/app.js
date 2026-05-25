@@ -4257,6 +4257,29 @@ async function refreshRuntimeForecast() {
 // route-enter and on every dashboard tick alongside the drift
 // sparkline. Cheap query — single rollup-table scan plus a couple
 // of latest-table lookups.
+
+// Show/clear a small "from BMS" / "from shunt" caption beneath a
+// metric value. Creates the caption span on first call; updates
+// text on later calls; hides when src is null.
+function _setHealthSource(valueId, src) {
+  const val = document.getElementById(valueId);
+  if (!val) return;
+  let cap = document.getElementById(valueId + "-src");
+  if (!cap) {
+    cap = document.createElement("div");
+    cap.id = valueId + "-src";
+    cap.className = "bhealth-src";
+    val.parentNode.insertBefore(cap, val.nextSibling);
+  }
+  if (src) {
+    cap.textContent = src;
+    cap.hidden = false;
+  } else {
+    cap.textContent = "";
+    cap.hidden = true;
+  }
+}
+
 async function refreshBatteryHealth() {
   const root = document.querySelector("#panel-battery-health");
   if (!root) return;
@@ -4272,34 +4295,68 @@ async function refreshBatteryHealth() {
   const rs = document.getElementById("bhealth-residency-stat");
   const bars = document.getElementById("bhealth-bars");
 
-  // BMS-direct numbers: only show when a BMS reports them. Otherwise
-  // a dash + a quiet hint so customers don't think the tile is broken.
+  // Cycle + lifetime layered fallback (#295):
+  //   1. BMS-reported (cleanest — manufacturer cycle definition)
+  //   2. Shunt-reported (Junctek surfaces its own counter; most don't)
+  //   3. Shunt-derived (cumulative_discharge_ah ÷ bank capacity —
+  //      works on any Renogy / Junctek shunt because they all expose
+  //      the lifetime Ah counter)
+  //   4. "BMS or shunt only" — no upstream reports it.
+  // Provenance lives in the title tooltip so the headline number
+  // stays uncluttered. The label hint shows where it came from in
+  // small grey text below the number.
   const bms = data.bms || {};
+  const shunt = data.shunt || {};
   if (cy) {
+    let value = null, src = null, tip = null;
     if (bms.cycle_count != null) {
-      cy.textContent = Math.round(bms.cycle_count).toLocaleString();
-      cy.title = "Reported by the BMS. Typically increments per full discharge-then-charge.";
+      value = Math.round(bms.cycle_count).toLocaleString();
+      src = "from BMS";
+      tip = "Reported by the BMS. Typically increments per full discharge-then-charge.";
+    } else if (shunt.cycle_count != null) {
+      value = Math.round(shunt.cycle_count).toLocaleString();
+      src = "from shunt";
+      tip = "Reported by the shunt's onboard cycle counter.";
+    } else if (shunt.estimated_cycle_count != null) {
+      value = shunt.estimated_cycle_count.toFixed(1);
+      src = "from shunt";
+      tip = "Estimated: lifetime discharged Ah ÷ bank capacity. Lands within ~5% of the BMS counter where both are present.";
+    }
+    if (value != null) {
+      cy.textContent = value;
+      cy.classList.remove("bhealth-v-empty");
+      cy.title = tip;
+      _setHealthSource("bhealth-cycles", src);
     } else {
-      // #294 — honest empty state. The opaque "·" used to read as
-      // "broken tile"; "BMS only" tells the user a JK / Lynx is
-      // required. Equivalent-cycles below still works without one.
       cy.textContent = "BMS only";
       cy.classList.add("bhealth-v-empty");
-      cy.title = "Add a JK / Lynx BMS to surface manufacturer cycle count. Equivalent cycles below works without one.";
+      cy.title = "Add a BMS or supported shunt (Renogy / Junctek) to surface a cycle count. Equivalent cycles below works without either.";
+      _setHealthSource("bhealth-cycles", null);
     }
   }
   if (lf) {
+    let value = null, src = null, tip = null;
     if (bms.lifetime_throughput_kwh != null) {
       const v = bms.lifetime_throughput_kwh;
-      lf.textContent = v >= 1000 ? `${(v / 1000).toFixed(2)} MWh`
-                                  : `${v.toFixed(1)} kWh`;
-      lf.title = "Lifetime energy moved through the bank (BMS-reported).";
+      value = v >= 1000 ? `${(v / 1000).toFixed(2)} MWh` : `${v.toFixed(1)} kWh`;
+      src = "from BMS";
+      tip = "Lifetime energy moved through the bank (BMS-reported).";
+    } else if (shunt.lifetime_throughput_kwh != null) {
+      const v = shunt.lifetime_throughput_kwh;
+      value = v >= 1000 ? `${(v / 1000).toFixed(2)} MWh` : `${v.toFixed(1)} kWh`;
+      src = "from shunt";
+      tip = "Lifetime discharged Ah (shunt accumulator) × bank nominal voltage.";
+    }
+    if (value != null) {
+      lf.textContent = value;
+      lf.classList.remove("bhealth-v-empty");
+      lf.title = tip;
+      _setHealthSource("bhealth-lifetime", src);
     } else {
-      // #294 — same treatment as cycles. Lifetime throughput needs
-      // a BMS that reports it (JK / Lynx do; Daly does not).
       lf.textContent = "BMS only";
       lf.classList.add("bhealth-v-empty");
-      lf.title = "Connect a JK / Lynx BMS to track lifetime throughput across the bank.";
+      lf.title = "Connect a JK / Lynx BMS, or any Renogy / Junctek shunt, to track lifetime throughput across the bank.";
+      _setHealthSource("bhealth-lifetime", null);
     }
   }
   if (wc) {

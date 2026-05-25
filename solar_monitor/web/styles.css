@@ -2599,6 +2599,15 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
+/* #295 — provenance caption under cycle/lifetime numbers.
+   "from BMS" / "from shunt" hint, small + grey so it reads as
+   metadata not data. */
+.bhealth-src {
+  font-size: .68rem;
+  color: var(--text-3);
+  letter-spacing: .02em;
+  margin-top: -.15rem;
+}
 .bhealth-residency {
   margin-top: .25rem;
   padding-top: .85rem;
