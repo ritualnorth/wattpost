@@ -1607,17 +1607,19 @@ function buildFlowSvgV2(model, opts) {
   return svg;
 }
 
-// Drill-in routing. Targets the device-list page filtered by kind
-// for now; once the per-device detail pages land (#292 for battery)
-// we can route more specifically. Returns null when no useful
-// destination — node renders without cursor:pointer.
+// Drill-in routing. Hash routes — using location.href would break
+// inside the broker tunnel (humnb7h4n6.wattpost.cloud), which only
+// proxies the SPA shell + /api/*. Anything else returns the raw
+// 404 JSON. Hash routes stay within the SPA and work everywhere.
+//
+// Battery → #292 dedicated detail page (bank aggregate). Sources go
+// to the devices list so users can see the per-device live numbers.
+// Load is the house demand aggregate (no per-device meaning) so the
+// history page is the most useful drill.
 function drillTargetFor(node, role) {
-  if (role === "battery") return "/devices";  // → #292 Battery detail page eventually
-  // Source = sun / AC charger / DC-DC. Load = house demand (aggregate,
-  // no per-device meaning). Route sources to /devices so users can
-  // see the per-device live numbers; loads to /history.
-  if (role === "source") return "/devices";
-  if (role === "load")   return "/history";
+  if (role === "battery") return "#/device/bank";
+  if (role === "source")  return "#/devices";
+  if (role === "load")    return "#/history";
   return null;
 }
 
@@ -1625,7 +1627,10 @@ function _onFlowSvgClick(e) {
   const node = e.target.closest("[data-flow-drill]");
   if (!node) return;
   const dest = node.getAttribute("data-flow-drill");
-  if (dest) location.href = dest;
+  if (!dest) return;
+  // Hash navigation only — see drillTargetFor for why.
+  if (dest.startsWith("#")) location.hash = dest.slice(1);
+  else                       location.href = dest;
 }
 
 function addFlowGradient(defs, id, x1, y1, x2, y2, fromColor, toColor) {

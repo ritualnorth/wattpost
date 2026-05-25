@@ -8,6 +8,21 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.112] · 2026-05-25
+
+### Fixed · Power-flow icon tap returned 404 over the broker tunnel
+
+Tapping one of the Power-flow tile icons (solar / battery / load /
+charger) was doing a hard `location.href = "/devices"` style nav.
+That works on the local LAN appliance (catch-all serves the SPA
+shell) but breaks on the broker URL (humnb7h4n6.wattpost.cloud),
+which only proxies the shell + /api/* and returns a raw 404 JSON
+for anything else. Switched to hash routing (`#/devices`,
+`#/history`) so the click stays inside the SPA on both paths.
+Bonus: battery icon now routes straight to the #292 battery
+detail page (`#/device/bank`) instead of dumping you into the
+devices list.
+
 ## [0.1.111] · 2026-05-25
 
 ### Added · Lifetime cycles + energy from shunt when BMS won't report (#295)
