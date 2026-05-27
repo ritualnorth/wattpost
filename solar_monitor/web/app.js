@@ -5285,6 +5285,11 @@ async function refreshCloudBackups() {
     list.innerHTML = `<div class="settings-empty">
       Pair this appliance to wattpost.cloud first (Settings → Cloud)
       to enable off-site backups.
+      <br><br>
+      <span class="dash-sub" style="display:block;font-size:.85rem;color:var(--text-2);margin-top:.4rem;">
+        Just restored from a cloud backup? Your previous credentials
+        were cleared for security — re-pair to reconnect.
+      </span>
     </div>`;
     return;
   }
