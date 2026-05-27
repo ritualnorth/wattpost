@@ -95,7 +95,7 @@ npx cap sync ios
 npx cap open ios   # opens Xcode
 
 # In Xcode:
-# 1. Signing & Capabilities → Team: WattPost Ltd (need Apple Dev account)
+# 1. Signing & Capabilities → Team: Ritual North (need Apple Dev account)
 # 2. Add capability: Push Notifications
 # 3. Add capability: Background Modes → Remote notifications
 # 4. Set Bundle Identifier: io.wattpost.app
