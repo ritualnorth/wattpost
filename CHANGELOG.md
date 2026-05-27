@@ -8,6 +8,104 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.114] · 2026-05-27
+
+### Changed · Pricing reset: single Cloud tier at £6/mo, no-card 14-day trial (#333, #334)
+
+The catalogue collapsed from a 4-tier model (Free / Hobby / Pro /
+Installer) to a single Cloud tier at £6/mo or £60/yr, on top of
+the existing free local-only appliance. The Installer tier still
+exists as a separate Stripe price for fleet/multi-site customers
+but doesn't appear on `/pricing` — installers come in via a
+contact-us door. The 14-day trial is now no-card upfront:
+customers sign up, get full Cloud features for 14 days, and the
+trial cancels at day 15 if they haven't added a payment method
+(`trial_settings.end_behavior.missing_payment_method = "cancel"`).
+The referral programme is disabled behind a `REFERRALS_ENABLED`
+feature flag — too easy to abuse pre-launch.
+
+### Changed · Backup defaults: daily snapshots, 7-day rolling window (#336)
+
+`BackupCfg` defaults moved from `interval_hours=168, keep_count=4`
+(weekly, 4-deep) to `interval_hours=24, keep_count=7` (daily,
+7-deep). Verified end-to-end with the cloud-pull restore flow
+(#337): Garage Stack → isolated Docker test appliance → ed25519-
+signed restore command → backup downloaded, signature verified,
+applied in well under a second.
+
+### Fixed · /app/account/billing 500 from a Jinja-eating JS comment
+
+`account_billing.html.jinja` line 181 had a JavaScript comment
+that read "the {% if %} around the card". Jinja's lexer doesn't
+care that the literal is inside a `//` comment — it saw `{% if %}`
+as a directive, found no condition expression, and raised
+`TemplateSyntaxError` on every render. The page had been silently
+500-ing since the `REFERRALS_ENABLED` flag landed. Caught via
+GlitchTip within seconds of being noticed, fixed by rewording.
+
+### Fixed · Appliance command state machine: instant + idempotent transitions
+
+`api/appliance_commands._TRANSITIONS` was rejecting two common
+real-world flows: `queued → success` directly (when the appliance
+acts immediately and reports success without ever going through
+`picked_up`), and `picked_up → picked_up` (idempotent retries
+after a network blip). Both allowed now. Terminal-state invariants
+still enforced.
+
+### Fixed · Identity v2 signed_audit: PyNaCl → cryptography
+
+The Phase 8B signed-audit sync (#320) was importing
+`nacl.signing.VerifyKey`, but PyNaCl wasn't in the cloud
+container's dependency tree — every audit event from a paired
+appliance was raising `ModuleNotFoundError` and being silently
+dropped before persistence. Swapped to
+`cryptography.hazmat.primitives.asymmetric.ed25519.Ed25519PublicKey`
+(transitive dep via Litestar/TLS); arg order flipped to match
+(`vk.verify(signature, message)`). Appliance audit events now
+actually land in `audit_log`.
+
+### Changed · Removed unfounded "Ltd" claims across all customer-facing surfaces
+
+Privacy, Terms, `NOTICE`, `LICENSE`, `docs/license.md`, the
+mobile-app Xcode signing note, and the ritualnorth.com footer
+previously said "Ritual North Ltd". Ritual North is not yet
+registered at Companies House; claiming Ltd status without
+incorporation is a Companies Act 2006 s.1199 offence. Trading
+name "Ritual North" remains. UK GDPR Article 13(1)(a) controller
+identification stays satisfied by name + `support@wattpost.io`.
+
+### Added · Cloud observability — GlitchTip + Umami (#338)
+
+Self-hosted Sentry-compatible error tracking now lives at
+`glitchtip.ritualnorth.com`, wired into the cloud Litestar app
+via `sentry_sdk.init`. A `before_send` hook drops `HTTPException`
+events with 4xx status codes — those are user errors, not server
+bugs. Within the first hour live it caught the state-machine
+4xx noise and the ed25519 signature import bug above.
+
+Umami analytics (cookieless, privacy-respecting) on the marketing
+pages from `analytics.ritualnorth.com`. Gated by Jinja conditional
+to exclude `/app/*` — logged-in dashboard activity stays out of
+the analytics pipeline. CSP `script-src` + `connect-src` extended
+at the Caddy layer to allow the new origin.
+
+### Fixed · UI polish round
+
+Small visual fixes batched together: verify-email success page now
+shows a next-steps breadcrumb instead of dead-ending. The
+marketing topbar correctly highlights the active Docs / Download
+item (regression from the Tailscale removal). The recommended
+pricing card's left border is now a single 2px stripe instead of
+overlapping a CSS box-shadow ring. The Energy page chart restored
+its uPlot live legend (which #324 had accidentally suppressed when
+collapsing the read-only hover state).
+
+### Removed · /landing-v2 preview reverted
+
+A more honest "plausible-shaped" alternative landing was built at
+`/landing-v2` to compare against the live landing. Ritual North didn't
+like the tone — reverted. Existing landing stays.
+
 ## [0.1.113] · 2026-05-25
 
 ### Changed · Settings split into a menu + 7 sub-pages (#328)
