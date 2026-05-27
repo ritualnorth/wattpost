@@ -30,7 +30,7 @@ writing a custom licence is risky and reinventing the wheel.
 The code at `wattpost.cloud` (multi-site dashboard, heartbeat ingest,
 Cloudflare tunnel provisioning, REST API server, billing) is **not**
 distributed and **not** covered by the appliance licence. It's
-private to RitualNorth Ltd.
+private to Ritual North.
 
 ## Commercial use
 
