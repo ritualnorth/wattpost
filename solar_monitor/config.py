@@ -252,12 +252,18 @@ class BackupCfg(msgspec.Struct, kw_only=True):
     tier.
     """
     enabled: bool = True
-    # Interval in hours between auto-snapshots. Default = weekly.
-    interval_hours: int = 168
+    # Interval in hours between auto-snapshots. Default = daily.
+    # Was weekly (168h) pre-launch; bumped 2026-05-27 — "off-site
+    # backups + one-click restore" as a Pro promise needs fresher
+    # snapshots than once a week. A customer whose Pi dies on day
+    # 6 of the cycle would otherwise lose 6 days of data.
+    interval_hours: int = 24
     # How many auto-snapshots to keep on disk. Older ones pruned
     # after each successful capture. Manual snapshots live under
     # the same dir so they count too.
-    keep_count: int = 4
+    # At 24h interval × 7 = 1 week rolling window. Cloud storage
+    # cost is trivial (~26 MB × 7 × N customers).
+    keep_count: int = 7
     # Where the .tar.gz files land. Empty string = "<db_dir>/backups".
     dir: str = ""
     # Push each new local snapshot to wattpost.cloud after capture.
