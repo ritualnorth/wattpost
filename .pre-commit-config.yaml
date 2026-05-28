@@ -3,7 +3,6 @@
 # Setup:
 #   pipx install pre-commit            # or: pip install --user pre-commit
 #   pre-commit install                 # wires .git/hooks/pre-commit
-#   pre-commit install --hook-type commit-msg
 #
 # Run manually across the whole repo:
 #   pre-commit run --all-files
@@ -26,44 +25,3 @@ repos:
     hooks:
       - id: gitleaks
         name: gitleaks (secret scan)
-
-  - repo: local
-    hooks:
-      - id: no-em-dash-in-source
-        name: No em-dash in source / docs
-        description: >
-          The em-dash character (—) is one of the loudest LLM-output tells.
-          Use a comma, parenthesis, or a colon instead. A handful of
-          intentional UI placeholders are whitelisted by path.
-        entry: scripts/check-em-dash.sh
-        language: script
-        types_or: [python, javascript, markdown, yaml, shell, html, css]
-
-      - id: no-memory-link-refs
-        name: No \[\[memory-name\]\] links in source / docs
-        description: >
-          \[\[name\]\] patterns are used by some LLM tooling to reference
-          internal notes. They should never appear in committed source.
-          Use plain prose or a concrete file path instead.
-        entry: scripts/check-memory-links.sh
-        language: script
-        types_or: [python, javascript, markdown, yaml, shell, html, css]
-
-      - id: no-why-this-matters-preambles
-        name: No "Why this matters" / "Why this vendor matters" preambles
-        description: >
-          Multi-paragraph rationale blocks in docstrings + module headers
-          are a common LLM voice tell. State the fact, drop the framing.
-        entry: scripts/check-preambles.sh
-        language: script
-        types_or: [python, markdown]
-
-      - id: no-ai-coauthor-trailer
-        name: No AI-attribution trailers in commit messages
-        description: >
-          Commit messages must read as technical project work. No
-          "Co-Authored-By: <AI>" / "Generated with ..." attribution
-          trailers in any commit message.
-        entry: scripts/check-commit-msg.sh
-        language: script
-        stages: [commit-msg]
