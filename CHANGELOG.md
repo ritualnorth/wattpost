@@ -8,6 +8,51 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.120] · 2026-05-28
+
+### Added · Deye / Sunsynk / Sol-Ark driver pair (#366, experimental)
+
+Read-only driver for the second-largest hybrid-inverter
+protocol family on Solar Assistant's coverage list. One Chinese
+OEM (Deye), three brand names (Deye, Sunsynk in UK/EU, Sol-Ark
+in US), one Modbus RTU register map. Closes the other half of
+#359 — combined with the Voltronic driver (v0.1.115) and EG4 XP
+driver (v0.1.118) we now cover the three biggest hybrid-inverter
+protocol families on the market.
+
+Ships as a pair under one vendor:
+
+  * `vendors/deye/inverter_1p` — single-phase + split-phase
+    chassis. Deye SUN-5K/8K-SG04LP1, Sunsynk SG01LP1 line
+    (3.6–16 kW), Sol-Ark 5K/8K/12K-1P, Sol-Ark 12K-2P US
+    split-phase. Register base 59..194.
+  * `vendors/deye/inverter_3p` — three-phase commercial
+    chassis. Deye SUN-12K/15K/20K/25K-SG01HP3, Sunsynk
+    Max-15K/20K, Sol-Ark 15K-3P. Register base 500..689.
+    Up to four MPPT inputs (PV1-PV4) for the 20K+ models.
+
+Modbus RTU over RS485 via the inverter's RJ45 port. Non-standard
+pinout: pin 1 = RS485-B, pin 2 = RS485-A, pin 3 = GND. Same
+USB-RS485 dongle path Renogy / EPEVER / EG4 already use; reuses
+the existing `serial_modbus` transport unmodified.
+
+The driver catches three known footguns up-front by hard-coding
+the right scale per variant: battery_voltage ÷100 (1P) vs ÷10
+(3P), battery_power in watts × sign-flip (1P) vs deci-watts ×
+sign-flip (3P), PV power sign-flipped (1P) vs positive deci-watts
+(3P). Same protocol family, divergent conventions — got us once
+in early drafts of the verify script.
+
+References (Apache-2.0 — see NOTICE):
+  * kellerza/sunsynk — primary register-map source.
+  * StephanJoubert/home_assistant_solarman — cross-reference.
+  * Deye Modbus PDF (mirror at domotica.solar).
+
+`scripts/verify_deye.py` exercises both variants with synthetic
+FC03 fixtures across status / temps / battery / grid / AC out /
+PV blocks — 66/66 assertions across sunny + grid-tied +
+discharging + fault scenarios, plus the full mode-enum sweep.
+
 ## [0.1.119] · 2026-05-28
 
 ### Fixed · Battery never disappears from Power Flow, label stops lying
