@@ -104,4 +104,4 @@ jobs:
             docker exec shared-caddy caddy reload --config /etc/caddy/Caddyfile || true
             # Prune can race with concurrent deploys ("a prune operation
             # is already running") — non-fatal, the next deploy will tidy.
-            docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/ritualnorth/offgrid-monitor" || true
+            docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/ritualnorth/wattpost" || true

@@ -52,8 +52,8 @@ passthrough: [docker-install.md](docs/docker-install.md).
 Developer setup:
 
 ```bash
-git clone git@github.com:ritualnorth/offgrid-monitor.git
-cd offgrid-monitor
+git clone git@github.com:ritualnorth/wattpost.git
+cd wattpost
 python3 -m venv .venv && .venv/bin/pip install -e .
 cp config.example.yaml config.yaml
 # edit config.yaml with your transports + devices

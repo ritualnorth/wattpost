@@ -114,11 +114,11 @@ Recovery from a developer laptop with VPS SSH access:
 
 ```bash
 # 1. Find the failing run id (most recent pi-gen)
-gh -R ritualnorth/offgrid-monitor run list --workflow=build-image.yml --limit 3
+gh -R ritualnorth/wattpost run list --workflow=build-image.yml --limit 3
 
 # 2. Download the artefact + verify
 cd /tmp && rm -rf wp-img-tmp && mkdir wp-img-tmp && cd wp-img-tmp
-gh -R ritualnorth/offgrid-monitor run download <RUN_ID>
+gh -R ritualnorth/wattpost run download <RUN_ID>
 cd wattpost-image
 sha256sum -c image_*.img.xz.sha256
 

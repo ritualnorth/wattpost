@@ -124,7 +124,7 @@ Peers show up above the empty scan result with a yellow panel
 explaining the single-master rule and what to do.
 
 The implementation is in
-[`solar_monitor/api/setup.py`](https://github.com/ritualnorth/offgrid-monitor/blob/main/solar_monitor/api/setup.py).
+[`solar_monitor/api/setup.py`](https://github.com/ritualnorth/wattpost/blob/main/solar_monitor/api/setup.py).
 The whole helper, including the docker-network-aware anchor
 selection, fits in 80 lines. The discriminator is small enough
 to be useful and unique enough to avoid false positives. We are

@@ -789,7 +789,7 @@ Versions follow [Semantic Versioning].
 ## [0.0.27] - 2026-05-16
 
 ### Changed
-- **Every offgrid-monitor workflow now runs on the self-hosted VPS runners**, not just pi-gen. Previously the Docker, source-tarball, cloud, and demo workflows stayed on GitHub-hosted runners. Looked cheap (~1-3 min each) but the appliance-image build fires twice per release (main push + tag push) so the real per-release cost was ~8.7 min, not the ~1.5 I'd estimated. At our shipping pace that would have burned the remaining GitHub Actions allowance in 3-5 days.
+- **Every appliance workflow now runs on the self-hosted VPS runners**, not just pi-gen. Previously the Docker, source-tarball, cloud, and demo workflows stayed on GitHub-hosted runners. Looked cheap (~1-3 min each) but the appliance-image build fires twice per release (main push + tag push) so the real per-release cost was ~8.7 min, not the ~1.5 I'd estimated. At our shipping pace that would have burned the remaining GitHub Actions allowance in 3-5 days.
 - **Second runner container added** (`github-runner-wattpost-2`) so a long pi-gen build doesn't block the fast Docker / source-tarball builds that fire on the same tag push.
 - Effective GitHub Actions minutes per release: **0**. (Plus redundancy on the VPS. Either runner can pick up either kind of job.)
 
