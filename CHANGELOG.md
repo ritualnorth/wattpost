@@ -8,6 +8,40 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.117] · 2026-05-28
+
+### Fixed · Dashboard tiles render inverter-only installs
+
+A Voltronic-only install paired with the server-side bank
+aggregator (#361) still rendered an empty SoC donut, blank
+Net-power / Voltage tiles, and 0 W on the Solar node of the
+Power Flow strip. The browser-side `aggregateBank()` and
+`buildFlowModel()` had their own kind-filter logic that
+didn't know about inverters, so the snapshot's `bank` data
+was correct but the JS that draws the hero ignored it.
+
+Two patches in `solar_monitor/web/app.js`:
+
+  * `aggregateBank()` now considers an `inverter`-kind device
+    as the last-resort source when neither a shunt nor BMS
+    is configured. Reads battery_voltage_v + battery_current_a
+    + soc_pct from the inverter's canonical metric schema.
+    Capacity-derived fields (remaining Ah, time-to-empty) stay
+    blank — those are bank-config knowledge the inverter
+    legitimately doesn't have.
+
+  * `FLOW_MAPPING.inverter` gains a `sources: [pv]` entry so
+    the inverter's PV input feeds the Solar node, and a
+    `battery: { vMetric, aMetric, pMetric }` overrides block
+    so the flow model reads the inverter's per-domain
+    battery fields instead of the generic voltage_v /
+    current_a (which on an inverter would collide with
+    ac_output_voltage_v + grid_voltage_v).
+
+App-cache + service-worker buster bumped (`?v=220`,
+`wattpost-v135-app220-css140`) so existing PWAs pick up the
+new shell on next load.
+
 ## [0.1.116] · 2026-05-28
 
 ### Added · Bank aggregate accepts inverter as SoC source (#361)
