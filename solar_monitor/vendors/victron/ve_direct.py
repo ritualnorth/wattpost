@@ -41,10 +41,8 @@ def _to_int(s: str | None) -> int | None:
 
 
 def _mark_silent_vedirect(result: dict[str, Any], transport) -> dict[str, Any]:
-    """Same shape the BLE Victron drivers use, adjusted for VE.Direct.
-    The flow strip's stale-tile logic reads `advertisement_age_s`, so
-    we reuse that field name even though the value is really "seconds
-    since the last VE.Direct frame.\""""
+    """Stamp `advertisement_age_s` from the VE.Direct transport's frame age,
+    so the flow tile's stale-detection works the same as for BLE devices."""
     age = getattr(transport, "last_frame_age_s", lambda: None)()
     if age is not None:
         result["advertisement_age_s"] = age
@@ -73,9 +71,7 @@ def _require_ve_direct(transport, result, kind_name: str) -> bool:
 # ----------------------------------------------------------------- shunt
 
 class VictronVeDirectShunt(DeviceDriver):
-    """SmartShunt + BMV-7xx over VE.Direct. Mirrors the field surface
-    of the BLE SmartShunt driver so the dashboard tile renders the
-    same way regardless of transport."""
+    """SmartShunt + BMV-7xx over VE.Direct."""
     vendor_id = "victron_vedirect"
     device_kind = "shunt"
 

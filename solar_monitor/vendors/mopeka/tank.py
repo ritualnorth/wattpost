@@ -75,9 +75,7 @@ class MopekaTank(DeviceDriver):
 
         # Stamp the age every poll (fresh OR stale) so the dashboard
         # silent-detector and the latest table both reflect real
-        # current freshness, not the moment of last decode. Mirrors
-        # the Victron _silent.stamp pattern but inlined to avoid
-        # cross-vendor import.
+        # current freshness, not the moment of last decode.
         if age is None:
             # Sentinel: never seen. 24h reads as "Silent" to the UI
             # without claiming we know the actual silence window.

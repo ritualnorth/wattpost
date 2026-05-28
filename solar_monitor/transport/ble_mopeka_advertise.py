@@ -172,8 +172,7 @@ class _SharedMopekaScanner:
     async def pause(self) -> bool:
         """Stop the scanner so another caller can run a discovery on
         the same HCI adapter. Returns True iff we actually stopped a
-        running scanner (caller should then resume()). Mirrors the
-        Victron transport's pause()/resume()."""
+        running scanner (caller should then resume())."""
         async with self._lock:
             if self._scanner is None:
                 return False

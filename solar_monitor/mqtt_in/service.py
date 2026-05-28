@@ -3,7 +3,7 @@
 Design:
 
 * One background asyncio task owns the MQTT connection (auto-reconnect
-  with backoff, same pattern as the MQTT-OUT exporter).
+  with backoff).
 * Two parallel ingest paths:
     - HA-discovery: subscribe to `<prefix>/+/+/config` and friends,
       parse each config payload, and from then on subscribe to its

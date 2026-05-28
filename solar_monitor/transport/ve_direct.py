@@ -82,7 +82,7 @@ class VeDirectTransport(Transport):
 
     Background reader task is started by `open()` and torn down by
     `close()`. The most recent valid frame is cached; drivers read
-    it via `get_latest()` exactly like the BLE-advertise transport.
+    it via `get_latest()`.
     """
 
     def __init__(

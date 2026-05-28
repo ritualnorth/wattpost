@@ -1,7 +1,6 @@
 """Pluggable notification-transport registry.
 
-Same shape as the exporter registry: each transport module registers a
-factory keyed by its YAML `type` field.
+Each transport module registers a factory keyed by its YAML `type` field.
 """
 from __future__ import annotations
 
