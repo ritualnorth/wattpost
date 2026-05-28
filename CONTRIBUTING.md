@@ -14,24 +14,21 @@ python3 -m venv .venv
 
 # Run the test suite (or any individual verify script)
 .venv/bin/python -m pytest tests/
-.venv/bin/python scripts/verify_renogy.py
+.venv/bin/python scripts/verify_new_drivers.py
 ```
 
 ## Pre-commit hooks (please install)
 
-A handful of hooks keep the tree tidy and catch common voice / hygiene
-issues before they hit the history:
+A handful of hooks keep the tree tidy and catch common hygiene issues
+before they hit the history:
 
 ```bash
 pipx install pre-commit            # or: pip install --user pre-commit
 pre-commit install                 # wires .git/hooks/pre-commit
-pre-commit install --hook-type commit-msg
 ```
 
-Hooks: trailing whitespace, YAML/JSON parse, large-file block, secret
-scan (gitleaks), no em-dashes in source/docs, no `[[memory-name]]`
-patterns, no "Why this matters" preambles, no AI-attribution
-trailers in commit messages.
+Hooks: trailing whitespace, YAML/JSON parse, large-file block, and a
+secret scan (gitleaks).
 
 ## Adding a vendor driver
 
@@ -51,7 +48,7 @@ version:
 - Small, focused PRs land fastest.
 - One logical change per PR.
 - Update [CHANGELOG.md](CHANGELOG.md) under `[Unreleased]`.
-- Commit messages: present-tense, what + why. No AI trailers.
+- Commit messages: present-tense, what + why.
 
 If you're adding a driver and don't have the physical hardware, mark
 it `experimental: true` in the vendor `INFO` block. The first customer
