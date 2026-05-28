@@ -141,6 +141,11 @@ keytool -genkey -v -keystore ~/wattpost-release.keystore \
 Configure firebase-messaging for FCM push when the Firebase project
 lands (separate setup, see below).
 
+The Android build needs `android/app/google-services.json` — that file
+is gitignored per fork. Copy `google-services.json.example`, then fill
+in the values from your own Firebase console (Project settings → Your
+apps → Android → google-services.json).
+
 ## Push notifications
 
 Both platforms register a device token on app launch. Token is POSTed to
