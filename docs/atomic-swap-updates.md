@@ -56,7 +56,7 @@ After a rollback, `previous` points at the slot you *just left*, so a second rol
 
 ## Cloud auto-apply
 
-If you're on the Installer tier and you've ticked **"Auto-apply updates fleet-wide"** on the cloud dashboard, the cloud watches each appliance's heartbeat-reported version. When it sees a Pi appliance running an older version than `releases.wattpost.io`'s latest, it auto-queues an `update` command for that appliance, the same command the dashboard's manual "Update now" button issues. The appliance picks it up on its next heartbeat (5min default) and runs the full atomic-swap flow described above. If the new release misbehaves, the OnFailure watchdog rolls it back without your involvement.
+If you've ticked **"Auto-apply updates fleet-wide"** in WattPost Cloud, the cloud watches each appliance's heartbeat-reported version. When it sees a Pi appliance running an older version than `releases.wattpost.io`'s latest, it auto-queues an `update` command for that appliance, the same command the dashboard's manual "Update now" button issues. The appliance picks it up on its next heartbeat (5min default) and runs the full atomic-swap flow described above. If the new release misbehaves, the OnFailure watchdog rolls it back without your involvement.
 
 Docker installs ignore the flag, they update via `docker compose pull && docker compose up -d` on the host.
 

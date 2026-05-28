@@ -29,9 +29,10 @@ You also get a permanent **Update history** card on the per-site page
 showing every update, every rollback, and a one-click "Roll back to v0.X.Y"
 button for any past version.
 
-**Installer tier** gets the same chain in bulk: **Update all out-of-date
-sites** queues the full snapshot → check → update → watchdog → auto-rollback
-sequence per site independently. Per-site progress surfaces in the response.
+**WattPost Cloud** can run the same chain across sites: **Update all
+out-of-date sites** queues the full snapshot → check → update → watchdog
+→ auto-rollback sequence per site independently. Per-site progress
+surfaces in the response.
 
 ## 2. Watchtower / auto-poll (Docker)
 

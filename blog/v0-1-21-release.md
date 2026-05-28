@@ -58,7 +58,7 @@ passing cloud doesn't flap the relay. And if you manually
 toggle the charger yourself, the rule stops touching it.
 Whatever you just did, you knew something we didn't.
 
-This is a Pro tier feature and it's off by default. The
+This is a WattPost Cloud feature and it's off by default. The
 **control point is a smart plug upstream of the charger**, not
 the charger itself. We don't write to charger Modbus registers
 for the AC-charger side (Renogy doesn't publish a verified

@@ -23,8 +23,8 @@ Two ways, in order of difficulty:
 
 1. **Pair with wattpost.cloud** (recommended).
    The cloud broker gives you `https://yourname.wattpost.cloud/` with
-   a real Let's Encrypt cert maintained by us. Free Hobby tier covers
-   one site. See [Remote access](/docs/remote-access) for pairing.
+   a real Let's Encrypt cert maintained by us. See [Remote
+   access](/docs/remote-access) for pairing.
 
 2. **Browser exceptions**.
    If you'd rather keep using `http://<pi-ip>:8000`, every browser

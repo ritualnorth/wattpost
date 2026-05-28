@@ -855,7 +855,7 @@ no appliance is forced into a hard cut-over.
 - **Upgrade fails mid-flight** (network blip during finalize).
   Appliance keypair on disk + v1 bearer still works. Cloud sees no
   v2 pairing; banner remains; user can retry. Idempotent.
-- **Fleet upgrade.** Installer-tier user with N appliances clicks
+- **Fleet upgrade.** A cloud user with N appliances clicks
   "Upgrade all" on the dashboard banner; commands queue for each;
   user sees per-appliance status. Same audit/safety chain as
   fleet update.

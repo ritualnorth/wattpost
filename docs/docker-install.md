@@ -270,8 +270,8 @@ The Docker image:
 - **Remote access goes through [WattPost Cloud](pairing.md).**
   Pair the appliance once and you get a stable
   `https://yourname.wattpost.cloud/` URL with a real cert, no
-  port-forwarding, no public IP. Free Hobby tier covers one site.
-  See [Remote access](remote-access.md) for the broker overview.
+  port-forwarding, no public IP. See [Remote access](remote-access.md)
+  for the broker overview.
   If you'd rather self-host a VPN / WireGuard / reverse-proxy in
   front of the container, the daemon binds `0.0.0.0:8000` like
   normal, wire your own ingress at that port.

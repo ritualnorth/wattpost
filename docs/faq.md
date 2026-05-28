@@ -60,9 +60,7 @@ If you're 100% grid-tied with no batteries, dedicated solar-PV monitoring tools 
 
 ## How much does the cloud tier cost?
 
-- **Hobby** · £3/mo, 1 site, multi-site dashboard + tunnel + REST API
-- **Pro** · £6/mo, 3 sites, push notifications, rules engine, cloud-stored backups
-- **Installer** · £39/mo + £3/site, white-label kiosk for paid installs
+WattPost runs free forever on the appliance. **WattPost Cloud** adds remote access, a multi-site dashboard, push notifications, cloud-side rules, and off-site backups for **£6/mo**.
 
 14-day free trial. Cancel anytime. Full breakdown at [wattpost.cloud/pricing](https://wattpost.cloud/pricing).
 
