@@ -45,11 +45,11 @@ flow: rotating weekly archives of `config.yaml` + the SQLite DB,
 stored on the appliance itself (or any USB stick you mount). Restore
 is one click from the same panel.
 
-## Cloud backups (Pro tier)
+## Cloud backups (WattPost Cloud)
 
-If the appliance is [paired to wattpost.cloud](/docs/pairing) on the
-Pro tier, every snapshot is pushed off-site as it's taken. The cloud
-keeps the last 8 weekly archives encrypted at rest.
+If the appliance is [paired to wattpost.cloud](/docs/pairing) with
+WattPost Cloud, every snapshot is pushed off-site as it's taken. The
+cloud keeps the last 8 weekly archives encrypted at rest.
 
 After a hardware failure:
 

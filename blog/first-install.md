@@ -235,10 +235,9 @@ succeeds. The **Open** button on the cloud dashboard opens the
 local dashboard remotely, through your cloud session, with no
 extra login or port forwarding.
 
-Pairing starts a 14-day free trial. From day 15 the appliance
-bills £3/month (Hobby tier, single appliance) or £6 per
-appliance per month (Pro tier, unlimited). The local appliance
-keeps working forever, with or without a paid plan.
+Pairing starts a 14-day free trial. After that, WattPost Cloud is
+£6/month. The local appliance keeps working forever, with or without
+a paid plan.
 
 ## Conclusion
 

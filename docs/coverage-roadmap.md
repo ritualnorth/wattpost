@@ -139,8 +139,8 @@ Three signals shift the order:
   of truth here; this page is a snapshot.
 - **Support tickets**. Two support tickets asking "do you
   support X" promotes X to the active queue regardless of tier.
-- **Paying-customer requests**. A paid Pro / Installer-tier
-  account asking for a driver beats every Tier 4 item.
+- **Paying-customer requests**. A paying WattPost Cloud customer
+  asking for a driver beats every Tier 4 item.
 
 ## How to add a vendor
 

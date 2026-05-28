@@ -19,8 +19,7 @@ port-forwarding, no public IP, no certs to manage.
 
 ## Pairing
 
-1. Sign in at **[wattpost.cloud](https://wattpost.cloud)** (free Hobby
-   tier covers one site).
+1. Sign in at **[wattpost.cloud](https://wattpost.cloud)**.
 2. Open the appliance dashboard (LAN), go to **Settings → Cloud → Pair
    with wattpost.cloud**.
 3. Paste the pairing code from the cloud dashboard. The appliance
@@ -35,7 +34,7 @@ screenshots.
 - **HTTPS for free.** Real cert, no "Not Secure" warning, works on
   every browser and the iOS Add-to-Home-Screen PWA.
 - **Multi-site dashboard.** One login, all your appliances in one
-  view. Free tier covers one site; Pro / Fleet add more.
+  view.
 - **Kiosk shares.** Generate a read-only `wattpost.cloud/k/<token>`
   URL for a wall-mounted tablet or to send a customer. Scoped to a
   fixed allow-list of read-only endpoints, they can never write
@@ -46,9 +45,10 @@ screenshots.
 
 ## Pricing
 
-Hobby (1 site) is **free forever**. Pro starts at £3/mo. See the
-pricing page for the full comparison, includes alerts, off-site
-backups, and the REST API.
+Local monitoring is **free forever**. **WattPost Cloud** is £6/mo and
+adds remote access, multi-site, push, off-site backups, and the REST
+API. See the [pricing page](https://wattpost.cloud/pricing) for the
+full comparison.
 
 ## If you'd rather skip the cloud
 

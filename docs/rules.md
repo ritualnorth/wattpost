@@ -5,8 +5,8 @@ Threshold alerts say "tell me when something happens." **Rules** say
 on every poll, with a tight set of triggers and actions covering
 ~95% of what off-grid operators actually want to automate.
 
-Available on the **Pro tier** in the cloud and on every appliance
-that's paired to a Pro account. Like alerts, rules you set on the
+Available in the cloud with **WattPost Cloud**, and on every appliance
+paired to a cloud account. Like alerts, rules you set on the
 appliance show up in your cloud Rules page and are editable from
 anywhere via [wattpost.cloud](https://wattpost.cloud)
 for how local + cloud rules fit together.
@@ -120,4 +120,4 @@ disconnect a cratering bank is too late).
   trigger to start, a different one to stop).
 - **Cross-site rules**: a rule fires on the appliance it's defined
   on. Cross-site triggers ("any of my 3 sites below 20%") are on
-  the Installer-tier roadmap.
+  the roadmap.

@@ -4,7 +4,7 @@
     {
       "slug": "atomic-swap-updates",
       "title": "Your WattPost can never brick itself on an update",
-      "summary": "v0.1.31 ships A/B slots, pre-swap health probes, atomic symlink flips and a systemd OnFailure watchdog. Power loss mid-install, a broken release, a half-baked venv — worst case is 'stuck on yesterday's version, dashboard healthy, no SSH required.' Plus 'Auto-apply updates fleet-wide' for installer-tier customers.",
+      "summary": "v0.1.31 ships A/B slots, pre-swap health probes, atomic symlink flips and a systemd OnFailure watchdog. Power loss mid-install, a broken release, a half-baked venv — worst case is 'stuck on yesterday's version, dashboard healthy, no SSH required.' Plus 'Auto-apply updates fleet-wide' in WattPost Cloud.",
       "published_at": "2026-05-20",
       "author": "Ritual North",
       "hero": null
@@ -44,7 +44,7 @@
     {
       "slug": "v0-1-21-release",
       "title": "What shipped in WattPost v0.1.21",
-      "summary": "Reset-to-defaults for Docker users, the new solar-aware charger pause rule engine (Pro tier), a dashboard snapshot-lock fix that stops the hero and flow tiles disagreeing with each other, plus a strategic coverage roadmap that finally writes down which drivers come next.",
+      "summary": "Reset-to-defaults for Docker users, the new solar-aware charger pause rule engine (WattPost Cloud), a dashboard snapshot-lock fix that stops the hero and flow tiles disagreeing with each other, plus a strategic coverage roadmap that finally writes down which drivers come next.",
       "published_at": "2026-06-02",
       "author": "Ritual North",
       "hero": null
