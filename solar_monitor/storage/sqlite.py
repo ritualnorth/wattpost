@@ -480,7 +480,7 @@ class Store:
         day_mid_ts and day_mid_ts + 86400 exclusive.
 
         Returns None when either side has no data, the UI hides the
-        widget rather than show "—%" of nothing.
+        widget rather than render an empty-state percentage of nothing.
         """
         if self._db is None:
             raise RuntimeError("Store not open")

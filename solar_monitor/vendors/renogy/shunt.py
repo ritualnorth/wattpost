@@ -91,8 +91,8 @@ def _parse_live_stats(bs: bytes) -> dict:
 
     # Time-to-go fields: the shunt reports 0xFFFF when it doesn't
     # have a useful estimate (no current draw, or recently reset).
-    # Surface those as None so the UI's "—" fallback renders rather
-    # than "65535 min".
+    # Surface those as None so the UI's empty-state fallback renders
+    # rather than "65535 min".
     tte = int(bytes_to_int(bs, 27, 2))
     ttf = int(bytes_to_int(bs, 29, 2))
     if tte and tte != 0xFFFF:

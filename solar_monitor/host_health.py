@@ -8,7 +8,8 @@ view.
 
 Failure mode is silent: every reader is wrapped so a missing /proc
 entry (e.g. inside a stripped container) returns the partial snapshot
-rather than throwing. The cloud renders "—" for missing keys.
+rather than throwing. The cloud uses an empty-state glyph for
+missing keys.
 """
 from __future__ import annotations
 
