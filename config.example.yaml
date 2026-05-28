@@ -1,4 +1,4 @@
-# solar-monitor config — copy to config.yaml and edit.
+# WattPost config — copy to config.yaml and edit.
 #
 # Each transport is one connection to one bus. Each device sits on a transport
 # at a Modbus slave id. The same transport can carry many devices.

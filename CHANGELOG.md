@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to solar-monitor. Format: [Keep a Changelog].
+All notable changes to WattPost. Format: [Keep a Changelog].
 Versions follow [Semantic Versioning].
 
 [Keep a Changelog]: https://keepachangelog.com/

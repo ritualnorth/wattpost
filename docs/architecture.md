@@ -1,6 +1,6 @@
 # Architecture
 
-This document captures the *why* behind solar-monitor's structure so a
+This document captures the *why* behind WattPost's structure so a
 future maintainer (or second engineer) can make changes without
 re-deriving every decision.
 
