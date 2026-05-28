@@ -210,7 +210,7 @@ if [[ ! -f "${CONFIG_FILE}" ]]; then
     else
         cat > "${CONFIG_FILE}" <<'YAML'
 # Edit via the Setup wizard at http://<this-pi>:8000/#/setup
-# or by hand. See https://github.com/ritualnorth/offgrid-monitor
+# or by hand. See https://github.com/ritualnorth/wattpost
 transports: []
 devices: []
 exporters: []

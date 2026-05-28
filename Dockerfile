@@ -9,7 +9,7 @@
 # produced by .github/workflows/build-image.yml.
 FROM python:3.13-slim
 
-LABEL org.opencontainers.image.source="https://github.com/ritualnorth/offgrid-monitor"
+LABEL org.opencontainers.image.source="https://github.com/ritualnorth/wattpost"
 LABEL org.opencontainers.image.description="WattPost appliance daemon — for demo + CI use"
 
 # Slim deps: bluez/dbus libraries that bleak would normally need at

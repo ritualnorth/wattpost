@@ -113,5 +113,5 @@ before we ship them; guessing at write-register addresses with
 a 3 kW inverter on the other end is not how I want to spend a
 weekend.
 
-For everything else: the [open issues list](https://github.com/ritualnorth/offgrid-monitor/issues)
+For everything else: the [open issues list](https://github.com/ritualnorth/wattpost/issues)
 on the repo is current. Bug reports and driver requests welcome.

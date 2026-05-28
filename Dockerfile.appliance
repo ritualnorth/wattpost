@@ -22,7 +22,7 @@
 # the right long-term fix (#283); this gets us unblocked today.
 FROM public.ecr.aws/docker/library/python:3.12-slim
 
-LABEL org.opencontainers.image.source="https://github.com/ritualnorth/offgrid-monitor"
+LABEL org.opencontainers.image.source="https://github.com/ritualnorth/wattpost"
 LABEL org.opencontainers.image.description="WattPost appliance — off-grid solar monitor daemon for Renogy gear over Bluetooth"
 LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
 

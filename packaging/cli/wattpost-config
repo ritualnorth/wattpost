@@ -281,7 +281,7 @@ action_about() {
     ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
     port="$(awk -F= '/^WATTPOST_PORT=/{print $2}' "${PORT_FILE}" 2>/dev/null || echo '80')"
     if [ "${port}" = "80" ]; then port_sfx=""; else port_sfx=":${port}"; fi
-    msg "About WattPost" "Version:    ${v}\nHostname:   ${host}\nLAN IP:     ${ip:-unknown}\nWeb port:   ${port}\n\nGitHub:     https://github.com/ritualnorth/offgrid-monitor\nDashboard:  http://${host}.local${port_sfx}\nDocs:       open the dashboard → Docs"
+    msg "About WattPost" "Version:    ${v}\nHostname:   ${host}\nLAN IP:     ${ip:-unknown}\nWeb port:   ${port}\n\nGitHub:     https://github.com/ritualnorth/wattpost\nDashboard:  http://${host}.local${port_sfx}\nDocs:       open the dashboard → Docs"
 }
 
 # ---------------- main loop ----------------

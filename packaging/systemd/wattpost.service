@@ -1,6 +1,6 @@
 [Unit]
 Description=WattPost solar-monitor daemon
-Documentation=https://github.com/ritualnorth/offgrid-monitor
+Documentation=https://github.com/ritualnorth/wattpost
 # Bluetooth must be up before we try to discover the BT-2 dongle.
 # network-online.target lets the cloud sync + ntfy / Discord / SMTP
 # transports reach the outside world on first poll.
