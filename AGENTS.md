@@ -1,24 +1,26 @@
 # Orientation for AI agents
 
-This is **WattPost** — an off-grid solar monitoring product. Two halves:
+This is **WattPost** — an off-grid solar monitoring appliance.
+`solar_monitor/` is the daemon that runs on a Pi (or any Linux
+Docker host), polls Renogy/Victron/JK BMS/EG4/Deye/Voltronic/etc.
+over Bluetooth or wired serial, and serves a local dashboard.
 
-- `solar_monitor/` — the appliance daemon. Runs on a Pi, polls Renogy/Victron/JK BMS over Bluetooth, serves a local dashboard.
-- `cloud/` — the SaaS at `app.wattpost.io`. Multi-site dashboard, heartbeat ingest, Cloudflare tunnel provisioning, paired appliance management.
+The optional cloud companion (multi-site fleet, push, encrypted
+backups) lives in a separate private repo. Code under this repo
+is local-first by definition.
 
 Read in this order if you're new:
 
 1. **[README.md](README.md)** — what the product is, top-level layout, how to install
 2. **[docs/architecture.md](docs/architecture.md)** — appliance internals (transports, scheduler, storage, vendor drivers)
-3. **[docs/cloud-architecture.md](docs/cloud-architecture.md)** — cloud / appliance split, tunnel pattern
-4. **[docs/release-pipeline.md](docs/release-pipeline.md)** — how features reach customers (SD images + tarballs + Update-now)
-5. **[docs/adding-a-vendor.md](docs/adding-a-vendor.md)** — add a new battery/charger driver
+3. **[docs/release-pipeline.md](docs/release-pipeline.md)** — how features reach customers (SD images + tarballs + Update-now)
+4. **[docs/adding-a-vendor.md](docs/adding-a-vendor.md)** — add a new battery/charger driver
 
 ## Repo conventions
 
-- **Private repo.** The appliance binary distribution is via `releases.wattpost.io` (self-hosted on the Contabo VPS, see `docs/release-pipeline.md`).
-- **Cloud auto-deploys.** Every push to `main` that touches `cloud/` triggers `build-cloud-image.yml` → GHCR → SSH-deploy to the VPS. Don't commit broken cloud code to main.
-- **Appliance + cloud share this repo.** Code under `solar_monitor/` ships to customer Pis; code under `cloud/` stays on our infrastructure. Don't mix imports across that boundary.
-- **Sister repo: `vps-infra`** at `/home/user/code/vps-infra` on the dev box. Holds `docker-compose.yml`, Caddyfile, bootstrap scripts for the VPS. Has its own CLAUDE.md.
+- **Public, Apache 2.0.** Don't commit anything cloud-side, SaaS-side, or commercially sensitive here.
+- **Binary distribution via `releases.wattpost.io`** (self-hosted, see `docs/release-pipeline.md`).
+- **No AI-tells in commits.** Plain technical voice, no Co-Authored-By trailers, no "Ritual North" or "today's session" narratives.
 
 ## Common ops
 
@@ -26,15 +28,9 @@ Read in this order if you're new:
 | ------------------------------------- | --------------------------------------------------------------------- |
 | **Cut a real release** (see below)    | Bump `__version__` + CHANGELOG, commit, `git tag vX.Y.Z`, push tag.   |
 | Ship a feature to bleeding-edge testers | Just push to `main`. Builds `:edge` Docker tag, no manifest bump.    |
-| Debug a failed pi-gen run             | `gh run view <id> --log-failed`. Common failure modes documented in release-pipeline.md operator runbook |
-| Cloud incident / something on fire    | [docs/runbook.md](docs/runbook.md) — indexed by symptom (5xx, no heartbeats, tunnel down, etc) |
-| Edit production Caddy                 | Edit `vps-infra/caddy/Caddyfile`, push to vps-infra main, SSH in + `docker compose up -d shared-caddy` |
-| Smoke-test the cloud locally          | `cd cloud && docker compose up -d`; visit `http://localhost:8080`     |
+| Debug a failed pi-gen run             | `gh run view <id> --log-failed`. Common failure modes in release-pipeline.md operator runbook. |
 
 ## Cutting a release (the ritual)
-
-Ritual North (the user) doesn't cut releases — I do, when he asks. The
-shape:
 
 ```bash
 # 1. Bump version. Two characters change.
@@ -42,8 +38,7 @@ sed -i 's/__version__ = "0.0.3"/__version__ = "0.0.4"/' solar_monitor/__init__.p
 
 # 2. Move the [Unreleased] block in CHANGELOG.md to a new
 #    [0.0.4] — YYYY-MM-DD section. Leave [Unreleased] empty
-#    above it for the next batch. Today's date is in
-#    `currentDate` context.
+#    above it for the next batch.
 
 # 3. Commit (push to main fires :edge build only — harmless).
 git add solar_monitor/__init__.py CHANGELOG.md
@@ -74,7 +69,6 @@ The tag push triggers, in parallel:
   anything user-visible.
 - NOT after every commit — that's what `:edge` is for. Customers
   on `:latest` should see batched, version-numbered releases.
-- If Ritual North says "cut a release" or "ship this" — do it.
 
 ### Things that often go wrong
 
@@ -83,9 +77,8 @@ The tag push triggers, in parallel:
   in the same commit as the tag intent. If you forget: rebase,
   fix, re-tag.
 - **CHANGELOG entry missing**: less catastrophic, but customers
-  won't know what changed. Always populate it from the commit
-  log since the previous tag (`git log v0.0.3..HEAD --oneline`
-  is your friend).
+  won't know what changed. Populate from the commit log since
+  the previous tag (`git log v0.0.3..HEAD --oneline`).
 - **Tag already exists**: `git tag -d v0.0.4 && git push origin :v0.0.4`
   to delete locally and remotely, then re-tag. Be careful — if
   CI already started building, you may have a stuck partial
@@ -94,6 +87,5 @@ The tag push triggers, in parallel:
 ## Gotchas
 
 - **Pi-gen + qemu**: must use `tonistiigi/binfmt:latest` (qemu 9.x) for Python 3.13 to not segfault inside the chroot. Ubuntu's apt qemu is too old. See `.github/workflows/build-image.yml`.
-- **Caddy + Cloudflare**: zone SSL must be **Full** (not Strict). Caddy uses `tls internal` (self-signed) on every proxied site. Strict would 525-error everything. Banner in `vps-infra/caddy/Caddyfile` explains.
 - **Heartbeat hot-start**: pairing now starts the heartbeat service in-process via the API endpoint (`solar_monitor/api/cloud_admin.py`). Don't reintroduce "restart required for pairing" — that bit users earlier in development.
-- **Source tarball channel is anonymous.** Don't add auth to `releases.wattpost.io` — the appliance Update-now flow relies on it being un-gated, and the contents are already shipped by definition.
+- **Source tarball channel is anonymous.** Don't add auth to `releases.wattpost.io` — the appliance Update-now flow relies on it being un-gated.

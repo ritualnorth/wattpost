@@ -63,7 +63,7 @@ After a hardware failure:
    alert rules, exporter config. Everything.
 
 No more re-pairing four batteries by hand. See
-[Cloud overview](/docs/cloud-overview) for the full feature list.
+See [wattpost.cloud](https://wattpost.cloud) for the full feature list.
 
 ## Config edits via the UI are safe
 

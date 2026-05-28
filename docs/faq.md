@@ -8,7 +8,7 @@ The cloud tier is strictly additive: lose internet and you lose multi-site / hea
 
 ## Do I have to subscribe to anything?
 
-No. The SD image and local appliance are free forever. The [Cloud tier](/docs/cloud-overview) is optional, aimed at people running multiple sites or who want SMS escalation / remote access. You'll never be required to buy us.
+No. The SD image and local appliance are free forever. The optional [cloud tier](https://wattpost.cloud) is aimed at people running multiple sites or who want SMS escalation / remote access. You'll never be required to buy us.
 
 ## What happens if my Pi dies?
 
