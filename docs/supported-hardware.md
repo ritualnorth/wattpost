@@ -135,11 +135,69 @@ devices:
 
 Setup-wizard support comes after the first customer reports the parse looks correct on their firmware.
 
+## EG4 XP / kPV / FlexBOSS (experimental)
+
+The EG4 inverter line splits into two protocol families. The
+6500EX is a Voltronic rebadge and lives in the section above.
+The XP / kPV / FlexBOSS line is **Luxpower-derived** and lives
+here as its own driver.
+
+Models expected to work, sharing the Luxpower input-register base:
+
+- **EG4 12000XP**, **EG4 6000XP** (off-grid, split-phase)
+- **EG4 18kPV**, **EG4 12kPV** (hybrid, grid-tied)
+- **EG4 FlexBOSS21**, **EG4 FlexBOSS18**
+- **Luxpower-branded LXP** siblings (LXP-LB, LXP-EU, LXP-LB-BR)
+
+Read-only over **Modbus RTU on RS485** through the inverter's
+**CT1 RJ45 port**:
+
+| RJ45 pin | Signal |
+|----------|--------|
+| 7 | RS485-B |
+| 8 | RS485-A |
+
+USB-RS485 dongle (any FTDI, CH340, CP2102, etc.), 9600 baud,
+8N1, slave ID 1. Same hardware path Renogy and EPEVER customers
+use. Driver covers: device mode, battery V / SoC / SoH /
+charge+discharge power / temperature, PV1+PV2 voltage + power
+(both strings summed for the dashboard), AC output, EPS
+(off-grid) output, grid V/Hz, internal + radiator temps, running
+time. The 12000XP's split-phase L1/L2 voltages populate the
+optional `eps_l1_voltage_v` / `eps_l2_voltage_v` fields; hybrid
+models leave them empty.
+
+Drop in your `config.yaml`:
+
+```yaml
+transports:
+  - id: eg4_serial
+    type: serial_modbus
+    port: /dev/ttyUSB0
+    baudrate: 9600
+    label: EG4 USB-RS485
+
+devices:
+  - vendor: eg4
+    kind: inverter
+    transport: eg4_serial
+    slave_id: 1
+    label: EG4 inverter
+```
+
+Marked **experimental**: the register addresses are confirmed
+across three independent public sources, but Luxpower firmwares
+occasionally ship `battery_temperature` ÷10 vs ÷1 and a couple
+of mode codes vary by family. First customer probe paste flips
+this to stable. If you're running an EG4 XP / kPV and want to
+help validate, email
+[support@wattpost.io](mailto:support@wattpost.io).
+
 ## On the roadmap
 
 No commit dates yet. If you want one of these sooner, email [support@wattpost.io](mailto:support@wattpost.io).
 
-- **Deye / Sunsynk / Sol-Ark hybrid inverters** (separate protocol family from Voltronic).
+- **Deye / Sunsynk / Sol-Ark hybrid inverters** (separate protocol family).
 - **Sub-metering**. Shelly EM, IoTaWatt
 
 ## Hardware we won't add

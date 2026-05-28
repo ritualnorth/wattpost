@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.118] · 2026-05-28
+
+### Added · EG4 XP / kPV / FlexBOSS driver (#364, experimental)
+
+Read-only driver for EG4's Luxpower-derived inverter line:
+12000XP, 6000XP, 18kPV, 12kPV, FlexBOSS21/18, and the
+Luxpower-branded LXP siblings. (EG4's 6500EX is a Voltronic
+rebadge and stays in the `voltronic` vendor.) Speaks Modbus
+RTU over RS485 through the inverter's CT1 RJ45 port using
+the existing `serial_modbus` transport — same USB-RS485
+dongle path Renogy and EPEVER customers already use.
+
+Driver covers device operating mode, battery V / SoC / SoH /
+charge+discharge power / temperature, PV1+PV2 (both strings
+summed for the dashboard's Solar source node), AC output,
+EPS (off-grid) output V/Hz/W, grid V/Hz, internal + radiator
+temperatures, running time. The 12000XP / 6000XP's split-phase
+L1/L2 voltages populate optional `eps_l1_voltage_v` /
+`eps_l2_voltage_v` fields; hybrid kPV models leave them empty.
+
+Marked experimental: register addresses are confirmed across
+three independent public sources (EG4's own 18kPV-12LV Modbus
+PDF, joyfulhouse/eg4_web_monitor MIT, celsworth/lxp-bridge MIT
+— see NOTICE) but Luxpower firmwares occasionally ship
+`battery_temperature` ÷10 vs ÷1 and a couple of mode codes
+vary by family. First customer probe paste flips to stable.
+
 ## [0.1.117] · 2026-05-28
 
 ### Fixed · Dashboard tiles render inverter-only installs
