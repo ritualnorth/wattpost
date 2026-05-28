@@ -58,6 +58,10 @@ try:
     from . import ble_junctek  # noqa: F401
 except ImportError:
     pass
+try:
+    from . import usbhid_voltronic  # noqa: F401
+except ImportError:
+    pass
 
 __all__ = [
     "Transport",
