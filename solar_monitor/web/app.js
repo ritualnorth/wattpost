@@ -7204,6 +7204,15 @@ if (kioskToggle) {
     setKioskDefault(kioskToggle.checked);
   });
 }
+// "Default to kiosk on this device" is a LAN-only convenience for
+// wall-mounted tablets booting straight to SoC. Over the cloud broker
+// the canonical kiosk path is the share-token flow (#225); the
+// localStorage flag is the wrong tool there and surprises operators
+// when their broker URL starts auto-rendering as kiosk.
+const kioskDefaultRow = $("#kiosk-default-row");
+if (kioskDefaultRow && IS_BROKER_VIEW) {
+  kioskDefaultRow.hidden = true;
+}
 const kioskExitBtn = $("#kiosk-exit");
 if (kioskExitBtn) {
   // Hide Exit Kiosk for two cases:
@@ -7492,8 +7501,14 @@ if (window.location.pathname === "/kiosk") {
   window.location.hash = "#/kiosk";
 }
 // If this device is set to default-to-kiosk and the URL has no explicit
-// hash, redirect before the initial setRoute runs.
-else if (kioskDefault() && (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
+// hash, redirect before the initial setRoute runs. Skipped on broker
+// views; the localStorage flag is per-origin so it can only have been
+// set there by accident from a UI we now hide.
+else if (
+  !IS_BROKER_VIEW &&
+  kioskDefault() &&
+  (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")
+) {
   window.location.hash = "#/kiosk";
 }
 

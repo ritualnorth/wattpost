@@ -8,6 +8,11 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.122] - 2026-05-28
+
+### Fixed
+- "Kiosk view on this device" toggle hidden + auto-redirect skipped under the cloud broker; the toggle is LAN-only, cloud kiosk goes through the share-token path (#225)
+
 ## [0.1.121] - 2026-05-28
 
 ### Fixed
