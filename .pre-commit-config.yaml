@@ -1,0 +1,69 @@
+# pre-commit hooks for WattPost.
+#
+# Setup:
+#   pipx install pre-commit            # or: pip install --user pre-commit
+#   pre-commit install                 # wires .git/hooks/pre-commit
+#   pre-commit install --hook-type commit-msg
+#
+# Run manually across the whole repo:
+#   pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+        exclude: '^mobile-app/android/app/google-services\.json\.example$'
+      - id: check-added-large-files
+        args: ['--maxkb=1024']
+      - id: check-merge-conflict
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+
+  - repo: local
+    hooks:
+      - id: no-em-dash-in-source
+        name: No em-dash in source / docs
+        description: >
+          The em-dash character (—) is one of the loudest LLM-output tells.
+          Use a comma, parenthesis, or a colon instead. A handful of
+          intentional UI placeholders are whitelisted by path.
+        entry: scripts/check-em-dash.sh
+        language: script
+        types_or: [python, javascript, markdown, yaml, shell, html, css]
+
+      - id: no-memory-link-refs
+        name: No \[\[memory-name\]\] links in source / docs
+        description: >
+          \[\[name\]\] patterns are how Claude links to its memory files.
+          They should never appear in committed source. Use plain prose
+          or a concrete file path instead.
+        entry: scripts/check-memory-links.sh
+        language: script
+        types_or: [python, javascript, markdown, yaml, shell, html, css]
+
+      - id: no-why-this-matters-preambles
+        name: No "Why this matters" / "Why this vendor matters" preambles
+        description: >
+          Multi-paragraph rationale blocks in docstrings + module headers
+          are a common LLM voice tell. State the fact, drop the framing.
+        entry: scripts/check-preambles.sh
+        language: script
+        types_or: [python, markdown]
+
+      - id: no-ai-coauthor-trailer
+        name: No "Co-Authored-By Claude/AI" trailers in commit messages
+        description: >
+          Commit messages must read as technical project work. No AI
+          attribution trailers ("Co-Authored-By: Claude ...",
+          "Generated with Claude Code", etc.) in any commit message.
+        entry: scripts/check-commit-msg.sh
+        language: script
+        stages: [commit-msg]
