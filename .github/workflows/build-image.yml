@@ -86,7 +86,7 @@ jobs:
         # SIGSEGV intermittently — flaky under Ubuntu's apt qemu, even
         # the 24.04 8.x version). Pinning to this action removes that
         # whole class of failures.
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
         with:
           image: tonistiigi/binfmt:latest
           platforms: arm64,arm
