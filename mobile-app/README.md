@@ -44,8 +44,7 @@ inside the WebView — zero duplication.
 - ✅ **Branded icon + splash** — generated from www/assets/icon.svg via @capacitor/assets.
 
 Out of scope for v1: native dashboard reimplementation, BLE pairing on phone, Watch / CarPlay /
-widgets. See `~/.claude/projects/-home-james-solar-monitor/memory/project_wattpost_mobile_app.md`
-for the full scope decision log.
+widgets. The native shell stays thin; everything else lives in the PWA the WebView loads.
 
 ## Shipping checklist (Play Store · still pending)
 

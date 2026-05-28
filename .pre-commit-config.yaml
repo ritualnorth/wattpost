@@ -42,9 +42,9 @@ repos:
       - id: no-memory-link-refs
         name: No \[\[memory-name\]\] links in source / docs
         description: >
-          \[\[name\]\] patterns are how Claude links to its memory files.
-          They should never appear in committed source. Use plain prose
-          or a concrete file path instead.
+          \[\[name\]\] patterns are used by some LLM tooling to reference
+          internal notes. They should never appear in committed source.
+          Use plain prose or a concrete file path instead.
         entry: scripts/check-memory-links.sh
         language: script
         types_or: [python, javascript, markdown, yaml, shell, html, css]
@@ -59,11 +59,11 @@ repos:
         types_or: [python, markdown]
 
       - id: no-ai-coauthor-trailer
-        name: No "Co-Authored-By Claude/AI" trailers in commit messages
+        name: No AI-attribution trailers in commit messages
         description: >
-          Commit messages must read as technical project work. No AI
-          attribution trailers ("Co-Authored-By: Claude ...",
-          "Generated with Claude Code", etc.) in any commit message.
+          Commit messages must read as technical project work. No
+          "Co-Authored-By: <AI>" / "Generated with ..." attribution
+          trailers in any commit message.
         entry: scripts/check-commit-msg.sh
         language: script
         stages: [commit-msg]

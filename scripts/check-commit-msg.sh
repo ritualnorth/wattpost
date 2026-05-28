@@ -7,15 +7,14 @@ set -u
 
 msg_file="$1"
 
-# Patterns: "Co-Authored-By: Claude ...", "Generated with Claude Code",
-# "🤖 Generated", any "@anthropic" / "Claude (Opus/Sonnet/Haiku)" trailer.
+# Catch "Co-Authored-By: <any AI tool>", "Generated with <AI>", any
+# vendor-bot email domain. Pattern set is broad so this stays useful as
+# new tools land.
 patterns=(
-  'Co-Authored-By:.*Claude'
-  'Co-Authored-By:.*Anthropic'
-  'Generated with.*Claude'
+  'Co-Authored-By:.*\b(AI|LLM|Bot|GPT|Codex|Copilot|Cursor|Claude|Gemini|Llama)\b'
+  'Generated (with|by) .*\b(AI|LLM|GPT|Codex|Copilot|Cursor|Claude|Gemini)\b'
+  'noreply@(anthropic|openai|github\.copilot)'
   '🤖 Generated'
-  'noreply@anthropic'
-  'Claude.*<.*@anthropic'
 )
 
 status=0

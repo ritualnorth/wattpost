@@ -72,5 +72,7 @@ cloud/.env.*
 !cloud/.env.example
 .env
 
-# Claude Code local state
+# Editor / tool local state
 .claude/
+.vscode/
+.idea/
