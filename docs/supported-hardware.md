@@ -193,11 +193,64 @@ this to stable. If you're running an EG4 XP / kPV and want to
 help validate, email
 [support@wattpost.io](mailto:support@wattpost.io).
 
+## Deye / Sunsynk / Sol-Ark (experimental)
+
+Three brand names, one Chinese OEM. Deye builds the chassis; Sunsynk rebrands them for the UK / EU market; Sol-Ark rebrands them for the US market. Same Modbus RTU register map across all three brands.
+
+The catalogue splits into two register-map variants by chassis size:
+
+**Single-phase + split-phase** (driver kind: `inverter_1p`)
+
+- **Deye SUN-5K-SG04LP1**, **SUN-8K-SG04LP1**
+- **Sunsynk SG01LP1** family (3.6 kW / 5.5 kW / 8 kW / 16 kW)
+- **Sol-Ark 5K**, **8K**, **12K-1P**, **12K-2P** (US split-phase)
+
+**Three-phase** (driver kind: `inverter_3p`)
+
+- **Deye SUN-12K / 15K / 20K / 25K-SG01HP3**
+- **Sunsynk Max-15K**, **Max-20K**
+- **Sol-Ark 15K-3P**
+
+Read-only over **Modbus RTU on RS485** through the inverter's RJ45 port. Pinout is non-standard (NOT T568) — Deye uses pins 1 and 2 for the differential pair:
+
+| RJ45 pin | Signal |
+|----------|--------|
+| 1 | RS485-B (D−) |
+| 2 | RS485-A (D+) |
+| 3 | GND |
+
+Any FTDI / CH340 / CP2102 USB-RS485 dongle works, 9600 8N1, slave ID 1.
+
+Drop in your `config.yaml`:
+
+```yaml
+transports:
+  - id: deye_serial
+    type: serial_modbus
+    port: /dev/ttyUSB0
+    baudrate: 9600
+    label: Deye USB-RS485
+
+devices:
+  - vendor: deye
+    kind: inverter_1p           # or inverter_3p for the bigger 3-phase units
+    transport: deye_serial
+    slave_id: 1
+    label: Deye inverter
+```
+
+Marked **experimental** until a customer with real hardware confirms the per-firmware scaling. Three known footguns the driver catches up-front (different between 1P and 3P):
+
+- Battery voltage scale (1P ÷100, 3P ÷10)
+- Battery power magnitude (1P watts, 3P deci-watts)
+- PV power sign convention (1P sign-flipped, 3P positive deci-watts)
+
+If you're running a Deye / Sunsynk / Sol-Ark and want to help validate the first real-hardware probe, email [support@wattpost.io](mailto:support@wattpost.io).
+
 ## On the roadmap
 
 No commit dates yet. If you want one of these sooner, email [support@wattpost.io](mailto:support@wattpost.io).
 
-- **Deye / Sunsynk / Sol-Ark hybrid inverters** (separate protocol family).
 - **Sub-metering**. Shelly EM, IoTaWatt
 
 ## Hardware we won't add

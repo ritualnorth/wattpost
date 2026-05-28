@@ -32,3 +32,14 @@ Third-party references used during driver development:
         Electronics, publicly mirrored). Register definitions
         are facts, not creative expression, and so not subject
         to copyright.
+
+  * Deye / Sunsynk / Sol-Ark driver (vendors/deye) — same
+    research-then-clean-room shape, three public references:
+      - kellerza/sunsynk (Apache-2.0) — primary Python register-
+        map source for both single-phase and three-phase variants.
+      - StephanJoubert/home_assistant_solarman (Apache-2.0) —
+        Home Assistant integration, cross-reference for the same
+        register definitions.
+      - Deye Modbus protocol PDF (publicly mirrored at
+        domotica.solar). Register definitions are facts, not
+        creative expression.
