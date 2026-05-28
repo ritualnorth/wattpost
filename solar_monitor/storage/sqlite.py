@@ -840,11 +840,13 @@ class Store:
                       if d and d.get("_kind") == "shunt"), None)
         batts = [d for d in devices.values()
                  if d and d.get("_kind") == "smart_battery"]
-        # Inverter-as-source: any device of kind 'inverter' that
-        # reports both battery_voltage_v and soc_pct is a candidate.
-        # Voltronic / Axpert / MPP / EG4 family all populate these.
+        # Inverter-as-source: any device whose _kind starts with
+        # "inverter" and reports battery_voltage_v + soc_pct is a
+        # candidate. Covers Voltronic (kind=inverter), EG4 XP
+        # (kind=inverter), and Deye/Sunsynk/Sol-Ark (kind=inverter_1p
+        # or inverter_3p — split by chassis size, same bank role).
         inverter = next((d for d in devices.values()
-                         if d and d.get("_kind") == "inverter"
+                         if d and (d.get("_kind") or "").startswith("inverter")
                          and d.get("battery_voltage_v") is not None
                          and d.get("soc_pct") is not None), None)
         if shunt is None and not batts and inverter is None:
