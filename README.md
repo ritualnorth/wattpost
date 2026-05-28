@@ -77,6 +77,5 @@ backups. £6/mo. Most people don't need it.
 
 ## License
 
-Proprietary, source-available. See [LICENSE.txt](LICENSE.txt).
-The full source ships under `/opt/wattpost-src` on every
-installed appliance.
+Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). The full
+source ships under `/opt/wattpost-src` on every installed appliance.
