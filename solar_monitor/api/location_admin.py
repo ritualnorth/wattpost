@@ -15,8 +15,7 @@ Two surfaces:
 
 The map tile reads `current_location` (the LOCAL view, always
 truthful), not the cloud-gated view. Show-the-customer-their-own-
-location is never gated; only TRANSMISSION is gated. See
-[[location-opt-in]] memory for the principle.
+location is never gated; only TRANSMISSION is gated.
 """
 from __future__ import annotations
 

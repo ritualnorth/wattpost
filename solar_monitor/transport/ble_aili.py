@@ -1,46 +1,24 @@
 """BLE GATT transport for AiLi smart shunts (#204).
 
-AiLi is one of the two cheap BLE shunts the DIY-van crowd reaches
-for as their first piece of telemetry. Sub-£40, a paired display
-unit + a Bluetooth "Battery Monitor" Android app. The protocol
-is reverse-engineered in several open-source projects:
-
-  - github.com/ChrisAndrews-Photos/aili-shunt
-  - github.com/somewattsolar/aili-shunt-mqtt
-  - github.com/svtmc/aili-bms-mqtt
-
-Protocol summary:
-
   * BLE service:  0000FFE0-0000-1000-8000-00805F9B34FB
   * Notify char:  0000FFE1-0000-1000-8000-00805F9B34FB
 
-The shunt streams a fixed 20-byte status frame ~every second on
-the notify characteristic with no command needed. We just connect
-+ subscribe + read.
-
-Frame layout (20 bytes, all big-endian unless flagged):
+Shunt streams a 20-byte status frame ~1Hz on notify, no command
+needed. Connect + subscribe + read.
 
     byte  0      header 0xFF
     byte  1      header 0x55
     bytes 2-3    voltage         mV (uint16)
-    bytes 4-6    current         24-bit signed in 0.001 A units
+    bytes 4-6    current         24-bit signed 0.001 A
                                  (top bit of byte 4 = sign)
     bytes 7-10   remaining_mAh   uint32
     byte  11     soc_pct         0-100
-    byte  12     temperature_c   signed int8 (offset 0 actually,
-                                 but some AiLi rebrands offset by 50
-                                , we use raw signed first; future
-                                 community report can disambiguate)
-    bytes 13-14  time_to_go      minutes (uint16); 0xFFFF = unknown
-    bytes 15-18  cumulative_mAh  uint32 (charge counter)
-    byte  19     checksum        sum of bytes 0..18 mod 256
+    byte  12     temperature_c   signed int8 (some rebrands offset 50)
+    bytes 13-14  time_to_go      minutes uint16, 0xFFFF = unknown
+    bytes 15-18  cumulative_mAh  uint32
+    byte  19     checksum        sum-mod-256 (some rebrands XOR)
 
-Different AiLi rebrands sometimes swap bytes 12 and 13, and the
-checksum is sometimes XOR rather than sum. We accept either form
-on receive, first customer report can lock in which variant.
-
-Read-only. AiLi has no documented write commands the community
-has reverse-engineered cleanly.
+Read-only.
 """
 from __future__ import annotations
 

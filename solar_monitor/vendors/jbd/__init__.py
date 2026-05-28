@@ -2,10 +2,7 @@
 
 Pending real-hardware validation: ships from public protocol
 docs + community reverse engineering (Overkill Solar's open
-client, syssi's ESPHome JBD module). First customer report
-becomes the real-world confirmation. See
-[[project-no-victron-lab-purchases]] for the validation
-discipline this follows.
+client, syssi's ESPHome JBD module).
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

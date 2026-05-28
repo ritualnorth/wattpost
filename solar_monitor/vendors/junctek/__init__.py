@@ -1,6 +1,6 @@
 """Junctek KH-F / KG-F shunt vendor package (#205).
 
-Pending real-hardware validation. See [[project-no-victron-lab-purchases]].
+Pending real-hardware validation.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

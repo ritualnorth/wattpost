@@ -1,8 +1,7 @@
 """Daly Smart BMS vendor package (#202).
 
 Pending real-hardware validation. Ships from public protocol
-docs + dalybms community projects. See
-[[project-no-victron-lab-purchases]].
+docs + dalybms community projects.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

@@ -1,46 +1,15 @@
 """BLE GATT transport for Daly Smart BMS (#202).
 
-Daly (Dongguan Daly Electronics) is the second-most-common BMS in
-budget LFP packs after JBD. Their app is "Smart BMS"; the device
-identifies in BLE scans as "DL-…" or "BMS-…" followed by an alpha
-suffix.
-
-Protocol summary (from dalybms.com docs + the dalybms open-source
-project + bigmonkeyboy/daly-bms-uart reverse engineering):
-
   * BLE service:  0000FFF0-0000-1000-8000-00805F9B34FB
   * Write char:   0000FFF2-0000-1000-8000-00805F9B34FB
   * Notify char:  0000FFF1-0000-1000-8000-00805F9B34FB
 
-Frame format (host -> BMS):
+Frame: A5 <ADDR> <CMD> 08 <8 bytes data> <CHK>. We send ADDR=0x80
+(most BLE firmwares accept). CHK = low byte of preceding sum.
 
-    A5 <ADDR> <CMD> 08 <8 bytes data, usually zeros> <CHK>
-
-Frame format (BMS -> host, possibly fragmented across notifies):
-
-    A5 <ADDR> <CMD> 08 <8 bytes data> <CHK>
-
-ADDR is 0x40 (host -> BMS) or 0x01 (BMS -> host on UART; on BLE the
-BMS replies with whatever ADDR was sent, so we send 0x80 which a
-lot of Daly BLE firmwares accept). CHK is the low byte of the sum
-of all preceding bytes.
-
-Commands we read:
-
-  * 0x90, SoC + total V + total I
-  * 0x91, min / max cell V + index
-  * 0x92, min / max temperature + sensor index
-  * 0x93, charge / discharge MOS state + cycle count
-  * 0x94, cells count + temp sensor count + charger/load status
-  * 0x95, per-cell voltages (multi-frame, one cell every 3 bytes)
-  * 0x96, per-temperature-sensor readings
-
-All read frames are 13 bytes. Cell-voltage replies span multiple
-13-byte frames; we accumulate them in the parser.
-
-Read-only at v1. Daly does support writes (BMS reset, threshold
-configuration) but they're behind the same brick-the-pack risk as
-JBD, gated on hardware validation.
+Commands: 0x90 SoC+V+I, 0x91 min/max cell V, 0x92 min/max temp,
+0x93 MOS state + cycles, 0x94 counts + charger/load, 0x95 per-cell
+mV (multi-frame), 0x96 per-sensor temps. Read-only at v1.
 """
 from __future__ import annotations
 

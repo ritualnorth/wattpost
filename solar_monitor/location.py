@@ -12,8 +12,7 @@ Two distinct concerns lumped into one module:
    in the heartbeat extras? Honours the LocationCfg.share_with_cloud
    privacy gate: returns None when share mode is "off", coordinates
    rounded to the approx grid when "approx", or full precision when
-   "precise". The gate is customer-controlled and authoritative,
-   see [[location-opt-in]] memory.
+   "precise". The gate is customer-controlled and authoritative.
 
 Splitting these two prevents the easy-to-miss bug where the cloud
 ends up with location data the user thought they'd disabled. The

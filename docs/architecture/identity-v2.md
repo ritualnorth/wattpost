@@ -396,9 +396,8 @@ mechanisms.
 ## Technical decisions (resolved 2026-05-24)
 
 These were originally framed as "open questions"; each has a
-standard industry answer. Resolved here without surfacing to Ritual North
-per [[user_role]], these are technical implementation calls, not
-strategic ones.
+standard industry answer. Resolved as technical implementation
+calls.
 
 | # | Decision | Reasoning |
 |---|---|---|
@@ -999,13 +998,10 @@ No scaling concerns at our target customer counts.
 
 ## Next steps
 
-1. ~~Ritual North reviews this doc~~, not needed; Ritual North is CEO, not
-  engineer (see [[user_role]]). Technical decisions resolved
-  above without his input.
-2. ~~Resolve the 8 open questions~~, done; see "Technical
+1. ~~Resolve the 8 open questions~~, done; see "Technical
   decisions" section.
-3. Mark Phase 0 (#302) **completed**, done.
-4. **Phase 1 (#303)**, appliance keypair foundation. ~1 week.
+2. Mark Phase 0 (#302) **completed**, done.
+3. **Phase 1 (#303)**, appliance keypair foundation.
   Ready to start.
 5. **Phase 5 (#307)**, WebAuthn / passkey on cloud. Parallel
   with Phase 1, doesn't block.

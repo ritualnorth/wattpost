@@ -1,5 +1,4 @@
-"""Daly BMS driver, emits the same normalised field surface as
-the JK and JBD drivers so the dashboard renders consistently.
+"""Daly BMS driver.
 
 Per-command payload layout (each is exactly 8 bytes):
 

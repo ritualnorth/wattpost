@@ -1,9 +1,5 @@
 """EPEVER Tracer-family MPPT driver (#203).
 
-Reference: EPEVER "Modbus protocol of solar charge controller" PDF
-(public). Field surface mirrors what the Renogy Rover driver
-exposes so the dashboard tiles render the same.
-
 Live-state input registers (FC04):
 
   0x3100   PV input voltage              0.01 V
@@ -44,12 +40,7 @@ Daily-stats input registers (FC04):
   0x3310   Generated energy total (low)
   0x3311   Generated energy total (high)
 
-Status discretes / coils (FC02 / FC05) exist for the load switch
-but reads are FC04 for the cached `is on` value at 0x3201.
-
-Read-only at v1. Writes for battery type / capacity / etc. live
-in holding-register space starting at 0x9000 and are gated on
-hardware validation through the probe-writable-setting script.
+Load switch state at 0x3201 (read via FC04). Read-only at v1.
 """
 from __future__ import annotations
 

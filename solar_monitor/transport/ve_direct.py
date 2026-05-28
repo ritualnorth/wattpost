@@ -1,37 +1,17 @@
 """Victron VE.Direct text-protocol transport (#197).
 
-Reads Victron's published VE.Direct text frames over a serial port
-(typically /dev/ttyUSB0 plugged into Victron's "VE.Direct to USB"
-cable, or a DIY FTDI/CP2102 USB-TTL adapter wired to the device's
-4-pin JST PH 2.0mm port).
+Serial, 19200 8N1. Device emits text frames ~1Hz as a series of
+<CR><LF><label><TAB><value> lines terminated by a Checksum line
+(unsigned sum of all bytes mod 256 = 0). HEX protocol lines
+(start with `:`) are skipped.
 
-Protocol summary (Victron's VE.Direct Protocol PDF, public):
+Read-only.
 
-  * 19200 baud, 8N1, no flow control
-  * Device emits frames every ~1 second
-  * Each frame is a series of <CR><LF><label><TAB><value> lines
-    terminated by a Checksum line. The checksum byte is chosen so
-    that the unsigned sum of every byte in the frame (including
-    the checksum line itself) modulo 256 equals zero.
-  * Some firmware mixes "HEX protocol" framing between text frames
-    (lines starting with `:`). We skip those lines, they're for
-    bidirectional GET/SET, which Victron only exposes for a tiny
-    subset of registers and which our scope memo locks out anyway.
-
-Read-only. Aligns with the long-standing project_victron_scope
-memo: we never write to Victron devices. VE.Direct adds a second
-read path for installs where BLE Instant Readout isn't reliable
-(metal van builds, dense RF, long lines of sight to a buried Pi).
-
-Contract:
-
-  * `open()` starts a background task that reads frames forever.
-  * `get_latest()` returns the most recently parsed frame as a
-    plain dict of {label: str_value, plus "_pid_int": int when
-    PID is present}, strings because every VE.Direct field is
-    a string on the wire. Per-device drivers convert.
-  * `request()` raises, VE.Direct is push-only, like the BLE
-    advertisement transport.
+  * `open()` starts a background reader.
+  * `get_latest()` returns the most recent frame as {label: str,
+    plus "_pid_int": int when PID is present}; per-device drivers
+    convert from string.
+  * `request()` raises, VE.Direct is push-only.
 """
 from __future__ import annotations
 

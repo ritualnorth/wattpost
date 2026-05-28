@@ -1,6 +1,6 @@
 """AiLi smart shunt vendor package (#204).
 
-Pending real-hardware validation. See [[project-no-victron-lab-purchases]].
+Pending real-hardware validation.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

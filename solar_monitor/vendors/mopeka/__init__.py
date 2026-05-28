@@ -16,12 +16,9 @@ We ship a single device kind today:
     horizontal cylindrical propane bottle vs a rectangular freshwater
     tote without us guessing.
 
-Strategic context: this driver is the entry point of the sensor wave
-([[project_van_mode]]). Persona A van-builders want propane + water
-visibility next to the battery; offering it natively (vs Mopeka's own
-app that doesn't talk to anything else) is the wedge. See
-[[project_target_customer]] for why we lean into Persona A here even
-though it widens the driver count.
+Van builders want propane + water visibility next to the battery;
+the native render (vs Mopeka's own app that doesn't talk to anything
+else) is the wedge.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

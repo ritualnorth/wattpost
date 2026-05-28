@@ -1,15 +1,7 @@
 """Deye / Sunsynk / Sol-Ark single-phase + split-phase driver.
 
-Covers:
-  * Deye SUN-5K/8K-SG04LP1
-  * Sunsynk SG01LP1 3.6K / 5.5K / 8K / 16K
-  * Sol-Ark 5K / 8K / 12K-1P
-  * Sol-Ark 12K-2P (US split-phase 120/240 V, still single-MPPT-pair on
-    the inverter side; treated as single-phase from the protocol view)
-
-Modbus RTU, holding registers (FC03), 9600 8N1, slave 1.
-
-Register map (decimal, holding registers):
+FC03 holding registers, 9600 8N1, slave 1. Covers SUN-5K/8K-SG04LP1,
+Sunsynk SG01LP1 3.6/5.5/8/16K, Sol-Ark 5K/8K/12K-1P, Sol-Ark 12K-2P.
 
     Reg  Field                       Scale    Unit  Notes
     ---  --------------------------- -------- ----- ----------------
@@ -34,16 +26,8 @@ Register map (decimal, holding registers):
     191  battery_current             ×–0.01   A    sign-flipped; ours: +=charge
     193  ac_output_frequency         ×0.01    Hz
 
-References (all credited in NOTICE, facts not creative expression):
-  * kellerza/sunsynk MIT-then-Apache-2.0, definitions/single_phase.py
-  * StephanJoubert/home_assistant_solarman Apache-2.0, solarman
-    integration register tables.
-  * Deye Modbus PDF mirror (domotica.solar).
-
-The driver reads four targeted Sections rather than one big sweep
-because the address space between covered registers is reserved
-on Deye firmware and some FW revs NAK long reads that span
-unmapped regions. Same defensive shape we used on the EG4 driver.
+Reads use four targeted Sections rather than one big sweep, some
+Deye FW revs NAK long reads that span reserved address gaps.
 """
 from __future__ import annotations
 

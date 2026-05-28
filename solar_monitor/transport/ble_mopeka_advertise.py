@@ -25,9 +25,6 @@ Why a separate shared scanner from Victron's:
   * Decouples Mopeka driver development from the Victron transport
     (their adapter-health debugging is enough surface as it is)
 
-See [[project-van-mode]] / [[project-target-customer]] in memory
-for why Mopeka specifically, it's the "vanlife killer feature"
-for the Persona A van-builder customer.
 """
 from __future__ import annotations
 

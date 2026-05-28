@@ -1,34 +1,12 @@
 """Passive BLE Instant Readout transport for Victron Energy devices.
 
-Victron's BLE story is fundamentally different from Renogy's BT-2:
-the device broadcasts encrypted "Instant Readout" advertisements
-~once per second, and consumers decrypt them with a per-device
-encryption key (revealed in VictronConnect under "Product info →
-Show device key"). There's no GATT connection, no Modbus, no
-write capability, strictly read-only, but every metric you'd
-want is in the payload.
+Device broadcasts encrypted advertisements ~1Hz; consumers decrypt
+with the per-device key from VictronConnect (Product info → Show
+device key). No GATT, no writes.
 
-Why a separate transport class (not BLE Modbus):
-
-  * The orchestrator's Transport ABC requires a `request()` method
-    (the Modbus pattern). Victron is passive: requests don't exist,
-    the device pushes data on its own schedule. We satisfy the ABC
-    by implementing `request()` that raises, Victron drivers
-    override `poll()` and never call it.
-
-  * One BleakScanner per process is plenty; spinning one up per
-    Victron transport instance would be wasteful and risks scan
-    conflicts. We use a module-level singleton (`_GLOBAL_SCANNER`)
-    that every Victron transport instance registers with, the
-    scanner's detection callback routes advertisements by MAC to
-    the right transport instance for decoding.
-
-  * Driver reads via `transport.get_latest()`, a dict of decoded
-    fields or None if no advertisement landed yet / is stale.
-
-See [[project-target-customer]] in memory for why this matters:
-SmartShunt is the highest-leverage driver to add (Persona B,
-"budget upgrader who buys a shunt for first-time visibility").
+`request()` raises (push-only); drivers override `poll()` to read
+via `transport.get_latest()`. A module-level singleton scanner
+(`_GLOBAL_SCANNER`) routes adverts by MAC to the right transport.
 """
 from __future__ import annotations
 
