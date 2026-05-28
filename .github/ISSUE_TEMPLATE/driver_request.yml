@@ -1,0 +1,37 @@
+name: Device / driver support request
+description: Ask for support for a battery, charger, MPPT, BMS, shunt, or inverter
+labels: ["driver-request"]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Device make and model
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Device kind
+      options:
+        - Battery / BMS
+        - Charger / MPPT
+        - Shunt
+        - Inverter
+        - DC-DC
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Product link or datasheet
+  - type: textarea
+    id: connectivity
+    attributes:
+      label: How does it connect?
+      description: Bluetooth, USB/RS485, RS232, CAN, WiFi, vendor app name, etc.
+  - type: textarea
+    id: protocol
+    attributes:
+      label: Protocol docs, vendor app, or existing integrations
+      description: Anything that helps us reverse the protocol (links, app names, other projects that read it).
