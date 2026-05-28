@@ -167,15 +167,9 @@ class RenogyDcc(DeviceDriver):
         ]
 
     def writable_settings(self) -> list[WritableSetting]:
-        """The DCC50S is the same charger silicon as the Rover MPPT
-        family with an alternator front-end bolted on. Renogy reuses
-        the 0xE004 / 0xE008..0xE00C register block across both, so
-        the descriptors here mirror the Rover's exactly. Read-back
-        comes from the new `charge_voltages` Section above.
-
-        Conservative ranges (same logic as Rover): a notch tighter
-        than the absolute vendor spec, so a typo'd entry doesn't
-        cycle the bank to death."""
+        """Charge-profile descriptors against the 0xE004 / 0xE008..0xE00C
+        register block. Ranges are a notch tighter than vendor spec so a
+        typo'd entry can't cycle the bank to death."""
         return [
             WritableSetting(
                 key="battery_type",

@@ -1,18 +1,9 @@
 """Victron Orion-Tr Smart DC-DC charger driver, read-only.
 
-The Orion-Tr Smart family (12/12-18, 12/12-30, 12/24-15, 24/12-30 etc.)
-broadcasts Instant Readout advertisements just like the SmartShunt;
-we reuse the `ble_victron_advertise` transport (#112) and only need
-to register a new driver that knows how to map the `DcDcConverter`
-payload onto our standard fields.
-
-Worth noting: the smaller Orion-Tr models don't have an output-current
-sensor. We expose every field victron-ble surfaces; downstream UI
-treats missing values the same way it does for any optional metric.
-
-Pairs with #119's coverage roadmap, Victron Orion-Tr is the most
-common DC-DC charger in vans alongside the Renogy DCC50S, which
-gets its own driver in #123.
+Covers 12/12-18, 12/12-30, 12/24-15, 24/12-30, etc. Maps the
+`DcDcConverter` Instant Readout payload onto canonical fields.
+Smaller models don't have an output-current sensor; downstream UI
+treats those as optional metrics.
 """
 from __future__ import annotations
 

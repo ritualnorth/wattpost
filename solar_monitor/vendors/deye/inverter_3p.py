@@ -153,8 +153,7 @@ def _parse_pv(bs: bytes) -> dict[str, Any]:
     inverters reserve room for PV3+PV4 (the bigger 20K+ chassis
     use all four strings); 12-15K commercial usually stop at two."""
     out: dict[str, Any] = {}
-    # PV powers at 672-675 are POSITIVE deci-watts (×10), not
-    # sign-flipped watts like the 1P variant.
+    # PV powers at 672-675 are POSITIVE deci-watts (×10).
     pv1_w = max(0, s16(bs, 3))  * 10
     pv2_w = max(0, s16(bs, 5))  * 10
     pv3_w = max(0, s16(bs, 7))  * 10

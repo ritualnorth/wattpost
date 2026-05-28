@@ -1791,7 +1791,7 @@ async def edit_setup_transport(
     if not changes:
         raise HTTPException(status_code=400, detail="no editable fields supplied")
 
-    # Apply, persist, hot-reload, same pattern as add/delete.
+    # Apply, persist, hot-reload.
     target.update(changes)
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)

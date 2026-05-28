@@ -161,8 +161,7 @@ def _parse_block_a(bs: bytes) -> dict[str, Any]:
 
     # Regs 10, 11: charge vs discharge power. Only one is
     # non-zero at any moment; the difference is the signed
-    # battery_power_w + battery_current_a the bank tile
-    # wants. Same shape as the Voltronic driver.
+    # battery_power_w + battery_current_a the bank tile wants.
     charge_w = _u16(bs, 23)
     discharge_w = _u16(bs, 25)
     out["battery_charging_power_w"]    = charge_w

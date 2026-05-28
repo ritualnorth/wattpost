@@ -113,8 +113,7 @@ class VictronSmartShunt(DeviceDriver):
         aux_mode = _get("get_aux_mode")
 
         # Compute power so the flow strip + power tiles light up
-        # without needing a vendor-specific field. Mirrors how
-        # Renogy smart_battery exposes it.
+        # without needing a vendor-specific field.
         power_w: float | None = None
         if voltage is not None and current is not None:
             power_w = round(voltage * current, 2)
