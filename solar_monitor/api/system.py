@@ -57,68 +57,6 @@ def _proc_uptime_seconds() -> float | None:
     return time.time() - _DAEMON_STARTED_AT
 
 
-@get("/api/system/kiosk")
-async def kiosk_status(state: State) -> dict[str, Any]:
-    """Returns the current kiosk share state for the Settings panel.
-
-    `share_url` is the public URL the user copy-pastes to wherever
-    they want to display the kiosk view. `null` when no cloud tunnel
-    is provisioned (the appliance needs a slug for the URL to point
-    anywhere, pair to enable).
-    """
-    config = state["config"]
-    if config.cloud is None:
-        return {"share_url": None, "enabled": False}
-    hostname = config.cloud.tunnel_hostname or ""
-    slug = hostname.split(".", 1)[0] if hostname else ""
-    tok  = config.cloud.kiosk_token or ""
-    share_url = None
-    if slug and tok:
-        share_url = f"https://{slug}.wattpost.cloud/kiosk?key={tok}"
-    return {
-        "share_url": share_url,
-        "enabled":   bool(slug and tok),
-    }
-
-
-@post("/api/system/kiosk/rotate", status_code=200)
-async def rotate_kiosk_token(state: State) -> dict[str, Any]:
-    """Generate a new kiosk_token, persist to config, return the new
-    public share URL. Old token instantly stops working, any
-    already-shared URLs break, which IS the intent ("I leaked the
-    URL, kill it").
-
-    Auth-gated by the normal session middleware (Settings tab
-    requires sign-in per v0.0.58)."""
-    import secrets as _secrets
-    from .. import config as _config_mod
-    config = state["config"]
-    config_path = state.get("config_path", "config.yaml")
-    if config.cloud is None:
-        raise HTTPException(status_code=400,
-                            detail="cloud not configured, pair first")
-    new_tok = _secrets.token_urlsafe(24)
-    config.cloud.kiosk_token = new_tok
-    # Persist via the same _save_config helper that cloud_admin uses;
-    # mutator preserves every other field.
-    from .cloud_admin import _serialize_cloud, _save_config
-    def _mutate(raw):
-        raw["cloud"] = _serialize_cloud(config.cloud)
-        return raw
-    _save_config(config_path, _mutate)
-    log.info("kiosk token rotated")
-    # Construct the public URL the user should now share. Assumes the
-    # cloud broker subdomain `<slug>.wattpost.cloud`, the appliance
-    # doesn't directly know its slug; pass the tunnel_hostname's
-    # slug-half if available.
-    share_url = None
-    hostname = config.cloud.tunnel_hostname or ""
-    slug = hostname.split(".", 1)[0] if hostname else ""
-    if slug:
-        share_url = f"https://{slug}.wattpost.cloud/kiosk?key={new_tok}"
-    return {"ok": True, "kiosk_token": new_tok, "share_url": share_url}
-
-
 @get("/api/system/auth-status")
 async def auth_status(request: Request, state: State) -> dict[str, Any]:
     """Read-only signal of whether the current request is authed,

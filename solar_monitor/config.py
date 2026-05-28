@@ -135,12 +135,11 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     # at least once post-v0.0.38; while empty, tunnel access falls
     # back to the local-password login page.
     sso_secret:        str  = ""
-    # Public-share kiosk token. Generated lazily by the daemon on
-    # first /kiosk request (or by load_config below). The cloud
-    # dashboard builds the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`
-    # so the recipient can open the chrome-free wall-display view
-    # without a session. Rotatable via POST /api/system/kiosk/rotate
-    # to revoke an over-shared URL.
+    # Deprecated legacy kiosk token. The appliance no longer mints,
+    # serves, or honours a `?key=` kiosk URL — cloud kiosk now flows
+    # through the cloud's kiosk-shares registry (broker `scope=kiosk`),
+    # and LAN kiosk uses the READONLY_PUBLIC path. Field kept so older
+    # configs still load; it is unused.
     kiosk_token:       str  = ""
 
 

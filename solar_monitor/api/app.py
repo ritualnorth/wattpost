@@ -79,8 +79,7 @@ from .outputs import (
     patch_solar_pause,
 )
 from .system import (
-    auth_status, broker_auth_log, diagnostics_bundle, kiosk_status,
-    rotate_kiosk_token, system_info,
+    auth_status, broker_auth_log, diagnostics_bundle, system_info,
     update_state, update_check_now, update_apply, update_log,
     slot_state, slot_rollback,
     release_changelog, appliance_branding, rotate_web_password,
@@ -1307,35 +1306,17 @@ def build_app(
             if _DEMO or _web_auth.is_loopback_source(scope):
                 await self.app(scope, receive, send)
                 return
-            # Kiosk-token bypass (#kiosk-share). The public share URL
-            # is `<slug>.wattpost.cloud/kiosk?key=<token>`. When the
-            # ?key matches config.cloud.kiosk_token we let GET / HEAD
-            # / OPTIONS requests through anonymously for the kiosk
-            # page itself + the small set of data endpoints the kiosk
-            # JS calls. Strict allow-list of paths to keep this from
-            # being a back door for the whole API. The kiosk JS
-            # appends ?key= to every fetch (see app.js wireKioskMode).
+            # Path + method + kiosk read allow-list, consumed by the
+            # cloud-broker kiosk-scope path below (#225). The legacy
+            # `?key=<token>` bypass was removed: cloud kiosk now flows
+            # through the broker's signed `scope=kiosk` header, and LAN
+            # kiosk uses the READONLY_PUBLIC path. There is no
+            # appliance-side share token to leak, rotate, or revoke.
             _path = scope.get("path", "/")
             _method = scope.get("method", "GET").upper()
             _kiosk_paths = ("/kiosk", "/api/devices", "/api/poll_run",
                             "/api/today", "/api/bank/current", "/api/weather",
                             "/web/", "/static/")
-            if _method in ("GET", "HEAD", "OPTIONS") and (
-                _path == "/kiosk" or any(_path.startswith(p) for p in _kiosk_paths)
-            ):
-                _kiosk_tok = (config.cloud.kiosk_token if config.cloud else "") or ""
-                if _kiosk_tok:
-                    qs = scope.get("query_string", b"") or b""
-                    # Tiny parse, querystring is short, fine to scan.
-                    supplied = None
-                    for part in qs.split(b"&"):
-                        if part.startswith(b"key="):
-                            supplied = part[4:].decode("ascii", errors="ignore")
-                            break
-                    import hmac as _hmac_mod
-                    if supplied and _hmac_mod.compare_digest(supplied, _kiosk_tok):
-                        await self.app(scope, receive, send)
-                        return
             # Cloud broker (#139). When the cloud proxies a logged-in
             # user's request through to this appliance, it stamps the
             # request with X-WP-Broker-Auth = <ts>.<hmac> signed with
@@ -1528,11 +1509,9 @@ def build_app(
             auth_status,
             diagnostics_bundle,
             broker_auth_log,
-            kiosk_status,
             get_history_settings,
             patch_history_settings,
             reset_to_defaults,
-            rotate_kiosk_token,
             update_state,
             update_check_now,
             rotate_web_password,
