@@ -13,9 +13,9 @@ in parallel, none of which compose cleanly:
 
 1. **LAN password**, first-boot generated, single shared credential
    per appliance. Read-only-public bypass means anyone on the LAN
-   can browse Settings without it. (Concretely surfaced in Ritual North's
-   conversation on 2026-05-24: "I went to the settings page and it
-   didn't ask me to login.")
+   can browse Settings without it. (Concretely surfaced in testing
+   on 2026-05-24: "went to the settings page and it didn't ask me
+   to login.")
 2. **Cloud account password + TOTP**, separate identity, separate
    realm, no relationship to the LAN credential.
 3. **HMAC broker auth**, cloud signs every proxied request with a
@@ -409,8 +409,8 @@ calls.
 | **8. Breaking-change handling** | **One-tap re-pair migration** via the cloud banner described in the migration section. Every paired appliance shows "Security upgrade available" until upgraded. v0.3.0 drops v1 entirely; appliances on v1 at that point are forced to re-pair from scratch (well-flagged in changelog + email). | Matches the "upgrade your password" UX every serious SaaS uses (Stripe, GitHub). One-tap because the appliance does all the keypair work; user only consents. |
 
 Decision-maker note: every one of these was a textbook industry-
-best-practice answer. No strategic content for Ritual North to weigh in
-on. RFC is implementation-ready; Phase 1 (#303) is unblocked.
+best-practice answer. No strategic content left to weigh in on.
+RFC is implementation-ready; Phase 1 (#303) is unblocked.
 
 ---
 
@@ -988,9 +988,9 @@ No scaling concerns at our target customer counts.
 - [x] Performance characteristics (latency + storage + CPU + bandwidth)
 - [x] **Open questions resolved**, see "Technical decisions"
   section. All 8 closed with industry-standard answers.
-- [x] **Strategic shape signed off** by Ritual North (enterprise ambition
-  + best-practice posture). No further review needed, technical
-  implementation calls are mine.
+- [x] **Strategic shape signed off** (enterprise ambition +
+  best-practice posture). No further review needed; implementation
+  calls are settled.
 
 ---
 

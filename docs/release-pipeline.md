@@ -54,7 +54,7 @@ Both are anonymously fetchable. There's no auth on `releases.wattpost.io` becaus
 - **Container**: `shared-caddy` in `vps-infra/docker-compose.yml`. Same Alpine Caddy that serves `wattpost.io` + `wattpost.cloud`.
 - **Host directory**: `/srv/wattpost-releases/{img,source}/`. Bind-mounted read-only into the container. Created by `vps-infra/scripts/bootstrap.sh`.
 - **Caddy block**: `vps-infra/caddy/Caddyfile` → `releases.wattpost.io`. `file_server browse` so the directory listing is human-readable. 24h cache header. Fine because filenames are versioned.
-- **DNS**: `releases.wattpost.io` A → `REDACTED-ORIGIN-IP` (Proxied through CF). Set in CF dashboard for the `wattpost.io` zone.
+- **DNS**: `releases.wattpost.io` A → the VPS origin IP (Proxied through CF). Set in CF dashboard for the `wattpost.io` zone.
 - **TLS**: same `cloudflare_tls` snippet (`tls internal`) used by every other proxied domain. CF zone SSL must stay on **Full** (not Strict) for this to work; documented in `vps-infra/caddy/Caddyfile` warning banner.
 
 ## Cutting a release
@@ -198,8 +198,8 @@ If the daemon was started before the helper was installed (legacy paired applian
 **releases.wattpost.io returns 521.** CF can't reach origin. Check (in this order):
 
 1. `dig +short releases.wattpost.io @1.1.1.1`. Should return CF IPs (104.x or 172.x).
-2. CF dashboard → DNS. Record should be `A` / `releases` / `REDACTED-ORIGIN-IP` / Proxied.
-3. `curl -sI --resolve releases.wattpost.io:443:REDACTED-ORIGIN-IP https://releases.wattpost.io/ -k`. Should 200 from inside the VPS. If yes, the break is CF→origin; if no, Caddy isn't serving it.
+2. CF dashboard → DNS. Record should be `A` / `releases` / the VPS origin IP / Proxied.
+3. `curl -sI --resolve releases.wattpost.io:443:"$ORIGIN_IP" https://releases.wattpost.io/ -k`. Should 200 from inside the VPS. If yes, the break is CF→origin; if no, Caddy isn't serving it.
 4. Caddy block syntax: `docker exec shared-caddy caddy validate --config /etc/caddy/Caddyfile`.
 
 **`latest.img.xz` points to wrong file / nothing.** The `build-image.yml`'s "Update `latest` symlink" step picks the newest `wattpost-*.img.xz` by mtime. SSH in, `cd /srv/wattpost-releases/img && ls -lt`, and `ln -sfn <correct-file> latest.img.xz` manually.

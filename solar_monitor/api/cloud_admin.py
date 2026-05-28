@@ -110,7 +110,7 @@ async def update_cloud_config(
     # versions of this handler only carried bearer_token + appliance_id
     # + label across, which silently wiped tunnel_token,
     # tunnel_hostname, and sso_secret every time the user clicked
-    # Save in Settings → Cloud. Ritual North hit it after pulling v0.0.38:
+    # Save in Settings → Cloud. Seen after a v0.0.38 pull:
     # heartbeat populated sso_secret, then Settings-save reset it,
     # then SSO redirects failed with 401 because the appliance had
     # no key to verify against.

@@ -53,7 +53,7 @@ widgets. The native shell stays thin; everything else lives in the PWA the WebVi
 | Debug APK builds + installs + runs | ✅ |
 | FCM end-to-end push working | ✅ |
 | Branded launcher + splash | ✅ |
-| Google Play Developer Console signup ($25 one-off) | ⏳ Needs Ritual North |
+| Google Play Developer Console signup ($25 one-off) | ⏳ Pending |
 | Upload keystore (generate inside Play Console at signup) | ⏳ |
 | Release AAB build with signed upload key | ⏳ (one `./gradlew bundleRelease` once keystore exists) |
 | Store listing copy + screenshots | ⏳ Screenshots can come from the mobile-app-mockups |
@@ -105,7 +105,7 @@ npx cap open ios   # opens Xcode
 ### Android — DONE on the dev laptop (2026-05-21)
 
 The Android target is scaffolded and builds a working debug APK on
-this dev laptop (192.168.1.13, Ubuntu 24.04). Toolchain installed
+the dev laptop (Ubuntu 24.04). Toolchain installed
 under `~/Android/Sdk`; env vars persisted in `~/.bashrc`.
 Requirements: OpenJDK 21 + Android SDK cmdline-tools + platforms;android-34
 + build-tools;34.0.0. Capacitor 8 needs JDK 21 (not 17).
@@ -113,7 +113,7 @@ Requirements: OpenJDK 21 + Android SDK cmdline-tools + platforms;android-34
 Build the debug APK:
 
 ```bash
-cd /home/user/solar-monitor/mobile-app
+cd mobile-app
 npm run sync                        # cap sync + copies www/ in
 cd android
 ./gradlew assembleDebug

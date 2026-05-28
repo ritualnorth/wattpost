@@ -1,4 +1,4 @@
-# Orientation for AI agents
+# Repository orientation
 
 This is **WattPost** — an off-grid solar monitoring appliance.
 `solar_monitor/` is the daemon that runs on a Pi (or any Linux
@@ -20,7 +20,7 @@ Read in this order if you're new:
 
 - **Public, Apache 2.0.** Don't commit anything cloud-side, SaaS-side, or commercially sensitive here.
 - **Binary distribution via `releases.wattpost.io`** (self-hosted, see `docs/release-pipeline.md`).
-- **No AI-tells in commits.** Plain technical voice, no Co-Authored-By trailers, no "Ritual North" or "today's session" narratives.
+- **Commit style.** Plain technical voice, imperative mood; no personal names or session-diary narratives.
 
 ## Common ops
 
