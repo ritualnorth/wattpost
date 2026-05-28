@@ -1182,6 +1182,21 @@
               <span class="settings-foot" id="discovery-toggle-msg"></span>
             </div>
           </div>
+          <div class="settings-block" data-subroute="privacy">
+            <h3>Anonymous install ping</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              On the daily update check, the appliance can include an
+              anonymous install ID + version so we can count how many
+              installs exist and which release they run.
+              <strong>Off by default.</strong> No account, no location,
+              no device data. The update check runs either way; this only
+              controls whether the anonymous ID rides along.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+              <button id="localtele-toggle" class="btn-action" type="button" hidden></button>
+              <span class="settings-foot" id="localtele-toggle-msg"></span>
+            </div>
+          </div>
           <div class="settings-block settings-block--diagnostics" data-subroute="advanced">
             <h3>Diagnostics</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
@@ -1304,6 +1319,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=224"></script>
+  <script src="/web/app.js?v=225"></script>
 </body>
 </html>

@@ -20,9 +20,9 @@ The appliance queries [Open-Meteo](https://open-meteo.com/) directly with your c
 
 Same 24-hour cadence as #1, hitting `https://releases.wattpost.io/CHANGELOG.md`. Anonymous; same as fetching any static file. Used so the dashboard can preview what's in a not-yet-installed version's release notes.
 
-### 4. Local-install beacon, *daily, anonymous, default ON*
+### 4. Local-install beacon, *daily, anonymous, opt-in, default OFF*
 
-When you fire the daily update check (#1), the appliance also POSTs three things to `https://wattpost.cloud/api/local_installs/beacon`:
+When you fire the daily update check (#1), **and only if you have opted in**, the appliance also POSTs three things to `https://wattpost.cloud/api/local_installs/beacon`:
 
 | Field | Example | Why we want it |
 | --- | --- | --- |
@@ -34,16 +34,14 @@ Cloudflare adds an `X-IP-Country` header on the way in (the two-letter ISO code,
 
 **We do not send and never have sent:** your email, your name, your MAC, your battery voltage, your SoC, your location coordinates, your hostname, your Wi-Fi SSID, your nearby Bluetooth devices, or any heartbeat data. The beacon body is exactly the three fields above.
 
-**Why it's on by default:** opt-in fleet telemetry gets ~0% adoption. We default-on a strictly anonymous beacon because it's the only way to know whether a release made it out into the world. Default-off ends up with us guessing.
-
-**How to disable it:** in `/etc/wattpost/config.yaml` add
+**Off by default.** Nothing is sent unless you turn it on. If you'd like to help us see release adoption, enable it from **Settings → Privacy → Anonymous install ping**, or in `/etc/wattpost/config.yaml`:
 
 ```yaml
 local_telemetry:
-  enabled: false
+  enabled: true
 ```
 
-… and restart the daemon. The 24-hour update check still fires (we still need to know whether to show the "Update available" badge), but the `install_id` POST is suppressed. Your existing beacon row on our side will fall off the "active in 30 days" cohort within a month and stop being counted.
+The 24-hour update check fires either way (we need it to show the "Update available" badge); the `install_id` POST only happens when you've opted in.
 
 ### 5. Location sharing, *opt-in, default OFF, three modes*
 

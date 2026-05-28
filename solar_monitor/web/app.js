@@ -4762,6 +4762,7 @@ function renderSettings() {
   wireBackupRunNow();
   refreshCloudBackups();
   refreshDiscoveryToggle();
+  refreshLocalTelemetryToggle();  // #217, anonymous install ping (off by default)
   refreshHistorySettings();  // #172, editable poll interval + retention
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
@@ -5133,6 +5134,52 @@ async function refreshDiscoveryToggle() {
       msg.textContent = e.message || String(e);
     } finally {
       await refreshDiscoveryToggle();
+    }
+  });
+}
+
+// Anonymous install ping (#217). Off by default; mirrors the discovery
+// telemetry consent pattern. No pairing required — the ping rides the
+// daily update check (which hits the anonymous release manifest).
+async function refreshLocalTelemetryToggle() {
+  const btn = document.getElementById("localtele-toggle");
+  const msg = document.getElementById("localtele-toggle-msg");
+  if (!btn || !msg) return;
+  let state;
+  try {
+    state = await api("/api/system/local-telemetry");
+  } catch (_) {
+    btn.hidden = true;
+    msg.textContent = "·";
+    return;
+  }
+  btn.hidden = false;
+  btn.dataset.enabled = state.enabled ? "1" : "0";
+  btn.textContent = state.enabled ? "Disable install ping" : "Enable install ping";
+  msg.textContent = state.enabled
+    ? "On. The daily update check includes an anonymous install ID."
+    : "Off. No install ID leaves this appliance.";
+  if (btn.dataset.wired === "1") return;
+  btn.dataset.wired = "1";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const next = btn.dataset.enabled !== "1";
+    try {
+      const r = await fetch("/api/system/local-telemetry/toggle", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({enabled: next}),
+      });
+      if (!r.ok) {
+        let d = `HTTP ${r.status}`;
+        try { const j = await r.json(); d = j.detail || d; } catch (_) {}
+        msg.textContent = d;
+      }
+    } catch (e) {
+      msg.textContent = e.message || String(e);
+    } finally {
+      await refreshLocalTelemetryToggle();
     }
   });
 }

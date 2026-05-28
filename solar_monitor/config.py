@@ -282,12 +282,13 @@ class LocalTelemetryCfg(msgspec.Struct, kw_only=True):
     Piggybacks an `install_id` + version + install method onto the
     daily update-check poll so the cloud can count distinct local
     installs and surface release adoption across the fleet (paired
-    + unpaired). ON by default, see `docs/privacy-and-telemetry.md`
-    for what's sent and what's not. Set to `false` to suppress the
-    install_id query param; the update poll itself still fires
-    (needed for the dashboard's `Update available` badge).
+    + unpaired). OFF by default, see `docs/privacy-and-telemetry.md`
+    for what's sent and what's not. When enabled, an install_id query
+    param rides the daily update poll; when off, the update poll still
+    fires (needed for the dashboard's `Update available` badge) but
+    carries no install_id. Toggle from Settings -> Privacy.
     """
-    enabled: bool = True
+    enabled: bool = False
 
 
 class DiscoveryCfg(msgspec.Struct, kw_only=True):
@@ -443,7 +444,7 @@ class Config(msgspec.Struct, kw_only=True):
     bank: BankCfg | None = None          # optional (#121, shunt-vs-BMS reconciliation)
     backup: BackupCfg | None = None      # optional, local rotating snapshots (#146 phase 2)
     discovery: DiscoveryCfg | None = None  # optional, anonymous discovery telemetry (#129)
-    local_telemetry: LocalTelemetryCfg | None = None  # optional, anonymous install beacon (#217); ON by default
+    local_telemetry: LocalTelemetryCfg | None = None  # optional, anonymous install beacon (#217); OFF by default
     history: HistoryCfg | None = None    # optional, poll cadence + retention (#172)
     solar_pause: SolarPauseCfg | None = None  # optional, auto-pause AC charger when PV covers (#163)
     smart_plugs: list[SmartPlugCfg] = []      # optional, LAN-attached smart plugs for solar-pause to drive

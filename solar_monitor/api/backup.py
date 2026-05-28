@@ -860,6 +860,62 @@ async def discovery_toggle(request: Request, state: State) -> dict[str, Any]:
     return {"ok": True, "enabled": enabled}
 
 
+@get("/api/system/local-telemetry", status_code=200)
+async def local_telemetry_state(state: State) -> dict[str, Any]:
+    """Read whether the anonymous install-count beacon (#217) is enabled.
+    Off by default. No pairing required — the beacon rides the daily
+    update-check poll, which hits the anonymous release manifest."""
+    config = state.get("config")
+    enabled = False
+    if config is not None and getattr(config, "local_telemetry", None) is not None:
+        enabled = bool(config.local_telemetry.enabled)
+    return {"enabled": enabled}
+
+
+@post("/api/system/local-telemetry/toggle", status_code=200)
+async def local_telemetry_toggle(request: Request, state: State) -> dict[str, Any]:
+    """Flip `local_telemetry.enabled` in the running config and persist.
+    Body: `{enabled: bool}`. The daily update check runs either way;
+    this only controls whether an anonymous install_id rides along.
+    Updates the live UpdateChecker so it takes effect without a restart."""
+    import shutil as _shutil
+    import yaml as _yaml
+    body = await request.json()
+    enabled = bool(body.get("enabled")) if isinstance(body, dict) else False
+
+    config_path = state.get("config_path")
+    if not config_path:
+        raise HTTPException(status_code=500, detail="config_path unset")
+    path = Path(config_path)
+
+    raw = _yaml.safe_load(path.read_text()) or {}
+    block = raw.get("local_telemetry") or {}
+    block["enabled"] = enabled
+    raw["local_telemetry"] = block
+    bak = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, bak)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+    config = state.get("config")
+    if config is not None:
+        from ..config import LocalTelemetryCfg
+        if config.local_telemetry is None:
+            config.local_telemetry = LocalTelemetryCfg(enabled=enabled)
+        else:
+            config.local_telemetry.enabled = enabled
+
+    # Apply live so the running beacon honours the change immediately
+    # (UpdateChecker reads self.telemetry_enabled at send time).
+    scheduler = state.get("scheduler")
+    updater = getattr(scheduler, "_updater", None) if scheduler is not None else None
+    if updater is not None:
+        updater.telemetry_enabled = enabled
+
+    return {"ok": True, "enabled": enabled}
+
+
 @post("/api/system/backup/cloud-restore/{backup_id:int}", status_code=202)
 async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
     """Download a specific cloud backup and feed it through the local

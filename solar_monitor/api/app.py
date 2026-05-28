@@ -91,6 +91,7 @@ from .backup import (
     backup_schedule, backup_run_now, backup_download_one, backup_delete_one,
     backup_cloud_list, backup_cloud_restore, backup_cloud_toggle,
     discovery_state, discovery_toggle,
+    local_telemetry_state, local_telemetry_toggle,
 )
 from ..backup import BackupService
 from .auth_oidc import auth_callback, auth_lan_login, oidc_available
@@ -1496,6 +1497,8 @@ def build_app(
             backup_cloud_toggle,
             discovery_state,
             discovery_toggle,
+            local_telemetry_state,
+            local_telemetry_toggle,
             battery_health,
             runtime_forecast,
             load_heatmap,
