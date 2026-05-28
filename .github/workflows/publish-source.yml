@@ -96,7 +96,7 @@ jobs:
           target: /srv/wattpost-releases/
 
       - name: Update `latest` symlink + manifest version
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           NEW_VERSION: ${{ steps.tarball.outputs.version }}
         with:
