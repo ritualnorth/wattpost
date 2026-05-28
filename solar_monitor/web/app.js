@@ -990,25 +990,31 @@ function renderHero() {
   // Donut wrapper state — drives ring gradient + leading-edge dot color
   // + flow-pill color. Four states:
   //   critical    SoC < 15 (urgent palette overrides flow direction)
-  //   charging    netW > +5  AND SoC ≥ 15
-  //   discharging netW < −5  AND SoC ≥ 15
-  //   holding     |netW| ≤ 5 AND SoC ≥ 15 (the no-flow / idle bucket)
+  //   charging    netW > +1  AND SoC ≥ 15
+  //   discharging netW < −1  AND SoC ≥ 15
+  //   holding     |netW| ≤ 1 AND SoC ≥ 15 (genuinely idle)
   // Critical wins over flow so a draining-fast-at-12% bank reads RED,
   // not the calmer amber, regardless of direction.
+  //
+  // The 1 W threshold is tight on purpose. The old 5 W rule called a
+  // 4 W discharge "holding" while the side label read "↑ 4 W out" —
+  // visually contradictory. Anything ≥1 W gets classified honestly
+  // by direction so the donut + flow-pill + watts line tell the same
+  // story.
   let donutState;
   if (pct < 15) donutState = "critical";
-  else if (Math.abs(bank.netW) < 5) donutState = "holding";
+  else if (Math.abs(bank.netW) < 1) donutState = "holding";
   else if (bank.netW > 0) donutState = "charging";
   else donutState = "discharging";
   // Flow-direction modifier — drives the leading-edge dot + halo
   // colour independently of the arc colour. Only applied when the
-  // bank has >5 W of net flow (the "holding" band keeps its neutral
+  // bank has >1 W of net flow (the "holding" band keeps its neutral
   // blue head). The visible case this unlocks: critical SoC + net
   // charging shows a red arc with a GREEN pulsing head, telegraphing
   // recovery without losing the "we're low" message on the arc.
   let headFlow = null;
-  if (bank.netW > 5)       headFlow = "donut-head-flow-up";
-  else if (bank.netW < -5) headFlow = "donut-head-flow-down";
+  if (bank.netW > 1)       headFlow = "donut-head-flow-up";
+  else if (bank.netW < -1) headFlow = "donut-head-flow-down";
   document.querySelectorAll(".donut-state").forEach(el => {
     el.classList.remove("charging", "discharging", "holding", "critical", "idle",
                         "donut-head-flow-up", "donut-head-flow-down");
@@ -1433,11 +1439,14 @@ function renderFlow(targetHost) {
   const hasLoads   = model.loads.length > 0;
   const battNetW   = Math.round(model.batteryNetW || 0);
 
-  // Show the battery as a node in the SVG when its flow is
-  // meaningful (≥10 W). Otherwise it lives only in the card below —
-  // keeps the diagram uncluttered for the common float / resting
-  // case. Card is always present when bank exists.
-  const showBattInSvg = !!model.bank && Math.abs(battNetW) >= 10;
+  // Always render the battery as a node in the SVG when a bank
+  // exists. Off-grid users want their battery visible at all times —
+  // the "uncluttered diagram" intent of hiding it below 10 W made
+  // the flow diagram lie about which devices were in the system and
+  // people genuinely couldn't find their bank on the dashboard. The
+  // battery is the heart of every off-grid install; it should never
+  // disappear from the picture.
+  const showBattInSvg = !!model.bank;
 
   // Battery-only topology — no sources, no loads (e.g. bank shunt + dumb packs).
   if (!hasSources && !hasLoads) {
@@ -1955,11 +1964,15 @@ function buildBatCard(bank, battNetW) {
 
   // State drives the icon-ring + fill colours. "Full" wins over a
   // tiny float trickle so users don't see amber discharging at 100 %.
+  // The old "Resting" middle tier was dropped because it labelled a
+  // 4 W discharge "Resting" while the side label still read "↑ 4 W
+  // out" — contradictory. Anything ≥1 W now reads honestly by
+  // direction; <1 W (genuinely idle) reads as "Idle".
   let state, tone;
   if (soc < 15 && battNetW > 0)      { state = "Low · Charging"; tone = "red"; }
   else if (soc < 15)                 { state = "Low";            tone = "red"; }
-  else if (soc >= 98)                { state = "Full";           tone = "blue"; }
-  else if (aNetW < 5)                { state = "Resting";        tone = "blue"; }
+  else if (soc >= 98 && aNetW < 50)  { state = "Full";           tone = "blue"; }
+  else if (aNetW < 1)                { state = "Idle";           tone = "blue"; }
   else if (battNetW > 0)             { state = "Charging";       tone = "green"; }
   else                               { state = "Discharging";    tone = "discharge"; }
 
@@ -2050,11 +2063,11 @@ function makeFlowDonut(bank, batteryNetW) {
   // discharge noise — at full SoC a tiny −5 W trickle is the MPPT in
   // float, not a real discharge alert.
   let state, label;
-  if (soc < 15)            { state = "critical";    label = "Low"; }
-  else if (soc >= 98)      { state = "holding";     label = "Full"; }
-  else if (aNetW < 5)      { state = "holding";     label = "Resting"; }
-  else if (netW > 0)       { state = "charging";    label = "Charging"; }
-  else                     { state = "discharging"; label = "Discharging"; }
+  if (soc < 15)                       { state = "critical";    label = "Low"; }
+  else if (soc >= 98 && aNetW < 50)   { state = "holding";     label = "Full"; }
+  else if (aNetW < 1)                 { state = "holding";     label = "Idle"; }
+  else if (netW > 0)                  { state = "charging";    label = "Charging"; }
+  else                                { state = "discharging"; label = "Discharging"; }
 
   // Direction line inside the donut. ↓ = energy flowing INTO the
   // battery (charging), ↑ = energy LEAVING the battery (discharging).

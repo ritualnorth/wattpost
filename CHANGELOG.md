@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.119] · 2026-05-28
+
+### Fixed · Battery never disappears from Power Flow, label stops lying
+
+Three small JS fixes for the Hero + Power Flow tiles that bit a
+real off-grid customer (3× RBT100LFP12S, 28% SoC, 4 W discharge):
+
+  * The battery node was hidden from the SVG flow diagram below
+    10 W of net flow. Intent was "less clutter when float-charging";
+    real outcome was "where the hell is my battery?" The threshold
+    was load-bearing on a UX assumption that doesn't survive
+    contact with off-grid users — the battery IS the system, it
+    should never disappear from the picture. Drop the rule
+    entirely: battery node always renders when a bank exists.
+  * The donut label said "Resting" while the watts beside it
+    read "↑ 4 W out". Contradictory. The 5 W "Resting" middle
+    tier is gone; anything ≥1 W now reads honestly as Charging
+    or Discharging, matching what the watts line says. Below
+    1 W reads "Idle". "Full" wins for SoC ≥98% when |W| < 50.
+  * Hero donut state thresholds tightened from 5 W → 1 W to
+    match the flow tile, so the donut colour and the bat card
+    label can't disagree.
+
+App-cache buster + service-worker version bumped (`?v=221`,
+`wattpost-v136-app221-css140`) so existing PWAs pick up the
+new shell on reload.
+
 ## [0.1.118] · 2026-05-28
 
 ### Added · EG4 XP / kPV / FlexBOSS driver (#364, experimental)
