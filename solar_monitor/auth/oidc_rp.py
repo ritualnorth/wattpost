@@ -269,9 +269,9 @@ class _PendingAuth:
 # Disk-persisted across daemon restarts (see _persist_pending /
 # _load_pending). The original in-memory-only version of this store
 # would lose every in-flight OIDC flow on a container recreate,
-# which Docker installs hit on every pull. Ritual North caught this with
-# the "OIDC state token unknown or expired" 400 after I pulled
-# v0.1.96 onto Garage; this is the fix.
+# which Docker installs hit on every pull. Surfaced as the
+# "OIDC state token unknown or expired" 400 after a v0.1.96 pull
+# on a Docker host; this is the fix.
 _pending: dict[str, _PendingAuth] = {}
 _PENDING_PATH = _KEY_DIR / "oidc_pending.json"
 

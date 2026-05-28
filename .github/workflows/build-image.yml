@@ -34,7 +34,7 @@ permissions:
 jobs:
   build:
     name: pi-gen build (x86_64 + qemu)
-    # Self-hosted runner on our Contabo VPS (REDACTED-ORIGIN-IP) — eliminates
+    # Self-hosted runner on our Contabo VPS — eliminates
     # the ~90 min per-build hit on the ritualnorth account's 3000 GH
     # Actions min/mo. The runner is Ubuntu 24.04 too (matches what
     # GitHub-hosted ubuntu-24.04 was), so qemu-user-static 8.x is

@@ -125,8 +125,8 @@ async def auth_callback(request: Request) -> Response:
         # state token unknown (CSRF mismatch, replay from history, or
         # expired). Don't dead-end the user in a JSON 400, bounce
         # back to /login with a banner. They click again, the round-
-        # trip works. The 400 was a real bug Ritual North hit on retry after
-        # I pulled v0.1.96; state was wiped by the container recreate.
+        # trip works. The 400 was a real bug seen on retry after a
+        # v0.1.96 pull; state was wiped by the container recreate.
         # Phase 3-followup: state store is now disk-persisted, so this
         # branch should be much rarer (only true CSRF / replay).
         log.info("auth_oidc: state %s... unknown/expired, bouncing to /login", state[:8])

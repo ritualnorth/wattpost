@@ -4,8 +4,8 @@ name: Build demo image
 # main push that touches the appliance source. Pushes to GHCR; the
 # next-step SSH-deploy pulls + restarts the wattpost-demo container.
 #
-# Separate from build-cloud-image.yml because they're independent
-# deployables sharing a runner pool.
+# Independent of the appliance/updater image builds; shares the
+# same runner pool.
 
 on:
   push:

@@ -2,7 +2,7 @@
 """Capture short interaction videos from the live appliance dashboard
 for the marketing landing page.
 
-Drives http://192.168.1.100:8000 (Ritual North's dev appliance) via
+Drives the local appliance dashboard (default http://192.168.1.100:8000) via
 playwright, records short clips in webm, drops them into
 cloud/wattpost_cloud/web/static/img/.
 

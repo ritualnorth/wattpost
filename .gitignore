@@ -73,6 +73,5 @@ cloud/.env.*
 .env
 
 # Editor / tool local state
-.claude/
 .vscode/
 .idea/
