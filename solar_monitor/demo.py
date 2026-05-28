@@ -8,17 +8,17 @@ they buy a Pi.
 
 Design choices:
 
-  * Time-of-day driven, not "elapsed since startup" — anyone landing on
+  * Time-of-day driven, not "elapsed since startup", anyone landing on
     the demo should see something consistent with the wall-clock view
     (mid-afternoon = lots of PV, 3 AM = batteries drawing).
-  * Plausible noise — perfect sine waves read as a toy. Each metric
+  * Plausible noise, perfect sine waves read as a toy. Each metric
     gets a small jittered offset on every poll.
-  * Believable inter-pack drift — three batteries report SoC values
+  * Believable inter-pack drift, three batteries report SoC values
     that drift by a few % so the dashboard's per-pack view doesn't look
     suspicious.
-  * Locked schema — emits exactly the fields `_compute_bank_aggregate`
+  * Locked schema, emits exactly the fields `_compute_bank_aggregate`
     and the dashboard already expect, so no UI changes are needed.
-  * No real DB writes outside the normal path — the scheduler still
+  * No real DB writes outside the normal path, the scheduler still
     calls store.record_poll(result), so demo data lands in the same
     SQLite store and history/CSV/forecast all work end-to-end.
 
@@ -38,11 +38,11 @@ from .config import Config
 
 # ----- tunables -----
 
-# Bank capacity (Ah) and nominal voltage — pick values that match a
+# Bank capacity (Ah) and nominal voltage, pick values that match a
 # realistic mid-size off-grid bank (3 × 100 Ah @ 12.8 V LiFePO4).
 BANK_CAPACITY_AH = 300.0
 NOMINAL_V       = 12.8
-PV_PEAK_W       = 600.0   # 600 W array — a couple of 280 W panels
+PV_PEAK_W       = 600.0   # 600 W array, a couple of 280 W panels
 BASE_LOAD_W     = 50.0    # always-on (fridge, controllers, fans)
 EVENING_LOAD_W  = 220.0   # extra evening load (lights, electronics)
 
@@ -80,7 +80,7 @@ def _load_curve(hod: float) -> float:
 
 
 # Track SoC as a daemon-lifetime variable so it integrates over actual
-# polling cadence — that way history charts show realistic curves
+# polling cadence, that way history charts show realistic curves
 # instead of resetting on every poll.
 _state = {
     "soc_pct":    62.0,    # mid-range default
@@ -98,7 +98,7 @@ def _step_soc(now: float) -> float:
     dt_h = (now - last) / 3600.0
     if dt_h <= 0 or dt_h > 1.0:
         # Either negative time (clock skew) or a huge gap (resumed
-        # after suspend). Don't accumulate from garbage — just keep
+        # after suspend). Don't accumulate from garbage, just keep
         # the existing SoC and let the next interval do real work.
         return _state["soc_pct"]
 
@@ -106,7 +106,7 @@ def _step_soc(now: float) -> float:
     pv = _pv_curve(hod)
     load = _load_curve(hod)
     net_w = pv - load
-    # Pretend 12.8 V nominal — 1% SoC ~= 3 Ah for our 300 Ah bank ~=
+    # Pretend 12.8 V nominal, 1% SoC ~= 3 Ah for our 300 Ah bank ~=
     # 38.4 Wh. So delta-soc = net_w * dt_h / (BANK_CAPACITY_AH * NOMINAL_V) * 100.
     bank_wh = BANK_CAPACITY_AH * NOMINAL_V
     delta_soc = (net_w * dt_h / bank_wh) * 100.0
@@ -124,7 +124,7 @@ def _jitter(value: float, pct: float = 0.02) -> float:
 class SyntheticPoller:
     """Drop-in replacement for orchestrator.Poller, no real hardware.
 
-    Same `poll()` interface — returns the same shape of result dict so
+    Same `poll()` interface, returns the same shape of result dict so
     storage.record_poll, the bank aggregate, the live dashboard, the
     history endpoint, and the cloud heartbeat builder all work without
     knowing anything has been replaced.
@@ -150,12 +150,12 @@ class SyntheticPoller:
         pv_w = _pv_curve(hod)
         load_w = _load_curve(hod)
         net_w = pv_w - load_w
-        # Pack voltage tracks SoC roughly — 13.4 V full, 12.0 V at 20%.
+        # Pack voltage tracks SoC roughly, 13.4 V full, 12.0 V at 20%.
         bank_v = _jitter(12.0 + (soc / 100.0) * 1.4, 0.005)
         bank_a = _jitter(net_w / bank_v, 0.03)
 
         # Today's PV energy: integrate from sunrise to now. Cheap
-        # approximation — area under the half-sine times the peak.
+        # approximation, area under the half-sine times the peak.
         sunrise = 6.5
         if hod <= sunrise:
             pv_today_wh = 0.0
@@ -171,7 +171,7 @@ class SyntheticPoller:
 
         # Per-pack SoC: three batteries with a few % drift from the bank.
         # Locked random per-pack drift so it doesn't jitter wildly
-        # between polls — caller still sees small jitter via _jitter().
+        # between polls, caller still sees small jitter via _jitter().
         pack_drifts = [+0.6, -0.3, -1.1]
         packs = {}
         for i, drift in enumerate(pack_drifts):
@@ -248,7 +248,7 @@ def _snapshot_at(ts: float, soc_pct: float) -> dict[str, Any]:
     bank_v = 12.0 + (soc_pct / 100.0) * 1.4
     bank_a = net_w / bank_v if bank_v > 0 else 0.0
 
-    # Cheaper pack derivation for backfill — no per-pack jitter, just
+    # Cheaper pack derivation for backfill, no per-pack jitter, just
     # the headline numbers. Charts read from the shunt aggregate anyway.
     packs = {}
     pack_drifts = [+0.6, -0.3, -1.1]
@@ -314,7 +314,7 @@ def _snapshot_at(ts: float, soc_pct: float) -> dict[str, Any]:
 
 async def seed_history(store, days: int = 30, step_minutes: int = 60) -> int:
     """Backfill `days` of synthetic history into the store at
-    `step_minutes` cadence. Idempotent — bails fast if the store
+    `step_minutes` cadence. Idempotent, bails fast if the store
     already has samples from the last 2 hours (i.e. a live run, not a
     fresh demo restart).
 
@@ -331,7 +331,7 @@ async def seed_history(store, days: int = 30, step_minutes: int = 60) -> int:
             log.info("demo history: store already populated, skipping backfill")
             return 0
     except Exception:
-        # Fresh DB with no tables — fall through and seed.
+        # Fresh DB with no tables, fall through and seed.
         pass
 
     log.info("demo history: seeding %dd × %dm cadence", days, step_minutes)

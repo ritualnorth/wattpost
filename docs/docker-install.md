@@ -106,7 +106,7 @@ Three paths, pick one:
 **1. Cloud "Update now" button (recommended for paired appliances)**
 
 The cloud's per-site "Update now" button drives a Watchtower sidecar
-on your host — one click, no SSH. The appliance takes a snapshot of
+on your host, one click, no SSH. The appliance takes a snapshot of
 its DB and config first, then triggers the pull + restart. If the
 new image fails to come up cleanly, restore from that snapshot via
 **/app/site/{id} → Cloud backups**.
@@ -114,7 +114,7 @@ new image fails to come up cleanly, restore from that snapshot via
 Needs the Watchtower service in your compose. The current
 [`docker-compose.example.yml`](https://github.com/ritualnorth/wattpost/blob/main/docker-compose.example.yml)
 includes it; if you installed before May 2026 you'll need to add it
-yourself — see **"Adding the Watchtower sidecar"** below.
+yourself, see **"Adding the Watchtower sidecar"** below.
 
 **2. Watchtower auto-poll**
 
@@ -262,7 +262,7 @@ The Docker image:
   lives under About, and a Reset to defaults button lives at the
   bottom of Diagnostics (type `RESET` to enable, keeps history
   and cloud pairing by default). The one thing that has to stay
-  on the host is the web port — change the `8000:8000` mapping
+  on the host is the web port, change the `8000:8000` mapping
   in your `docker-compose.yml` and `docker compose up -d` to
   apply.
 - **Doesn't** auto-update via the daemon's "Update now" button ·
@@ -274,4 +274,4 @@ The Docker image:
   See [Remote access](remote-access.md) for the broker overview.
   If you'd rather self-host a VPN / WireGuard / reverse-proxy in
   front of the container, the daemon binds `0.0.0.0:8000` like
-  normal — wire your own ingress at that port.
+  normal, wire your own ingress at that port.

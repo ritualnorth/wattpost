@@ -3,7 +3,7 @@
 The threat model for cloud-stored backups is "compromised cloud
 account swaps the bytes under a victim appliance's row, then queues
 a restore". Even with the restore-time config sanitiser (#297-1)
-that path is still bad — a malicious SQLite (with crafted device
+that path is still bad, a malicious SQLite (with crafted device
 rows, attacker rules, etc.) lands on the victim.
 
 Mitigation: at upload time the appliance signs the archive bytes
@@ -19,11 +19,11 @@ Once a customer has at least one signed backup, the unsigned ones
 naturally age out of the retention window.
 
 Notes:
-* The signature covers the RAW tarball bytes — we don't tweak the
+* The signature covers the RAW tarball bytes, we don't tweak the
   archive layout (no embedded MANIFEST.sig member; that would make
   the bytes-being-signed circular). External-only sidecar is
   simpler and works for both cloud and local-file restore flows.
-* PyNaCl is already a dep via the keypair module — no new pip pin.
+* PyNaCl is already a dep via the keypair module, no new pip pin.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def sign_archive(tar_bytes: bytes) -> Signature:
     base64url-encoded signature + the appliance pubkey fingerprint
     suitable for the HTTP transport headers.
 
-    Raises if the keypair can't be loaded — backup upload should
+    Raises if the keypair can't be loaded, backup upload should
     still proceed in that case (the cloud handles missing signature
     headers gracefully) so callers should catch + log."""
     kp = _keypair.load_or_create()
@@ -89,7 +89,7 @@ def verify_archive(
     path for backups taken pre-0.1.99. Caller decides whether to
     accept the grandfather (cloud restore: warn + allow). When ANY
     of the three is present, we require ALL of them and they must
-    all check out — partial signature data is treated as tampering.
+    all check out, partial signature data is treated as tampering.
     """
     # Grandfather: pre-0.1.99 backups have no signature. Caller logs
     # a warning and may allow the restore; we don't fail here.
@@ -98,12 +98,12 @@ def verify_archive(
 
     if not (sig_b64 and pubkey_fp and alg):
         raise BackupSigError(
-            "partial signature data — refusing restore (looks tampered)"
+            "partial signature data, refusing restore (looks tampered)"
         )
 
     if alg != SIG_ALG:
         raise BackupSigError(
-            f"unrecognised signature alg {alg!r} — refusing restore"
+            f"unrecognised signature alg {alg!r}, refusing restore"
         )
 
     kp = _keypair.load_or_create()

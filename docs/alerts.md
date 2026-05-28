@@ -1,6 +1,6 @@
 # Alerts
 
-WattPost evaluates **alert rules** on every poll cycle (~60 s) and fans out matching events to **transports**. Rules + transports are entirely local in the free tier; the cloud adds the things only an outside observer can do — heartbeat-stale detection, cross-site triggers, weather-aware rules.
+WattPost evaluates **alert rules** on every poll cycle (~60 s) and fans out matching events to **transports**. Rules + transports are entirely local in the free tier; the cloud adds the things only an outside observer can do, heartbeat-stale detection, cross-site triggers, weather-aware rules.
 
 If you're paired to wattpost.cloud, every rule below is **mirrored into your cloud Rules page** and editable from anywhere. The cloud is the canonical editing surface; the appliance is where the rule actually fires (so it works even when the cloud is unreachable). See [/docs/cloud-alerts-and-notifications](/docs/cloud-alerts-and-notifications) for the full picture.
 
@@ -16,12 +16,12 @@ Rules are defined in `config.yaml` under `alerts:` or, more typically, edited vi
 
 A fresh appliance starts with four sensible defaults so you get useful alerts without any setup:
 
-- **Low battery** — SoC below 30%, warn
-- **Critical battery** — SoC below 15%, alarm
-- **Bank temperature high** — above 45°C, warn
-- **Bank temperature critical** — above 55°C, alarm
+- **Low battery**, SoC below 30%, warn
+- **Critical battery**, SoC below 15%, alarm
+- **Bank temperature high**, above 45°C, warn
+- **Bank temperature critical**, above 55°C, alarm
 
-These fire to the **local ring buffer** and your **cloud inbox** (via heartbeat extras) by default. Add transports — ntfy, Discord, email, etc. — from Settings → Alerts to also get push / chat / email notifications. Delete or edit any of them; the appliance won't re-seed once you've taken control. Set `alerts_seeded: false` in `config.yaml` if you ever want the defaults back.
+These fire to the **local ring buffer** and your **cloud inbox** (via heartbeat extras) by default. Add transports, ntfy, Discord, email, etc., from Settings → Alerts to also get push / chat / email notifications. Delete or edit any of them; the appliance won't re-seed once you've taken control. Set `alerts_seeded: false` in `config.yaml` if you ever want the defaults back.
 
 ## Severity
 
@@ -41,7 +41,7 @@ All are free + local:
 - **Email** (SMTP). Your relay, your Gmail app password, your ISP, etc.
 - **MQTT**. Publish to a topic; Home Assistant / Node-RED / your own scripts can subscribe
 - **Generic webhook** · `POST` JSON to any URL
-- **Cloud** · one switch, fans out to your **cloud inbox** + **web push** + **mobile app push** + **email** using your wattpost.cloud notification prefs. No SMTP credentials, no separate Pushover account — uses whatever channels you've already enabled in the cloud. Add `cloud` to a rule's `transports:` list, or pick "Cloud" in the Settings → Alerts editor.
+- **Cloud** · one switch, fans out to your **cloud inbox** + **web push** + **mobile app push** + **email** using your wattpost.cloud notification prefs. No SMTP credentials, no separate Pushover account, uses whatever channels you've already enabled in the cloud. Add `cloud` to a rule's `transports:` list, or pick "Cloud" in the Settings → Alerts editor.
 
 The Cloud tier adds:
 

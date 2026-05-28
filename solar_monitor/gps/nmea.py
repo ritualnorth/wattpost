@@ -1,7 +1,7 @@
 """Minimal NMEA 0183 sentence decoder.
 
 We only care about the RMC sentence (Recommended Minimum
-navigation Course) — it carries time + lat/lon + status in one
+navigation Course), it carries time + lat/lon + status in one
 line, emitted ~1Hz by every GPS receiver. Other sentences (GGA,
 GSV, GSA) carry extra detail we don't need for "where am I right
 now."
@@ -12,7 +12,7 @@ Receiver vendors prefix the sentence with their constellation:
   $GARMC  Galileo
   $GNRMC  multi-constellation (most modern receivers)
 
-We accept any of those. Checksum validation skipped — RMC frames
+We accept any of those. Checksum validation skipped, RMC frames
 are short, the underlying USB-CDC link is reliable, and a corrupt
 frame just fails our coordinate parse and gets ignored.
 """
@@ -83,7 +83,7 @@ def parse_rmc(line: str) -> dict | None:
     won't parse.
 
     Returns `{lat, lon, ts_utc, speed_knots, course_deg}` on success.
-    `ts_utc` is the UTC timestamp from the GPS, NOT the host clock —
+    `ts_utc` is the UTC timestamp from the GPS, NOT the host clock,
     receivers emit accurate time from the satellites' atomic clocks,
     which is more trustworthy than the Pi's local clock on a fresh
     boot (no NTP yet).
@@ -111,7 +111,7 @@ def parse_rmc(line: str) -> dict | None:
     if len(parts) < 10:
         return None
     if parts[2] != "A":
-        return None  # void fix — no satellite lock yet
+        return None  # void fix, no satellite lock yet
     lat = _parse_lat(parts[3], parts[4])
     lon = _parse_lon(parts[5], parts[6])
     if lat is None or lon is None:

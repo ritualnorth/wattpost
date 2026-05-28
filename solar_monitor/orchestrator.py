@@ -2,11 +2,11 @@
 
 Two entry points:
 
-* `Poller` — long-lived. Opens transports once at start, reuses them across
+* `Poller`, long-lived. Opens transports once at start, reuses them across
   many `poll()` calls. Used by the daemon scheduler. Re-opens any transport
   that's dropped between calls.
 
-* `poll_once(config)` — convenience for one-shot CLI usage. Wraps Poller in
+* `poll_once(config)`, convenience for one-shot CLI usage. Wraps Poller in
   an async context manager.
 
 Reconnection policy is deliberately simple: if a transport reports it isn't
@@ -58,7 +58,7 @@ class Poller:
     def __init__(self, config: Config) -> None:
         self.config = config
         self._transports: dict[str, Transport] = {}
-        # Transports whose last open() raised — retried on subsequent
+        # Transports whose last open() raised, retried on subsequent
         # _ensure_open() calls with backoff so a flaky USB BLE dongle
         # or a wedged BlueZ doesn't strand the appliance until the
         # next container restart. Maps id → (next_attempt_monotonic,
@@ -74,7 +74,7 @@ class Poller:
             t = _build_transport(tcfg)
             # Always register the transport, even if the initial open
             # fails (e.g. BT-2 dongle not advertising at boot). The
-            # object knows how to reconnect — the setup wizard probe
+            # object knows how to reconnect, the setup wizard probe
             # and the scheduler's per-poll request can call .open()
             # again. Discarding it stranded users who had to restart
             # the daemon every time the dongle bounced.
@@ -83,11 +83,11 @@ class Poller:
                 await t.open()
             except Exception:
                 log.exception(
-                    "transport %s failed to open at startup — will "
+                    "transport %s failed to open at startup, will "
                     "retry on next poll",
                     tcfg.get("id"),
                 )
-                # Schedule a retry. Initial backoff is short — we want
+                # Schedule a retry. Initial backoff is short, we want
                 # the BLE adapter to come back as soon as it's ready.
                 self._retry_state[t.id] = (time.monotonic() + 5.0, 1)
 
@@ -132,13 +132,13 @@ class Poller:
         # is_connected. We use duck typing to avoid coupling to one
         # transport implementation.
         #
-        # Passive transports (BLE advertisement listeners — Victron
+        # Passive transports (BLE advertisement listeners, Victron
         # Instant Readout etc.) deliberately don't have a `_client`.
         # They subscribe to a shared scanner and have no per-device
         # connection to check. Skipping them here is the correct
         # call: tearing down + reopening the scanner subscriber every
         # poll cycle (60s) was causing BlueZ to drop adverts during
-        # the filter-settle window — Garage Stack appliance went
+        # the filter-settle window, Garage Stack appliance went
         # 2+ hours without a single decoded Victron advert while
         # this loop hammered the scanner. Trust the transport's own
         # lifecycle here; reopen logic kicks in only when there IS a
@@ -154,7 +154,7 @@ class Poller:
                 return None
         # Retry transports whose open() previously failed (e.g. BlueZ
         # InProgress on a wedged Realtek dongle). Backoff doubles each
-        # consecutive failure, capped at 5 minutes — keeps us from
+        # consecutive failure, capped at 5 minutes, keeps us from
         # hammering a truly dead adapter but recovers fast once the
         # user replugs / power-cycles.
         retry = self._retry_state.get(transport_id)

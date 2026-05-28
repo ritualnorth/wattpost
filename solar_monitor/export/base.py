@@ -5,7 +5,7 @@ to an external system (MQTT broker, InfluxDB, webhook, etc).
 
 Exporters must:
   - never block the scheduler (operate via their own queue / async tasks)
-  - tolerate the sink being unavailable (drop, retry, or buffer — their call)
+  - tolerate the sink being unavailable (drop, retry, or buffer, their call)
   - be safely startable + stoppable; the scheduler owns lifecycle
 """
 from __future__ import annotations
@@ -33,7 +33,7 @@ class Exporter(abc.ABC):
 
     @abc.abstractmethod
     async def export(self, result: dict[str, Any]) -> None:
-        """Receive one full poll result. Should return quickly — buffer
+        """Receive one full poll result. Should return quickly, buffer
         internally if downstream is slow."""
 
     async def __aenter__(self) -> "Exporter":

@@ -1,4 +1,4 @@
-"""Energy-today overview endpoint — powers the chart at the top of /history.
+"""Energy-today overview endpoint, powers the chart at the top of /history.
 
 Replaces five separate per-metric history requests + client-side
 alignment with a single endpoint that returns one shared `ts` grid +
@@ -20,7 +20,7 @@ from ..storage.sqlite import Store
 
 # Source / charger device kinds. Anything that *injects* power onto
 # the bus belongs here. dcdc/dcdc_xs are DC-DC chargers (e.g. Orion-Tr,
-# Renogy DCC50S) — they show up as sources because they pull from
+# Renogy DCC50S), they show up as sources because they pull from
 # alternator/aux + push onto the bank bus.
 _SOURCE_KINDS = ("charge_controller", "mppt", "dcdc", "dcdc_charger", "dcdc_xs")
 _CHARGER_KINDS = ("ac_charger",)
@@ -103,7 +103,7 @@ async def compute_energy(
     soc_pct   = _align(bank_soc,  grid_ts)
     temp_c    = _align(bank_temp, grid_ts)
 
-    # kWh integration — each non-null bucket contributes
+    # kWh integration, each non-null bucket contributes
     # `value_W × (bucket_s / 3600) = Wh`. Positive bank_w = charging,
     # negative = discharging.
     factor = bucket_s / 3600.0
@@ -114,7 +114,7 @@ async def compute_energy(
     sources_wh  = solar_wh + charger_wh
     load_wh     = max(0.0, sources_wh + bank_out_wh - bank_in_wh)
 
-    # Self-powered breakdown — what fraction of the load was served
+    # Self-powered breakdown, what fraction of the load was served
     # by each input. Per-bucket attribution: in each bucket, load is
     # approximately (sources_in + bank_out − bank_in); we attribute
     # the served portion proportionally to each source's share of
@@ -181,7 +181,7 @@ def _align(series: dict[str, Any], grid_ts: list[int]) -> list[float | None]:
 
 def _sum_aligned(series_list: list[dict[str, Any]], grid_ts: list[int]) -> list[float | None]:
     """Sum multiple series on the same grid. None counts as zero unless
-    EVERY contributor is None at that bucket (then result is None too —
+    EVERY contributor is None at that bucket (then result is None too,
     distinguishes "no data" from "zero W")."""
     if not series_list:
         return [None] * len(grid_ts)

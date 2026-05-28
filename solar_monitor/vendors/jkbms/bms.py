@@ -1,31 +1,31 @@
-"""JK BMS device driver — protocol-version-aware cell-info parser.
+"""JK BMS device driver, protocol-version-aware cell-info parser.
 
 Frame layout (from syssi/esphome-jk-bms, validated against every
 JK firmware in the wild):
 
   Byte  Len  Field
   0     4    Header: 0x55 0xAA 0xEB 0x90  (or 0xAA 0x55 0x90 0xEB)
-  4     1    Frame type (0x02 = cell info — what we parse)
+  4     1    Frame type (0x02 = cell info, what we parse)
   5     1    Frame counter
   6     N×2  Cell voltages (N cells, mV little-endian)
               N=24 for JK02_24S, N=32 for JK02_32S
-  54    4    Enabled-cells bitmask (24S) — at 70 for 32S
-  58    2    Average cell voltage (mV) — at 74 for 32S
-  60    2    Delta cell voltage (mV) — at 76 for 32S
-  64    N×2  Cell resistances (mΩ) — at 80 for 32S
-  112   2    Power-tube temp (32S only) / Unknown (24S) — at 144 for 32S
-  118   4    Battery voltage (mV) — at 150 for 32S
-  126   4    Charge current (mA, signed) — at 158 for 32S
-  130   2    Temp sensor 1 (0.1°C) — at 162 for 32S
-  132   2    Temp sensor 2 (0.1°C) — at 164 for 32S
-  134   2    MOS temp / errors (32S) — at 166 for 32S
-  138   2    Balance current (mA) — at 170 for 32S
-  140   1    Balancing action (0=off, 1=charge, 2=discharge) — at 172 for 32S
-  141   1    State of charge (%) — at 173 for 32S
-  142   4    Remaining capacity (mAh) — at 174 for 32S
-  146   4    Nominal capacity (mAh) — at 178 for 32S
-  150   4    Cycle count — at 182 for 32S
-  154   4    Cumulative cycle capacity (mAh) — at 186 for 32S
+  54    4    Enabled-cells bitmask (24S), at 70 for 32S
+  58    2    Average cell voltage (mV), at 74 for 32S
+  60    2    Delta cell voltage (mV), at 76 for 32S
+  64    N×2  Cell resistances (mΩ), at 80 for 32S
+  112   2    Power-tube temp (32S only) / Unknown (24S), at 144 for 32S
+  118   4    Battery voltage (mV), at 150 for 32S
+  126   4    Charge current (mA, signed), at 158 for 32S
+  130   2    Temp sensor 1 (0.1°C), at 162 for 32S
+  132   2    Temp sensor 2 (0.1°C), at 164 for 32S
+  134   2    MOS temp / errors (32S), at 166 for 32S
+  138   2    Balance current (mA), at 170 for 32S
+  140   1    Balancing action (0=off, 1=charge, 2=discharge), at 172 for 32S
+  141   1    State of charge (%), at 173 for 32S
+  142   4    Remaining capacity (mAh), at 174 for 32S
+  146   4    Nominal capacity (mAh), at 178 for 32S
+  150   4    Cycle count, at 182 for 32S
+  154   4    Cumulative cycle capacity (mAh), at 186 for 32S
 
 Protocol version is detected from frame length: JK02_24S frames
 are typically 200-250 bytes; JK02_32S are 280-320 bytes. The
@@ -71,7 +71,7 @@ def _parse_cell_info(frame: bytes) -> dict[str, Any]:
     Detects 24S vs 32S from the frame length: 32S frames carry 16
     extra bytes (8 extra cell voltages + 8 extra resistances) plus
     a slightly different trailer layout. We use the "offset"
-    variable to switch between the two — same approach syssi's C++
+    variable to switch between the two, same approach syssi's C++
     reference takes."""
     out: dict[str, Any] = {}
     if len(frame) < 150:
@@ -79,7 +79,7 @@ def _parse_cell_info(frame: bytes) -> dict[str, Any]:
         return out
 
     # 32S frames are ~280-320 bytes; 24S are ~200-250. The boundary
-    # is fuzzy in practice, so use 260 as the cutoff — bigger than
+    # is fuzzy in practice, so use 260 as the cutoff, bigger than
     # any 24S frame, smaller than the smallest 32S.
     is_32s = len(frame) >= 260
     cell_count_max = 32 if is_32s else 24
@@ -184,13 +184,13 @@ class JkBms(DeviceDriver):
         }
         if not hasattr(transport, "get_latest_frame"):
             result["_errors"] = [
-                "wrong transport type — JK BMS requires ble_jkbms"
+                "wrong transport type, JK BMS requires ble_jkbms"
             ]
             return result
         frame = transport.get_latest_frame()
         if frame is None:
             result["_errors"] = [
-                "no cell-info frame received yet (or stale) — "
+                "no cell-info frame received yet (or stale), "
                 "the BMS should start streaming within ~2s of connect"
             ]
             return result

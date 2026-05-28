@@ -12,7 +12,7 @@ Why mutate Config in place vs introducing a LocationService:
   * The existing weather + forecast services read
     `cfg.weather.lat/lon` and `cfg.forecast.lat/lon` directly at
     each fetch. Mutating them in place keeps the change surface
-    tiny — no refactor of the per-provider plumbing.
+    tiny, no refactor of the per-provider plumbing.
   * The mutation is in-memory only. Persisting to YAML on every
     move would write hundreds of files a day in a moving van.
     On daemon restart, the config-on-disk's lat/lon (or the user-
@@ -34,11 +34,11 @@ log = logging.getLogger(__name__)
 _EARTH_KM = 6371.0
 # Minimum movement (km) before we treat the new fix as "different
 # enough" to re-fetch weather/forecast. 5 km matches the spec in
-# #125 — finer triggers too many re-fetches during slow city
+# #125, finer triggers too many re-fetches during slow city
 # driving, coarser misses real moves.
 DEFAULT_MIN_MOVE_KM = 5.0
 # How often (seconds) we force a re-apply even when the van's
-# stationary — catches the edge case where the GPS time has drifted
+# stationary, catches the edge case where the GPS time has drifted
 # such that we should refresh sunrise/sunset for the new day.
 DEFAULT_REFRESH_AFTER_S = 1800   # 30 min
 
@@ -132,7 +132,7 @@ class GpsService:
         try:
             import serial as pyserial
         except ImportError:
-            log.error("pyserial not installed — GPS service disabled")
+            log.error("pyserial not installed, GPS service disabled")
             return
 
         backoff = 1.0
@@ -152,7 +152,7 @@ class GpsService:
                 while not self._stop.is_set():
                     line_bytes = await loop.run_in_executor(None, ser.readline)
                     if not line_bytes:
-                        # Idle — readline timed out; just loop and check stop.
+                        # Idle, readline timed out; just loop and check stop.
                         continue
                     try:
                         line = line_bytes.decode("ascii", errors="replace")
@@ -165,7 +165,7 @@ class GpsService:
                     self._latest_fix_at = time.time()
                     await self._maybe_apply(fix)
             except Exception as e:
-                log.warning("gps: %s — retrying in %.1fs", e, backoff)
+                log.warning("gps: %s, retrying in %.1fs", e, backoff)
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
                     return
@@ -183,7 +183,7 @@ class GpsService:
         a downstream weather/forecast refresh + log + dispatch."""
         lat, lon = fix["lat"], fix["lon"]
         now = time.time()
-        # First fix after start — always apply.
+        # First fix after start, always apply.
         if self._last_applied_lat is None:
             should_apply = True
             distance_km = 0.0

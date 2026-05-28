@@ -1,13 +1,13 @@
 # Updates
 
-WattPost ships fast — updates come weekly. You have three ways to take them.
+WattPost ships fast, updates come weekly. You have three ways to take them.
 The cloud-driven path is the safe one: snapshot before, auto-rollback after,
 restore from cloud if anything goes really wrong.
 
 ## 1. Cloud "Update now" button (recommended)
 
 The per-site dashboard at `/app/site/{id}` has an **Update** button. One click
-fires the full safety chain — same flow on Pi and on Docker:
+fires the full safety chain, same flow on Pi and on Docker:
 
 1. **Local snapshot.** The appliance writes a fresh tarball of config + DB.
 2. **24h cloud-backup check.** If your most recent cloud-stored backup is
@@ -84,7 +84,7 @@ bind-mounted volumes.
 
 ## What if an update breaks something?
 
-The cloud-driven path (option 1 above) is layered defence in depth — multiple
+The cloud-driven path (option 1 above) is layered defence in depth, multiple
 things have to fail before you lose data or end up with a broken appliance.
 
 | Layer | What protects you | Where it lives |

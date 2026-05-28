@@ -5,7 +5,7 @@ Voyager) all expose a 12V load terminal controlled by Modbus
 register 0x010A: write 1 to switch on, 0 to switch off. The same
 register reads back the current state, but our existing rover.py
 driver already extracts load_status from the bulk register dump
-(register byte 67, high bit) — so we lean on that for read-back
+(register byte 67, high bit), so we lean on that for read-back
 rather than issuing a redundant FC03.
 
 ### BT-2 firmware quirk
@@ -13,7 +13,7 @@ rather than issuing a redundant FC03.
 The BT-2 BLE dongle silently swallows the FC06 ack frame on Rover
 firmware 3.x: the write IS applied at the Rover end, but no
 response ever arrives back over the BLE notify char. Our transport
-times out after 5s and raises TransportTimeout — which the naive
+times out after 5s and raises TransportTimeout, which the naive
 read of the response would treat as failure.
 
 We handle this two ways:
@@ -22,7 +22,7 @@ We handle this two ways:
      written value, we report `ok=True` regardless of whether the
      FC06 ack arrived.
   2. If even the readback times out we report `ok=False` with
-     `confirmed_state=None` — the caller should retry or surface a
+     `confirmed_state=None`, the caller should retry or surface a
      "no response from charger" error.
 
 Serial users (USB-RS485 wired in) typically *do* get a real ack;
@@ -56,17 +56,17 @@ LOAD_REGISTER = 0x010A
 LOAD_ON  = 1
 LOAD_OFF = 0
 
-# Models we know expose a load output. Match on substring — Renogy
+# Models we know expose a load output. Match on substring, Renogy
 # model strings come in several forms across the product line:
-#   * "RNG-CTRL-RVR40"  — Rover (current standard naming)
-#   * "RNG-CTRL-WND10"  — Wanderer
-#   * "RNG-CTRL-ADV30"  — Adventurer
-#   * "RNG-CTRL-VNG20"  — Voyager (waterproof)
-#   * "RVR40" / "WND10" — Some older firmware drops the RNG-CTRL- prefix
+#   * "RNG-CTRL-RVR40" , Rover (current standard naming)
+#   * "RNG-CTRL-WND10" , Wanderer
+#   * "RNG-CTRL-ADV30" , Adventurer
+#   * "RNG-CTRL-VNG20" , Voyager (waterproof)
+#   * "RVR40" / "WND10", Some older firmware drops the RNG-CTRL- prefix
 #
 # Bigger Rovers (200A+) without an L terminal report a model that
 # matches these prefixes too, but flipping their non-existent load
-# register is a no-op rather than dangerous — adapters can still
+# register is a no-op rather than dangerous, adapters can still
 # discover an output here and the FC06 write goes nowhere.
 _LOAD_BEARING_PREFIXES = (
     "RNG-CTRL-RVR", "RNG-CTRL-WND", "RNG-CTRL-ADV", "RNG-CTRL-VNG",
@@ -83,7 +83,7 @@ class RoverLoadAdapter:
 
     def discover(self, device: dict[str, Any]) -> list[ControllableOutput]:
         # Only register a load output for models we know have one.
-        # Bigger Rovers + non-load variants get nothing — they'll
+        # Bigger Rovers + non-load variants get nothing, they'll
         # just not show a Load Output panel on the device-detail page.
         latest = device.get("latest") or {}
         model = (device.get("model") or latest.get("model") or "").upper()
@@ -117,10 +117,10 @@ class RoverLoadAdapter:
                 verify_response(resp, slave_id, expected_fc=6)
                 ack_seen = True
             except ValueError as e:
-                log.info("[outputs.rover] %s: FC06 ack malformed: %s — "
+                log.info("[outputs.rover] %s: FC06 ack malformed: %s, "
                          "falling through to read-back", output.id, e)
         except TransportTimeout:
-            log.info("[outputs.rover] %s: FC06 ack timed out — BT-2 "
+            log.info("[outputs.rover] %s: FC06 ack timed out, BT-2 "
                      "quirk; verifying via read-back", output.id)
         except Exception as e:
             log.warning("[outputs.rover] %s: FC06 send failed: %s",
@@ -131,7 +131,7 @@ class RoverLoadAdapter:
         # Pass 2: read back register 0x010A. Some BT-2 firmwares serve
         # the register one-at-a-time only via the bulk register dump,
         # but the standard FC03 single-register read works on the
-        # Rovers we've tested — start with that. The bulk-dump fallback
+        # Rovers we've tested, start with that. The bulk-dump fallback
         # ride the next regular poll cycle automatically (see
         # read_state_from_snapshot).
         await asyncio.sleep(0.3)
@@ -151,13 +151,13 @@ class RoverLoadAdapter:
                 )
             return WriteResult(ok=True, confirmed_state=confirmed_state)
         except TransportTimeout:
-            # Even the read-back didn't come back — the BLE link is
+            # Even the read-back didn't come back, the BLE link is
             # likely flaky right now. The write may still have landed
             # (we saw acks swallowed before) but we can't prove it
             # here. The next regular poll cycle will reflect truth.
             if ack_seen:
                 return WriteResult(ok=True, confirmed_state=None,
-                                   detail="ack ok; read-back timed out — "
+                                   detail="ack ok; read-back timed out, "
                                           "next poll will confirm")
             return WriteResult(
                 ok=False, confirmed_state=None,

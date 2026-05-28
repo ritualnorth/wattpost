@@ -1,12 +1,12 @@
 """Daily poll of the release manifest.
 
 The cloud serves a JSON manifest at
-`<endpoint>/api/releases/latest` — `{version, released_at,
+`<endpoint>/api/releases/latest`, `{version, released_at,
 release_url}`. The appliance hits it every ~24h, compares to its
 own `solar_monitor.__version__`, and stashes the result so the
 API + Settings UI can surface "Update available" when newer.
 
-Strictly check-only at this layer — applying an update is a
+Strictly check-only at this layer, applying an update is a
 separate (not-yet-built) path. Failure to fetch is logged at WARNING
 and ignored; the next attempt comes around 24h later.
 """
@@ -40,10 +40,10 @@ class UpdateState:
     release_url:        str | None = None
     last_checked_at:    int | None = None     # unix seconds
     last_error:         str | None = None     # last fetch failure if any
-    # Cached upstream CHANGELOG.md text — refreshed each successful
+    # Cached upstream CHANGELOG.md text, refreshed each successful
     # manifest poll. Lets the dashboard show "what's in 0.0.3" while
     # the appliance is still on 0.0.2 (bundled docs only know the
-    # versions <= the running release). Not included in as_dict() —
+    # versions <= the running release). Not included in as_dict(),
     # served separately via /api/releases/changelog because it can be
     # several KB and the update-state endpoint is polled frequently.
     release_notes_md:   str | None = None
@@ -70,7 +70,7 @@ class UpdateState:
 
 
 def _semver_tuple(v: str) -> tuple:
-    """Cheap version comparison — splits on dots, ints where possible,
+    """Cheap version comparison, splits on dots, ints where possible,
     strings as fallback. Handles "0.0.2" vs "0.0.10" correctly which
     is the main reason we don't just `<`-compare the raw string."""
     parts = []
@@ -135,7 +135,7 @@ class UpdateChecker:
 
                 # Refresh cached release notes so the dashboard can
                 # preview a not-yet-installed version's changelog
-                # entry. Independent failure path — the manifest poll
+                # entry. Independent failure path, the manifest poll
                 # is the source of truth for has_update, the
                 # changelog is best-effort decoration.
                 try:
@@ -146,11 +146,11 @@ class UpdateChecker:
                     log.info("changelog fetch failed (keeping prior "
                              "cache + local fallback): %s", e)
 
-                # Fire the anonymous install beacon (#217) — separate
+                # Fire the anonymous install beacon (#217), separate
                 # URL so the Cloudflare-cached /api/releases/latest
                 # endpoint stays fast. install_id is the only ID we
                 # send; suppressed entirely when local_telemetry is
-                # opted out. Failure is non-fatal — we don't want a
+                # opted out. Failure is non-fatal, we don't want a
                 # missing beacon to mask a successful version check.
                 if self.telemetry_enabled and self.install_id:
                     try:

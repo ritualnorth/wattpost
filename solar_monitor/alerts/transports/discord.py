@@ -1,4 +1,4 @@
-"""Discord webhook transport — POSTs a rich embed to a channel webhook.
+"""Discord webhook transport, POSTs a rich embed to a channel webhook.
 
 Users create a channel webhook in Discord, paste the URL into config.yaml
 under `notification_transports[].url`. No bot setup required.

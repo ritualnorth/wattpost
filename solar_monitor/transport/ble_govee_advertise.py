@@ -1,6 +1,6 @@
 """Passive BLE listener for Govee thermometer-hygrometers (#255).
 
-Govee makes the dominant cheap ambient temp/humidity sensors — H5074,
+Govee makes the dominant cheap ambient temp/humidity sensors, H5074,
 H5075, H5101/H5102, etc. ~£10-15 on Amazon, palm-sized, CR2477 coin
 cell, plaintext BLE advertisement every ~2 seconds.
 
@@ -37,7 +37,7 @@ from .registry import register_transport
 
 log = logging.getLogger(__name__)
 
-# Shenzhen Govee Trading Co., Ltd. — assigned BLE manufacturer ID.
+# Shenzhen Govee Trading Co., Ltd., assigned BLE manufacturer ID.
 GOVEE_MANUFACTURER_ID = 0xEC88
 
 # How long a decoded payload stays "fresh". Govee broadcasts every
@@ -68,7 +68,7 @@ def parse_govee_advertisement(mfr_data: bytes) -> dict[str, Any] | None:
         # it's H5074. Otherwise treat as H5075.
         humid_candidate = int.from_bytes(mfr_data[3:5], "little")
         if humid_candidate <= 10000:
-            # H5074 / H5072 — explicit fields, no packed math.
+            # H5074 / H5072, explicit fields, no packed math.
             temp_raw = int.from_bytes(mfr_data[1:3], "little", signed=True)
             battery  = mfr_data[5]
             return {

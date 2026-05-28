@@ -32,8 +32,8 @@ from ..transport import Transport, TransportError
 class Section(msgspec.Struct, frozen=True):
     """One Modbus read + parser.
 
-    `function_code` selects FC03 (read holding registers, default —
-    Renogy + most vendors) or FC04 (read input registers — EPEVER and
+    `function_code` selects FC03 (read holding registers, default,
+    Renogy + most vendors) or FC04 (read input registers, EPEVER and
     the Tracer family use FC04 for live state). Other values are
     rejected at poll time."""
 
@@ -65,7 +65,7 @@ class WritableSetting(msgspec.Struct, frozen=True):
       register       Modbus holding register the write hits (FC06).
       read_from      snapshot field name to pull the current value from
                      the latest poll. None when the value isn't already
-                     in the bulk read — phase 2 will add an explicit
+                     in the bulk read, phase 2 will add an explicit
                      read for those.
       units          display-only ("V", "A", "°C", ""), no scaling.
       choices        for kind="enum": (value, label) pairs.
@@ -110,7 +110,7 @@ class DeviceDriver(abc.ABC):
     def writable_settings(self) -> Sequence["WritableSetting"]:
         """Device-side settings the user can view (and phase-2 change).
 
-        Default empty — drivers that don't have a write story or
+        Default empty, drivers that don't have a write story or
         haven't been audited for safe ranges shouldn't expose any.
         Renogy + JK BMS implement this; Victron stays read-only
         forever (separate product-scope decision)."""

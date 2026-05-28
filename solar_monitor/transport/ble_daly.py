@@ -27,20 +27,20 @@ of all preceding bytes.
 
 Commands we read:
 
-  * 0x90 — SoC + total V + total I
-  * 0x91 — min / max cell V + index
-  * 0x92 — min / max temperature + sensor index
-  * 0x93 — charge / discharge MOS state + cycle count
-  * 0x94 — cells count + temp sensor count + charger/load status
-  * 0x95 — per-cell voltages (multi-frame, one cell every 3 bytes)
-  * 0x96 — per-temperature-sensor readings
+  * 0x90, SoC + total V + total I
+  * 0x91, min / max cell V + index
+  * 0x92, min / max temperature + sensor index
+  * 0x93, charge / discharge MOS state + cycle count
+  * 0x94, cells count + temp sensor count + charger/load status
+  * 0x95, per-cell voltages (multi-frame, one cell every 3 bytes)
+  * 0x96, per-temperature-sensor readings
 
 All read frames are 13 bytes. Cell-voltage replies span multiple
 13-byte frames; we accumulate them in the parser.
 
 Read-only at v1. Daly does support writes (BMS reset, threshold
 configuration) but they're behind the same brick-the-pack risk as
-JBD — gated on hardware validation.
+JBD, gated on hardware validation.
 """
 from __future__ import annotations
 
@@ -79,7 +79,7 @@ def _checksum(b: bytes) -> int:
 
 def build_request(command: int) -> bytes:
     # 0x80 = "BLE bridge" address. Most Daly BLE firmwares accept it;
-    # the few that don't accept 0x40 (the UART host address) — those
+    # the few that don't accept 0x40 (the UART host address), those
     # would need a config override we'd add when a real device reports
     # back. v1 picks one and ships.
     body = bytes([FRAME_HEADER, 0x80, command, 0x08,
@@ -168,7 +168,7 @@ class BleDalyTransport(Transport):
     async def request(self, frame: bytes, expected_response_len: int,
                       timeout: float = 5.0) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on ble_daly — "
+            f"{self.id}: request() is unsupported on ble_daly, "
             "drivers must override poll() and use get_latest_frame()"
         )
 

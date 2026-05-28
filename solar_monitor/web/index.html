@@ -9,11 +9,11 @@
        broker (<slug>.wattpost.cloud). Push notifications register
        against the page's origin; if a user "Add to Home Screen"s
        from a broker URL they'd get a per-appliance PWA scoped to
-       that single broker subdomain — alerts wouldn't reach it
+       that single broker subdomain, alerts wouldn't reach it
        (cloud sends push from wattpost.cloud origin), and the
        multi-site picker wouldn't exist. The canonical install
        target is wattpost.cloud/app. LAN access (192.168.x.x etc.)
-       still installs the appliance PWA — that's still valid for
+       still installs the appliance PWA, that's still valid for
        offline-first / no-cloud customers. -->
   <script>
     (function () {
@@ -29,7 +29,7 @@
           var nodes = document.querySelectorAll(sel);
           for (var i = 0; i < nodes.length; i++) nodes[i].remove();
         }
-      } catch (_) { /* ignore — non-fatal */ }
+      } catch (_) { /* ignore, non-fatal */ }
     })();
   </script>
   <!-- PWA: install-to-home-screen + offline shell. Stripped above
@@ -42,7 +42,7 @@
   <meta name="apple-mobile-web-app-title" content="WattPost" />
   <script>
     // Skip SW registration when the HTML was served via the cloud
-    // broker — the cloud's own SW (at wattpost.cloud/wp-sw.js)
+    // broker, the cloud's own SW (at wattpost.cloud/wp-sw.js)
     // owns push delivery for paired users. Registering a second SW
     // on the broker subdomain would just compete for the alerts
     // inbox notification flow.
@@ -92,7 +92,7 @@
   <script>
     // Detect the WattPost mobile shell (sets a UA marker via
     // capacitor.config.ts.{ios,android}.appendUserAgent). When set,
-    // tag <body> so CSS can strip the appliance's own header — the
+    // tag <body> so CSS can strip the appliance's own header, the
     // mobile app's native tab bar + cloud-served wrapper already
     // provide chrome; rendering ours again is "website in a frame"
     // double chrome. Done inline before paint so there's no flash. #}
@@ -105,7 +105,7 @@
 </head>
 <body>
   <!-- Conditional alert banner (always visible across all routes) -->
-  <!-- Single collapsible alert banner — replaces the old stacked rows
+  <!-- Single collapsible alert banner, replaces the old stacked rows
        that were eating ~25% of the mobile fold. Banner shows a one-line
        summary; tap to expand the per-category detail. Same-category
        alerts (e.g. cell drift on two batteries at the same value) are
@@ -163,7 +163,7 @@
       <span class="status-icon"></span>
       <span class="text">connecting…</span>
     </button>
-    <!-- Help icon-button — small, sits in the topbar instead of a
+    <!-- Help icon-button, small, sits in the topbar instead of a
          floating FAB. Same destination (#/docs), less screen real-estate
          eaten on mobile, no overlay clash with the dashboard tiles. -->
     <a class="help-btn" id="help-btn" href="#/docs"
@@ -176,13 +176,13 @@
       </svg>
     </a>
     <!-- Sign-in / sign-out lived here briefly but moved inside Settings
-         (the only place you actually need them) — clicking Settings on
+         (the only place you actually need them), clicking Settings on
          an unauthed session bounces to /login automatically, so the
          header button was redundant noise. Sign-out now lives inside
          Settings → System. -->
 
 
-    <!-- Status legend popover — opens when the pill is tapped. -->
+    <!-- Status legend popover, opens when the pill is tapped. -->
     <div id="status-legend" class="status-legend" hidden>
       <div class="status-legend-head">
         <span>System status</span>
@@ -263,7 +263,7 @@
             <div class="donut-disagreement" id="donut-disagreement" hidden></div>
             <!-- #293: one-liner battery health badge. Aggregated from
                  the worst of cycles / silent-cells / cell-spread /
-                 charger-state — surfaces a single status without the
+                 charger-state, surfaces a single status without the
                  user needing to open the Battery health panel. -->
             <div class="donut-health" id="donut-health" hidden></div>
           </div>
@@ -358,7 +358,7 @@
         </div>
       </section>
 
-      <!-- RIGHT NOW (Open-Meteo current conditions — hidden until configured) -->
+      <!-- RIGHT NOW (Open-Meteo current conditions, hidden until configured) -->
       <section class="panel weather-panel" id="weather-panel" hidden>
         <div class="panel-header">
           <h2>
@@ -390,7 +390,7 @@
         </div>
       </section>
 
-      <!-- LOCATION (#264) — shown when the appliance has any current
+      <!-- LOCATION (#264), shown when the appliance has any current
            location (GPS fix OR static forecast lat/lon). Always rendered
            locally; cloud transmission is gated separately by the
            Settings → Location toggle. -->
@@ -409,7 +409,7 @@
         <p class="map-attrib" style="margin:.4rem 0 0;font-size:.68rem;color:var(--text-3);text-align:right">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">CARTO</a></p>
       </section>
 
-      <!-- DAILY OUTLOOK (PV forecast — hidden until first fetch lands) -->
+      <!-- DAILY OUTLOOK (PV forecast, hidden until first fetch lands) -->
       <section class="panel week-panel" id="week-panel" hidden>
         <div class="panel-header">
           <h2>
@@ -445,7 +445,7 @@
         </div>
       </section>
 
-      <!-- TANK + AMBIENT SENSORS (#257) — hidden by default, surfaces
+      <!-- TANK + AMBIENT SENSORS (#257), hidden by default, surfaces
            when at least one tank (Mopeka) or ambient (Govee/Ruuvi)
            device is paired. Renders below the weather/location stack
            so it sits with environmental data, not battery telemetry. -->
@@ -530,7 +530,7 @@
          ===================================================== -->
     <section class="route" data-route="history">
 
-      <!-- ENERGY TODAY — Powerwall-style overview chart. Multi-series
+      <!-- ENERGY TODAY, Powerwall-style overview chart. Multi-series
            area + SoC line, four kWh totals, self-powered breakdown.
            Backed by /api/energy/today which returns aligned series in
            a single request. -->
@@ -692,7 +692,7 @@
           <span class="panel-sub">Scan a Bluetooth dongle for new devices and add them automatically.</span>
         </div>
 
-        <!-- Restart banner — visible after a successful add until the daemon restarts. -->
+        <!-- Restart banner, visible after a successful add until the daemon restarts. -->
         <div id="wiz-restart" class="wiz-restart" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
           <div>
@@ -702,7 +702,7 @@
         </div>
 
         <div class="wizard">
-          <!-- BLE adapter status — diagnostic at the top so users
+          <!-- BLE adapter status, diagnostic at the top so users
                can tell if their dongle / docker passthrough is even
                reaching the daemon before fiddling with anything else. -->
           <div id="wiz-ble-status" class="wiz-ble-status">
@@ -719,8 +719,8 @@
             <div id="wiz-ble-diag-out" class="wiz-ble-diag-out" hidden></div>
           </div>
 
-          <!-- Step 1 — Bluetooth connection (internally "transport"
-               — kept that word in IDs/CSS/APIs but the UX shows
+          <!-- Step 1, Bluetooth connection (internally "transport"
+              , kept that word in IDs/CSS/APIs but the UX shows
                plain English). -->
           <div class="wiz-step">
             <div class="wiz-step-head"><span class="wiz-num">1</span><span>Your Bluetooth connection</span></div>
@@ -728,7 +728,7 @@
             <div id="wiz-transports" class="wiz-transports"><div class="wiz-empty">Loading…</div></div>
           </div>
 
-          <!-- Step 2 — scan -->
+          <!-- Step 2, scan -->
           <div class="wiz-step" id="wiz-step-scan" hidden>
             <div class="wiz-step-head"><span class="wiz-num">2</span><span>Find your devices</span></div>
             <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running. Scanning just shares the link.</p>
@@ -759,12 +759,12 @@
           </h2>
         </div>
 
-        <!-- Sub-page back link — only visible when a sub-route is
+        <!-- Sub-page back link, only visible when a sub-route is
              active (CSS hides .settings-sub-back when
              body[data-route-sub="menu"]). -->
         <a href="#/settings" class="settings-sub-back">← Settings</a>
 
-        <!-- Menu landing — only visible when no sub-route is selected.
+        <!-- Menu landing, only visible when no sub-route is selected.
              Each row deep-links to a sub-page where the matching
              settings-blocks render. CSS in body[data-route-sub="menu"]
              shows this and hides the .settings-grid blocks. -->
@@ -829,7 +829,7 @@
 
         <div class="settings-grid">
           <!-- Session + system actions promoted to the top of the
-               grid (#147). Sign Out specifically — easy to miss when
+               grid (#147). Sign Out specifically, easy to miss when
                buried under five blocks of config; finishing at "Sign
                out" up here means you don't accidentally walk away
                from an authed session on a shared tablet. -->
@@ -851,7 +851,7 @@
               </button>
             </div>
             <p id="signout-broker-note" class="settings-block-note" hidden style="margin:.5rem 0 0;color:var(--text-2);font-size:.85rem;line-height:1.45">
-              You're signed in via wattpost.cloud. The button above takes you to cloud sign-out — ending that session ends broker access to this appliance.
+              You're signed in via wattpost.cloud. The button above takes you to cloud sign-out, ending that session ends broker access to this appliance.
             </p>
           </div>
           <div class="settings-block settings-block--cta" data-subroute="devices">
@@ -1284,7 +1284,7 @@
     </section>
 
     <!-- =====================================================
-         ROUTE: Kiosk — chrome-free SoC + flow for wall-mounted tablets
+         ROUTE: Kiosk, chrome-free SoC + flow for wall-mounted tablets
          ===================================================== -->
     <section class="route kiosk-route" data-route="kiosk">
       <div class="kiosk-stage">

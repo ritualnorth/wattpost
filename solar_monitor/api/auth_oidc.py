@@ -19,7 +19,7 @@ flight). This makes the feature feature-flagged-by-presence: as
 soon as identity_v2 upgrade succeeds and oidc_client.json is
 written, OIDC login becomes available; until then it doesn't.
 
-Existing password login keeps working in parallel — OIDC is
+Existing password login keeps working in parallel, OIDC is
 additive in Phase 3. Phase 4 adds an offline fallback for
 no-WAN scenarios; Phase 5 layers WebAuthn on top.
 """
@@ -123,7 +123,7 @@ async def auth_callback(request: Request) -> Response:
     pending = oidc_rp.consume_pending(state)
     if pending is None:
         # state token unknown (CSRF mismatch, replay from history, or
-        # expired). Don't dead-end the user in a JSON 400 — bounce
+        # expired). Don't dead-end the user in a JSON 400, bounce
         # back to /login with a banner. They click again, the round-
         # trip works. The 400 was a real bug Ritual North hit on retry after
         # I pulled v0.1.96; state was wiped by the container recreate.

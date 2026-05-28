@@ -38,7 +38,7 @@ class DeviceCfg(msgspec.Struct, kw_only=True):
     transport: str
     # slave_id is the Modbus unit ID for ble_modbus / serial_modbus
     # devices. Victron Instant Readout devices (ble_victron_advertise
-    # transport) don't have a Modbus address — they're identified by
+    # transport) don't have a Modbus address, they're identified by
     # MAC at the transport level. Optional so a Victron device config
     # block can omit it. Drivers that genuinely need a slave_id
     # validate it on poll().
@@ -61,13 +61,13 @@ class AlertRuleCfg(msgspec.Struct, kw_only=True):
 
 class ForecastCfg(msgspec.Struct, kw_only=True):
     """Third-party PV forecast integration. Each user supplies their
-    own credentials — we don't proxy. Each provider uses the subset
+    own credentials, we don't proxy. Each provider uses the subset
     of fields it cares about:
-      * `solcast`   — api_key + resource_id
-      * `openmeteo` — lat + lon + array_kw + tilt_deg + azimuth_deg
+      * `solcast`  , api_key + resource_id
+      * `openmeteo`, lat + lon + array_kw + tilt_deg + azimuth_deg
                       (free, no key; physical PV estimate from
                       irradiance + array geometry)
-      * `synthetic` — none (demo container only)
+      * `synthetic`, none (demo container only)
     """
     provider: str = "solcast"
     # Solcast credentials. Empty when using openmeteo or synthetic.
@@ -88,9 +88,9 @@ class ForecastCfg(msgspec.Struct, kw_only=True):
     tilt_deg: float = 30.0
     # Panel azimuth: 0 = south (northern hemisphere optimal), 90 = west,
     # 180 = north, 270 = east. We don't currently switch convention by
-    # hemisphere — southern-hemisphere users should configure 180.
+    # hemisphere, southern-hemisphere users should configure 180.
     azimuth_deg: float = 0.0
-    # System efficiency multiplier — covers inverter losses, wiring,
+    # System efficiency multiplier, covers inverter losses, wiring,
     # soiling, temperature derating. 0.80 is the commonly-cited
     # all-in figure for a healthy system.
     system_efficiency: float = 0.80
@@ -103,7 +103,7 @@ class ForecastCfg(msgspec.Struct, kw_only=True):
 class CloudCfg(msgspec.Struct, kw_only=True):
     """Opt-in cloud integration. When present, the daemon periodically
     POSTs a heartbeat (SoC, net power, alert summary) to wattpost.io.
-    Nothing else changes — the appliance stays fully functional with
+    Nothing else changes, the appliance stays fully functional with
     no cloud, no internet, no account.
 
     Pairing flow lives in the API: user gets a code from the cloud
@@ -113,7 +113,7 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     """
     # Canonical product subdomain. wattpost.io is the marketing site;
     # the API + dashboard live on wattpost.cloud. Old pairings with
-    # endpoint=https://wattpost.io keep working — Caddy reverse-proxies
+    # endpoint=https://wattpost.io keep working, Caddy reverse-proxies
     # /api/* on both hostnames.
     endpoint:          str  = "https://wattpost.cloud"
     bearer_token:      str  = ""    # empty until paired
@@ -123,7 +123,7 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     # Cloudflare Tunnel credentials, returned by the cloud's
     # /api/pair/exchange when the cloud has CF API access. Empty
     # when the cloud hasn't yet had CF credentials configured
-    # (development, or pre-launch production) — appliance still
+    # (development, or pre-launch production), appliance still
     # works locally + pushes heartbeats, just doesn't expose itself
     # over the tunnel.
     tunnel_token:      str  = ""
@@ -145,14 +145,14 @@ class CloudCfg(msgspec.Struct, kw_only=True):
 
 
 class WeatherCfg(msgspec.Struct, kw_only=True):
-    """Current weather conditions integration. Open-Meteo only for now —
+    """Current weather conditions integration. Open-Meteo only for now,
     no API key required (free public service, generous rate limits).
     Lat/lon are user-supplied; could derive from Solcast in a future
     iteration but explicit is cleaner."""
     provider: str = "openmeteo"
     lat: float
     lon: float
-    # Cadence in minutes — Open-Meteo doesn't rate-limit hobbyist
+    # Cadence in minutes, Open-Meteo doesn't rate-limit hobbyist
     # traffic but there's no point hammering when conditions change
     # on a 10-minute timescale anyway.
     poll_minutes: int = 15
@@ -165,19 +165,19 @@ class BankCfg(msgspec.Struct, kw_only=True):
 
     Default behaviour (`source: auto`):
       * Cell-level data (per-cell V, drift, balance state) always
-        comes from BMSes — shunts don't have it.
+        comes from BMSes, shunts don't have it.
       * System-level data (V, A, SoC, time-to-go) prefers the shunt
         when present (direct measurement at the busbar, Coulomb-
         counted), falls back to summing BMSes when no shunt.
 
     Overrides for users whose hardware lies / drifts:
-      * `source: shunt` — force system-level from shunt even when
+      * `source: shunt`, force system-level from shunt even when
         BMSes are present. Doesn't affect cell data.
-      * `source: bms`   — force system-level from BMS pack sum
+      * `source: bms`  , force system-level from BMS pack sum
         even when a shunt is present.
 
     `disagreement_threshold_pct` controls when the dashboard surfaces
-    a quiet "shunt vs BMS disagree" warning — 5% by default. Set to
+    a quiet "shunt vs BMS disagree" warning, 5% by default. Set to
     100 to suppress the warning entirely.
     """
     source: str = "auto"                      # auto | shunt | bms
@@ -188,24 +188,24 @@ class LocationCfg(msgspec.Struct, kw_only=True):
     """Privacy gate for shipping location to the cloud (#263/#264).
 
     Location plumbing (GpsCfg or ForecastCfg.lat/lon) exists for local
-    use regardless — forecasts, the appliance's own map tile, weather.
+    use regardless, forecasts, the appliance's own map tile, weather.
     Cloud transmission is a SEPARATE decision the customer makes here,
     OPT-IN, default OFF. Three modes:
 
-      off     — cloud receives no location data at all (default)
-      approx  — appliance rounds to ~10km grid before transmission
-      precise — real lat/lon
+      off    , cloud receives no location data at all (default)
+      approx , appliance rounds to ~10km grid before transmission
+      precise, real lat/lon
 
     Why three modes:  precise enables the cool features (fleet map,
     geofences, anchor watch).  approx supports "show roughly where my
-    fleet is" without precise tracking — useful for vanlife customers
+    fleet is" without precise tracking, useful for vanlife customers
     who want fleet visibility but not constant pinpoint surveillance.
     off is the default so a fresh install never leaks location until
     the customer explicitly opts in.
 
     Customer-side is authoritative: even if the cloud's UI shows a
     fleet map, this toggle controls whether THIS appliance contributes.
-    Bob Smith (the OEM builder pattern) cannot override it remotely —
+    Bob Smith (the OEM builder pattern) cannot override it remotely,
     see project-oem-builder-gtm memory.
     """
     share_with_cloud: str = "off"   # "off" | "approx" | "precise"
@@ -216,7 +216,7 @@ class LocationCfg(msgspec.Struct, kw_only=True):
 
 
 class GpsCfg(msgspec.Struct, kw_only=True):
-    """USB GPS receiver (#125). Off by default — opt in by adding a
+    """USB GPS receiver (#125). Off by default, opt in by adding a
     `gps:` block to config.yaml. The daemon reads NMEA at `baudrate`
     from `port` (typically `/dev/ttyACM0` for a USB-CDC receiver like
     the VK-162 G-Mouse) and, on significant movement (>5 km from
@@ -235,7 +235,7 @@ class QuietHoursCfg(msgspec.Struct, kw_only=True):
     """Window during which `warn`-severity alerts are buffered instead of
     dispatched immediately. `alarm` always pages through. Hours are
     integers 0-23 in the daemon's local timezone. Overnight windows
-    work — start > end means "from start_hour today to end_hour tomorrow".
+    work, start > end means "from start_hour today to end_hour tomorrow".
 
     Disabled when start_hour == end_hour or this whole struct is absent.
     """
@@ -253,7 +253,7 @@ class BackupCfg(msgspec.Struct, kw_only=True):
     """
     enabled: bool = True
     # Interval in hours between auto-snapshots. Default = daily.
-    # Was weekly (168h) pre-launch; bumped 2026-05-27 — "off-site
+    # Was weekly (168h) pre-launch; bumped 2026-05-27, "off-site
     # backups + one-click restore" as a Pro promise needs fresher
     # snapshots than once a week. A customer whose Pi dies on day
     # 6 of the cycle would otherwise lose 6 days of data.
@@ -268,7 +268,7 @@ class BackupCfg(msgspec.Struct, kw_only=True):
     dir: str = ""
     # Push each new local snapshot to wattpost.cloud after capture.
     # Only effective when the appliance is paired AND on a paying
-    # tier — the cloud rejects uploads from Hobby with an explicit
+    # tier, the cloud rejects uploads from Hobby with an explicit
     # "upgrade for cloud backups" 402.
     cloud_upload: bool = False
     # How many cloud-side backups to retain per appliance. The cloud
@@ -283,7 +283,7 @@ class LocalTelemetryCfg(msgspec.Struct, kw_only=True):
     Piggybacks an `install_id` + version + install method onto the
     daily update-check poll so the cloud can count distinct local
     installs and surface release adoption across the fleet (paired
-    + unpaired). ON by default — see `docs/privacy-and-telemetry.md`
+    + unpaired). ON by default, see `docs/privacy-and-telemetry.md`
     for what's sent and what's not. Set to `false` to suppress the
     install_id query param; the update poll itself still fires
     (needed for the dashboard's `Update available` badge).
@@ -296,22 +296,22 @@ class DiscoveryCfg(msgspec.Struct, kw_only=True):
 
     OFF by default. When opted in, the appliance forwards anonymised
     fingerprints of devices its scans see but our drivers don't
-    recognise — feeding the next-driver pipeline. No customer-
+    recognise, feeding the next-driver pipeline. No customer-
     identifying information leaves the appliance:
 
       * MAC truncated to vendor prefix (first 3 octets / OUI)
-      * advertised local name (typically just a model + serial — we
+      * advertised local name (typically just a model + serial, we
         strip the serial suffix server-side)
       * manufacturer-data ID + first 4 bytes (model identifier)
       * service UUIDs
-      * appliance bearer-token is the only auth — cloud derives no
+      * appliance bearer-token is the only auth, cloud derives no
         owner/email from it for the discovery write path
     """
     enabled: bool = False
 
 
 class SmartPlugCfg(msgspec.Struct, kw_only=True):
-    """One smart plug entry. WattPost talks to it over local HTTP —
+    """One smart plug entry. WattPost talks to it over local HTTP,
     no broker, no cloud, no Home Assistant required.
 
     `kind` selects the protocol: `shelly_gen2` for any Shelly Plus /
@@ -354,8 +354,8 @@ class MqttInTopicCfg(msgspec.Struct, kw_only=True):
     vendor: str = "mqtt"              # surfaced via _vendor
     kind: str = "sensor"              # surfaced via _kind
     # How to interpret the payload bytes:
-    #   "scalar" — payload is the raw number / string (default)
-    #   "json"   — payload is JSON; extract `json_path` (dotted, e.g.
+    #   "scalar", payload is the raw number / string (default)
+    #   "json"  , payload is JSON; extract `json_path` (dotted, e.g.
     #              `value.temperature` for `{"value": {"temperature": 21.3}}`)
     value_type: str = "scalar"
     json_path: str = ""               # required when value_type == "json"
@@ -384,7 +384,7 @@ class MqttInCfg(msgspec.Struct, kw_only=True):
     # HA MQTT-discovery autopopulate. Subscribes to
     # `<ha_discovery_prefix>/+/+/config` and friends; turns each
     # `state_topic` into a virtual device on the dashboard. This is
-    # the single highest-leverage toggle — most existing HA users
+    # the single highest-leverage toggle, most existing HA users
     # already have hundreds of entities ready to surface.
     ha_discovery: bool = True
     ha_discovery_prefix: str = "homeassistant"
@@ -392,7 +392,7 @@ class MqttInCfg(msgspec.Struct, kw_only=True):
     topics: list[MqttInTopicCfg] = []
     # How long a virtual device stays in the result with no fresh
     # advertisement before we drop it from `/api/devices`. Mirrors
-    # the BLE STALE_AFTER_SECONDS pattern but longer — MQTT devices
+    # the BLE STALE_AFTER_SECONDS pattern but longer, MQTT devices
     # can be quiet for minutes between state changes.
     stale_after_seconds: int = 600
 
@@ -420,7 +420,7 @@ class HistoryCfg(msgspec.Struct, kw_only=True):
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
-    # silently dropped the YAML value — every Docker user's history
+    # silently dropped the YAML value, every Docker user's history
     # was still landing in /app/solar-monitor.db (inside the
     # ephemeral writable layer). v0.0.63 actually wires it up.
     # Default matches the historical CLI default so absence of the
@@ -439,23 +439,23 @@ class Config(msgspec.Struct, kw_only=True):
     forecast: ForecastCfg | None = None  # optional
     weather: WeatherCfg | None = None    # optional
     cloud: CloudCfg | None = None        # optional
-    gps: GpsCfg | None = None            # optional (USB GPS — #125)
-    location: LocationCfg | None = None  # optional — cloud-share gate (#263/#264). Default-off when absent.
-    bank: BankCfg | None = None          # optional (#121 — shunt-vs-BMS reconciliation)
-    backup: BackupCfg | None = None      # optional — local rotating snapshots (#146 phase 2)
-    discovery: DiscoveryCfg | None = None  # optional — anonymous discovery telemetry (#129)
-    local_telemetry: LocalTelemetryCfg | None = None  # optional — anonymous install beacon (#217); ON by default
-    history: HistoryCfg | None = None    # optional — poll cadence + retention (#172)
-    solar_pause: SolarPauseCfg | None = None  # optional — auto-pause AC charger when PV covers (#163)
-    smart_plugs: list[SmartPlugCfg] = []      # optional — LAN-attached smart plugs for solar-pause to drive
-    mqtt_in: MqttInCfg | None = None     # optional — ingest from user's MQTT broker (#256)
+    gps: GpsCfg | None = None            # optional (USB GPS, #125)
+    location: LocationCfg | None = None  # optional, cloud-share gate (#263/#264). Default-off when absent.
+    bank: BankCfg | None = None          # optional (#121, shunt-vs-BMS reconciliation)
+    backup: BackupCfg | None = None      # optional, local rotating snapshots (#146 phase 2)
+    discovery: DiscoveryCfg | None = None  # optional, anonymous discovery telemetry (#129)
+    local_telemetry: LocalTelemetryCfg | None = None  # optional, anonymous install beacon (#217); ON by default
+    history: HistoryCfg | None = None    # optional, poll cadence + retention (#172)
+    solar_pause: SolarPauseCfg | None = None  # optional, auto-pause AC charger when PV covers (#163)
+    smart_plugs: list[SmartPlugCfg] = []      # optional, LAN-attached smart plugs for solar-pause to drive
+    mqtt_in: MqttInCfg | None = None     # optional, ingest from user's MQTT broker (#256)
 
 
-# #258 — default alert rules seeded on first boot. System-voltage-
+# #258, default alert rules seeded on first boot. System-voltage-
 # agnostic (SoC + temperature only; voltage rules would need to know
 # 12V/24V/48V which we don't at first boot). Empty `transports` list
 # means they fire to the local ring buffer + cloud inbox via heartbeat
-# extras — the user gets visibility immediately, and can attach SMTP /
+# extras, the user gets visibility immediately, and can attach SMTP /
 # MQTT / Cloud push from the Alerts settings later.
 _DEFAULT_ALERT_RULES: list[dict[str, Any]] = [
     {
@@ -485,12 +485,12 @@ def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
     cfg = msgspec.convert(raw, Config)
 
-    # #258 — first-boot default rules. Only seeds when:
+    # #258, first-boot default rules. Only seeds when:
     #   1. `alerts:` is empty (or absent), AND
     #   2. `alerts_seeded:` is missing or False.
     # Persists alerts_seeded=true on disk so a user who intentionally
     # clears all rules later doesn't get them silently re-added on the
-    # next start. Best-effort write — if the config is read-only the
+    # next start. Best-effort write, if the config is read-only the
     # in-memory seed still works for this session.
     if not cfg.alerts and not cfg.alerts_seeded:
         cfg.alerts = msgspec.convert(_DEFAULT_ALERT_RULES, list[AlertRuleCfg])
@@ -504,7 +504,7 @@ def load_config(path: str | Path) -> Config:
 
     # Legacy endpoint auto-upgrade. Appliances paired before the
     # rebrand have `cloud.endpoint: https://app.wattpost.io` saved.
-    # That hostname now 301s to wattpost.cloud at the edge — and
+    # That hostname now 301s to wattpost.cloud at the edge, and
     # httpx (correctly) strips the Authorization header on cross-host
     # redirects, so every heartbeat 401s before being rewritten and
     # the appliance shows offline forever. Detect + upgrade in-place
@@ -515,7 +515,7 @@ def load_config(path: str | Path) -> Config:
         "https://wattpost.io",
         "https://wattpost.io/",
     )
-    # Auto-generate kiosk_token if missing. Pure convenience — the
+    # Auto-generate kiosk_token if missing. Pure convenience, the
     # token is the bearer for the public share URL, so anyone with
     # the URL has access regardless of whether the token was
     # auto-generated or user-set. Re-running this on every start is

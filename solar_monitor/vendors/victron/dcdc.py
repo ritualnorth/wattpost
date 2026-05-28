@@ -1,4 +1,4 @@
-"""Victron Orion-Tr Smart DC-DC charger driver — read-only.
+"""Victron Orion-Tr Smart DC-DC charger driver, read-only.
 
 The Orion-Tr Smart family (12/12-18, 12/12-30, 12/24-15, 24/12-30 etc.)
 broadcasts Instant Readout advertisements just like the SmartShunt;
@@ -10,7 +10,7 @@ Worth noting: the smaller Orion-Tr models don't have an output-current
 sensor. We expose every field victron-ble surfaces; downstream UI
 treats missing values the same way it does for any optional metric.
 
-Pairs with #119's coverage roadmap — Victron Orion-Tr is the most
+Pairs with #119's coverage roadmap, Victron Orion-Tr is the most
 common DC-DC charger in vans alongside the Renogy DCC50S, which
 gets its own driver in #123.
 """
@@ -38,7 +38,7 @@ class VictronDcDc(DeviceDriver):
 
     @property
     def sections(self) -> tuple[Section, ...]:
-        return ()  # Not a Modbus driver — see SmartShunt for the same pattern
+        return ()  # Not a Modbus driver, see SmartShunt for the same pattern
 
     async def poll(self, transport) -> dict[str, Any]:
         result: dict[str, Any] = {
@@ -50,7 +50,7 @@ class VictronDcDc(DeviceDriver):
 
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Victron DC-DC requires "
+                "wrong transport type, Victron DC-DC requires "
                 "ble_victron_advertise"
             ]
             return result
@@ -88,7 +88,7 @@ class VictronDcDc(DeviceDriver):
         # Map onto normalised fields. We borrow `pv_voltage_v` /
         # `battery_voltage_v` semantics from the Rover so the device-
         # detail dashboard tile lights up without per-vendor templates,
-        # even though the Orion isn't a PV charger — input is whatever
+        # even though the Orion isn't a PV charger, input is whatever
         # is on the input side (alternator typically) and output is the
         # battery being charged.
         if input_v   is not None: result["input_voltage_v"]   = input_v
@@ -97,14 +97,14 @@ class VictronDcDc(DeviceDriver):
 
         # Enums serialise by name (.name) so storage + SSE see plain
         # strings, not Python repr. The charger-state field is what the
-        # dashboard pill renders — same convention as Rover's
+        # dashboard pill renders, same convention as Rover's
         # `charging_state` so existing UI code reads it correctly.
         if state is not None:
             result["charging_state"] = getattr(state, "name", str(state)).lower()
         if err is not None:
             result["charger_error"]  = getattr(err, "name", str(err))
         if off_rsn is not None:
-            # OFF_REASON is informative — surfaces "ENGINE_SHUTDOWN"
+            # OFF_REASON is informative, surfaces "ENGINE_SHUTDOWN"
             # so the UI can show "waiting for ignition" rather than
             # leaving the user wondering why their DC-DC is idle.
             result["off_reason"]     = getattr(off_rsn, "name", str(off_rsn))

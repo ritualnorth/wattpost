@@ -2,7 +2,7 @@
 
 These dongles expose Modbus RTU as a transparent pipe over two GATT
 characteristics: write requests to FFD1, read responses via a notify
-characteristic. Which notify char depends on firmware revision —
+characteristic. Which notify char depends on firmware revision,
 newer BT-2 uses FFD2 (in the same FFD0 service as the write char),
 older BT-1/BT-2 uses FFF1 (in a separate FFF0 service). Auto-
 detected at connect time. The same Modbus-over-BLE pattern is used
@@ -26,7 +26,7 @@ from bleak import BleakClient, BleakScanner
 # AND by the manual /api/setup/ble_scan endpoint, so the two can't
 # run simultaneous BleakScanner instances and hit
 # `org.bluez.Error.InProgress`. The Victron passive scanner stays
-# OUT of this lock — it uses pause()/resume() to yield the adapter
+# OUT of this lock, it uses pause()/resume() to yield the adapter
 # while the lock-holder is working.
 HCI_DISCOVER_LOCK: asyncio.Lock = asyncio.Lock()
 
@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 # Default GATT UUIDs for Renogy BT-1 / BT-2 and lookalikes.
 #
 # Write goes to `ffd0/ffd1` (write-without-response). Modbus
-# responses come back on `fff0/fff1` — even though the same dongle
+# responses come back on `fff0/fff1`, even though the same dongle
 # also advertises `ffd0/ffd2` as notify-capable, BT-TH-* firmware
 # delivers replies on fff1 in practice (matches what
 # cyrils/renogy-bt has used for years against real Renogy gear).
@@ -94,13 +94,13 @@ class BleModbusTransport(Transport):
             # Two failure modes worth retrying, both caused by stale
             # BlueZ state rather than the dongle actually being gone:
             #
-            #   1. TransportError "not advertising" — BlueZ thinks the
+            #   1. TransportError "not advertising", BlueZ thinks the
             #      device is still connected to the previous Python
             #      process, so the dongle never re-advertises. Fixed
             #      by `bluetoothctl disconnect`.
             #
             #   2. BleakError "failed to discover services, device
-            #      disconnected" — BlueZ has a cached GATT tree from
+            #      disconnected", BlueZ has a cached GATT tree from
             #      a previous session with a slightly different device
             #      state, bleak tries to use the cached handles, the
             #      dongle disconnects mid-discovery. Fixed by
@@ -108,10 +108,10 @@ class BleModbusTransport(Transport):
             #      device record entirely so the next discovery walks
             #      the live GATT tree from scratch.
             #
-            # We do BOTH on retry — disconnect first (cheap, safe even
+            # We do BOTH on retry, disconnect first (cheap, safe even
             # if not connected), then remove (purges cache). Then one
             # retry. If that fails too, propagate the original error.
-            log.warning("[%s] %s — clearing stale BlueZ state + retrying",
+            log.warning("[%s] %s, clearing stale BlueZ state + retrying",
                         self.id, e)
             try:
                 await self._bluez_force_disconnect()
@@ -128,7 +128,7 @@ class BleModbusTransport(Transport):
         # Three rules to coexist on a single HCI adapter:
         #
         #   1. HCI_DISCOVER_LOCK serialises us against any OTHER caller
-        #      that's running a BleakScanner — the manual ble_scan
+        #      that's running a BleakScanner, the manual ble_scan
         #      endpoint, another Renogy transport, etc. Without it
         #      two simultaneous discoveries collide with
         #      `org.bluez.Error.InProgress`.
@@ -138,7 +138,7 @@ class BleModbusTransport(Transport):
         #      asked) so it doesn't hold the discovery slot for the
         #      duration of our scan + connect.
         #
-        #   3. resume() the Victron scanner in finally{} — it
+        #   3. resume() the Victron scanner in finally{}, it
         #      reacquires its slot when subscribers are still
         #      registered; otherwise stays stopped.
         async with HCI_DISCOVER_LOCK:
@@ -196,13 +196,13 @@ class BleModbusTransport(Transport):
                     self.notify_char = cand
                     break
             if self.notify_char is None:
-                # Nothing matched — fall back to the historical default
+                # Nothing matched, fall back to the historical default
                 # so start_notify produces a clear error rather than
                 # us silently doing nothing.
                 self.notify_char = DEFAULT_NOTIFY_CHAR
                 log.warning(
                     "[%s] no known notify char in GATT tree; falling "
-                    "back to %s — probes will likely time out",
+                    "back to %s, probes will likely time out",
                     self.id, self.notify_char[4:8])
             else:
                 log.info("[%s] auto-selected notify_char=%s",
@@ -222,11 +222,11 @@ class BleModbusTransport(Transport):
         """When BlueZ thinks a device is still connected (to a Python
         process that's gone), the device won't re-advertise. Sending it
         an explicit disconnect via DBus releases the cached connection
-        so the next discovery sees it again. Idempotent — no-op if the
+        so the next discovery sees it again. Idempotent, no-op if the
         device isn't tracked or already disconnected.
 
         Implemented as a subprocess `bluetoothctl disconnect <MAC>`
-        rather than reaching into bleak's DBus internals — works
+        rather than reaching into bleak's DBus internals, works
         across bleak versions and easier to reason about."""
         await self._run_bluetoothctl("disconnect", self.address)
         # Brief pause so BlueZ surfaces the released state to its scan
@@ -234,7 +234,7 @@ class BleModbusTransport(Transport):
         await asyncio.sleep(1.0)
 
     async def _bluez_remove_device(self) -> None:
-        """Evict the cached device record from BlueZ — including its
+        """Evict the cached device record from BlueZ, including its
         cached GATT tree. Necessary after a "failed to discover
         services, device disconnected" because bleak otherwise reuses
         stale service handles on the next connect and re-hits the
@@ -250,7 +250,7 @@ class BleModbusTransport(Transport):
 
     async def _run_bluetoothctl(self, *args: str) -> None:
         """Common subprocess runner for bluetoothctl one-shots.
-        Swallows nothing — the caller's try/except decides what to
+        Swallows nothing, the caller's try/except decides what to
         log. Kills the subprocess if it stalls past 5s."""
         proc = await asyncio.create_subprocess_exec(
             "bluetoothctl", *args,
@@ -274,20 +274,20 @@ class BleModbusTransport(Transport):
         #45; Renogy's own KB recommends physical unplug).
 
         Defensive layering:
-        1. stop_notify with a 2 s cap — protects against a hung
+        1. stop_notify with a 2 s cap, protects against a hung
            DBus call when BlueZ has already half-dropped the link.
-        2. disconnect() with a 5 s cap — same risk. Total in-Docker
+        2. disconnect() with a 5 s cap, same risk. Total in-Docker
            shutdown budget is the SIGTERM grace (10 s default), so
            we have to fit inside that or Docker SIGKILLs us mid-call.
         3. If either path raised or timed out, fall back to a
-           subprocess `bluetoothctl disconnect <mac>` — that drops
+           subprocess `bluetoothctl disconnect <mac>`, that drops
            the session at the BlueZ layer even when the bleak
            Python object got wedged.
 
         Always logs the outcome at INFO so a quick `journalctl -u
         wattpost | grep "ble_modbus.*close"` proves the exit ran
         cleanly. If you see "close: forced" in production it means
-        the bleak disconnect timed out — worth investigating but
+        the bleak disconnect timed out, worth investigating but
         not a stuck-dongle situation either way.
         """
         if self._client is None:
@@ -307,7 +307,7 @@ class BleModbusTransport(Transport):
                 await asyncio.wait_for(client.disconnect(), timeout=5.0)
                 bleak_ok = True
         except (asyncio.TimeoutError, Exception) as e:
-            log.warning("[%s] close: bleak disconnect failed (%s) — "
+            log.warning("[%s] close: bleak disconnect failed (%s), "
                         "falling back to bluetoothctl",
                         self.id, type(e).__name__)
         # Belt + braces: even when bleak said "disconnected ok", a

@@ -1,6 +1,6 @@
 """SMTP / email transport.
 
-User configures their own SMTP credentials in config.yaml — Gmail app
+User configures their own SMTP credentials in config.yaml, Gmail app
 password, an ISP relay, AWS SES, etc. We don't ship a default broker
 because email-from-an-appliance is a deliverability minefield (SPF /
 DKIM / DMARC against arbitrary domains). The price of asking the user
@@ -81,7 +81,7 @@ class SmtpTransport(NotificationTransport):
         msg.set_content(body)
 
         try:
-            # aiosmtplib opens, authenticates, sends, and closes per call —
+            # aiosmtplib opens, authenticates, sends, and closes per call,
             # simpler than holding a connection open between alert fires
             # (most setups send <10 mails/day, no benefit to pooling).
             await aiosmtplib.send(

@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 # ---------- payloads ----------
 
 class ForecastConfigPayload(msgspec.Struct, kw_only=True):
-    """Each provider uses a subset of these — Solcast needs api_key +
+    """Each provider uses a subset of these, Solcast needs api_key +
     resource_id, Open-Meteo needs lat/lon + array geometry, synthetic
     ignores everything. Routing happens in the PUT/POST handlers."""
     provider: str = "solcast"
@@ -82,7 +82,7 @@ async def get_forecast_accuracy(
     `day_offset=1` (default) = yesterday; 2 = day-before-yesterday, etc.
     Capped at 30 to match the forecast_history retention window.
 
-    The endpoint never errors when there's no data — it returns a
+    The endpoint never errors when there's no data, it returns a
     `{ok: false}` shape that the UI treats as "hide this widget."
     """
     from ..storage.sqlite import Store
@@ -131,7 +131,7 @@ async def get_pv_forecast(state: State) -> dict[str, Any]:
     try:
         payload = json.loads(body)
     except json.JSONDecodeError:
-        # Cache corrupt — return empty rather than 500. Next poll
+        # Cache corrupt, return empty rather than 500. Next poll
         # overwrites it.
         return {"points": [], "fetched_at": None, "provider": None}
     payload.setdefault("fetched_at", updated_at)
@@ -141,7 +141,7 @@ async def get_pv_forecast(state: State) -> dict[str, Any]:
 @get("/api/forecast/config")
 async def get_forecast_config(state: State) -> dict[str, Any]:
     """Masked view of the config for the Settings UI. Never returns
-    the raw api_key — the field comes back as `****` when set, "" when
+    the raw api_key, the field comes back as `****` when set, "" when
     unset, and the UI handles "leave blank to keep existing" the same
     way the alert transport editor does. Open-Meteo fields ride along
     so the form can show the array geometry without a second fetch."""
@@ -195,7 +195,7 @@ async def update_forecast_config(
                    "limits make 3-6 the practical range.",
         )
 
-    # Branch per provider — each has different required fields, so
+    # Branch per provider, each has different required fields, so
     # "clearing" semantics differ too. Solcast clears when api_key or
     # resource_id is missing; Open-Meteo clears when lat/lon is missing.
     existing = config.forecast
@@ -217,7 +217,7 @@ async def update_forecast_config(
             )
     elif data.provider == "openmeteo":
         # Lat/lon falls back to WeatherCfg if the user hasn't given the
-        # forecast block its own — typical case: van builder with a
+        # forecast block its own, typical case: van builder with a
         # single static lat/lon for both current weather + PV forecast.
         lat = data.lat
         lon = data.lon
@@ -258,7 +258,7 @@ async def update_forecast_config(
     config.forecast = new_fc
 
     def _mutate(raw):
-        # Write only the fields relevant to the chosen provider — keeps
+        # Write only the fields relevant to the chosen provider, keeps
         # the yaml clean for the inspecting user. Common fields always
         # written; provider-specific fields conditioned on provider.
         block: dict[str, Any] = {

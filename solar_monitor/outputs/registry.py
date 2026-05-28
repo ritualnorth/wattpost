@@ -3,7 +3,7 @@
 Adapters call `register_adapter(...)` at import time; the outputs
 service calls `discover_outputs_for_device(...)` to fan out across
 adapters and collect every output a device exposes. Adapters are
-keyed by `device.kind` (the existing device-classification field —
+keyed by `device.kind` (the existing device-classification field,
 `charge_controller`, `smart_battery`, `bms`, etc.) so a single
 device kind can have multiple adapters cooperating.
 """
@@ -24,7 +24,7 @@ def register_adapter(adapter: OutputAdapter) -> None:
 
 def get_adapter_for(kind: str, vendor: str | None = None) -> OutputAdapter | None:
     """Find the adapter for a given (kind, vendor). When vendor is
-    None we return the first adapter registered for that kind —
+    None we return the first adapter registered for that kind,
     works for one-adapter-per-kind cases (Rover-load), useful in
     the write path where we already know which output we're flipping
     from its id."""

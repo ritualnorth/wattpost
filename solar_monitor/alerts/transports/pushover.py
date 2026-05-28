@@ -1,13 +1,13 @@
-"""Pushover transport — POST one message to api.pushover.net.
+"""Pushover transport, POST one message to api.pushover.net.
 
 Pushover is a paid one-time app ($5) popular with the Home Assistant /
 maker crowd. Better mobile UX than ntfy for users who don't want a
 second push app, and survives quiet hours when severity = alarm.
 
 Two secrets the user must paste into config.yaml:
-  app_token  — created at https://pushover.net/apps/build (one per
+  app_token , created at https://pushover.net/apps/build (one per
                appliance fleet is fine; they're free for personal use)
-  user_key   — displayed at the top of https://pushover.net dashboard
+  user_key  , displayed at the top of https://pushover.net dashboard
                after signing up
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 PUSHOVER_API = "https://api.pushover.net/1/messages.json"
 
 # warn = 0 (default delivery, respects quiet hours).
-# alarm = 1 (high priority — bypasses the user's quiet hours and
+# alarm = 1 (high priority, bypasses the user's quiet hours and
 #            shows a louder notification on iOS/Android).
 _SEVERITY_PRIORITY = {"warn": 0, "alarm": 1}
 
@@ -65,7 +65,7 @@ class PushoverTransport(NotificationTransport):
         }
         if self.device:
             # Restrict delivery to one of the user's registered devices
-            # — useful when the same user_key fans out to phone + tablet
+            #, useful when the same user_key fans out to phone + tablet
             # and they only want alerts on the phone.
             data["device"] = self.device
         try:

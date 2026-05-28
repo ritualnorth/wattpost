@@ -52,7 +52,7 @@ Read-only by design. We don't expose Cerbo/VRM-style write control. Heavy-Victro
 
 ### Wired alternative: VE.Direct over cable
 
-For metal-van installs and dense-RF environments where BLE struggles, WattPost also reads SmartShunt / SmartSolar MPPT / Phoenix Inverter over Victron's **VE.Direct** wired protocol. ~£25 Victron-branded VE.Direct-to-USB cable, or a ~£12 DIY JST-to-FTDI rig. See [Wired setup](/docs/wired-setup) for the pinout and config. Read-only on this path too — VE.Direct doesn't expose writes.
+For metal-van installs and dense-RF environments where BLE struggles, WattPost also reads SmartShunt / SmartSolar MPPT / Phoenix Inverter over Victron's **VE.Direct** wired protocol. ~£25 Victron-branded VE.Direct-to-USB cable, or a ~£12 DIY JST-to-FTDI rig. See [Wired setup](/docs/wired-setup) for the pinout and config. Read-only on this path too, VE.Direct doesn't expose writes.
 
 ## JK BMS
 
@@ -60,10 +60,10 @@ JK B-series (BD6A20S, B1A24S, B2A24S, etc.) advertise their own Bluetooth servic
 
 ## JBD / Overkill Solar BMS
 
-The BMS family inside most sub-£500 LFP packs. **Pending community validation** — the driver is shipped on protocol docs + open-source reverse engineering (Overkill Solar's reference client). Customer reports against real hardware will catch any remaining field-mapping quirks.
+The BMS family inside most sub-£500 LFP packs. **Pending community validation**, the driver is shipped on protocol docs + open-source reverse engineering (Overkill Solar's reference client). Customer reports against real hardware will catch any remaining field-mapping quirks.
 
 - **Overkill Solar** (US-branded JBD)
-- **Battle Born**, **LiTime**, **Power Queen**, many **Eco-Worthy** SKUs — these are JBD-rebranded packs, so the same driver covers them
+- **Battle Born**, **LiTime**, **Power Queen**, many **Eco-Worthy** SKUs, these are JBD-rebranded packs, so the same driver covers them
 - **Vatrer** and other AliExpress-direct LFP packs with the BD/JBD-style smart-app sticker
 
 Service UUID `0xFF00`. Read-only. Configure with the pack's BLE MAC.
@@ -72,7 +72,7 @@ Service UUID `0xFF00`. Read-only. Configure with the pack's BLE MAC.
 
 Second-most-common BMS in budget LFP packs after JBD. **Pending community validation.**
 
-- **Daly** B-series (smart variant — the dumb 4S/8S/16S BMS without Bluetooth isn't covered)
+- **Daly** B-series (smart variant, the dumb 4S/8S/16S BMS without Bluetooth isn't covered)
 - Anything advertising as `DL-…` or `BMS-…` and pairing with the "Smart BMS" Android app
 
 Read-only. BLE service UUID `0xFFF0`.
@@ -107,7 +107,7 @@ ASCII-framed protocol on the FFE1 characteristic. Read-only.
 
 ## Voltronic / Axpert / MPP Solar (experimental)
 
-Single shared ASCII-over-USB-HID protocol covers a long tail of hybrid-inverter rebadges. **Experimental — built from protocol docs, awaiting first-customer reports.** Plug the inverter's USB cable into the Pi/host; no extra hardware needed.
+Single shared ASCII-over-USB-HID protocol covers a long tail of hybrid-inverter rebadges. **Experimental, built from protocol docs, awaiting first-customer reports.** Plug the inverter's USB cable into the Pi/host; no extra hardware needed.
 
 Rebadges expected to work (one driver, many badges):
 
@@ -116,7 +116,7 @@ Rebadges expected to work (one driver, many badges):
 - **Anenji**, **Datouboss**, **HZSolar**, **Effekta KS**, **LVTopSun**
 - **PowMr**, **Easun ISolar**
 
-Read-only — live status (V / A / W / SoC / temps), mode (line / battery / fault / eco), warning bitmap. We never send a write command. Three-phase / dual-output models (QPIGS2/3) only have phase 1 parsed today.
+Read-only, live status (V / A / W / SoC / temps), mode (line / battery / fault / eco), warning bitmap. We never send a write command. Three-phase / dual-output models (QPIGS2/3) only have phase 1 parsed today.
 
 USB-HID transport (default VID:PID `0665:5161`, override in YAML for EG4 variants on `0001:0000`). Drop in your `config.yaml`:
 
@@ -211,7 +211,7 @@ The catalogue splits into two register-map variants by chassis size:
 - **Sunsynk Max-15K**, **Max-20K**
 - **Sol-Ark 15K-3P**
 
-Read-only over **Modbus RTU on RS485** through the inverter's RJ45 port. Pinout is non-standard (NOT T568) — Deye uses pins 1 and 2 for the differential pair:
+Read-only over **Modbus RTU on RS485** through the inverter's RJ45 port. Pinout is non-standard (NOT T568), Deye uses pins 1 and 2 for the differential pair:
 
 | RJ45 pin | Signal |
 |----------|--------|

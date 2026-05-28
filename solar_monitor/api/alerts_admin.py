@@ -289,7 +289,7 @@ async def delete_transport(transport_id: str, state: State) -> dict[str, Any]:
     if not any(t.get("id") == transport_id for t in config.notification_transports):
         raise NotFoundException(f"transport {transport_id!r} not found")
 
-    # Refuse to delete a transport that's still referenced by a rule —
+    # Refuse to delete a transport that's still referenced by a rule,
     # avoids leaving rules pointing at nothing.
     referenced = [r.id for r in config.alerts if transport_id in r.transports]
     if referenced:

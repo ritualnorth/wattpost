@@ -1,4 +1,4 @@
-"""Victron Smart BatteryProtect driver — read-only.
+"""Victron Smart BatteryProtect driver, read-only.
 
 The BatteryProtect is a load-disconnect device: cuts the load circuit
 when the battery drops below a configured threshold, reconnects when
@@ -6,7 +6,7 @@ it recovers. Common in van installs to stop the fridge from killing
 the bank overnight. Reports input + output voltage, output state
 (connected/disconnected), and alarm/warning reasons.
 
-Registered under `device_kind="load_disconnect"` — distinct from
+Registered under `device_kind="load_disconnect"`, distinct from
 `dcdc` and `ac_charger` because the dashboard rendering is different
 (no power flow; the interesting state is on/off + why).
 """
@@ -39,7 +39,7 @@ class VictronSmartBatteryProtect(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — requires ble_victron_advertise"]
+            result["_errors"] = ["wrong transport type, requires ble_victron_advertise"]
             return result
         from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()
@@ -72,7 +72,7 @@ class VictronSmartBatteryProtect(DeviceDriver):
         if in_v    is not None: result["input_voltage_v"]  = in_v
         if out_v   is not None: result["output_voltage_v"] = out_v
         if model   is not None: result["model"]            = model
-        # The headline state is whether the load is currently connected —
+        # The headline state is whether the load is currently connected,
         # mirror the Rover/Renogy "load_status" semantics: "on" / "off".
         if out_state is not None:
             name = getattr(out_state, "name", str(out_state)).lower()

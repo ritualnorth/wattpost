@@ -20,7 +20,7 @@ INFO = VendorInfo(
         "rebadged units in the US, plus the BMS inside most cheap "
         "LFP packs sold under Battle Born, LiTime, Power Queen, "
         "Eco-Worthy and other rebrand labels. Read-only at v1. "
-        "BLE GATT — service UUID 0xFF00, request via 0xFF02, "
+        "BLE GATT, service UUID 0xFF00, request via 0xFF02, "
         "notifications on 0xFF01. The bms transport polls commands "
         "0x03 (basic info) and 0x04 (cell voltages) on a ~1 s "
         "cadence."

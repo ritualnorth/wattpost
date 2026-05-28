@@ -40,10 +40,10 @@ hardware in the lab (issues #185, #186).
 
 Two read paths:
 
-- **BLE Instant Readout** — default for every device above except
+- **BLE Instant Readout**, default for every device above except
   the Phoenix Inverter. Broadcast, no pairing, per-device
   encryption key from VictronConnect.
-- **VE.Direct (wired)** — alternative path for SmartShunt /
+- **VE.Direct (wired)**, alternative path for SmartShunt /
   SmartSolar MPPT / Phoenix Inverter. Use this in metal-van
   builds or anywhere BLE is unreliable. Cable is Victron's
   VE.Direct-to-USB (~£25) or a £12 DIY JST + FTDI rig. See
@@ -53,7 +53,7 @@ Read-only either way. Heavy-Victron users live inside VRM and
 will not switch. Our Victron customer is the mixed-stack builder
 who wants one dashboard alongside their Renogy or JBD gear.
 MultiPlus / Quattro inverters need VE.Bus, which is a different
-physical layer plus an MK3-USB interface — deferred indefinitely.
+physical layer plus an MK3-USB interface, deferred indefinitely.
 
 ### Other
 
@@ -68,7 +68,7 @@ the mixed-stack van builder; Persona B is the budget upgrader who
 bought a cheap shunt as their first piece of telemetry. Both are
 already paying personas in our pricing model.
 
-### Tier 1 — paying-persona unlocks (shipped in v0.1.25)
+### Tier 1, paying-persona unlocks (shipped in v0.1.25)
 
 1. ✅ **JBD / Overkill Solar BMS** (#201). The BMS inside most
    sub-£500 LFP packs (Eco-Worthy, LiTime, Power Queen, many
@@ -82,7 +82,7 @@ already paying personas in our pricing model.
    MPPT in DIY van and cabin builds. Modbus RTU over USB-RS485
    with FC04 for live state. **Pending community validation.**
 
-### Tier 2 — cheap-shunt wedge (shipped in v0.1.25)
+### Tier 2, cheap-shunt wedge (shipped in v0.1.25)
 
 4. ✅ **AiLi shunt** (#204). Sub-£40 BLE shunt; the cheap
    shunt that ships in thousands of first-time DIY installs.
@@ -92,10 +92,10 @@ already paying personas in our pricing model.
    responses into one canonical shunt-shaped output. **Pending
    community validation.**
 6. ✅ **Battle Born / LiTime / Power Queen LFP**. Covered
-   automatically by the JBD driver — they're JBD-rebranded
+   automatically by the JBD driver, they're JBD-rebranded
    inside. No additional code.
 
-### Tier 3 — Persona A "I have a generator"
+### Tier 3, Persona A "I have a generator"
 
 7. **MPP Solar / Voltronic clones (PIP-MS, Axpert,
    EASUN)**. The off-grid inverter segment in DIY. RS-232 /
@@ -106,7 +106,7 @@ already paying personas in our pricing model.
 9. **REDARC BCDC**. Australian + AU-influenced van market
    dominant. Bluetooth on the newer models.
 
-### Tier 4 — long tail / nice-to-have
+### Tier 4, long tail / nice-to-have
 
 10. **Bogart TriMetric battery monitor**. Older, niche,
     RS-485, but loyal user base in legacy off-grid cabin

@@ -2,7 +2,7 @@
 
 For users who plug a USB-to-RS-485 adapter into the Pi and wire it to the
 Renogy Hub / charge controller / inverter directly. Same Modbus frames as
-the BLE transport — drivers don't know the difference.
+the BLE transport, drivers don't know the difference.
 
 Read path is exercised in production by every customer running USB-RS485.
 Write path (FC06 via settings_write.write_setting_register) is verified

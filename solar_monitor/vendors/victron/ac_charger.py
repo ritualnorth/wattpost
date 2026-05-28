@@ -1,4 +1,4 @@
-"""Victron Blue Smart AC Charger driver — read-only.
+"""Victron Blue Smart AC Charger driver, read-only.
 
 The Blue Smart AC Charger is Victron's mains-input battery charger
 (common when a van/cabin has occasional mains hookup, or as a backup
@@ -37,7 +37,7 @@ class VictronAcCharger(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — requires ble_victron_advertise"]
+            result["_errors"] = ["wrong transport type, requires ble_victron_advertise"]
             return result
         from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()
@@ -71,7 +71,7 @@ class VictronAcCharger(DeviceDriver):
         if err is not None:
             result["charger_error"]  = getattr(err, "name", str(err))
 
-        # Three output channels — surface each as a separate output_N
+        # Three output channels, surface each as a separate output_N
         # field so the per-device detail page can render them in a
         # 3-column layout.
         for n in (1, 2, 3):

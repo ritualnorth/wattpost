@@ -8,7 +8,7 @@ table):
     appliance proxies to localhost so any request from the loopback
     came through the authenticated CF tunnel (cloud already authed
     the user when they signed in to wattpost.cloud). LAN visitors
-    have non-loopback source IPs and can't spoof loopback — the
+    have non-loopback source IPs and can't spoof loopback, the
     kernel decides which interface a packet came in on.
   * LAN access to write endpoints / `/`: password required.
   * WATTPOST_DEMO=1: middleware does nothing (demo dashboard stays
@@ -20,7 +20,7 @@ Storage:
   * Password hash lives in `/etc/wattpost/web-password.hash`
     (argon2id, regenerated on every change). Group-readable by
     `wattpost` so the daemon can read it; written 0640.
-  * Sessions: in-memory only — they don't survive a daemon restart.
+  * Sessions: in-memory only, they don't survive a daemon restart.
     Acceptable trade-off: a brief re-login after `Restart wattpost`
     is fine; we get no DB write path complexity in return.
 
@@ -71,7 +71,7 @@ ANONYMOUS_PATH_PREFIXES = (
     "/service-worker.js",
     "/api/login",
     "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
-    # Identity v2 Phase 3 (#305) — OIDC redirect endpoints. /auth/lan/login
+    # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
     # own state before issuing a session, so they're safe-anon.
     "/auth/lan/login",
@@ -79,7 +79,7 @@ ANONYMOUS_PATH_PREFIXES = (
     "/api/system/oidc-available",
     # /api/system/auth-status is a read-only, no-PII "are you authed?"
     # signal the SPA uses to gate the Sign In button. It HAS to be
-    # anonymous-accessible — if it required a session, the unauthed
+    # anonymous-accessible, if it required a session, the unauthed
     # case would 401 instead of returning {authed: false} and the JS
     # would have to interpret that as a no, which is more fragile.
     "/api/system/auth-status",
@@ -89,13 +89,13 @@ ANONYMOUS_PATH_PREFIXES = (
 
 # In-memory session store. Token → {"issued_at": epoch, "origin": "local"|"sso"}.
 # Origin matters because tunnel-origin requests must be backed by an
-# "sso" session — a local-password session shouldn't grant tunnel
+# "sso" session, a local-password session shouldn't grant tunnel
 # access (the password is a fallback for LAN, not the perimeter for
 # internet exposure).
 #
 # Read-through cache over SESSIONS_PATH: every issue/revoke writes the
 # file, every read hits the dict. On module import we slurp whatever
-# the file had (so daemon restart preserves logged-in users — fixed
+# the file had (so daemon restart preserves logged-in users, fixed
 # in v0.0.75 after a pentest revealed the in-memory-only store would
 # silently log everyone out on every container restart, including the
 # user-initiated Settings → Restart daemon).
@@ -104,7 +104,7 @@ _SESSIONS: dict[str, dict[str, float | str]] = {}
 
 def _load_sessions_from_disk() -> None:
     """Populate _SESSIONS from SESSIONS_PATH at module-import time.
-    Tolerates a missing or unreadable file by starting empty — sessions
+    Tolerates a missing or unreadable file by starting empty, sessions
     are recoverable (user re-logs in) so a clobbered file isn't fatal."""
     import json as _json
     if not SESSIONS_PATH.is_file():
@@ -130,7 +130,7 @@ def _load_sessions_from_disk() -> None:
 
 def _persist_sessions_to_disk() -> None:
     """Atomic-write the current _SESSIONS dict to SESSIONS_PATH. Called
-    on every issue + revoke (cheap — dict is tiny). Write-temp-rename
+    on every issue + revoke (cheap, dict is tiny). Write-temp-rename
     means a power loss can't half-corrupt the on-disk file.
 
     Failure is non-fatal: a write error logs and continues. The
@@ -143,11 +143,11 @@ def _persist_sessions_to_disk() -> None:
         tmp.write_text(_json.dumps(_SESSIONS), encoding="utf-8")
         tmp.replace(SESSIONS_PATH)
     except OSError:
-        # Disk full, permissions, RO filesystem. Don't break login —
+        # Disk full, permissions, RO filesystem. Don't break login,
         # the user's session is still valid in memory for this run.
         import logging as _lg
         _lg.getLogger(__name__).warning(
-            "could not persist sessions to %s — sessions will not "
+            "could not persist sessions to %s, sessions will not "
             "survive daemon restart this cycle", SESSIONS_PATH,
         )
 
@@ -205,7 +205,7 @@ def issue_session(origin: str = "local") -> str:
     token; caller drops it in the response Set-Cookie.
 
     `origin` tags the session for the tunnel-origin check in the
-    middleware — "local" for local-password logins, "sso" for
+    middleware, "local" for local-password logins, "sso" for
     cloud-redirect SSO logins. Tunnel-origin requests require an
     "sso" session (see is_session_valid_for_tunnel)."""
     _gc_sessions()
@@ -238,7 +238,7 @@ def is_session_valid(token: str | None) -> bool:
 
 
 def is_session_valid_for_tunnel(token: str | None) -> bool:
-    """Tunnel-origin requests need a session whose origin is "sso" —
+    """Tunnel-origin requests need a session whose origin is "sso",
     i.e. one issued by the /sso endpoint after verifying a cloud-
     signed redirect token. Local-password sessions don't qualify
     (you can still use the password on the LAN, but it can't grant
@@ -251,7 +251,7 @@ def is_session_valid_for_tunnel(token: str | None) -> bool:
 
 def _gc_sessions() -> None:
     """Drop sessions older than the TTL. O(n) scan; n is small here
-    (a couple of admin browsers, in practice). Runs only on issue —
+    (a couple of admin browsers, in practice). Runs only on issue,
     don't pay the cost on every request."""
     now = time.time()
     expired = [t for t, rec in _SESSIONS.items()
@@ -288,7 +288,7 @@ def verify_broker_auth_verdict(
     try:
         parts = header_value.split(".")
         if len(parts) == 2:
-            # Legacy two-part header — owner session, no kiosk flag.
+            # Legacy two-part header, owner session, no kiosk flag.
             ts_str, sig_b64 = parts
             scope = "user"
             signed_body = ts_str
@@ -325,7 +325,7 @@ def verify_broker_auth(header_value: str, sso_secret_hex: str) -> bool:
 
     Format: `<ts>.<hmac_b64url>` where hmac signs the unix-second `ts`
     with the per-appliance `sso_secret`. The appliance trusts any
-    request bearing a valid broker header — the cloud is the
+    request bearing a valid broker header, the cloud is the
     authenticated party (cloud session + ownership check happen
     cloud-side before this signed request fires).
 
@@ -344,7 +344,7 @@ def verify_broker_auth(header_value: str, sso_secret_hex: str) -> bool:
 def broker_auth_scope(header_value: str, sso_secret_hex: str) -> str | None:
     """Return the scope tag ('user' or 'kiosk') iff the header
     verifies. None on any failure. Callers gate their allow-list
-    on this — see api/app.py middleware (#225)."""
+    on this, see api/app.py middleware (#225)."""
     verdict, _, scope = verify_broker_auth_verdict(header_value, sso_secret_hex)
     return scope if verdict == "ok" else None
 
@@ -399,7 +399,7 @@ def consume_sso_token(token: str, sso_secret_hex: str) -> dict | None:
 
 
 def is_loopback_source(scope: dict) -> bool:
-    """Returns True only for a *real* loopback request — i.e. local
+    """Returns True only for a *real* loopback request, i.e. local
     curl, SSH port-forward, the appliance talking to itself.
 
     Returns False when the request came through the Cloudflare Tunnel,
@@ -407,7 +407,7 @@ def is_loopback_source(scope: dict) -> bool:
     proxies tunnel traffic to localhost, so the kernel-level client
     address always looks loopback. Without distinguishing tunnel vs.
     real-loopback, anyone with the public tunnel URL would inherit
-    "tunnel-loopback trust" and bypass auth entirely — a complete
+    "tunnel-loopback trust" and bypass auth entirely, a complete
     security hole.
 
     Detection: cloudflared always injects `CF-Ray` and
@@ -431,7 +431,7 @@ def is_loopback_source(scope: dict) -> bool:
 
 
 def is_tunnel_origin(scope: dict) -> bool:
-    """True iff this request arrived via the Cloudflare Tunnel — i.e.
+    """True iff this request arrived via the Cloudflare Tunnel, i.e.
     the appliance's cloudflared proxied it from the public hostname.
 
     Used by the auth middleware to also disable the "readonly public"
@@ -455,7 +455,7 @@ def hash_password(plaintext: str) -> str:
 
 def write_password_hash(plaintext: str) -> None:
     """Replace the stored password hash. Caller is responsible for
-    file ownership / mode — this just writes the bytes."""
+    file ownership / mode, this just writes the bytes."""
     PASSWORD_HASH_PATH.parent.mkdir(parents=True, exist_ok=True)
     PASSWORD_HASH_PATH.write_text(hash_password(plaintext) + "\n", encoding="utf-8")
 
@@ -465,7 +465,7 @@ def ensure_first_boot_password() -> str | None:
 
     Called once on daemon startup. Closes the "Docker installs ship
     with no password, so the auth middleware bypasses everything"
-    hole — packaging/install.sh did this for the Pi SD image, but
+    hole, packaging/install.sh did this for the Pi SD image, but
     Docker users never ran install.sh and were left wide open.
 
     Returns the plaintext if a new password was just generated,
@@ -501,7 +501,7 @@ def ensure_first_boot_password() -> str | None:
     log.warning("")
     log.warning("    %s", plaintext)
     log.warning("")
-    log.warning("Save it now — you'll need it to log into the dashboard.")
+    log.warning("Save it now, you'll need it to log into the dashboard.")
     log.warning("Rotate via Settings → System → Reset web password (or")
     log.warning("`wattpost-config` on the Pi). Stored at %s",
                 PASSWORD_HASH_PATH)

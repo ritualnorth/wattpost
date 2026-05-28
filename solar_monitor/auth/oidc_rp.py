@@ -35,7 +35,7 @@ from nacl.signing import VerifyKey
 log = logging.getLogger(__name__)
 
 
-# JWKS on-disk cache — used as a fallback when the appliance is
+# JWKS on-disk cache, used as a fallback when the appliance is
 # offline and a session needs validating. Lives next to the keypair
 # so the on-disk identity surface is one directory.
 _KEY_DIR = Path(os.environ.get("WATTPOST_KEYS_DIR", "/var/lib/wattpost/keys"))
@@ -47,7 +47,7 @@ JWKS_CACHE_PATH = _KEY_DIR / "cloud_jwks.json"
 # (key 'rotating' for ~24h, then promoted).
 JWKS_TTL_SECONDS = 60 * 60 * 24
 
-# State store TTL — the redirect round-trip should take <5min in
+# State store TTL, the redirect round-trip should take <5min in
 # normal browsing. Anything older was abandoned + can be cleared.
 STATE_TTL_SECONDS = 60 * 5
 
@@ -92,7 +92,7 @@ def _disk_load_jwks() -> list[dict[str, Any]] | None:
             return keys
     except json.JSONDecodeError:
         pass
-    log.warning("oidc_rp: jwks disk-cache corrupt — ignoring")
+    log.warning("oidc_rp: jwks disk-cache corrupt, ignoring")
     return None
 
 
@@ -104,7 +104,7 @@ def _disk_save_jwks(keys: list[dict[str, Any]]) -> None:
         os.chmod(tmp, 0o600)
         os.replace(tmp, JWKS_CACHE_PATH)
     except OSError as e:
-        log.warning("oidc_rp: jwks disk-cache write failed (%s) — "
+        log.warning("oidc_rp: jwks disk-cache write failed (%s), "
                     "in-memory cache will still be used", e)
 
 
@@ -112,7 +112,7 @@ async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, An
     """Return the current JWKS keys list. Cached in-memory + on-disk.
 
     Concurrent callers during the TTL get the cached value (no
-    thundering herd). `force=True` bypasses the cache — used by the
+    thundering herd). `force=True` bypasses the cache, used by the
     verify path when an unknown kid is encountered (key rotation that
     happened mid-window)."""
     global _jwks_cache
@@ -129,10 +129,10 @@ async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, An
             if not isinstance(keys, list):
                 raise ValueError("JWKS response missing 'keys' array")
     except Exception as e:
-        # Network failure — try the on-disk fallback so verify can
+        # Network failure, try the on-disk fallback so verify can
         # still proceed. If THAT's missing too, return [] (callers
         # treat empty key set as "no JWT verifiable").
-        log.warning("oidc_rp: JWKS fetch failed (%s) — falling back to disk cache", e)
+        log.warning("oidc_rp: JWKS fetch failed (%s), falling back to disk cache", e)
         disk = _disk_load_jwks()
         return disk if disk is not None else []
 
@@ -161,7 +161,7 @@ def _verify_key_from_jwk(jwk: dict[str, Any]) -> VerifyKey | None:
 
 
 class JwtVerifyError(Exception):
-    """Any failure during JWT verify. Generic on purpose — callers
+    """Any failure during JWT verify. Generic on purpose, callers
     treat as 'unauthenticated' and don't branch on the message."""
 
 
@@ -205,7 +205,7 @@ async def verify_jwt(
     keys = await fetch_jwks(jwks_url)
     match = next((k for k in keys if k.get("kid") == kid), None)
     if match is None:
-        # Unknown kid — possible mid-rotation, force-refresh once.
+        # Unknown kid, possible mid-rotation, force-refresh once.
         keys = await fetch_jwks(jwks_url, force=True)
         match = next((k for k in keys if k.get("kid") == kid), None)
     if match is None:
@@ -268,7 +268,7 @@ class _PendingAuth:
 # state-token → _PendingAuth. Cleared on consume or after TTL.
 # Disk-persisted across daemon restarts (see _persist_pending /
 # _load_pending). The original in-memory-only version of this store
-# would lose every in-flight OIDC flow on a container recreate —
+# would lose every in-flight OIDC flow on a container recreate,
 # which Docker installs hit on every pull. Ritual North caught this with
 # the "OIDC state token unknown or expired" 400 after I pulled
 # v0.1.96 onto Garage; this is the fix.
@@ -297,7 +297,7 @@ def _persist_pending() -> None:
         # Disk-full / RO-fs: keep going with in-memory state. A
         # restart will lose in-flight flows but we're not blocking
         # the current click.
-        log.warning("oidc_rp: pending persist failed (%s) — in-flight "
+        log.warning("oidc_rp: pending persist failed (%s), in-flight "
                     "flows won't survive a daemon restart this cycle", e)
 
 
@@ -326,7 +326,7 @@ def _load_pending() -> None:
                 created_at=float(created),
             )
     except (OSError, ValueError):
-        # Corrupt / missing — start with empty store. Worst case the
+        # Corrupt / missing, start with empty store. Worst case the
         # one in-flight OIDC flow that's mid-air fails and the user
         # gets bounced back to /login. Acceptable.
         pass
@@ -411,7 +411,7 @@ async def exchange_code(
         r = await client.post(token_endpoint, data=form)
     if r.status_code != 200:
         raise RuntimeError(
-            f"/oidc/token exchange failed: HTTP {r.status_code} — "
+            f"/oidc/token exchange failed: HTTP {r.status_code}, "
             f"{r.text[:200]}",
         )
     body = r.json()
@@ -430,7 +430,7 @@ async def refresh_tokens(
     refresh_token:  str,
     client_id:      str,
 ) -> TokenSet:
-    """grant_type=refresh_token. Returns the rotated TokenSet — the
+    """grant_type=refresh_token. Returns the rotated TokenSet, the
     refresh token field will be a NEW value; persist it and discard
     the old one (the cloud has marked it rotated; presenting the old
     one again triggers chain revocation)."""
@@ -443,7 +443,7 @@ async def refresh_tokens(
         r = await client.post(token_endpoint, data=form)
     if r.status_code != 200:
         raise RuntimeError(
-            f"/oidc/token refresh failed: HTTP {r.status_code} — "
+            f"/oidc/token refresh failed: HTTP {r.status_code}, "
             f"{r.text[:200]}",
         )
     body = r.json()

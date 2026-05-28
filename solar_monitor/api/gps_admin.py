@@ -1,6 +1,6 @@
 """REST endpoint for the USB GPS service (#125).
 
-Single status endpoint for now — the dashboard's Settings →
+Single status endpoint for now, the dashboard's Settings →
 Location panel reads from here to surface current fix + age. No
 config CRUD yet: enable by adding a `gps:` block to config.yaml,
 restart the daemon. Wizard-driven configuration follows in a

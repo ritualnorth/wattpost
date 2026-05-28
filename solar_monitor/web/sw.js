@@ -4,7 +4,7 @@
  *   • The static shell (HTML, CSS, JS, uPlot, manifest, icons) is
  *     cached on install and served cache-first. This is what makes the
  *     "Add to Home Screen" experience instant on cold launch.
- *   • API requests (/api/*) and the SSE stream are network-only — we
+ *   • API requests (/api/*) and the SSE stream are network-only, we
  *     never want to cache live telemetry or hand the user stale data.
  *   • If the network fails on a navigation request, we fall back to
  *     the cached index.html so the app still boots and can show its
@@ -14,7 +14,7 @@
  * index.html change so old shells are evicted on first visit after a
  * deploy.
  */
-// Bump on every PR that touches index.html, app.js or styles.css —
+// Bump on every PR that touches index.html, app.js or styles.css,
 // the inner cache-busters (?v=NN) don't help if the cached index.html
 // itself is what's stale. Suffix corresponds to the current app.js
 // version so future-me can see at a glance what's pinned.
@@ -34,7 +34,7 @@ const SHELL = [
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_VERSION);
-    // addAll is atomic — any 404 aborts the install and the SW is
+    // addAll is atomic, any 404 aborts the install and the SW is
     // rejected, which is what we want.
     await cache.addAll(SHELL);
     await self.skipWaiting();
@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Bypass cross-origin (CDNs etc) — let the browser handle natively.
+  // Bypass cross-origin (CDNs etc), let the browser handle natively.
   if (url.origin !== self.location.origin) return;
 
   // API + SSE: never cached. Going offline against these is the daemon's
@@ -71,7 +71,7 @@ self.addEventListener('fetch', (event) => {
 
   // Navigation requests: network-first. A cache-first navigation hands
   // the browser the *previous* index.html, which references the
-  // *previous* app.js?v=N cache-buster, which is also still cached —
+  // *previous* app.js?v=N cache-buster, which is also still cached,
   // so a stale shell self-perpetuates and any client-side fix (like
   // the broker-view SSE skip) never reaches the device. Going to
   // network first means an online client always gets the latest shell;
@@ -92,7 +92,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static sub-resources (css, js, icons): cache-first is still right —
+  // Static sub-resources (css, js, icons): cache-first is still right,
   // they're version-keyed by the ?v= cache-buster in the shell, so a
   // fresh shell brings a fresh app.js URL that misses the old cache.
   event.respondWith((async () => {

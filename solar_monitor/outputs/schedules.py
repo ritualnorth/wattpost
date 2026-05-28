@@ -4,13 +4,13 @@ Walks the `output_schedules` table once per poll cycle and fires any
 schedule whose computed fire-time falls in the window since the
 previous check. Supports three trigger kinds:
 
-  * `time`     — fires at a fixed HH:MM in the appliance's local
+  * `time`    , fires at a fixed HH:MM in the appliance's local
                  timezone.
-  * `sunrise`  — fires at today's sunrise ± `offset_min` minutes.
+  * `sunrise` , fires at today's sunrise ± `offset_min` minutes.
                  Requires the weather integration to be configured
                  (we read sunrise_ts from the cached Open-Meteo
                  blob); otherwise the trigger silently no-ops.
-  * `sunset`   — same shape as sunrise, for dusk schedules.
+  * `sunset`  , same shape as sunrise, for dusk schedules.
 
 Days-of-week filtering via `days_mask` (bitmask MTWTFSS, Monday is
 bit 0). Defaults to 127 = every day.
@@ -66,7 +66,7 @@ async def compute_fire_time(
     today, or None if the trigger doesn't apply (no time / weather
     unavailable / unsupported kind).
 
-    Pure function — no I/O. The scheduler tick calls this for every
+    Pure function, no I/O. The scheduler tick calls this for every
     enabled schedule and compares the result against `now_ts` and
     the schedule's `last_run_at`.
     """
@@ -116,7 +116,7 @@ async def fire_due_schedules(
         if fire_ts is None or fire_ts > now_ts:
             continue
         last_run = sched.get("last_run_at") or 0
-        # "Already fired today" check — defend against re-firing after
+        # "Already fired today" check, defend against re-firing after
         # a daemon restart that lands within the same calendar day.
         if last_run >= today_midnight and last_run >= fire_ts:
             continue
@@ -149,7 +149,7 @@ async def fire_due_schedules(
 async def load_weather_cache(store) -> dict[str, Any] | None:
     """Helper: pull the cached current-weather blob (used for sunrise/
     sunset lookups). Returns None when weather isn't configured / no
-    fetch has succeeded yet — schedules with sun-relative triggers
+    fetch has succeeded yet, schedules with sun-relative triggers
     silently skip until a weather fetch lands."""
     cached = await store.kv_get("weather:current")
     if cached is None:

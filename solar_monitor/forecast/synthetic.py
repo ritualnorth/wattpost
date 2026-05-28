@@ -1,4 +1,4 @@
-"""Synthetic PV forecast provider — for demo.wattpost.io.
+"""Synthetic PV forecast provider, for demo.wattpost.io.
 
 Produces a Solcast-shaped `PvForecast` (7 days × 48 half-hour points
 each) without ever hitting an external API. Bell-curve PV peaked at
@@ -19,10 +19,10 @@ from datetime import datetime, timedelta, timezone
 from .base import ForecastProvider, PvForecast, PvForecastPoint
 
 
-# Tunables — should produce numbers that look like a real ~3-4 kW
+# Tunables, should produce numbers that look like a real ~3-4 kW
 # residential array. Adjust if the demo's actual synthetic battery
 # bank changes scale.
-PEAK_KW          = 3.6   # kW — peak instantaneous power on a clear day
+PEAK_KW          = 3.6   # kW, peak instantaneous power on a clear day
 DAYLIGHT_HOURS   = 12.0  # window over which the half-sine spans
 DAYS_AHEAD       = 7
 PERIOD_MINUTES   = 30
@@ -33,7 +33,7 @@ class SyntheticForecastProvider(ForecastProvider):
 
     def __init__(self) -> None:
         # Locked seed so the demo's forecast is consistent across
-        # restarts within the same calendar day — visitors who reload
+        # restarts within the same calendar day, visitors who reload
         # don't see wildly different numbers.
         self._seed_for_today = self._daily_seed()
 
@@ -98,5 +98,5 @@ class SyntheticForecastProvider(ForecastProvider):
 
 def build(cfg) -> SyntheticForecastProvider:
     """Factory matching the contract in forecast/service.py.
-    `cfg` is ignored — the synthetic provider has no config knobs."""
+    `cfg` is ignored, the synthetic provider has no config knobs."""
     return SyntheticForecastProvider()

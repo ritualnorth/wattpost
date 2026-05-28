@@ -18,7 +18,7 @@ SSH in (`ssh wattpost@wattpost.local`, default password `wattpost`. Change it!) 
 ```
 
 Pair with **[wattpost.cloud](https://wattpost.cloud/app/pair)** if you
-want to reach the dashboard from outside your LAN — see
+want to reach the dashboard from outside your LAN, see
 [Remote access](remote-access.md) for the full pairing walk-through.
 
 Everything you need to find the dashboard. Type `wattpost-config` for the interactive setup menu. Change web port, reset web password, check daemon status, view live logs, pair / unpair from cloud, check for updates.

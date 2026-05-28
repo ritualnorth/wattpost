@@ -1,8 +1,8 @@
 """solar-monitor CLI.
 
 Two subcommands:
-  poll  — run one poll cycle and print JSON (scripting, CI, debugging)
-  serve — run the daemon: scheduler + Litestar API + web UI
+  poll , run one poll cycle and print JSON (scripting, CI, debugging)
+  serve, run the daemon: scheduler + Litestar API + web UI
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def _resolve_db_path(args: argparse.Namespace, config) -> str:
       2. config.db_path if set in config.yaml. This is the canonical
          path for both Pi and Docker installs (mapped to a persistent
          volume on Docker).
-      3. The CLI default, ./solar-monitor.db — backward-compat for
+      3. The CLI default, ./solar-monitor.db, backward-compat for
          anyone still launching without either.
 
     Critical bug this fixes: before v0.0.60 the daemon ALWAYS used
@@ -67,7 +67,7 @@ def _resolve_db_path(args: argparse.Namespace, config) -> str:
         chosen = cfg_path
     else:
         chosen = args.db
-    # SQLite-special values pass straight through — don't try to
+    # SQLite-special values pass straight through, don't try to
     # treat them as filesystem paths or run legacy-migration on them.
     # `:memory:` is the in-process DB sqlite reserves; `file::memory:?...`
     # is the URI form. Both are valid sqlite open()s but don't have
@@ -109,13 +109,13 @@ def cmd_serve(args: argparse.Namespace) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
     # NOTE: install_log_ring() is called from the Litestar on_startup
-    # hook, AFTER uvicorn finishes reconfiguring logging — if we attach
+    # hook, AFTER uvicorn finishes reconfiguring logging, if we attach
     # here uvicorn's dictConfig wipes the handler before any of our
     # daemon code emits log lines.
     config = load_config(args.config)
     # First-boot password generation. The Pi SD-card image's install.sh
     # used to do this, but Docker installs never ran install.sh and so
-    # shipped with no password — combined with the auth middleware's
+    # shipped with no password, combined with the auth middleware's
     # "no password = bypass" rule that left the dashboard wide open to
     # anyone who could reach it (incl. via the cloud tunnel). Idempotent:
     # once the hash file exists this is a no-op.

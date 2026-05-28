@@ -46,7 +46,7 @@ class SolcastProvider(ForecastProvider):
         }
         # Ask explicitly for 168 hours (7 days) at 30-min resolution.
         # Solcast's default response length varies by tier and account
-        # state — sometimes only 3 days come back without `hours` set,
+        # state, sometimes only 3 days come back without `hours` set,
         # which would silently shrink the daily-outlook strip. The
         # hobbyist tier caps at 168 anyway, so this is the safe max.
         params = {"format": "json", "hours": "168", "period": "PT30M"}

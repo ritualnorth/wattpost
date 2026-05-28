@@ -4,7 +4,7 @@ Tier-1 driver on the coverage roadmap. The Tracer series is the
 #1 budget MPPT in DIY van and cabin builds. Same EPSolar protocol
 covers Tracer-AN, Tracer-BN, Triron, BN-DR, eTracer, and similar.
 
-Speaks **Modbus RTU**, but with a quirk — live state lives in
+Speaks **Modbus RTU**, but with a quirk, live state lives in
 **input registers (FC04)**, not holding registers (FC03). FC03
 is reserved for configuration setpoints. Our `serial_modbus`
 transport handles the wire; `Section.function_code` selects FC04

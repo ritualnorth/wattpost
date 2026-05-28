@@ -1,4 +1,4 @@
-"""RuuviTag driver — passive BLE, format 5."""
+"""RuuviTag driver, passive BLE, format 5."""
 from __future__ import annotations
 
 import logging
@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 
 
 class RuuviAmbient(DeviceDriver):
-    """RuuviTag — temp / humidity / pressure / battery."""
+    """RuuviTag, temp / humidity / pressure / battery."""
     vendor_id = "ruuvi"
     device_kind = "ambient"
 
@@ -27,7 +27,7 @@ class RuuviAmbient(DeviceDriver):
         }
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Ruuvi ambient requires "
+                "wrong transport type, Ruuvi ambient requires "
                 "ble_ruuvi_advertise"
             ]
             return result

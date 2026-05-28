@@ -1,7 +1,7 @@
 """Per-device settings write path (#111 phase 2).
 
 Wraps Modbus FC06 with the same BT-2 ack-swallowing fallback the
-Rover load-output adapter has been using in production since #104 —
+Rover load-output adapter has been using in production since #104,
 the BT-2 BLE dongle silently swallows the FC06 ack on Rover
 firmware 3.x, so we always fall through to an explicit FC03 read-
 back of the register we just wrote to confirm the change landed.
@@ -38,7 +38,7 @@ async def write_setting_register(
         {"ok": bool, "confirmed_value": int | None, "detail": str | None}
 
     `ok=True` means we confirmed the new value via read-back (or the
-    FC06 ack arrived AND read-back timed out — same fallback the
+    FC06 ack arrived AND read-back timed out, same fallback the
     Rover load-output uses to tolerate the BT-2 ack-swallowing
     firmware quirk).
 
@@ -62,7 +62,7 @@ async def write_setting_register(
             ack_seen = True
         except ValueError as e:
             log.info(
-                "settings_write: FC06 ack malformed (%s) — falling "
+                "settings_write: FC06 ack malformed (%s), falling "
                 "through to read-back", e,
             )
     except TransportTimeout:
@@ -88,7 +88,7 @@ async def write_setting_register(
             "ok": ack_seen,
             "confirmed_value": None,
             "detail": None if ack_seen
-                      else "no ack and read-back disabled — write may have landed",
+                      else "no ack and read-back disabled, write may have landed",
         }
 
     # Pass 2: read back the register we just wrote.
@@ -107,7 +107,7 @@ async def write_setting_register(
                 "confirmed_value": confirmed,
                 "detail": (
                     f"read-back returned {confirmed} after writing "
-                    f"{value} — device may have clamped to a safe range"
+                    f"{value}, device may have clamped to a safe range"
                 ),
             }
         return {"ok": True, "confirmed_value": confirmed, "detail": None}
@@ -115,7 +115,7 @@ async def write_setting_register(
         if ack_seen:
             return {
                 "ok": True, "confirmed_value": None,
-                "detail": "ack ok; read-back timed out — next poll will confirm",
+                "detail": "ack ok; read-back timed out, next poll will confirm",
             }
         return {
             "ok": False, "confirmed_value": None,

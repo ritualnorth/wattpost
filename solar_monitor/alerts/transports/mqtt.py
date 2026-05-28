@@ -1,4 +1,4 @@
-"""MQTT-publish alert transport — fires alert events onto a topic so
+"""MQTT-publish alert transport, fires alert events onto a topic so
 Home Assistant / Node-RED / Telegraf / a custom subscriber on the
 local network picks them up. Critical for fully off-grid setups where
 ntfy / Discord / SMTP all need internet.

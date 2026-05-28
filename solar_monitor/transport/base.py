@@ -1,12 +1,12 @@
 """Transport abstract base class.
 
 A Transport is a connection to one or more Modbus devices. It does not know
-about device IDs, registers, parsers, or vendors — it only knows how to ship
+about device IDs, registers, parsers, or vendors, it only knows how to ship
 bytes and wait for the response.
 
 Each driver builds Modbus RTU frames (slave_id + function + payload + CRC)
 and asks the transport to `request()` them. The transport is responsible for
-fragmentation, MTU, retries, and timing — *not* protocol semantics.
+fragmentation, MTU, retries, and timing, *not* protocol semantics.
 """
 from __future__ import annotations
 

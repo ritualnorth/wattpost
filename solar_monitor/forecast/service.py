@@ -6,7 +6,7 @@ One ForecastService instance per daemon. Owns:
   - The cached JSON blob in the Store's kv table
 
 The cache survives daemon restarts so the dashboard isn't blank for
-the first 3 hours after a reboot — we serve the previous fetch and
+the first 3 hours after a reboot, we serve the previous fetch and
 the next poll refreshes it. Cache key: `forecast:pv`.
 """
 from __future__ import annotations
@@ -31,12 +31,12 @@ CACHE_KEY = "forecast:pv"
 from . import synthetic as _synth_mod
 
 PROVIDERS = {
-    # Site-trained ML forecast — best quality for fixed installs that
+    # Site-trained ML forecast, best quality for fixed installs that
     # have registered a rooftop in Solcast's web app. Needs an account
     # + API key; free tier capped at 10 calls/day per site.
     "solcast":   _solcast_mod.build,
     # Physical PV estimate from Open-Meteo irradiance + array geometry.
-    # Free, unlimited, lat/lon-based — the right pick for moving vans
+    # Free, unlimited, lat/lon-based, the right pick for moving vans
     # and for users who don't want to register a Solcast account.
     "openmeteo": _openmeteo_mod.build,
     # Demo-only fake forecast; never makes a network call. Selected by
@@ -84,7 +84,7 @@ class ForecastService:
         await self.store.kv_set(CACHE_KEY, body)
         # Archive every point under one fetched_at so the accuracy
         # widget can later look back at "the forecast as the user
-        # would have seen it before day X started." Best-effort —
+        # would have seen it before day X started." Best-effort,
         # archiving failure must not block the dashboard refresh.
         try:
             archive_rows = [

@@ -6,7 +6,7 @@ for the one-shot fetch behind the Settings UI's Test button.
 
 Open-Meteo doesn't require an API key, so the "credentials" are
 just (lat, lon, poll_minutes). The masking dance is therefore a
-no-op here — both fields are public coordinates.
+no-op here, both fields are public coordinates.
 """
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ async def update_weather_config(
             return raw
         _save_config(config_path, _mutate)
         log.info("weather integration cleared")
-        # Background hot-reload — the running scheduler picks up the
+        # Background hot-reload, the running scheduler picks up the
         # cleared config within a few seconds, no user-visible restart.
         asyncio.create_task(_hot_reload_bg(state))
         return {"ok": True, "configured": False, "restart_required": False}

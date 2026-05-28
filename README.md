@@ -80,33 +80,33 @@ host-network setting for BLE.
 
 ## Dashboard
 
-- **Bank hero** — SoC donut (green / amber / red), animated
+- **Bank hero**, SoC donut (green / amber / red), animated
   direction pulse, net W, time-to-empty / full, voltage,
   capacity, pack info
-- **Power flow strip** — sources → battery → loads, animated
+- **Power flow strip**, sources → battery → loads, animated
   arrows, with the load tile computed from energy balance (sees
   loads on the busbar, not just the controller)
-- **Today** — PV in, charged Ah, peak W, load consumed
+- **Today**, PV in, charged Ah, peak W, load consumed
   (computed from balance, not what the MPPT thinks), lifetime Wh
-- **Right now** — optional current-weather tile (Open-Meteo)
-- **Tomorrow** — optional PV forecast tile (Solcast or
+- **Right now**, optional current-weather tile (Open-Meteo)
+- **Tomorrow**, optional PV forecast tile (Solcast or
   Open-Meteo). Expected kWh, peak time, day-after preview,
   sparkline
-- **7-day outlook** — per-day kWh + sparkline across the
+- **7-day outlook**, per-day kWh + sparkline across the
   forecast window
-- **Cell balance** — per-cell voltages across every pack,
+- **Cell balance**, per-cell voltages across every pack,
   min / max highlighted, panel hue follows drift severity
-- **Charge efficiency** — SoC-corrected coulombic η per pack,
+- **Charge efficiency**, SoC-corrected coulombic η per pack,
   surfaced on smart_battery cards
-- **History chart** — uPlot, any metric of any device,
+- **History chart**, uPlot, any metric of any device,
   1h / 6h / 24h / 7d / 30d, with tiered rollups under the hood.
   Compare-packs overlay across multi-pack rigs; PV-forecast
   overlay when viewing `pv_power_w`
-- **Settings** — UI-driven device + transport management,
+- **Settings**, UI-driven device + transport management,
   alerts, integrations (MQTT, Solcast, Open-Meteo), retention
   tiers, kiosk mode, backups, solar-pause rule, smart-scene
   rules
-- **Conditional alert banner** — hidden when healthy, shows on
+- **Conditional alert banner**, hidden when healthy, shows on
   cell drift, low SoC, over-temp, comms loss
 
 ## Architecture
@@ -175,16 +175,16 @@ Full recipe: [docs/adding-a-vendor.md](docs/adding-a-vendor.md).
 
 ## Releases + cloud
 
-- [docs/release-pipeline.md](docs/release-pipeline.md) — how
+- [docs/release-pipeline.md](docs/release-pipeline.md), how
   features reach a customer's Pi: SD image build, source
   tarballs, in-place Update-now flow, the self-hosted
   `releases.wattpost.io` infrastructure
-- [docs/cloud-architecture.md](docs/cloud-architecture.md) —
+- [docs/cloud-architecture.md](docs/cloud-architecture.md),
   cloud broker + multi-site fleet pattern
-- [CHANGELOG.md](CHANGELOG.md) — versioned release notes
+- [CHANGELOG.md](CHANGELOG.md), versioned release notes
 
 ## Licence
 
 Proprietary. All rights reserved. See [LICENSE.txt](LICENSE.txt).
 The full source ships under `/opt/wattpost-src` on every
-installed appliance — source-available, not open source.
+installed appliance, source-available, not open source.

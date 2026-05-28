@@ -2,7 +2,7 @@
 
 Best-effort: failures here never affect the user-facing scan flow.
 The cloud endpoint is bearer-authed with the appliance's existing
-token (the same one the heartbeat uses) — pairing is the only
+token (the same one the heartbeat uses), pairing is the only
 gate, no separate credential to manage.
 """
 from __future__ import annotations
@@ -19,14 +19,14 @@ log = logging.getLogger(__name__)
 def build_ble_fingerprint(rec: dict[str, Any]) -> dict[str, Any] | None:
     """Reduce a BLE scan result to its anonymised fingerprint, or
     return None if the device is recognised by an existing driver
-    (we only ship the unknowns to the discovery pipeline — known
+    (we only ship the unknowns to the discovery pipeline, known
     devices are noise).
 
     Input is the per-device dict that `ble_scan` builds, with keys
     `address`, `name`, `rssi`, optional `vendor`, `protocol`,
     `manufacturer_data` (raw map, if available).
     """
-    # Don't ship if we already recognised the vendor — those are
+    # Don't ship if we already recognised the vendor, those are
     # already covered by an existing driver and add no new info to
     # the unknown-device pipeline.
     if rec.get("vendor"):
@@ -35,7 +35,7 @@ def build_ble_fingerprint(rec: dict[str, Any]) -> dict[str, Any] | None:
     addr = (rec.get("address") or "").upper()
     if not addr or addr.count(":") < 2:
         return None
-    # OUI only — never the full MAC. Vendors register OUIs publicly,
+    # OUI only, never the full MAC. Vendors register OUIs publicly,
     # so this leaks at most "you have a Texas Instruments BLE chip".
     oui = ":".join(addr.split(":")[:3])
 
@@ -51,7 +51,7 @@ def build_ble_fingerprint(rec: dict[str, Any]) -> dict[str, Any] | None:
 
     # Optional richer hints when the caller supplied them. The
     # ble_scan handler doesn't currently include raw manufacturer
-    # data in its response shape — we pass it forward when the
+    # data in its response shape, we pass it forward when the
     # caller does.
     mfr_first = rec.get("manufacturer_first_id")
     mfr_prefix = rec.get("manufacturer_prefix_hex")
@@ -61,7 +61,7 @@ def build_ble_fingerprint(rec: dict[str, Any]) -> dict[str, Any] | None:
         fp["mfr_prefix_hex"] = mfr_prefix
     svc_uuids = rec.get("service_uuids")
     if svc_uuids:
-        # Cap to keep payloads tiny — 8 UUIDs is more than any sane
+        # Cap to keep payloads tiny, 8 UUIDs is more than any sane
         # device advertises.
         fp["service_uuids"] = list(svc_uuids)[:8]
     return fp

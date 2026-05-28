@@ -54,7 +54,7 @@ def verify_and_strip(frame: bytes) -> bytes:
     framing mismatch."""
     if not frame:
         raise ValueError("empty frame")
-    # Trim trailing 0x0D if present — the HID reader usually returns
+    # Trim trailing 0x0D if present, the HID reader usually returns
     # the bytes up to and including the CR, but be tolerant.
     if frame.endswith(b"\r"):
         frame = frame[:-1]

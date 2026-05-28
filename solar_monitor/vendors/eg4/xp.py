@@ -1,4 +1,4 @@
-"""EG4 XP / kPV / FlexBOSS family driver — Luxpower-derived Modbus.
+"""EG4 XP / kPV / FlexBOSS family driver, Luxpower-derived Modbus.
 
 Read-only. Polls Modbus RTU input registers (FC04) over the
 inverter's CT1 RJ45 with a standard USB-RS485 dongle. Default
@@ -9,7 +9,7 @@ decimal, scaling as noted):
 
     Reg  Field                       Scale   Unit
     ---  --------------------------- ------- -----
-      0  device_status (low byte)    enum    —
+      0  device_status (low byte)    enum   ,
       1  pv1_voltage                 ÷10     V
       2  pv2_voltage                 ÷10     V
       4  battery_voltage             ÷10     V
@@ -36,12 +36,12 @@ decimal, scaling as noted):
 
 The 12000XP carries split-phase L1/L2 readings at additional
 register positions (127/128 for EPS, 193/194 for grid). Read
-in a separate optional section — silently degrades when the
+in a separate optional section, silently degrades when the
 inverter doesn't populate them (every hybrid model leaves
 them zero).
 
 Mode enum at register 0's low byte (cross-referenced against
-galets/eg4-modbus-monitor's registers-18kpv.yaml — values
+galets/eg4-modbus-monitor's registers-18kpv.yaml, values
 documented but field names paraphrased to avoid GPL contamination):
 
     0x00  Standby
@@ -56,7 +56,7 @@ documented but field names paraphrased to avoid GPL contamination):
     0x40  Battery only, off-grid
     0x80  PV only, off-grid (rare; daytime full-bank)
     0x88  PV charging the bank, off-grid (the normal sunny
-          off-grid case — what wastral1978's 12000XP runs)
+          off-grid case, what wastral1978's 12000XP runs)
     0xC0  PV + battery, off-grid
 
 Mapped onto WattPost's canonical inverter_mode vocabulary so
@@ -66,9 +66,9 @@ References (all cross-checked, see NOTICE):
 
   * EG4 18kPV-12LV Modbus Communication Protocol PDF (EG4
     Electronics, public mirror at eg4electronics.com).
-  * joyfulhouse/eg4_web_monitor (MIT) — register addresses +
+  * joyfulhouse/eg4_web_monitor (MIT), register addresses +
     field names.
-  * celsworth/lxp-bridge (MIT) — Luxpower-LXP semantics.
+  * celsworth/lxp-bridge (MIT), Luxpower-LXP semantics.
 
 Marked experimental at v1. First customer probe paste flips
 to stable.
@@ -198,7 +198,7 @@ def _parse_block_a(bs: bytes) -> dict[str, Any]:
 
     # Reg 12: grid_voltage_r (the R phase on hybrid; or just
     # "grid" on split-phase XP). Three-phase customers would
-    # also want regs 13/14 — out of scope for v1.
+    # also want regs 13/14, out of scope for v1.
     grid_v = _u16(bs, 27) / 10.0
     if grid_v > 0:
         out["grid_voltage_v"] = round(grid_v, 1)
@@ -214,11 +214,11 @@ def _parse_block_b(bs: bytes) -> dict[str, Any]:
     """Registers 16..27, 12 words. AC output, EPS output (the
     off-grid side), and grid sell/import meters."""
     out: dict[str, Any] = {}
-    # Reg 16: ac_output_power — inverter output across all phases.
+    # Reg 16: ac_output_power, inverter output across all phases.
     # On a grid-tied install this is what the inverter pushes
     # through to the AC bus; on off-grid it'll typically match eps_power.
     out["ac_output_power_w"] = _u16(bs, 3)
-    # Reg 17: rectifier_power — grid->loads pass-through, only
+    # Reg 17: rectifier_power, grid->loads pass-through, only
     # meaningful when grid is present.
     rect_w = _u16(bs, 5)
     if rect_w > 0:
@@ -236,7 +236,7 @@ def _parse_block_b(bs: bytes) -> dict[str, Any]:
     eps_hz = _u16(bs, 17) / 100.0
     if eps_hz > 0:
         out["ac_output_frequency_hz"] = round(eps_hz, 2)
-    # Reg 24: EPS power — the off-grid load power.
+    # Reg 24: EPS power, the off-grid load power.
     eps_w = _u16(bs, 19)
     if eps_w > 0:
         out["eps_power_w"] = eps_w
@@ -265,7 +265,7 @@ def _parse_temps(bs: bytes) -> dict[str, Any]:
     if r1 != 0: out["radiator_temperature_1_c"] = r1
     if r2 != 0: out["radiator_temperature_2_c"] = r2
     # Reg 67: battery temperature. The known firmware-quirk
-    # field — some Luxpower revs ship this scaled ÷10. We
+    # field, some Luxpower revs ship this scaled ÷10. We
     # publish the raw value; the validation step on first
     # customer poll catches an out-of-range reading and the
     # follow-up release applies a per-firmware scale.

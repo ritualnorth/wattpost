@@ -1,4 +1,4 @@
-"""Victron SmartShunt driver — read-only via BLE Instant Readout.
+"""Victron SmartShunt driver, read-only via BLE Instant Readout.
 
 The SmartShunt broadcasts an encrypted advertisement ~1/second
 carrying voltage, current, SoC, time-to-go, consumed Ah, and an
@@ -9,7 +9,7 @@ victron-ble's `BatteryMonitorData` into our normalised field names
 so the dashboard's hero donut, Remaining tile, and Battery health
 tile (#109) light up without per-vendor logic.
 
-The driver doesn't go through Modbus — no `sections`, no FC03. We
+The driver doesn't go through Modbus, no `sections`, no FC03. We
 override `poll()` and read the latest decoded payload from the
 transport.
 """
@@ -25,14 +25,14 @@ log = logging.getLogger(__name__)
 
 # Expected device-class names from victron-ble. SmartShunt + BMV-712
 # share the BatteryMonitor parser (they're functionally identical for
-# our purposes — both report V/A/SoC/time-to-go).
+# our purposes, both report V/A/SoC/time-to-go).
 EXPECTED_DEVICE_CLASSES = {"BatteryMonitor"}
 
 
 class VictronSmartShunt(DeviceDriver):
     """Victron SmartShunt / BMV-712 battery monitor.
 
-    `slave_id` isn't meaningful for Victron BLE (no bus addressing —
+    `slave_id` isn't meaningful for Victron BLE (no bus addressing,
     each device broadcasts independently), but the DeviceDriver base
     requires one. We accept any int and ignore it; the config
     layer's transport_id is what binds the driver to its device's
@@ -43,7 +43,7 @@ class VictronSmartShunt(DeviceDriver):
 
     @property
     def sections(self) -> tuple[Section, ...]:
-        # Not a Modbus driver — sections are unused. Return empty
+        # Not a Modbus driver, sections are unused. Return empty
         # rather than None so any code that introspects without
         # calling .poll() (diagnostics, tests) doesn't NPE.
         return ()
@@ -63,7 +63,7 @@ class VictronSmartShunt(DeviceDriver):
         # talking to a SmartShunt before calling its methods.
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Victron SmartShunt requires "
+                "wrong transport type, Victron SmartShunt requires "
                 "ble_victron_advertise"
             ]
             return result
@@ -78,7 +78,7 @@ class VictronSmartShunt(DeviceDriver):
         if class_name and class_name not in EXPECTED_DEVICE_CLASSES:
             # We discovered the configured device is actually a
             # SmartSolar / Inverter / etc., not a battery monitor.
-            # Surface the mismatch loud — the user picked the wrong
+            # Surface the mismatch loud, the user picked the wrong
             # device-kind in the config.
             result["_errors"] = [
                 f"configured as 'shunt' but transport sees a "

@@ -34,7 +34,7 @@ class AiliShunt(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — AiLi shunt requires ble_aili"]
+            result["_errors"] = ["wrong transport type, AiLi shunt requires ble_aili"]
             return result
 
         age = getattr(transport, "last_frame_age_s", lambda: None)()
@@ -43,7 +43,7 @@ class AiliShunt(DeviceDriver):
 
         f = transport.get_latest()
         if f is None:
-            # No frame received yet — the dashboard's silent-tile
+            # No frame received yet, the dashboard's silent-tile
             # logic kicks in via the age field above.
             return result
 

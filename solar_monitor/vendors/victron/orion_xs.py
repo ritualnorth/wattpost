@@ -1,4 +1,4 @@
-"""Victron Orion XS DC-DC driver — read-only via BLE Instant Readout.
+"""Victron Orion XS DC-DC driver, read-only via BLE Instant Readout.
 
 The Orion XS is Victron's newer DC-DC range, slowly replacing the
 Orion-Tr Smart family. Adds proper output current measurement (which
@@ -38,7 +38,7 @@ class VictronOrionXS(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — requires ble_victron_advertise"]
+            result["_errors"] = ["wrong transport type, requires ble_victron_advertise"]
             return result
         from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()

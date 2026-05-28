@@ -34,7 +34,7 @@ _META_KEYS = {"_vendor", "_kind", "_label", "_slave_id", "_errors"}
 _TOPIC_SKIP = _META_KEYS
 
 # Identifying metadata fields that live on the latest snapshot but aren't
-# numeric sensors — used to enrich the HA `device` block, not published as
+# numeric sensors, used to enrich the HA `device` block, not published as
 # sensors.
 _HA_DEVICE_META = {"model", "serial", "firmware_version", "device_id"}
 
@@ -45,7 +45,7 @@ def _ha_sensor_meta(metric: str) -> dict[str, str]:
     device_class when it lines up with HA's enum, otherwise just set the
     unit so the value still renders correctly."""
     m = metric.lower()
-    # SoC is a special case — HA classifies as "battery" with % unit.
+    # SoC is a special case, HA classifies as "battery" with % unit.
     if m == "soc_pct":
         return {"device_class": "battery", "unit_of_measurement": "%",
                 "state_class": "measurement"}
@@ -65,12 +65,12 @@ def _ha_sensor_meta(metric: str) -> dict[str, str]:
         # Non-SoC percentages: no HA device_class fits, keep unit only.
         return {"unit_of_measurement": "%", "state_class": "measurement"}
     if m.endswith("_ah"):
-        # Amp-hours — no HA class; total_increasing for counters, but our
+        # Amp-hours, no HA class; total_increasing for counters, but our
         # _ah metrics are instantaneous (remaining/capacity), so measurement.
         return {"unit_of_measurement": "Ah", "state_class": "measurement"}
     if m.endswith("_wh"):
         # Watt-hours: energy. Both "_today_wh" (daily reset) and
-        # "_total_wh" (lifetime cumulative) use total_increasing —
+        # "_total_wh" (lifetime cumulative) use total_increasing,
         # HA detects resets automatically and adjusts. Required for
         # HA's built-in Energy dashboard to pick these up as Solar
         # production / Battery in/out sources.
@@ -89,7 +89,7 @@ _UNIT_SUFFIXES = {"v", "a", "w", "c", "ah", "wh", "pct", "hz"}
 
 def _ha_name(metric: str) -> str:
     """Pretty entity name. HA prepends the device name when grouped, so
-    we just describe the metric — strip a trailing unit suffix so we
+    we just describe the metric, strip a trailing unit suffix so we
     don't get "Voltage V" (HA already shows the unit separately)."""
     parts = metric.split("_")
     if parts and parts[-1].lower() in _UNIT_SUFFIXES:
@@ -165,7 +165,7 @@ class MqttExporter(Exporter):
         self._task = None
 
     async def export(self, result: dict[str, Any]) -> None:
-        # Drop if queue is full — we're a live monitor, not a buffered log.
+        # Drop if queue is full, we're a live monitor, not a buffered log.
         try:
             self._queue.put_nowait(result)
         except asyncio.QueueFull:
@@ -196,7 +196,7 @@ class MqttExporter(Exporter):
                 ) as client:
                     log.info("[%s] connected to %s:%d", self.id, self.host, self.port)
                     backoff = 1.0
-                    # Re-publish HA discovery configs on each reconnect — the
+                    # Re-publish HA discovery configs on each reconnect, the
                     # broker may have lost retained messages, or HA may have
                     # been reconfigured since last time.
                     self._ha_published.clear()
@@ -262,7 +262,7 @@ class MqttExporter(Exporter):
             if not data:
                 continue
 
-            # Full device snapshot — keep `_vendor`/`_kind` for downstream routing.
+            # Full device snapshot, keep `_vendor`/`_kind` for downstream routing.
             snapshot = dict(data)
             snapshot["_ts"] = timestamp
             await client.publish(
@@ -317,7 +317,7 @@ class MqttExporter(Exporter):
             "manufacturer": "WattPost",
         }
         # Surface model / serial / firmware from the latest snapshot if
-        # the driver exposed them — HA will group entities by device.
+        # the driver exposed them, HA will group entities by device.
         model = data.get("model")
         if isinstance(model, str) and model:
             device_block["model"] = model
@@ -344,7 +344,7 @@ class MqttExporter(Exporter):
             config_topic,
             payload=json.dumps(config),
             qos=self.qos,
-            retain=True,  # discovery configs are always retained — HA convention
+            retain=True,  # discovery configs are always retained, HA convention
         )
 
 
@@ -364,11 +364,11 @@ def _factory(cfg: dict) -> MqttExporter:
       qos: default 0
       retain: default true
       publish_per_metric: default true
-      ha_discovery: default false — when true, publishes Home Assistant
+      ha_discovery: default false, when true, publishes Home Assistant
         MQTT-discovery configs so HA auto-creates one sensor per metric
         on top of the existing per-metric topics.
       ha_discovery_prefix: default "homeassistant" (HA convention)
-      ha_node_id: default "solar_monitor" — used in the unique_id and the
+      ha_node_id: default "solar_monitor", used in the unique_id and the
         HA device identifier so multiple WattPost units on the same broker
         don't collide.
     """

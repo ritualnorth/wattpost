@@ -2,18 +2,18 @@
 
 Two surfaces:
 
-  GET  /api/location/status   — current best location + share mode,
+  GET  /api/location/status  , current best location + share mode,
                                  used by the appliance dashboard
                                  "where am I" map tile and by the
                                  Settings → Location panel.
 
-  PATCH /api/location/share   — flip share_with_cloud between off /
+  PATCH /api/location/share  , flip share_with_cloud between off /
                                  approx / precise. Writes to
                                  config.yaml and the in-memory Config
                                  so the next heartbeat picks it up
                                  without a daemon restart.
 
-The map tile reads `current_location` (the LOCAL view — always
+The map tile reads `current_location` (the LOCAL view, always
 truthful), not the cloud-gated view. Show-the-customer-their-own-
 location is never gated; only TRANSMISSION is gated. See
 [[location-opt-in]] memory for the principle.

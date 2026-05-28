@@ -7,7 +7,7 @@ every ~10s. Plaintext, no encryption key.
 
 We ship a single device kind today:
 
-  * tank — Pro Check / Pro Plus / Pro Check H2O / Pro Universal,
+  * tank, Pro Check / Pro Plus / Pro Check H2O / Pro Universal,
     all decoded through the same parser. Hardware-id byte tells us
     which model the sensor reports as; the driver emits raw distance
     + signal quality + battery + temperature. Fluid level % is per-
@@ -34,7 +34,7 @@ INFO = VendorInfo(
         "BLE tank-level sensors (Pro Check, Pro Plus, H2O, Universal). "
         "Magnetically mount to the bottom of a propane or water tank "
         "and broadcast ultrasonic fluid-level readings every ~10s. "
-        "Plaintext advertisements — no encryption key required. "
+        "Plaintext advertisements, no encryption key required. "
         "Read-only."
     ),
 )

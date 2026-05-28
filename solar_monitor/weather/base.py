@@ -16,7 +16,7 @@ class HourlyForecast(msgspec.Struct):
 
 class CurrentWeather(msgspec.Struct):
     """Snapshot of current conditions. Optional fields are None when
-    the provider doesn't report them — keeps the schema additive as
+    the provider doesn't report them, keeps the schema additive as
     more providers get wired up."""
     provider: str
     fetched_at: int        # unix seconds when the daemon completed the fetch

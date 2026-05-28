@@ -2,14 +2,14 @@
 
 Schema decisions:
 
-* `samples` — long format, one row per (device, metric, ts) numeric reading.
+* `samples`, long format, one row per (device, metric, ts) numeric reading.
   Long format wins here because metrics vary per vendor and we don't want to
   ALTER TABLE every time a new field appears.
-* `samples_str` — same shape but for string-valued metrics (model name,
+* `samples_str`, same shape but for string-valued metrics (model name,
   charging_state). Far fewer rows.
-* `latest` — a snapshot table updated on every poll. Lets `/api/devices` be
+* `latest`, a snapshot table updated on every poll. Lets `/api/devices` be
   a fast single-row-per-(device, metric) read with no aggregation.
-* `device_meta` — vendor + kind + first/last seen, populated on poll.
+* `device_meta`, vendor + kind + first/last seen, populated on poll.
 
 Write path is funneled through a single async task to keep SQLite happy.
 We commit per poll (a handful of inserts each), not per row.
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS kv (
 -- Archive of every PV-forecast point we've ever fetched. The current-
 -- forecast blob in `kv` is overwritten on each poll, so without this
 -- table we can't compute "yesterday's prediction vs reality." Keyed
--- by (fetched_at, period_end) — a single forecast fetch produces
+-- by (fetched_at, period_end), a single forecast fetch produces
 -- ~336 rows (7 days × 48 half-hour slices), and we keep ~30 days of
 -- history, so the table caps at ~80k rows. Light.
 CREATE TABLE IF NOT EXISTS forecast_history (
@@ -157,7 +157,7 @@ CREATE INDEX IF NOT EXISTS idx_fc_hist_period
 -- Rover load terminal, JK BMS charge MOS, future MQTT relay etc.
 -- Discovery is driven by vendor adapters seeing a known device and
 -- registering its outputs here. State is updated from the next poll's
--- read-back after a write — we don't trust FC06 acks (BT-2 swallows
+-- read-back after a write, we don't trust FC06 acks (BT-2 swallows
 -- them on Rover firmware 3.x).
 CREATE TABLE IF NOT EXISTS controllable_outputs (
     id                TEXT PRIMARY KEY,             -- "charge_controller.load"
@@ -240,7 +240,7 @@ PRAGMAS = (
 
 # ---------- Schema migrations ----------
 #
-# `SCHEMA` above is CREATE-IF-NOT-EXISTS only — safe to run forever on
+# `SCHEMA` above is CREATE-IF-NOT-EXISTS only, safe to run forever on
 # an existing DB, but it can't *evolve* an existing table (rename a
 # column, add a NOT NULL constraint, etc.). For those, we need a real
 # migration runner.
@@ -248,7 +248,7 @@ PRAGMAS = (
 # Strategy: use SQLite's built-in `PRAGMA user_version` as the
 # bookkeeper. Every migration here gets a monotonic integer; on boot
 # we read the stored user_version, run any with a higher number than
-# stored, then write the new max version. Idempotent — re-running
+# stored, then write the new max version. Idempotent, re-running
 # against an up-to-date DB is a no-op.
 #
 # Adding a migration:
@@ -256,7 +256,7 @@ PRAGMAS = (
 #   2. Add (N, "short name", SQL_or_async_callable) to MIGRATIONS.
 #   3. Bump SCHEMA_VERSION to N.
 #   4. Test against a copy of a real customer DB before tagging a
-#      release — schema mistakes are forever for self-hosted users.
+#      release, schema mistakes are forever for self-hosted users.
 #
 # Why not Alembic: the cloud uses Alembic because it has a single
 # Postgres + a managed deploy. The appliance has thousands of
@@ -264,17 +264,17 @@ PRAGMAS = (
 # revision id, and the simplicity of `PRAGMA user_version` is a
 # better fit. If migrations get genuinely complex, revisit.
 #
-# Adding a NEW TABLE doesn't need a migration — add it to SCHEMA
+# Adding a NEW TABLE doesn't need a migration, add it to SCHEMA
 # above with CREATE IF NOT EXISTS and it'll appear on next boot.
 # Migrations are for ALTERing tables that already exist.
 SCHEMA_VERSION = 2
 
 async def _v1_add_display_name(db) -> None:
-    """Idempotent ALTER TABLE ADD COLUMN — SQLite has no
+    """Idempotent ALTER TABLE ADD COLUMN, SQLite has no
     `ADD COLUMN IF NOT EXISTS`, so we check pragma_table_info first.
 
     Why idempotency matters: the demo container's DB ended up with the
-    column already present but `user_version` still at 0 — a previous
+    column already present but `user_version` still at 0, a previous
     daemon must have ALTERed before the user_version bump landed, then
     crashed before committing the version. Every subsequent boot then
     re-tried the migration and hit `duplicate column name` until we
@@ -299,7 +299,7 @@ MIGRATIONS: list[tuple[int, str, Any]] = [
 async def _apply_migrations(db) -> None:
     """Run any unapplied schema migrations against the open
     connection. Reads / writes `PRAGMA user_version`. Each migration
-    runs in its own transaction — a failure leaves the previous
+    runs in its own transaction, a failure leaves the previous
     versions applied and the user_version pointing at the highest
     that succeeded, so an admin can investigate without losing
     intermediate state.
@@ -334,7 +334,7 @@ async def _apply_migrations(db) -> None:
             await db.commit()
         except Exception:
             log.exception(
-                "migration v%d (%s) FAILED — DB left at user_version=%d. "
+                "migration v%d (%s) FAILED, DB left at user_version=%d. "
                 "Daemon will keep booting against the old schema; investigate "
                 "before applying further changes.",
                 version, name, current,
@@ -352,7 +352,7 @@ class Store:
 
     def __init__(self, path: str | Path) -> None:
         # SQLite-special paths (`:memory:`, `file::memory:?...`) are
-        # not filesystem paths — pass them through verbatim so the
+        # not filesystem paths, pass them through verbatim so the
         # mkdir-parents call in `open()` doesn't try to create `.`.
         # The health-probe path in wattpost-update (#36) uses
         # `:memory:` so it can boot the daemon without touching the
@@ -381,7 +381,7 @@ class Store:
         hour_days: int | None = None,
     ) -> None:
         """Hot-applied retention windows (#172). None means "keep
-        the current value" — pass each one only when changing it.
+        the current value", pass each one only when changing it.
         Clamped to sensible minimums so a fat-fingered 0 doesn't
         wipe history on the next maintenance pass."""
         if raw_days is not None:
@@ -402,7 +402,7 @@ class Store:
         after reading the optional `bank:` block from config.yaml.
         Defaults stay in effect when no block is present."""
         if source not in ("auto", "shunt", "bms"):
-            log.warning("invalid bank source %r — keeping current (%r)",
+            log.warning("invalid bank source %r, keeping current (%r)",
                         source, self._bank_source)
             return
         self._bank_source = source
@@ -418,7 +418,7 @@ class Store:
         self._db = await aiosqlite.connect(self.path)
         for pragma in PRAGMAS:
             await self._db.execute(pragma)
-        # Base schema first — CREATE-IF-NOT-EXISTS so this is safe to
+        # Base schema first, CREATE-IF-NOT-EXISTS so this is safe to
         # run against an existing DB. Then run any pending migrations
         # to evolve from one schema_version to the next.
         await self._db.executescript(SCHEMA)
@@ -447,7 +447,7 @@ class Store:
         """Persist a batch of forecast points under one fetched_at
         timestamp. Each point is (period_end_ts, pv_w, p10, p90).
 
-        Idempotent — re-archiving the same (fetched_at, period_end)
+        Idempotent, re-archiving the same (fetched_at, period_end)
         replaces the previous row. The same scheduler that records the
         live cache calls this; the two stay in lockstep."""
         if self._db is None:
@@ -471,7 +471,7 @@ class Store:
         """Compute predicted-vs-actual PV energy for one local day.
 
         Predicted: integrate the forecast that the user could have
-        SEEN before the day started — the latest fetch made strictly
+        SEEN before the day started, the latest fetch made strictly
         before `day_mid_ts`. That's the prediction they "trusted"; a
         forecast made mid-day after observing low PV doesn't count.
 
@@ -479,7 +479,7 @@ class Store:
         device whose label is in `controller_labels`, between
         day_mid_ts and day_mid_ts + 86400 exclusive.
 
-        Returns None when either side has no data — the UI hides the
+        Returns None when either side has no data, the UI hides the
         widget rather than show "—%" of nothing.
         """
         if self._db is None:
@@ -489,7 +489,7 @@ class Store:
 
         # Predicted: latest forecast made before the target day, then
         # all of its points falling inside the day's window. (Solcast
-        # period_end follows the END of the slice — we bucket by the
+        # period_end follows the END of the slice, we bucket by the
         # mid-point ts - 900 to keep the day boundary honest, same as
         # the dashboard summariser.)
         async with self._db.execute(
@@ -597,7 +597,7 @@ class Store:
     ) -> None:
         """Persist a single `orchestrator.poll_once()` result.
 
-        `ts_override` is only used by the demo history-seeding path —
+        `ts_override` is only used by the demo history-seeding path,
         it lets us insert historical rows at past timestamps. Real
         polls always use the current clock.
         """
@@ -668,16 +668,16 @@ class Store:
         # bank.voltage_v, etc. the same way it charts a real device.
         #
         # Source preference: a shunt (if present) wins over smart-battery
-        # summation — matches the JS bank-aggregate logic.
+        # summation, matches the JS bank-aggregate logic.
         #
         # Critically, we DON'T recompute from "what responded this cycle"
-        # alone — on a lossy BLE link, individual packs can miss a poll
+        # alone, on a lossy BLE link, individual packs can miss a poll
         # cycle, which would flip pack_count from 3 → 2 and halve the
         # bank's capacity/current/voltage for a minute. Instead, augment
         # this cycle's devices with the most-recent snapshot of any
         # smart_battery/shunt from the `latest` table that's still fresh.
         # A pack that's been silent longer than BANK_AGGREGATE_STALE_S
-        # gets dropped — the bank reflects current reality, not a frozen
+        # gets dropped, the bank reflects current reality, not a frozen
         # version of an unplugged pack.
         augmented = await self._augment_for_bank(devices, now_ts=ts)
         bank = self._compute_bank_aggregate(augmented)
@@ -757,7 +757,7 @@ class Store:
     # Packs silent longer than this drop OUT of the bank aggregate.
     # 5 min covers the ~1 min poll cadence plus a few cycles of missed
     # polls (which is normal on a noisy BLE link without meaning the
-    # pack is gone). Beyond that, treat it as actually offline — the
+    # pack is gone). Beyond that, treat it as actually offline, the
     # bank shrinks to match.
     BANK_AGGREGATE_STALE_S = 300
 
@@ -768,7 +768,7 @@ class Store:
         shunt entries from the latest table that didn't respond this
         cycle but were last seen recently enough to still count as
         present. Lets the bank aggregate stay stable across single
-        missed polls — without this, pack_count flickers between
+        missed polls, without this, pack_count flickers between
         N and N-1 every time the BLE link drops a packet."""
         out = dict(devices)
         try:
@@ -820,7 +820,7 @@ class Store:
                 priority. The inverter falls back last because its
                 SoC is firmware-coulomb-counted (drifts over weeks)
                 while shunt/BMS coulomb counters are more reliable.
-                Still — for Persona-A hybrid-only installs with no
+                Still, for Persona-A hybrid-only installs with no
                 shunt and no smart battery, the inverter is the
                 only source of truth and we use it.
               - "shunt": force shunt even when BMS or inverter present.
@@ -829,7 +829,7 @@ class Store:
         When BOTH a shunt and BMS report SoC and they differ by more
         than `self._bank_disagreement_pct`, we surface a diagnostic
         line (`source_disagreement`) so the dashboard can render a
-        quiet "shunt 65 %, BMS 72 %, showing shunt — tap to
+        quiet "shunt 65 %, BMS 72 %, showing shunt, tap to
         investigate" hint. Renogy DC Home makes users pick manually;
         we pick + tell them when we're unsure.
 
@@ -844,7 +844,7 @@ class Store:
         # "inverter" and reports battery_voltage_v + soc_pct is a
         # candidate. Covers Voltronic (kind=inverter), EG4 XP
         # (kind=inverter), and Deye/Sunsynk/Sol-Ark (kind=inverter_1p
-        # or inverter_3p — split by chassis size, same bank role).
+        # or inverter_3p, split by chassis size, same bank role).
         inverter = next((d for d in devices.values()
                          if d and (d.get("_kind") or "").startswith("inverter")
                          and d.get("battery_voltage_v") is not None
@@ -930,7 +930,7 @@ class Store:
                 "remaining_ah": rem,
                 "capacity_ah":  cap,
             }
-            # Time-to-go is shunt-only — neither BMS pack-sums nor
+            # Time-to-go is shunt-only, neither BMS pack-sums nor
             # voltage estimates produce a real time estimate.
             ttg = l.get("time_to_go_minutes")
             if isinstance(ttg, (int, float)) and ttg > 0:
@@ -955,7 +955,7 @@ class Store:
             }
 
         # Pick the chosen source per policy. Auto-mode preference is
-        # shunt → BMS → inverter — first available wins.
+        # shunt → BMS → inverter, first available wins.
         policy = getattr(self, "_bank_source", "auto")
         chosen: dict[str, float] | None
         chosen_label: str
@@ -1056,7 +1056,7 @@ class Store:
         Pass `None` (or empty string) to clear the override and fall
         back to the original label. The underlying `device` key is the
         primary identifier for history, samples, alerts, etc. and is
-        never touched — only the human-readable label changes.
+        never touched, only the human-readable label changes.
         """
         if self._db is None:
             raise RuntimeError("Store not open")
@@ -1071,7 +1071,7 @@ class Store:
         """Choose the right rollup table for a query range.
 
         Returns (table, ts_column, native_bucket_seconds). The native bucket
-        is the resolution stored — the caller may further downsample via
+        is the resolution stored, the caller may further downsample via
         SQL-side aggregation.
         """
         # Aim for ~500-2000 points across the range. Below thresholds where
@@ -1150,7 +1150,7 @@ class Store:
                 mins.append(float(mn))
                 maxs.append(float(mx))
 
-        # Summary stats — computed once on the server so every client gets
+        # Summary stats, computed once on the server so every client gets
         # the same numbers without re-doing the math.
         stats: dict[str, Any] = {"count": len(values)}
         if values:
@@ -1251,7 +1251,7 @@ class Store:
         )
         stats["purged_1hour"] = purged_hour.rowcount
 
-        # Trim very old poll_runs too — keep ~30 days for diagnostics.
+        # Trim very old poll_runs too, keep ~30 days for diagnostics.
         purged_runs = await db.execute(
             "DELETE FROM poll_runs WHERE ts < ?", (now - 30 * 86400,)
         )
@@ -1274,12 +1274,12 @@ class Store:
         power, integrated via trapezoid rule across the day.
 
         Captures everything wired anywhere on the bus, not just the
-        load output of a particular MPPT — integration over the bank's
+        load output of a particular MPPT, integration over the bank's
         V × I tells the truth regardless of cabling.
 
         Previous implementation (pre-v0.0.81) had two bugs:
           1. PV "today" came from a hardcoded `device = 'rover_mppt'`
-             SQL query — but the actual MPPT device label varies
+             SQL query, but the actual MPPT device label varies
              ("charge_controller", "rover_40a", anything the install
              chose). For everyone except the original Renogy Rover
              install, PV today was always zero.
@@ -1287,7 +1287,7 @@ class Store:
              an AC charger + alternator running could be net-charging
              the bank with significant load on top, but the load
              formula (`pv + discharged − charged`) would compute
-             negative and clamp to zero — hiding the load entirely.
+             negative and clamp to zero, hiding the load entirely.
 
         Both fixed by integrating power directly over EVERY source-kind
         device's per-poll metric:
@@ -1335,11 +1335,11 @@ class Store:
         # ---- Per-source integration ----
         # Map (device_kind, metric_name) → trapezoid integration of that
         # metric across today's polls. Each row in `samples` is one
-        # device/metric/timestamp triple — we filter by metric and
+        # device/metric/timestamp triple, we filter by metric and
         # `device LIKE pattern` corresponding to the kind. Device names
         # aren't tagged with their kind in `samples`, but Renogy MPPTs
         # report `pv_power_w`, AC chargers report `output_1_power_w`,
-        # etc — so filtering by the metric name effectively scopes by
+        # etc, so filtering by the metric name effectively scopes by
         # kind. Multiple devices of the same kind sum naturally (each
         # device contributes its own poll rows).
         async def _integrate_metric(metric: str) -> float:
@@ -1370,18 +1370,18 @@ class Store:
         # PV: prefer the device's own `energy_today_wh` cumulative
         # counter when it exists (Renogy MPPTs all expose this and
         # it's accurate to the second). Integration via 60 s polls
-        # systematically under-counts fast peaks — observed at ~40%
+        # systematically under-counts fast peaks, observed at ~40%
         # under on a real install. Fall back to integration only for
         # PV devices that don't surface the counter (rare).
         #
         # Counter-reset detection: the device's daily counter resets
         # on ITS OWN clock (BT-2 dongle time), not the server's
         # midnight. Across midnight-UTC → device-midnight, the
-        # samples carry yesterday's accumulated total — taking a
+        # samples carry yesterday's accumulated total, taking a
         # naive `MAX(value)` would phantom-credit that to today.
         # Walk the samples per device in time order and accumulate
         # only the POSITIVE deltas (cur >= prev). When the counter
-        # drops, that's a reset event — we start a fresh leg.
+        # drops, that's a reset event, we start a fresh leg.
         pv_today_wh = 0.0
         sql = (
             "SELECT device, ts, value FROM samples "
@@ -1410,13 +1410,13 @@ class Store:
                 # the drop as negative energy; just rebase.
                 prev_v = v
         if not seen_any or pv_today_wh <= 0:
-            # No device counter visible — or the counter hasn't moved
+            # No device counter visible, or the counter hasn't moved
             # at all today (overnight, brand-new install). Integrate
             # power directly as a fallback.
             pv_today_wh = await _integrate_metric("pv_power_w")
         # AC chargers / DC-DC: no per-device daily counter in the BLE
         # advertisement payload, so integration is the only option.
-        # 60 s polls give a usable-but-rough total — fine for "is the
+        # 60 s polls give a usable-but-rough total, fine for "is the
         # load real" sanity but don't expect device-counter accuracy.
         ac_charger_today_wh   = await _integrate_metric("output_1_power_w")
         dcdc_today_wh         = await _integrate_metric("output_power_w")
@@ -1463,7 +1463,7 @@ class Store:
         # SoC residency histogram. Sample bank.soc_pct hourly across
         # the window and bucket. samples_1hour gives us pre-rolled
         # averages, but we only have those if the window is long
-        # enough — otherwise sample raw.
+        # enough, otherwise sample raw.
         table, ts_col, _ = self._pick_history_table(until_ts - since_ts)
         value_col = "value" if table == "samples" else "avg"
         soc_sql = (
@@ -1523,7 +1523,7 @@ class Store:
             "WHERE device = 'bank' AND metric IN ('capacity_ah', 'voltage_v')"
         ) as cur:
             async for row in cur:
-                pass  # placeholder — re-query below for clarity
+                pass  # placeholder, re-query below for clarity
         async with self._db.execute(
             "SELECT metric, value_num FROM latest "
             "WHERE device = 'bank' AND metric IN ('capacity_ah', 'voltage_v')"
@@ -1556,14 +1556,14 @@ class Store:
                 if val is not None:
                     bms_lifetime[metric] = float(val)
 
-        # #295 — Shunt-derived lifetime fallback. When the BMS doesn't
+        # #295, Shunt-derived lifetime fallback. When the BMS doesn't
         # report lifetime throughput / cycles (typical for Daly, no-BMS
         # shunt-only installs, JBD configs that don't expose the
         # counter), pull what the shunts themselves track. Renogy +
         # Junctek shunts both report cumulative_charge_ah and
         # cumulative_discharge_ah straight off the device.
         #
-        # Summed across all shunts on the bus — covers the rare
+        # Summed across all shunts on the bus, covers the rare
         # multi-shunt install (one per parallel string). Single-shunt
         # is the normal case and the sum collapses cleanly.
         #
@@ -1635,7 +1635,7 @@ class Store:
         """(min, max) of bank.soc_pct over the window. None if no rows.
 
         Used by the cloud heartbeat to surface "today's low/high SoC"
-        on the dashboard card — answers "did the bank get critically
+        on the dashboard card, answers "did the bank get critically
         low overnight?" without needing the operator to open History."""
         if self._db is None:
             raise RuntimeError("Store not open")
@@ -1655,7 +1655,7 @@ class Store:
         when discharging.
 
         Used by the runtime-forecast endpoint (#99) to make "hours to
-        empty" stable. The instant V×I number is volatile — a kettle
+        empty" stable. The instant V×I number is volatile, a kettle
         on for 30 seconds drags it down to a worrying value. A rolling
         1-hour average tracks the actual draw pattern."""
         if self._db is None:
@@ -1683,7 +1683,7 @@ class Store:
         × day-of-week. Returns a 7×24 grid of mean load (positive = the
         bank supplying watts, i.e. household consumption).
 
-        Uses local time for the hour/day bucketing — what counts as
+        Uses local time for the hour/day bucketing, what counts as
         "Sunday at 6pm" is the user's idea, not UTC's.
         """
         if self._db is None:
@@ -1699,7 +1699,7 @@ class Store:
             "GROUP BY v.ts"
         )
 
-        # buckets[dow][hour] = (sum_w, count) — accumulating absolute
+        # buckets[dow][hour] = (sum_w, count), accumulating absolute
         # discharge wattage (we only count negative bank_w as "load").
         # 7×24 grid; Monday = 0 follows ISO + Python convention.
         sums = [[0.0] * 24 for _ in range(7)]
@@ -1707,7 +1707,7 @@ class Store:
 
         async with self._db.execute(sql, (since_ts, until_ts)) as cur:
             async for ts, w in cur:
-                # Only count discharging (negative bank net) — for off-grid
+                # Only count discharging (negative bank net), for off-grid
                 # heat-mapping "what's drawing power" is the question.
                 if w is None or w >= 0:
                     continue
@@ -1744,17 +1744,17 @@ class Store:
 
         For an AC charger (`output_1_power_w`) or solar MPPT
         (`pv_power_w`) device, computes:
-          - `lifetime_energy_wh` — total energy delivered since first
+          - `lifetime_energy_wh`, total energy delivered since first
             poll (trapezoid-integrated power × dt). Cheap until the
             device has years of samples; revisit if it bites.
-          - `today_energy_wh` — same integration, scoped to today.
-          - `today_active_s` — seconds today where power > 5 W (i.e.
+          - `today_energy_wh`, same integration, scoped to today.
+          - `today_active_s`, seconds today where power > 5 W (i.e.
             charger was meaningfully on, ignoring sleep-tick noise).
-          - `today_state_seconds` — dict of `charging_state` value →
+          - `today_state_seconds`, dict of `charging_state` value →
             seconds spent in that state today (bulk, absorption,
             float, etc.). Lets the UI render the "Today: 45m bulk,
             2h abs, 5h float" breakdown.
-          - `state_ribbon` — list of `{start_ts, end_ts, state}`
+          - `state_ribbon`, list of `{start_ts, end_ts, state}`
             segments today, condensed (consecutive same-state polls
             collapsed). Used by the JS to render the 24h ribbon bar.
 
@@ -1842,7 +1842,7 @@ class Store:
         device. Cycles are referenced against the latest known `capacity_ah`
         (also fetched here, defaulting to 100 Ah for the typical LFP pack).
 
-        For multi-year data this becomes expensive — at v0.0.x volumes it's
+        For multi-year data this becomes expensive, at v0.0.x volumes it's
         fast. When it starts to bite we'll add a `lifetime_counters` table
         that the scheduler increments on each poll.
         """
@@ -1895,7 +1895,7 @@ class Store:
                 since_ts = int(row[0]) if row[0] is not None else None
                 until_ts = int(row[1]) if row[1] is not None else until_ts
 
-        # Latest known capacity for the pack — needed to express cycle equivalence
+        # Latest known capacity for the pack, needed to express cycle equivalence
         capacity_ah = 100.0
         async with self._db.execute(
             "SELECT value FROM samples WHERE device = ? AND metric = 'capacity_ah' "
@@ -1925,7 +1925,7 @@ class Store:
         """Trapezoid-integrate `current_a` for one device, optionally
         bounded by since_ts. Returns (ah_in, ah_out) where both are
         positive. Pairs include one sample taken before since_ts so the
-        first interval inside the window is fully accounted for —
+        first interval inside the window is fully accounted for,
         prevents bias when the window starts mid-cycle."""
         if self._db is None:
             raise RuntimeError("Store not open")
@@ -2004,7 +2004,7 @@ class Store:
         artificially depress the ratio.
 
         We only mark the result `reliable` when total throughput is at
-        least one pack's worth — i.e. ah_in >= capacity_ah. With less
+        least one pack's worth, i.e. ah_in >= capacity_ah. With less
         cycling, SoC measurement noise dominates the signal.
 
         Window:
@@ -2107,7 +2107,7 @@ class Store:
         self, *, id: str, device_label: str, name: str, kind: str,
         capabilities: list[str],
     ) -> None:
-        """Register or update an output definition. Idempotent on (id) —
+        """Register or update an output definition. Idempotent on (id),
         re-discovery on daemon restart preserves state + safety_confirmed.
         Capabilities are overwritten because the adapter is the source
         of truth for what an output can do."""

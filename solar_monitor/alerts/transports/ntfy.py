@@ -1,4 +1,4 @@
-"""ntfy.sh transport — POST plain text to a topic.
+"""ntfy.sh transport, POST plain text to a topic.
 
 Free public broker at ntfy.sh; users can also self-host. We default to
 the public server because that's the path-of-least-resistance for a
@@ -44,7 +44,7 @@ class NtfyTransport(NotificationTransport):
         # e.g. "State of charge is 18.5% (threshold < 20%)"
         body = render_alert_summary(event)
         try:
-            # ntfy headers are sent as HTTP headers and must be ASCII —
+            # ntfy headers are sent as HTTP headers and must be ASCII,
             # no fancy bullets. Body can be UTF-8 freely. Explicit
             # Content-Type on the body helps the iOS app's push handler
             # render the notification reliably.

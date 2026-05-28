@@ -16,15 +16,15 @@ Design:
   result so MQTT-IN devices appear on `/api/devices` and `/api/today`
   exactly like a BLE-decoded device.
 * Stale virtual devices (no message within `stale_after_seconds`)
-  fall out of `current_snapshots()` automatically — same end-user
+  fall out of `current_snapshots()` automatically, same end-user
   behaviour as a silent BLE sensor.
 
 Out of scope here, deferred:
-* Outbound publishes — that's the MQTT-OUT exporter already.
-* Complex Jinja templates — only `{{ value }}` and
+* Outbound publishes, that's the MQTT-OUT exporter already.
+* Complex Jinja templates, only `{{ value }}` and
   `{{ value_json.X }}` (with dotted paths) are handled. Anything
   else logs a one-shot warning and skips the entity.
-* Shelly gen1 ad-hoc topic patterns — those land in a follow-up
+* Shelly gen1 ad-hoc topic patterns, those land in a follow-up
   when we have a real Shelly to test against.
 """
 from __future__ import annotations
@@ -73,7 +73,7 @@ def _parse_value_template(tmpl: str | None) -> tuple[str, str] | None:
 
 def _extract_json_path(payload: bytes, dotted: str) -> Any:
     """Walk a dotted JSON path through the payload. Returns None on
-    any parse / lookup failure rather than throwing — MQTT bus is noisy
+    any parse / lookup failure rather than throwing, MQTT bus is noisy
     and we'd otherwise bury the broker log in tracebacks."""
     try:
         obj: Any = json.loads(payload.decode("utf-8", errors="replace"))
@@ -134,7 +134,7 @@ class MqttInService:
         # topic). Stops the log from filling up with the same N lines
         # every reconnect cycle.
         self._ha_warned: set[str] = set()
-        # Manual mapping routes — built from cfg.topics. Same shape
+        # Manual mapping routes, built from cfg.topics. Same shape
         # as _ha_routes for code symmetry.
         self._manual_routes: dict[str, tuple[str, str, str, str]] = {}
         for t in cfg.topics:
@@ -173,7 +173,7 @@ class MqttInService:
 
     def status(self) -> dict[str, Any]:
         """Settings panel reads this. Numbers are estimates, not
-        load-bearing — meant for human eyeballing."""
+        load-bearing, meant for human eyeballing."""
         return {
             "enabled":      self.cfg.enabled,
             "state":        self._state,
@@ -230,7 +230,7 @@ class MqttInService:
 
     def _handle_ha_config(self, topic: str, payload: bytes) -> None:
         """Parse an HA-discovery config payload and add a routing
-        entry. Tolerant of broken / unsupported configs — log once
+        entry. Tolerant of broken / unsupported configs, log once
         and skip."""
         if not payload:
             # HA convention: empty payload means "delete this entity".
@@ -253,7 +253,7 @@ class MqttInService:
         if parsed is None:
             if topic not in self._ha_warned:
                 log.info(
-                    "mqtt_in: skipping HA entity at %s — unsupported "
+                    "mqtt_in: skipping HA entity at %s, unsupported "
                     "value_template %r (only `value` / `value_json.X` "
                     "are handled in this release)",
                     topic, tmpl,
@@ -381,11 +381,11 @@ class MqttInService:
                                 except Exception:
                                     pass
                             continue
-                        # Otherwise it's a state message — route via
+                        # Otherwise it's a state message, route via
                         # whichever table claims it.
                         route = self._ha_routes.get(topic) or self._manual_routes.get(topic)
                         if route is None:
-                            # Could be a wildcard manual match — walk
+                            # Could be a wildcard manual match, walk
                             # the manual routes once. Skipped for
                             # first release; the YAML expects exact
                             # topic strings.

@@ -6,12 +6,12 @@ Ruuvi adds pressure (good for weather forecasting on the move),
 accelerometer (movement detect), and a much better battery life than
 the Govee coin cells. ~£25-35, manufacturer ID 0x0499.
 
-We decode **RAWv2 (format 5)** — the dominant modern Ruuvi payload.
+We decode **RAWv2 (format 5)**, the dominant modern Ruuvi payload.
 Format 3 (legacy) and 8 (encrypted) are rare enough we don't bother
 yet; the dashboard surfaces a "format not supported" error if those
 turn up so the user knows to enable RAWv2 in the Ruuvi app.
 
-Read-only — RuuviTags accept GATT writes for config, but the BLE
+Read-only, RuuviTags accept GATT writes for config, but the BLE
 advertisement is the read path and the only thing the average user
 cares about. WattPost doesn't (re)configure Ruuvi units.
 """
@@ -29,7 +29,7 @@ from .registry import register_transport
 
 log = logging.getLogger(__name__)
 
-# Ruuvi Innovations Ltd. — assigned BLE manufacturer ID.
+# Ruuvi Innovations Ltd., assigned BLE manufacturer ID.
 RUUVI_MANUFACTURER_ID = 0x0499
 
 STALE_AFTER_SECONDS = 90.0
@@ -60,11 +60,11 @@ def parse_ruuvi_advertisement(mfr_data: bytes) -> dict[str, Any] | None:
     #   3-4:  humid_u16   × 0.0025 %
     #   5-6:  pressure_u16 + 50000 Pa
     #   7-12: accel x/y/z int16 (mg)
-    #   13-14: power_info — 11 upper bits = battery_mv − 1600,
+    #   13-14: power_info, 11 upper bits = battery_mv − 1600,
     #                       5 lower bits = tx_power × 2 + 40
     #   15:   movement_counter
     #   16-17: measurement_sequence
-    #   18-23: MAC (echoed; we ignore — appliance row has it already)
+    #   18-23: MAC (echoed; we ignore, appliance row has it already)
     temp_raw = int.from_bytes(mfr_data[1:3], "big", signed=True)
     humid_raw = int.from_bytes(mfr_data[3:5], "big")
     press_raw = int.from_bytes(mfr_data[5:7], "big")

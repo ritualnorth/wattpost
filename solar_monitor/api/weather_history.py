@@ -3,12 +3,12 @@
 The Energy chart at the top of /history shows energy curves over a
 chosen range (today / 24h / 7d / 30d). This endpoint returns a
 matching weather series so the frontend can overlay cloud cover
-behind the chart — letting the user see "solar dropped because it
+behind the chart, letting the user see "solar dropped because it
 clouded over" without leaving the page.
 
 Source: Open-Meteo's forecast API supports `past_days=N` (1-92)
 returning hourly cloud cover + shortwave radiation. No API key,
-no auth, free. For now we only surface cloud cover — it reads
+no auth, free. For now we only surface cloud cover, it reads
 intuitively to non-technical customers ("70% overcast at 2pm")
 where W/m² doesn't.
 
@@ -17,7 +17,7 @@ returned by linear interpolation between hourly samples (Open-Meteo
 hourly is the densest resolution we can get without paying).
 
 If no lat/lon is configured, or the upstream fetch fails, we return
-an empty series rather than 500 — the chart still renders, the
+an empty series rather than 500, the chart still renders, the
 overlay just doesn't appear. The weather overlay is a nice-to-have,
 not a hard dependency.
 """
@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 
 BASE_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_S = 10.0
-# 15 min cache per (lat,lon,since,bucket) — keeps chart re-renders
+# 15 min cache per (lat,lon,since,bucket), keeps chart re-renders
 # snappy without hammering Open-Meteo if the user toggles ranges.
 CACHE_TTL_S = 15 * 60
 
@@ -128,7 +128,7 @@ async def _fetch_open_meteo_hourly(
     past_days covers everything earlier than today; forecast_days=1
     covers any portion of the window after midnight today. We
     over-fetch by a day on each side so the interpolation has
-    sample points just outside the window — the chart edges
+    sample points just outside the window, the chart edges
     interpolate correctly instead of going flat.
     """
     now_ts = int(time.time())
@@ -173,7 +173,7 @@ def _interp(
 ) -> list[float | None]:
     """Linear-interpolate the (src_ts, src_v) hourly series onto
     grid_ts. Buckets outside the source's range get None. Buckets
-    that fall in a gap (a None on either side) get None too — better
+    that fall in a gap (a None on either side) get None too, better
     to draw a hole than fake a value."""
     if not src_ts:
         return [None] * len(grid_ts)

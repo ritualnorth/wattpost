@@ -3,7 +3,7 @@
 
 Bundles operations that customers would otherwise have to SSH in for:
 
-  1. Force-prune local snapshots beyond ``backup.keep_count`` — same
+  1. Force-prune local snapshots beyond ``backup.keep_count``, same
      pruner the scheduled backup loop uses, just run on demand.
   2. ``journalctl --vacuum-size=500M`` to cap systemd journal growth
      on Pi installs (no-op on Docker; the container doesn't carry
@@ -13,12 +13,12 @@ Bundles operations that customers would otherwise have to SSH in for:
 
 Explicitly NOT doing here:
 
-  * ``apt upgrade`` — can wedge a remote Pi (kernel + glibc bumps),
+  * ``apt upgrade``, can wedge a remote Pi (kernel + glibc bumps),
     see ``[[security-patches-surface]]`` for the right safety chain
     we'd need first.
-  * ``rm -rf /var/log/*`` — would nuke non-journald logs we may
+  * ``rm -rf /var/log/*``, would nuke non-journald logs we may
     care about during incident triage.
-  * Docker image prune — needs docker-socket access the wattpost
+  * Docker image prune, needs docker-socket access the wattpost
     container doesn't have. Will route through the updater sidecar
     in a follow-up; for now Docker installs only get snapshot
     pruning here.
@@ -39,7 +39,7 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 # Cap on subprocess runtime per op. journal vacuum + apt clean usually
-# finish in seconds; autoremove is the long pole — 180s is the
+# finish in seconds; autoremove is the long pole, 180s is the
 # pragmatic ceiling, beyond which we assume something's wrong.
 _OP_TIMEOUT_S = 180
 
@@ -121,13 +121,13 @@ async def _apt_autoremove() -> dict[str, Any]:
 async def run(scheduler) -> dict[str, Any]:
     """Run all applicable ops. Caller supplies the live scheduler
     (CloudService.scheduler) so we can reach backup_service for the
-    snapshot prune. Returns a report — caller decides success/failure
+    snapshot prune. Returns a report, caller decides success/failure
     framing based on `errors`."""
     is_docker = os.environ.get("WATTPOST_DEPLOYMENT") == "docker"
     before = _disk_free("/")
     ops: list[dict[str, Any]] = []
 
-    # 1. Snapshot prune (works on both Pi + Docker — snapshots dir is
+    # 1. Snapshot prune (works on both Pi + Docker, snapshots dir is
     #    bind-mounted into the container on Docker installs).
     if scheduler is not None:
         ops.append(_prune_snapshots(scheduler))

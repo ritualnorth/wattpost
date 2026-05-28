@@ -1,4 +1,4 @@
-"""Exporter registry — mirrors transport + vendor pattern."""
+"""Exporter registry, mirrors transport + vendor pattern."""
 from __future__ import annotations
 
 from typing import Callable

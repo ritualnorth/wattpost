@@ -43,7 +43,7 @@ def install() -> None:
     """Attach the ring handler to the root logger. Idempotent."""
     root = logging.getLogger()
     if LOG_RING not in root.handlers:
-        # Compact one-line format — Diagnostics renders it as monospace.
+        # Compact one-line format, Diagnostics renders it as monospace.
         LOG_RING.setFormatter(logging.Formatter("%(message)s"))
         root.addHandler(LOG_RING)
 
@@ -70,11 +70,11 @@ def record_broker_auth(
     header_prefix: str | None = None,
 ) -> None:
     """Append a broker-auth verify result. Verdicts:
-      ok          — HMAC matched, timestamp fresh
-      no-secret   — appliance has no sso_secret (pre-pair / drift)
-      bad-format  — header malformed (no `.` separator, bad b64, etc)
-      expired     — timestamp outside the ±30 s freshness window
-      bad-mac     — signature didn't match the expected HMAC
+      ok         , HMAC matched, timestamp fresh
+      no-secret  , appliance has no sso_secret (pre-pair / drift)
+      bad-format , header malformed (no `.` separator, bad b64, etc)
+      expired    , timestamp outside the ±30 s freshness window
+      bad-mac    , signature didn't match the expected HMAC
 
     `header_age_s` is `now - header_ts` (seconds) when computable. For
     `expired` it tells you which way the skew leans; for `ok` it
@@ -82,7 +82,7 @@ def record_broker_auth(
 
     `header_prefix` is the first ~80 chars of the raw header bytes,
     captured ONLY on non-ok verdicts. Useful for diagnosing the exact
-    shape an attacker (or a buggy cloud) sent — the ts + scope + sig
+    shape an attacker (or a buggy cloud) sent, the ts + scope + sig
     pattern is well-formed enough that 80 chars covers it. Stays
     local: the ring is exposed via /api/diagnostics/broker-auth
     behind auth, never leaves the appliance.
