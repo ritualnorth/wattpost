@@ -8,6 +8,33 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.115] · 2026-05-28
+
+### Added · Voltronic-family inverter driver (#360, experimental)
+
+Read-only driver for the Voltronic / Axpert / MPP Solar / EG4
+hybrid-inverter family — one shared ASCII protocol covers ~11
+manufacturer rebadges (Axpert, MPP PIP, EG4 6000XP/6500EX, Mecer,
+RCT, Infinisolar, Anenji, Datouboss, HZSolar, Effekta, LVTopSun,
+PowMr, Easun). New `usbhid_voltronic` transport speaks the
+protocol over USB-HID; new `voltronic.inverter` driver maps
+QPIGS / QMOD / QPIWS responses into the canonical metric schema
+(battery_voltage_v, soc_pct, pv_power_w, ac_output_power_w,
+inverter_mode, alarm_flags). XMODEM CRC-16 with the Voltronic
+byte-substitution quirk lives in `solar_monitor/voltronic_crc.py`.
+
+Marked experimental: the parse layer is built from the published
+protocol docs plus a community fixture, not lab hardware.
+Firmware variants diverge past QPIGS column ~17, so first-
+customer reports become the validation set. Setup-wizard
+integration lands once one rebadge is confirmed end-to-end — for
+now installers drop a `usbhid_voltronic` transport into
+`config.yaml` directly (see /docs/supported-hardware).
+
+Optional dep: install the `hid` package on hosts that need this
+transport. Missing-dep import failure is caught at registry time
+so the rest of the daemon is unaffected.
+
 ## [0.1.114] · 2026-05-27
 
 ### Changed · Pricing reset: single Cloud tier at £6/mo, no-card 14-day trial (#333, #334)

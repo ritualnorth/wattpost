@@ -105,13 +105,42 @@ Second-most-common cheap shunt after AiLi. **Pending community validation.**
 
 ASCII-framed protocol on the FFE1 characteristic. Read-only.
 
+## Voltronic / Axpert / MPP Solar (experimental)
+
+Single shared ASCII-over-USB-HID protocol covers a long tail of hybrid-inverter rebadges. **Experimental — built from protocol docs, awaiting first-customer reports.** Plug the inverter's USB cable into the Pi/host; no extra hardware needed.
+
+Rebadges expected to work (one driver, many badges):
+
+- **Axpert** (Voltronic), **MPP Solar PIP / LV-MK**, **EG4 6000XP / 6500EX**
+- **Mecer SOL-I-AX**, **RCT Axpert**, **Infinisolar V / E**
+- **Anenji**, **Datouboss**, **HZSolar**, **Effekta KS**, **LVTopSun**
+- **PowMr**, **Easun ISolar**
+
+Read-only — live status (V / A / W / SoC / temps), mode (line / battery / fault / eco), warning bitmap. We never send a write command. Three-phase / dual-output models (QPIGS2/3) only have phase 1 parsed today.
+
+USB-HID transport (default VID:PID `0665:5161`, override in YAML for EG4 variants on `0001:0000`). Drop in your `config.yaml`:
+
+```yaml
+transports:
+  - id: voltronic_usb
+    type: usbhid_voltronic
+    label: Hybrid inverter
+
+devices:
+  - vendor: voltronic
+    kind: inverter
+    transport: voltronic_usb
+    slave_id: 1
+```
+
+Setup-wizard support comes after the first customer reports the parse looks correct on their firmware.
+
 ## On the roadmap
 
 No commit dates yet. If you want one of these sooner, email [support@wattpost.io](mailto:support@wattpost.io).
 
-- **Hybrid inverters**. EG4, Sol-Ark
+- **Deye / Sunsynk / Sol-Ark hybrid inverters** (separate protocol family from Voltronic).
 - **Sub-metering**. Shelly EM, IoTaWatt
-- **JBD / Overkill Solar BMS, Daly BMS, EPEVER MPPT**. Top of the coverage-roadmap queue. See [coverage-roadmap.md](/docs/coverage-roadmap).
 
 ## Hardware we won't add
 
