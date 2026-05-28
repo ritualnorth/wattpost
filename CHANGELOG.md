@@ -8,6 +8,14 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.123] - 2026-05-28
+
+### Changed
+- Kiosk sharing for remote viewing is now managed entirely from the cloud (per-share links with expiry, one-click revoke, optional PIN). The appliance's legacy `?key=` kiosk URL and its Settings tile are removed; LAN wall-display kiosk is unchanged (#225)
+
+### Security
+- Cloud kiosk share revocation now takes effect immediately. The broker re-validates each share against the server on every request instead of trusting the session cookie, which previously kept a revoked share working for up to 24h (#225)
+
 ## [0.1.122] - 2026-05-28
 
 ### Fixed
@@ -1041,4 +1049,3 @@ Versions follow [Semantic Versioning].
 - Bank current rounds at 0.01 A per pack. Small trickle currents (< ~0.5 A on a single 100 Ah pack) show as zero. Not a bug, a BMS resolution limit.
 - Renogy load output (`load_power_w`) is intentionally not used as the primary load number; bus-wired loads (the common case) need the energy-balance approach.
 - The 32-ish watts of "Other loads" you see when nothing's running is real phantom draw (inverter standby, BMS overhead × 3 packs, Hub + MPPT self-consumption). Most apps hide this. We don't.
-

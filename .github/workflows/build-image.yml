@@ -227,6 +227,20 @@ jobs:
           # build automatically. No commit-to-cloud step.
           VERSION=$(grep -E '^__version__' solar_monitor/__init__.py \
                     | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          # No-downgrade guard. A tag force-push (e.g. a history rewrite)
+          # re-fires this workflow for EVERY old tag; with cancel-in-progress
+          # a stale build can win the race and overwrite the release channel
+          # with an ancient version (incident 2026-05-28: a re-run of v0.0.35
+          # clobbered the manifest to 0.0.35). Refuse to publish if the
+          # channel already advertises a newer version than this build.
+          CUR_RAW=$(ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" \
+            "grep -oE '\"version\"[^,]*' /srv/wattpost-releases/img/manifest.json 2>/dev/null | head -1" || echo "")
+          CUR=$(printf '%s' "$CUR_RAW" | sed -E 's/.*"([0-9][^"]*)".*/\1/')
+          if [ -n "$CUR" ] && [ "$CUR" != "$VERSION" ] \
+             && [ "$(printf '%s\n%s\n' "$CUR" "$VERSION" | sort -V | tail -1)" = "$CUR" ]; then
+            echo "no-downgrade: channel at $CUR, this build is $VERSION -- skipping publish"
+            exit 0
+          fi
           SHA=$(awk '{print $1}' "$CHECKSUM")
           SIZE=$(stat -c %s "$IMG")
           FNAME=$(basename "$IMG")

@@ -106,6 +106,19 @@ jobs:
           envs: NEW_VERSION
           script: |
             set -euo pipefail
+            # No-downgrade guard (incident 2026-05-28). A re-pushed old tag
+            # must not roll the release channel backwards. Skip the whole
+            # source publish if the manifest already advertises a newer
+            # version than this release.
+            MANIFEST=/srv/wattpost-releases/img/manifest.json
+            if [ -f "$MANIFEST" ]; then
+              CUR=$(python3 -c "import json;print(json.load(open('$MANIFEST')).get('version',''))" 2>/dev/null || echo "")
+              if [ -n "$CUR" ] && [ "$CUR" != "$NEW_VERSION" ] \
+                 && [ "$(printf '%s\n%s\n' "$CUR" "$NEW_VERSION" | sort -V | tail -1)" = "$CUR" ]; then
+                echo "no-downgrade: channel at $CUR, this release is $NEW_VERSION -- skipping source publish"
+                exit 0
+              fi
+            fi
             cd /srv/wattpost-releases/source
             newest=$(ls -1t wattpost-source-*.tar.gz 2>/dev/null | head -1)
             if [ -n "$newest" ]; then
