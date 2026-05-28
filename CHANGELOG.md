@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.121] · 2026-05-28
+
+### Fixed · Bank aggregate now matches all inverter sub-kinds (#366 followup)
+
+Caught during the Deye driver shake-out. The bank aggregator
+(both server-side in `storage/sqlite._compute_bank_aggregate`
+and browser-side in `app.js:aggregateBank`) was matching on
+`_kind == "inverter"` exactly, so the Deye drivers (which use
+`kind: inverter_1p` and `kind: inverter_3p` to distinguish
+chassis size) never fed the bank tile. A 33% SoC Sol-Ark
+install was rendering the bank as empty even though the
+inverter was reporting the data cleanly.
+
+Both aggregators now match any device whose kind starts with
+`"inverter"`, so Voltronic (`inverter`), EG4 XP (`inverter`),
+and Deye 1P/3P (`inverter_1p` / `inverter_3p`) all qualify.
+The flow tile's `FLOW_MAPPING` gained explicit `inverter_1p`
+and `inverter_3p` entries (identical to the generic `inverter`
+entry) so the Power Flow Solar + AC + battery nodes render
+identically across all three protocol families.
+
+Verified end-to-end by reconfiguring a Docker-spun appliance
+from `inverter_1p` → `inverter_3p` mid-test: 34/34 scenario
+assertions green across single-phase + three-phase + four-MPPT
++ heavy-discharge + fault cases, bank tile populated from the
+inverter on every cycle. 84/84 in-process assertions on top of
+that, no tracebacks across 40+ poll runs.
+
+App-cache buster + service-worker version bumped (`?v=222`,
+`wattpost-v137-app222-css140`).
+
 ## [0.1.120] · 2026-05-28
 
 ### Added · Deye / Sunsynk / Sol-Ark driver pair (#366, experimental)

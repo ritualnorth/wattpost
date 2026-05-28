@@ -179,14 +179,40 @@ const FLOW_MAPPING = {
                 vMetric: "output_1_voltage_v", aMetric: "output_1_current_a" }],
   },
   inverter: {
-    // Hybrid inverter (Voltronic family today; Deye/SunSynk later).
-    // Has a PV-input side AND an AC-output side AND a battery side
-    // all on one device — so it contributes to every node of the
-    // flow strip. The Solar source uses pv_power_w; the AC load
-    // uses ac_output_power_w; battery: {} routes battery V/A back
-    // to the bank-net calculation with the inverter's per-domain
-    // field names instead of generic voltage_v/current_a (which on
-    // an inverter would be ambiguous — there are five voltages).
+    // Hybrid inverter (Voltronic + EG4 XP families). Has a PV-input
+    // side AND an AC-output side AND a battery side all on one
+    // device — so it contributes to every node of the flow strip.
+    // The Solar source uses pv_power_w; the AC load uses
+    // ac_output_power_w; battery: {} routes battery V/A back to
+    // the bank-net calculation with the inverter's per-domain
+    // field names instead of generic voltage_v/current_a (which
+    // on an inverter would be ambiguous — there are five voltages).
+    sources: [{ id: "pv", label: "Solar", color: "pv", icon: "sun",
+                metric: "pv_power_w",
+                vMetric: "pv_voltage_v", aMetric: "pv_current_a" }],
+    loads:   [{ id: "ac", label: "AC Load", color: "ac", icon: "bolt",
+                metric: "ac_output_power_w", vMetric: "ac_output_voltage_v",
+                aMetric: "ac_output_current_a" }],
+    battery: { vMetric: "battery_voltage_v", aMetric: "battery_current_a",
+               pMetric: "battery_power_w" },
+  },
+  // Deye / Sunsynk / Sol-Ark single-phase + split-phase + three-phase.
+  // Same flow-tile shape as the generic inverter — split out only
+  // because the device_kind enum is finer-grained. (We could have
+  // collapsed to kind=inverter and stored phase-info separately, but
+  // the two-kind split is honest about the chassis difference and
+  // lets the wizard branch render variant-specific copy.)
+  inverter_1p: {
+    sources: [{ id: "pv", label: "Solar", color: "pv", icon: "sun",
+                metric: "pv_power_w",
+                vMetric: "pv_voltage_v", aMetric: "pv_current_a" }],
+    loads:   [{ id: "ac", label: "AC Load", color: "ac", icon: "bolt",
+                metric: "ac_output_power_w", vMetric: "ac_output_voltage_v",
+                aMetric: "ac_output_current_a" }],
+    battery: { vMetric: "battery_voltage_v", aMetric: "battery_current_a",
+               pMetric: "battery_power_w" },
+  },
+  inverter_3p: {
     sources: [{ id: "pv", label: "Solar", color: "pv", icon: "sun",
                 metric: "pv_power_w",
                 vMetric: "pv_voltage_v", aMetric: "pv_current_a" }],
@@ -772,10 +798,14 @@ function aggregateBank() {
   const shunt = devices.find(d => d.kind === "shunt" && isFresh(d));
   const batts = devices.filter(d => d.kind === "smart_battery" && isFresh(d));
   // Inverter-as-source: when neither shunt nor BMS is present, a
-  // hybrid inverter (Voltronic family today; Deye/SunSynk later) is
-  // the only device that knows SoC + bank V/A. Mirrors the
-  // server-side fallback chain in storage/sqlite._compute_bank_aggregate.
-  const inverter = devices.find(d => d.kind === "inverter" && isFresh(d)
+  // hybrid inverter is the only device that knows SoC + bank V/A.
+  // Match any kind starting with "inverter" so Voltronic (kind=
+  // inverter), EG4 XP (kind=inverter), and Deye/Sunsynk/Sol-Ark
+  // (kind=inverter_1p or inverter_3p) all qualify. Mirrors the
+  // server-side fallback chain in
+  // storage/sqlite._compute_bank_aggregate.
+  const inverter = devices.find(d => (d.kind || "").startsWith("inverter")
+    && isFresh(d)
     && d.latest && d.latest.battery_voltage_v != null
     && d.latest.soc_pct != null);
   if (!shunt && batts.length === 0 && !inverter) { _frame.bank = null; return null; }
