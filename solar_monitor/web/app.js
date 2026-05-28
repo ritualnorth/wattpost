@@ -179,9 +179,22 @@ const FLOW_MAPPING = {
                 vMetric: "output_1_voltage_v", aMetric: "output_1_current_a" }],
   },
   inverter: {
-    loads: [{ id: "ac", label: "AC Load", color: "ac", icon: "bolt",
-              metric: "ac_output_power_w", vMetric: "ac_output_voltage_v",
-              aMetric: "ac_output_current_a" }],
+    // Hybrid inverter (Voltronic family today; Deye/SunSynk later).
+    // Has a PV-input side AND an AC-output side AND a battery side
+    // all on one device — so it contributes to every node of the
+    // flow strip. The Solar source uses pv_power_w; the AC load
+    // uses ac_output_power_w; battery: {} routes battery V/A back
+    // to the bank-net calculation with the inverter's per-domain
+    // field names instead of generic voltage_v/current_a (which on
+    // an inverter would be ambiguous — there are five voltages).
+    sources: [{ id: "pv", label: "Solar", color: "pv", icon: "sun",
+                metric: "pv_power_w",
+                vMetric: "pv_voltage_v", aMetric: "pv_current_a" }],
+    loads:   [{ id: "ac", label: "AC Load", color: "ac", icon: "bolt",
+                metric: "ac_output_power_w", vMetric: "ac_output_voltage_v",
+                aMetric: "ac_output_current_a" }],
+    battery: { vMetric: "battery_voltage_v", aMetric: "battery_current_a",
+               pMetric: "battery_power_w" },
   },
   // Victron SmartBatteryProtect / similar load-disconnect modules.
   // Their telemetry is mostly state (connected / disconnected / fault)
@@ -758,7 +771,14 @@ function aggregateBank() {
   };
   const shunt = devices.find(d => d.kind === "shunt" && isFresh(d));
   const batts = devices.filter(d => d.kind === "smart_battery" && isFresh(d));
-  if (!shunt && batts.length === 0) { _frame.bank = null; return null; }
+  // Inverter-as-source: when neither shunt nor BMS is present, a
+  // hybrid inverter (Voltronic family today; Deye/SunSynk later) is
+  // the only device that knows SoC + bank V/A. Mirrors the
+  // server-side fallback chain in storage/sqlite._compute_bank_aggregate.
+  const inverter = devices.find(d => d.kind === "inverter" && isFresh(d)
+    && d.latest && d.latest.battery_voltage_v != null
+    && d.latest.soc_pct != null);
+  if (!shunt && batts.length === 0 && !inverter) { _frame.bank = null; return null; }
 
   // ---------- Cell layer (always BMS-sourced) ----------
   let cellMin = null, cellMax = null, worstDrift = 0;
@@ -816,8 +836,28 @@ function aggregateBank() {
     };
   }
 
-  // ---------- Source pick (auto policy: shunt > BMS) ----------
-  const chosen = shuntView || bmsView;
+  // Inverter view — last-resort source when neither shunt nor BMS is
+  // configured. The inverter knows SoC + battery V/A but NOT capacity
+  // (capacity is bank-config knowledge that lives on a shunt/BMS),
+  // so totalCap/totalRem are left at 0 and the "time to empty" hint
+  // gracefully degrades to V*I extrapolation.
+  let inverterView = null;
+  if (inverter) {
+    const l = inverter.latest || {};
+    const v = +l.battery_voltage_v || 0;
+    const i = +l.battery_current_a || 0;
+    const power_w = l.battery_power_w != null ? +l.battery_power_w : v * i;
+    const soc = +l.soc_pct || 0;
+    inverterView = {
+      source: "inverter",
+      model: inverter.label || "hybrid inverter",
+      soc, meanV: v, sumI: i, netW: power_w, totalCap: 0, totalRem: 0,
+      timeToGoMinutes: null,
+    };
+  }
+
+  // ---------- Source pick (auto policy: shunt > BMS > inverter) ----------
+  const chosen = shuntView || bmsView || inverterView;
 
   // ---------- Disagreement diagnostic ----------
   let disagreement = null;
@@ -1175,13 +1215,22 @@ function buildFlowModel() {
     })();
 
     if (mapping.battery) {
-      // Smart batteries: sum V × I across packs. Shunts (future): just power_w.
+      // Smart batteries: sum V × I across packs. Shunts: power_w
+      // (already V × I aggregated by the driver). Hybrid inverters
+      // pass `battery: { vMetric, aMetric, pMetric }` so the flow
+      // model knows to read their per-domain battery fields rather
+      // than the generic voltage_v / current_a (which would clash
+      // with the inverter's ac_output_voltage_v on the same device).
+      const overrides = (typeof mapping.battery === "object") ? mapping.battery : null;
+      const vKey = overrides?.vMetric || "voltage_v";
+      const aKey = overrides?.aMetric || "current_a";
+      const pKey = overrides?.pMetric || "power_w";
       if (isSilent) {
         // pass — stale battery contributes nothing
-      } else if (typeof l.voltage_v === "number" && typeof l.current_a === "number") {
-        batteryNetW += l.voltage_v * l.current_a;
-      } else if (typeof l.power_w === "number") {
-        batteryNetW += l.power_w;
+      } else if (typeof l[vKey] === "number" && typeof l[aKey] === "number") {
+        batteryNetW += l[vKey] * l[aKey];
+      } else if (typeof l[pKey] === "number") {
+        batteryNetW += l[pKey];
       }
     }
     // Sources: ALWAYS render configured sources, even when they're at 0 W.
