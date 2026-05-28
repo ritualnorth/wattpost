@@ -1,9 +1,7 @@
 # Identity v2, Design RFC
 
 **Status:** DRAFT (Phase 0 of EPIC #301)
-**Author:** Claude (co-architect with Ritual North)
 **Date opened:** 2026-05-24
-**Target completion:** end of week
 **Implementation tracker:** Tasks #303–#312
 
 ---

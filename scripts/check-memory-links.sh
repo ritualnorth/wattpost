@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Reject [[memory-name]] / [[memory_name]] patterns.
-# These are how Claude links to its memory files. Should never appear in
-# committed source. Use plain prose or a concrete file path instead.
+# Used by some LLM tooling to reference internal notes. Should never
+# appear in committed source. Use plain prose or a concrete file path.
 set -u
 
 status=0
