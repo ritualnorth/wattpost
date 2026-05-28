@@ -1,51 +1,21 @@
 """BLE GATT transport for JBD / Overkill Solar BMS family (#201).
 
-JBD (Jiabaida) makes the BMS inside most cheap LFP packs in the
-hobby market. Battle Born, LiTime, Power Queen, many Eco-Worthy
-SKUs, anything sold rebranded on Amazon under "100Ah LiFePO4
-smart battery", almost all of them are JBD inside. Overkill
-Solar is the most prominent rebadge in the US market; the
-"Overkill Solar app" is the open-source-friendly client for the
-same protocol.
-
-Protocol summary (from Overkill's documentation + community
-reverse engineering):
-
   * BLE service:  0000FF00-0000-1000-8000-00805F9B34FB
   * Notify char:  0000FF01-0000-1000-8000-00805F9B34FB
   * Write char:   0000FF02-0000-1000-8000-00805F9B34FB
 
-Request frame (we send):
+Request:  DD A5 <CMD> 00 <DLEN> [<DATA…>] <CRC_HI> <CRC_LO> 77
+Response: DD <CMD> <STATUS> <DLEN> [<DATA…>] <CRC_HI> <CRC_LO> 77
 
-    DD A5 <CMD> 00 <DLEN> [<DATA…>] <CRC_HI> <CRC_LO> 77
+CRC = two's complement of the unsigned sum of <CMD> through end
+of <DATA>. Two commands:
 
-Response frame (BMS sends, possibly split across notifications):
+  * 0x03, basic info: V, A, residual / nominal Ah, cycles, FET +
+    balance + protection bits, SoC.
+  * 0x04, cell voltages: one uint16 mV per cell.
 
-    DD <CMD> <STATUS> <DLEN> [<DATA…>] <CRC_HI> <CRC_LO> 77
-
-CRC is the two's complement of the unsigned sum of bytes from
-<CMD> through the end of <DATA>. We validate on receive and skip
-malformed frames.
-
-Two commands we care about:
-
-  * 0x03, basic info: voltage, current, residual / nominal Ah,
-    cycle count, FET status, balance bits, protection bits, SoC.
-  * 0x04, cell voltages: one uint16 (mV) per cell.
-
-The transport polls both per cycle by writing the request frame
-and accumulating notifications until a complete CRC-valid frame
-lands. Cached by command; the driver reads via get_latest_frame().
-
-request() is unsupported (JBD doesn't fit the Modbus request /
-response shape we use on Renogy serial). Drivers override poll()
-and read both 0x03 and 0x04 frames directly.
-
-Read-only at v1. JBD does expose write registers (over-volt
-thresholds, balance start, etc.) but they're behind a checksum
-gate and getting one wrong can brick a customer's pack. Match
-the project_no_victron_lab_purchases discipline: ship reads
-from docs, gate writes on hardware validation.
+request() is unsupported (non-Modbus shape); drivers read both
+frames directly via get_latest_frame(). Read-only at v1.
 """
 from __future__ import annotations
 

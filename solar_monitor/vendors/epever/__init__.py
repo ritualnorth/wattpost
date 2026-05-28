@@ -10,8 +10,7 @@ is reserved for configuration setpoints. Our `serial_modbus`
 transport handles the wire; `Section.function_code` selects FC04
 where needed.
 
-Pending real-hardware validation. See
-[[project-no-victron-lab-purchases]].
+Pending real-hardware validation.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

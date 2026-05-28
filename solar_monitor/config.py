@@ -373,7 +373,7 @@ class MqttInCfg(msgspec.Struct, kw_only=True):
 
     Privacy note: only OUTBOUND connection to the user's own broker.
     Nothing leaves the LAN unless the user explicitly points us at a
-    remote broker. Same model as the [[project_cloud_tier]] gate.
+    remote broker. Same model as the cloud-tier opt-in gate.
     """
     enabled: bool = False
     host: str = "127.0.0.1"

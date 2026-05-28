@@ -13,9 +13,8 @@ Bundles operations that customers would otherwise have to SSH in for:
 
 Explicitly NOT doing here:
 
-  * ``apt upgrade``, can wedge a remote Pi (kernel + glibc bumps),
-    see ``[[security-patches-surface]]`` for the right safety chain
-    we'd need first.
+  * ``apt upgrade``, can wedge a remote Pi (kernel + glibc bumps);
+    needs the full security-patches safety chain first.
   * ``rm -rf /var/log/*``, would nuke non-journald logs we may
     care about during incident triage.
   * Docker image prune, needs docker-socket access the wattpost

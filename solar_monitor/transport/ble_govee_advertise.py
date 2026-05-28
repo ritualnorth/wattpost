@@ -18,10 +18,9 @@ cell, plaintext BLE advertisement every ~2 seconds.
     H6 / H7 product lines that DO accept writes go through Govee's
     cloud, which we don't touch.
 
-Per [[project_van_mode]], ambient temp on the dashboard answers
-"is the inverter cabinet overheating?" and "how cold is the van
-overnight?". Per [[project_target_customer]], Govee is what every
-vanlife forum recommends as the cheap start.
+Ambient temp on the dashboard answers "is the inverter cabinet
+overheating?" and "how cold is the van overnight?". Govee is what
+the vanlife forums tend to recommend as the cheap start.
 """
 from __future__ import annotations
 

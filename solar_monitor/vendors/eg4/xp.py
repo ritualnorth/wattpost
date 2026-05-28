@@ -1,11 +1,7 @@
 """EG4 XP / kPV / FlexBOSS family driver, Luxpower-derived Modbus.
 
-Read-only. Polls Modbus RTU input registers (FC04) over the
-inverter's CT1 RJ45 with a standard USB-RS485 dongle. Default
-slave ID 1, 9600 8N1.
-
-Register layout (all input registers, FC04, addresses in
-decimal, scaling as noted):
+Read-only, FC04 input registers over USB-RS485 (9600 8N1,
+slave ID 1).
 
     Reg  Field                       Scale   Unit
     ---  --------------------------- ------- -----
@@ -34,15 +30,10 @@ decimal, scaling as noted):
      67  battery_temperature         1       °C
      69  running_time (uint32, LH)   1       s
 
-The 12000XP carries split-phase L1/L2 readings at additional
-register positions (127/128 for EPS, 193/194 for grid). Read
-in a separate optional section, silently degrades when the
-inverter doesn't populate them (every hybrid model leaves
-them zero).
+12000XP split-phase L1/L2 are at registers 127/128 (EPS) and
+193/194 (grid); other hybrids leave them zero.
 
-Mode enum at register 0's low byte (cross-referenced against
-galets/eg4-modbus-monitor's registers-18kpv.yaml, values
-documented but field names paraphrased to avoid GPL contamination):
+Mode enum at reg 0 low byte:
 
     0x00  Standby
     0x01  Fault
@@ -55,23 +46,8 @@ documented but field names paraphrased to avoid GPL contamination):
     0x20  AC charging the bank
     0x40  Battery only, off-grid
     0x80  PV only, off-grid (rare; daytime full-bank)
-    0x88  PV charging the bank, off-grid (the normal sunny
-          off-grid case, what wastral1978's 12000XP runs)
+    0x88  PV charging the bank, off-grid
     0xC0  PV + battery, off-grid
-
-Mapped onto WattPost's canonical inverter_mode vocabulary so
-the dashboard mode pill renders the same as a Voltronic install.
-
-References (all cross-checked, see NOTICE):
-
-  * EG4 18kPV-12LV Modbus Communication Protocol PDF (EG4
-    Electronics, public mirror at eg4electronics.com).
-  * joyfulhouse/eg4_web_monitor (MIT), register addresses +
-    field names.
-  * celsworth/lxp-bridge (MIT), Luxpower-LXP semantics.
-
-Marked experimental at v1. First customer probe paste flips
-to stable.
 """
 from __future__ import annotations
 

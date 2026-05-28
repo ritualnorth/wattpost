@@ -1,16 +1,7 @@
 """Deye / Sunsynk / Sol-Ark three-phase driver.
 
-Covers:
-  * Deye SUN-12K/15K/20K/25K-SG01HP3 (HV battery, 3-phase)
-  * Sunsynk Max-15K / Max-20K
-  * Sol-Ark 15K-3P
-  * Sunsynk Max 3-Phase LV variants (share the common register
-    block at 500..689, the HV-vs-LV diff is mostly battery-side
-    enums, not the live-watts surface this driver covers).
-
-Modbus RTU, holding registers (FC03), 9600 8N1, slave 1.
-
-Register map (decimal, holding registers):
+FC03 holding registers, 9600 8N1, slave 1. Covers SUN-12K/15K/
+20K/25K-SG01HP3, Sunsynk Max-15K/20K, Sol-Ark 15K-3P.
 
     Reg  Field                       Scale    Unit  Notes
     ---  --------------------------- -------- ----- ------------------
@@ -43,18 +34,9 @@ Register map (decimal, holding registers):
     680  pv3_voltage                 ×0.1     V
     682  pv4_voltage                 ×0.1     V
 
-Footguns vs the single-phase variant:
-  * battery_voltage on 3P is ÷10 (vs ÷100 on 1P). Easy mistake.
-  * battery_power on 3P is ×–10, wire-value is in deci-watts.
-    Multiply raw by 10 BEFORE sign-flipping.
-  * PV powers on 3P are POSITIVE deci-watts (×10), not sign-flipped
-    watts like 1P. Same protocol family, different conventions.
-
-References credited in NOTICE (Apache-2.0):
-  * kellerza/sunsynk definitions/three_phase_common.py,
-    definitions/three_phase_hv.py.
-  * StephanJoubert/home_assistant_solarman 3P table.
-  * Deye Modbus PDF mirror.
+Scale-factor differences vs 1P: battery_voltage is ÷10 not ÷100,
+battery_power is wire-deci-watts then sign-flipped, PV powers
+are positive deci-watts (×10) not sign-flipped watts.
 """
 from __future__ import annotations
 

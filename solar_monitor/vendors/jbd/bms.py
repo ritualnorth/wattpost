@@ -1,45 +1,27 @@
-"""JBD BMS driver, read-only, all fields from cmd 0x03 + 0x04.
+"""JBD BMS driver. Read-only, fields from cmd 0x03 + 0x04.
 
-Field semantics taken from the Overkill Solar reference doc + the
-canonical JBD protocol PDF that ships with the BMS. Multi-byte
-fields are big-endian unsigned unless flagged signed.
-
-cmd 0x03 (basic info) payload layout:
+cmd 0x03 (basic info) payload:
 
     offset  size  field
-    0       2     pack_voltage   in 10 mV units (uint16)
-    2       2     pack_current   in 10 mA units (int16, signed,
-                                 +ve = discharge by spec; we
-                                 invert so +ve = charge to
-                                 match the rest of WattPost)
-    4       2     residual_ah    in 10 mAh units
-    6       2     nominal_ah     in 10 mAh units
+    0       2     pack_voltage   10 mV units (uint16)
+    2       2     pack_current   10 mA units (int16, signed;
+                                 spec is +ve = discharge,
+                                 we invert to +ve = charge)
+    4       2     residual_ah    10 mAh units
+    6       2     nominal_ah     10 mAh units
     8       2     cycle_count
-    10      2     production_date (packed YYYY-MM-DD bitfield;
-                                  we surface the raw int)
+    10      2     production_date (packed YYYY-MM-DD bitfield)
     12      2     balance_status_low  (bit per cell)
     14      2     balance_status_high (bit per cell)
-    16      2     protection_status   (bit flags, over/under V,
-                                       over/under T, over-current,
-                                       short, IC error, …)
+    16      2     protection_status   (over/under V, T, etc.)
     18      1     software_version (BCD)
     19      1     soc_percent
-    20      1     fet_status       (bit 0 = charge MOSFET on,
-                                    bit 1 = discharge MOSFET on)
+    20      1     fet_status       (bit 0 = charge MOS, bit 1 = discharge)
     21      1     cell_count
     22      1     ntc_count
-    23..    2*N   temperatures, uint16 each, value in 0.1 K with
-                  offset 2731 (so temp_c = (raw - 2731) / 10).
-    last 2 bytes  trailing region varies between firmware revs;
-                  we don't parse them at this level.
+    23..    2*N   temperatures, uint16 in 0.1 K offset 2731
 
-cmd 0x04 (cell info) payload: just `cell_count * 2` bytes of
-uint16 big-endian mV per cell.
-
-Driver emits the same normalised field surface as our other BMS
-drivers (JK, Renogy smart battery) so the dashboard renders
-identically. See `solar_monitor/vendors/jkbms/bms.py` for the
-naming convention.
+cmd 0x04 (cell info): cell_count * 2 bytes of uint16 BE mV.
 """
 from __future__ import annotations
 
