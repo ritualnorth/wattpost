@@ -164,7 +164,7 @@ class BleJunctekTransport(Transport):
     async def request(self, frame: bytes, expected_response_len: int,
                       timeout: float = 5.0) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on ble_junctek — "
+            f"{self.id}: request() is unsupported on ble_junctek, "
             "drivers must override poll() and use get_latest()"
         )
 

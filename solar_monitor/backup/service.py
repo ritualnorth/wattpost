@@ -111,7 +111,7 @@ class BackupService:
     async def snapshot_now(self) -> Path:
         """Take a snapshot synchronously (well, async) and return its
         path. Used by the manual "Run now" button and by the scheduler
-        loop. Throws on failure — caller handles."""
+        loop. Throws on failure, caller handles."""
         self.backup_dir.mkdir(parents=True, exist_ok=True)
         data = await asyncio.to_thread(
             build_archive_bytes, self.db_path, self.config_path,
@@ -123,12 +123,12 @@ class BackupService:
         self.last_run_path = out_path
         self.last_run_error = None
         log.info("backup: wrote %s (%d bytes)", out_path.name, len(data))
-        # Prune after a successful write — we never delete to make room
+        # Prune after a successful write, we never delete to make room
         # for a snapshot that might fail, so the policy is "keep N most
         # recent that exist on disk after this run completed".
         self._prune()
         # Fire-and-await cloud upload if configured. We don't fail the
-        # local snapshot if the cloud half blows up — local is the
+        # local snapshot if the cloud half blows up, local is the
         # source of truth, cloud is best-effort backup-of-backup.
         if self.cfg.cloud_upload and self.cloud_uploader is not None:
             try:
@@ -186,7 +186,7 @@ class BackupService:
             except Exception as e:
                 self.last_run_error = str(e)
                 log.exception("backup: snapshot_now failed: %s", e)
-                # Don't tight-loop on persistent failure — back off an
+                # Don't tight-loop on persistent failure, back off an
                 # hour and try again. Beats spamming the log forever
                 # when something's structurally wrong (disk full, etc).
                 try:

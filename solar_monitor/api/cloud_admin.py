@@ -76,7 +76,7 @@ async def get_cloud_config(state: State) -> dict[str, Any]:
         "heartbeat_minutes": c.heartbeat_minutes,
         "appliance_id":      c.appliance_id,
         "label":             c.label,
-        # Token is intentionally masked — the UI never gets the real one.
+        # Token is intentionally masked, the UI never gets the real one.
         "bearer_token":      "****",
         # Tunnel surface: hostname is shown on Integrations so the
         # operator can copy/click it; tunnel_enabled is true once a
@@ -152,7 +152,7 @@ async def pair_appliance(
 
     url = f"{data.endpoint.rstrip('/')}/api/pair/exchange"
     try:
-        # Same follow_redirects rationale as the heartbeat client —
+        # Same follow_redirects rationale as the heartbeat client,
         # a user typing https://wattpost.io into the pairing form
         # still works because Caddy 308s /api/* to wattpost.cloud.
         async with httpx.AsyncClient(
@@ -164,7 +164,7 @@ async def pair_appliance(
             status_code=502, detail=f"could not reach {data.endpoint}: {e}",
         )
 
-    # Cloud's @post default is 201 Created, not 200 — accept any 2xx.
+    # Cloud's @post default is 201 Created, not 200, accept any 2xx.
     if r.status_code >= 400:
         try:
             detail = r.json().get("detail") or r.text
@@ -198,7 +198,7 @@ async def pair_appliance(
 
     # Hot-start the cloud + tunnel services in the live daemon so the
     # first heartbeat fires NOW, not after a manual restart. Previously
-    # the only way to "complete" pairing was to restart wattpost —
+    # the only way to "complete" pairing was to restart wattpost,
     # confusing UX since the user already clicked Save. We still flag
     # restart_required so the UI nudges the user, but the appliance is
     # already showing up online by then.
@@ -209,7 +209,7 @@ async def pair_appliance(
         "ok": True,
         "appliance_id": new_c.appliance_id,
         "label": new_c.label,
-        # Only force a restart prompt when in-process start failed —
+        # Only force a restart prompt when in-process start failed,
         # otherwise the daemon is fully paired right now.
         "restart_required": not hot_started,
     }
@@ -251,7 +251,7 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
     except Exception:
         log.exception("hot-start: cloud heartbeat service failed to start")
         return False
-    # Tunnel — best-effort; success here is bonus, not required.
+    # Tunnel, best-effort; success here is bonus, not required.
     try:
         if TunnelService.is_available(cfg):
             old_t = getattr(scheduler, "_tunnel", None)
@@ -287,14 +287,14 @@ async def unpair_appliance(state: State) -> dict[str, Any]:
 
 @post("/api/cloud/heartbeat", status_code=202)
 async def trigger_heartbeat(state: State) -> dict[str, Any]:
-    """Force an immediate heartbeat — Settings UI's "Send now" button.
+    """Force an immediate heartbeat, Settings UI's "Send now" button.
     Returns true/false depending on whether the cloud accepted it."""
     scheduler = state["scheduler"]
     svc = getattr(scheduler, "_cloud", None)
     if svc is None:
         # Daemon started before pair (or pair didn't hot-start for some
         # reason). If config has a bearer token now, bring the service
-        # up rather than telling the user to "pair first" — which is
+        # up rather than telling the user to "pair first", which is
         # misleading and what was hitting people who paired without
         # restarting the daemon.
         config: Config = state["config"]
@@ -303,7 +303,7 @@ async def trigger_heartbeat(state: State) -> dict[str, Any]:
             if not ok_started:
                 raise HTTPException(
                     status_code=500,
-                    detail="couldn't start heartbeat service — check daemon logs",
+                    detail="couldn't start heartbeat service, check daemon logs",
                 )
             svc = getattr(scheduler, "_cloud", None)
         if svc is None:
@@ -340,7 +340,7 @@ def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
         "label":             c.label,
         "heartbeat_minutes": c.heartbeat_minutes,
     }
-    # Only persist tunnel fields when they're set — keeps existing
+    # Only persist tunnel fields when they're set, keeps existing
     # config.yaml files free of empty placeholders.
     if c.tunnel_token:
         out["tunnel_token"]    = c.tunnel_token

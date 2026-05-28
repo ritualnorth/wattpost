@@ -1,4 +1,4 @@
-"""Settings UI editor for the MQTT exporter — closes the last
+"""Settings UI editor for the MQTT exporter, closes the last
 yaml-only gap on the appliance side.
 
 The exporter system supports a list of arbitrary types, but in practice
@@ -181,7 +181,7 @@ async def update_mqtt_config(
 async def test_mqtt(
     data: MqttExporterPayload, state: State,
 ) -> dict[str, Any]:
-    """One-shot connect to the broker with the supplied credentials —
+    """One-shot connect to the broker with the supplied credentials,
     used by the Settings UI's Test button. Doesn't publish anything;
     just verifies host/port/auth are correct."""
     import aiomqtt
@@ -207,7 +207,7 @@ async def test_mqtt(
     except aiomqtt.MqttError as e:
         raise HTTPException(
             status_code=502,
-            detail=f"could not connect to {data.host}:{data.port} — {e}",
+            detail=f"could not connect to {data.host}:{data.port}, {e}",
         )
     except Exception as e:
         raise HTTPException(

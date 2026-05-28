@@ -1,4 +1,4 @@
-"""USB GPS support — NMEA-over-serial location updates.
+"""USB GPS support, NMEA-over-serial location updates.
 
 Lets the daemon's "current location" track a moving van/RV. Once
 configured, fresh fixes from a `/dev/ttyACM0`-style GPS receiver
@@ -8,7 +8,7 @@ fetch.
 
 Designed around the £8 VK-162 G-Mouse + similar puck/stick
 receivers: open the port, read NMEA at 9600 baud, decode RMC
-sentences for lat/lon. No `gpsd` dependency — pyserial is enough
+sentences for lat/lon. No `gpsd` dependency, pyserial is enough
 for a single device.
 """
 from .service import GpsService  # noqa: F401

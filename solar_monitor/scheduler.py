@@ -35,7 +35,7 @@ def _transport_is_open(t: Any) -> bool:
     each transport class uses; see api/setup.py:list_setup_transports
     for the canonical version of this logic.
 
-    The duplication is deliberate — keeping this small and inline
+    The duplication is deliberate, keeping this small and inline
     here avoids an import cycle between scheduler and api.setup.
     """
     if t is None:
@@ -85,7 +85,7 @@ class PollScheduler:
         # slow client falls behind we drop the oldest event for it (never
         # block the scheduler on a misbehaving consumer).
         self._subscribers: set[asyncio.Queue[dict]] = set()
-        # Local alert engine — runs after every successful poll.
+        # Local alert engine, runs after every successful poll.
         rules = [
             AlertRule(
                 id=r.id, name=r.name, metric=r.metric, op=r.op,
@@ -99,7 +99,7 @@ class PollScheduler:
         self._alerts = AlertEngine(
             rules, config.notification_transports, quiet_hours=quiet_hours,
         )
-        # PV forecast service — only built when the user has configured
+        # PV forecast service, only built when the user has configured
         # a `forecast:` block. Stays None otherwise so the rest of the
         # daemon doesn't pay for an unused feature.
         self._forecast: ForecastService | None = None
@@ -110,7 +110,7 @@ class PollScheduler:
                 log.exception("forecast service failed to initialise")
 
         # Current-weather service (Open-Meteo). Independent of the PV
-        # forecast — many users will want one without the other.
+        # forecast, many users will want one without the other.
         self._weather: WeatherService | None = None
         if config.weather is not None:
             try:
@@ -119,7 +119,7 @@ class PollScheduler:
                 log.exception("weather service failed to initialise")
 
         # Cloud heartbeat. Only spun up when an actual bearer token is
-        # present — daemon stays fully offline-capable when not paired.
+        # present, daemon stays fully offline-capable when not paired.
         self._cloud: CloudService | None = None
         if config.cloud is not None and config.cloud.bearer_token:
             try:
@@ -131,7 +131,7 @@ class PollScheduler:
             except Exception:
                 log.exception("cloud heartbeat service failed to initialise")
 
-        # Outbound Cloudflare Tunnel — exposes the local dashboard at
+        # Outbound Cloudflare Tunnel, exposes the local dashboard at
         # `<slug>.wattpost.io`. Only spun up when the cloud has issued
         # a tunnel token at pair time AND cloudflared is on PATH.
         # Off entirely otherwise; appliance keeps working locally.
@@ -142,7 +142,7 @@ class PollScheduler:
             except Exception:
                 log.exception("tunnel service failed to initialise")
 
-        # Self-update *check* — polls the cloud's release manifest
+        # Self-update *check*, polls the cloud's release manifest
         # daily and exposes the result on /api/system/update so the
         # UI can show "v0.0.x available". No auto-apply yet. Same
         # task also fires the anonymous local-install beacon (#217)
@@ -247,7 +247,7 @@ class PollScheduler:
         re-fetches; weather/forecast then refresh their kv caches
         which the dashboard reads from on next poll.
 
-        We DO NOT persist the new lat/lon to YAML — that would write
+        We DO NOT persist the new lat/lon to YAML, that would write
         hundreds of files a day in a moving van. The original config-
         file values stay as the cold-start fallback."""
         if self.config.weather is not None:
@@ -268,7 +268,7 @@ class PollScheduler:
                 log.exception("gps move: weather refetch failed")
         if self._forecast is not None and self.config.forecast and self.config.forecast.provider == "openmeteo":
             try:
-                # Rebuild the provider so it picks up the new lat/lon —
+                # Rebuild the provider so it picks up the new lat/lon,
                 # ForecastService caches the provider built at start.
                 from .forecast.service import PROVIDERS as _FC
                 self._forecast.provider = _FC[self.config.forecast.provider](
@@ -288,7 +288,7 @@ class PollScheduler:
         self._subscribers.discard(q)
 
     def _broadcast(self, payload: dict) -> None:
-        # Non-blocking publish. A full queue means the consumer is slow —
+        # Non-blocking publish. A full queue means the consumer is slow,
         # drop the oldest event for them rather than stall the scheduler.
         for q in self._subscribers:
             while True:
@@ -316,7 +316,7 @@ class PollScheduler:
         today = await self.store.today_aggregate(midnight, now)
 
         # Count configured + open transports the same way the REST
-        # /api/poll_run does — otherwise every SSE tick handed the
+        # /api/poll_run does, otherwise every SSE tick handed the
         # dashboard a poll_run with no transports field, the pill
         # logic treated that as `configured: 0`, and a healthy
         # appliance painted "Setup needed" until the next manual
@@ -355,13 +355,13 @@ class PollScheduler:
             return
         # Demo mode swaps the real BLE poller for a synthetic data
         # generator (solar_monitor/demo.py). Same poll() contract,
-        # zero hardware required — used by demo.wattpost.io.
+        # zero hardware required, used by demo.wattpost.io.
         import os
         if os.environ.get("WATTPOST_DEMO") == "1":
             from .demo import SyntheticPoller, seed_history
-            log.info("WATTPOST_DEMO=1 — using synthetic poller (no real BLE)")
+            log.info("WATTPOST_DEMO=1, using synthetic poller (no real BLE)")
             # Backfill 30 days of synthetic history so charts have
-            # something to draw immediately. Idempotent — skips if
+            # something to draw immediately. Idempotent, skips if
             # the store already has recent data.
             try:
                 await seed_history(self.store, days=30, step_minutes=60)
@@ -498,7 +498,7 @@ class PollScheduler:
                         log.exception("mqtt_in: merge into poll result failed")
                 self._last_result = result
                 await self.store.record_poll(result)
-                # Output adapters (#104) — discover-on-first-poll and
+                # Output adapters (#104), discover-on-first-poll and
                 # refresh state from every snapshot. Tolerant of crash:
                 # any failure logs but doesn't stall polling.
                 try:
@@ -507,11 +507,11 @@ class PollScheduler:
                         await self.outputs.discover_all()
                         self._outputs_last_device_count = devices_now
                     await self.outputs.apply_snapshot()
-                    # Schedule engine (#117) — fires any rule whose
+                    # Schedule engine (#117), fires any rule whose
                     # trigger landed since the last tick. Tolerant of
                     # crash; no schedules configured = cheap no-op.
                     await self.outputs.fire_schedules_if_due()
-                    # Solar-pause controller (#163) — auto-pause the AC
+                    # Solar-pause controller (#163), auto-pause the AC
                     # charger when PV is covering. Off by default; cheap
                     # when disabled (one config check). Last decision
                     # is cached on the scheduler so build_snapshot can
@@ -549,7 +549,7 @@ class PollScheduler:
                         )
                     self._consecutive_failures = 0
 
-                # Build the snapshot once per poll — used by both SSE and
+                # Build the snapshot once per poll, used by both SSE and
                 # the alert evaluator. Skip the work entirely when no one
                 # cares (no subscribers, no rules) so an idle daemon stays
                 # cheap.

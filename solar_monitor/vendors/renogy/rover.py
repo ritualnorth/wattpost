@@ -71,7 +71,7 @@ def _parse_battery_type(bs: bytes) -> dict:
 
 
 def _parse_charge_voltages(bs: bytes) -> dict:
-    """Registers 0xE007..0xE00C (6 words) — the user-tunable charge
+    """Registers 0xE007..0xE00C (6 words), the user-tunable charge
     profile. Voltages stored as deci-volts (X.X V × 10) on Rovers;
     LFP customers commonly need to tune these from the open-lead-acid
     defaults so the bank actually reaches absorption."""
@@ -124,7 +124,7 @@ class RenogyRover(DeviceDriver):
                 ),
                 help_text=(
                     "Picks the default charge profile. Set to "
-                    "Lithium for any LFP / Li-ion bank — open-lead "
+                    "Lithium for any LFP / Li-ion bank, open-lead "
                     "defaults will under-charge it."
                 ),
             ),

@@ -1,4 +1,4 @@
-"""Self-update *check* — polls the cloud manifest daily and exposes
+"""Self-update *check*, polls the cloud manifest daily and exposes
 the result on Settings → About.
 
 v1 is read-only: the daemon learns about new releases but the user

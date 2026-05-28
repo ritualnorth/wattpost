@@ -1,26 +1,26 @@
 # Privacy & telemetry
 
-WattPost is local-first by design. Everything you see on your dashboard comes from your hardware over a wire on your network — nothing has to leave the box for the appliance to work. This page lists every connection it _does_ make to the outside world, what's in it, and how to switch each one off.
+WattPost is local-first by design. Everything you see on your dashboard comes from your hardware over a wire on your network, nothing has to leave the box for the appliance to work. This page lists every connection it _does_ make to the outside world, what's in it, and how to switch each one off.
 
 ## What leaves the appliance
 
 There are five outbound flows. The first three are mandatory (the dashboard can't function without them); the last two are optional and have UI toggles.
 
-### 1. Update check — every 24 hours
+### 1. Update check, every 24 hours
 
 The appliance fetches `https://wattpost.cloud/api/releases/latest` once a day to find out what the current shipping version is, so the dashboard can show an **Update available** badge. The request carries the appliance's User-Agent (`wattpost-appliance/<version>`); the response is identical for every appliance and is cached by our CDN.
 
 Cannot be disabled. Disabling it would mean the appliance never knows when there's a security fix waiting.
 
-### 2. Weather + solar forecast — every 15 minutes
+### 2. Weather + solar forecast, every 15 minutes
 
 The appliance queries [Open-Meteo](https://open-meteo.com/) directly with your configured latitude and longitude. Open-Meteo is a non-profit weather API; the request does not pass through WattPost servers. If you don't want to share your coordinates with them, leave the `weather:` block out of `config.yaml` and the appliance will skip the call (the dashboard's weather tile + PV forecast curve simply won't render).
 
-### 3. CHANGELOG fetch — daily, alongside the update check
+### 3. CHANGELOG fetch, daily, alongside the update check
 
 Same 24-hour cadence as #1, hitting `https://releases.wattpost.io/CHANGELOG.md`. Anonymous; same as fetching any static file. Used so the dashboard can preview what's in a not-yet-installed version's release notes.
 
-### 4. Local-install beacon — *daily, anonymous, default ON*
+### 4. Local-install beacon, *daily, anonymous, default ON*
 
 When you fire the daily update check (#1), the appliance also POSTs three things to `https://wattpost.cloud/api/local_installs/beacon`:
 
@@ -45,21 +45,21 @@ local_telemetry:
 
 … and restart the daemon. The 24-hour update check still fires (we still need to know whether to show the "Update available" badge), but the `install_id` POST is suppressed. Your existing beacon row on our side will fall off the "active in 30 days" cohort within a month and stop being counted.
 
-### 5. Location sharing — *opt-in, default OFF, three modes*
+### 5. Location sharing, *opt-in, default OFF, three modes*
 
-If — and only if — you flip `location.share_with_cloud` to `approx` or `precise` (from Settings → Location or directly in `config.yaml`), the appliance ships coordinates in its heartbeat. **Default is `off`** — even a paired appliance with a working GPS will not transmit location until you flip this.
+If, and only if, you flip `location.share_with_cloud` to `approx` or `precise` (from Settings → Location or directly in `config.yaml`), the appliance ships coordinates in its heartbeat. **Default is `off`**, even a paired appliance with a working GPS will not transmit location until you flip this.
 
 Three modes:
 
-- **off** (default) — cloud receives no location data at all. Your local dashboard still knows where you are; this gate is purely about transmission.
-- **approx** — coordinates snapped to a ~10&nbsp;km grid on the appliance *before* transmission. The cloud literally never sees the precise number. Good for "show roughly where my fleet is" without precise tracking.
-- **precise** — real lat/lon. Required for geofences, anchor-watch, and the moving-van trail.
+- **off** (default), cloud receives no location data at all. Your local dashboard still knows where you are; this gate is purely about transmission.
+- **approx**, coordinates snapped to a ~10&nbsp;km grid on the appliance *before* transmission. The cloud literally never sees the precise number. Good for "show roughly where my fleet is" without precise tracking.
+- **precise**, real lat/lon. Required for geofences, anchor-watch, and the moving-van trail.
 
-The toggle is customer-side and authoritative: nothing on the cloud — admin, installer, or builder — can override it remotely.
+The toggle is customer-side and authoritative: nothing on the cloud, admin, installer, or builder, can override it remotely.
 
-### 6. Discovery telemetry — *opt-in, default OFF*
+### 6. Discovery telemetry, *opt-in, default OFF*
 
-If — and only if — you flip `discovery.enabled: true` in `config.yaml`, the appliance forwards anonymised fingerprints of Bluetooth devices it scans but does not yet recognise. This feeds our driver-add pipeline. Even when on, we strip serial numbers, truncate the MAC to its vendor prefix (first 3 octets / OUI), and never associate the fingerprint with your account or install_id. Off by default precisely because we'd rather you opt in.
+If, and only if, you flip `discovery.enabled: true` in `config.yaml`, the appliance forwards anonymised fingerprints of Bluetooth devices it scans but does not yet recognise. This feeds our driver-add pipeline. Even when on, we strip serial numbers, truncate the MAC to its vendor prefix (first 3 octets / OUI), and never associate the fingerprint with your account or install_id. Off by default precisely because we'd rather you opt in.
 
 ## What stays local, always
 
@@ -71,14 +71,14 @@ Just to be explicit about what we _don't_ do, because the privacy-conscious crow
 - Local user accounts, sessions, login attempts
 - Your network's other devices
 
-If you pair (the SaaS tier), all of the above flow to the cloud as part of the heartbeat — that's the whole point of pairing — and you can see exactly what's in each heartbeat at any time via the appliance's diagnostics endpoint or `journalctl -u wattpost`.
+If you pair (the SaaS tier), all of the above flow to the cloud as part of the heartbeat, that's the whole point of pairing, and you can see exactly what's in each heartbeat at any time via the appliance's diagnostics endpoint or `journalctl -u wattpost`.
 
 ## How to verify yourself
 
-- `journalctl -u wattpost | grep -E "manifest|beacon|open-meteo"` — every outbound call we log shows up here.
-- `tcpdump -i <iface> host wattpost.cloud or host releases.wattpost.io or host api.open-meteo.com` — captures the four production hostnames the appliance talks to.
+- `journalctl -u wattpost | grep -E "manifest|beacon|open-meteo"`, every outbound call we log shows up here.
+- `tcpdump -i <iface> host wattpost.cloud or host releases.wattpost.io or host api.open-meteo.com`, captures the four production hostnames the appliance talks to.
 - The source of every outbound call is open: `solar_monitor/update/checker.py` (update + beacon), `solar_monitor/weather/service.py` (Open-Meteo), `solar_monitor/cloud/service.py` (heartbeat, paired only), `solar_monitor/discovery/service.py` (BLE fingerprint, opt-in only).
 
 ## Changelog
 
-- **2026-05-20** — Anonymous local-install beacon added (#217), default ON, opt-out via `local_telemetry.enabled: false`. Three-field payload + Cloudflare country header; no IP, no PII.
+- **2026-05-20**, Anonymous local-install beacon added (#217), default ON, opt-out via `local_telemetry.enabled: false`. Three-field payload + Cloudflare country header; no IP, no PII.

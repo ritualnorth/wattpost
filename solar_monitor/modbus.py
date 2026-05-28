@@ -48,7 +48,7 @@ def build_write_single(slave_id: int, register: int, value: int) -> bytes:
     Used for one-register writes like the Renogy Rover load-control
     register (0x010A: 0=off, 1=on). FC06 echoes the request on success;
     a successful response is the same 8 bytes back. Multi-register
-    writes (FC16) aren't supported here yet — add when a vendor needs
+    writes (FC16) aren't supported here yet, add when a vendor needs
     them."""
     if not (0 <= value <= 0xFFFF):
         raise ValueError(f"value {value} out of range for FC06 (must fit in 16 bits)")
@@ -86,6 +86,6 @@ def verify_response(resp: bytes, slave_id: int, expected_fc: int = 3) -> None:
     if resp[1] != expected_fc:
         raise ValueError(f"unexpected function code 0x{resp[1]:02x} "
                          f"(expected 0x{expected_fc:02x})")
-    # CRC verify (optional — most transports already do this implicitly)
+    # CRC verify (optional, most transports already do this implicitly)
     if crc16(resp[:-2]) != resp[-2:]:
         raise ValueError("CRC mismatch")

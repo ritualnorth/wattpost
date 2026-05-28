@@ -1,13 +1,13 @@
-"""Renogy Smart Shunt driver — RBM-S100 / RBM-S300 / RBM-S500.
+"""Renogy Smart Shunt driver, RBM-S100 / RBM-S300 / RBM-S500.
 
 The Renogy Battery Monitor with Shunt is the budget-upgrade entry
-point for "I just want to know my real bank state" — single device,
+point for "I just want to know my real bank state", single device,
 clamps the negative terminal, no BMS needed (#115's "shunt-as-truth"
 mode is already wired for it). Persona B in the target-customer
 memory: someone buying their first shunt to get visibility.
 
 Protocol: Modbus FC03 over BLE (BT-1 / BT-2 dongle) or direct
-RS-485 — same transports we already ship for the Rover, the DCC50S,
+RS-485, same transports we already ship for the Rover, the DCC50S,
 and the inverter family. Slave ID is typically 0x30 on BT-2 (vs
 0xFF on Rover), but the user picks it in the setup wizard's scan
 step so we don't hardcode here.
@@ -15,7 +15,7 @@ step so we don't hardcode here.
 Reference register map: cyril/renogy-bt's `BatteryMonitorClient.py`
 plus the public Renogy Modbus PDF that ships with the product.
 Marked experimental until at least one paying customer has a unit
-verified — discovery telemetry (#129) will flag any field-decoding
+verified, discovery telemetry (#129) will flag any field-decoding
 mismatches faster than waiting for support tickets.
 """
 from __future__ import annotations
@@ -26,7 +26,7 @@ from ._util import bytes_to_int
 
 def _parse_device_info(bs: bytes) -> dict:
     """Registers 12-19 (8 words = 16 ASCII bytes). Shared Renogy
-    convention — every product reports its model name in this exact
+    convention, every product reports its model name in this exact
     block, padded with NUL. The shunt usually identifies as
     `RBM-S100` / `RBM-S300` / `RBM-S500` per the model variant."""
     return {"model": bs[3:19].decode("utf-8", errors="replace").rstrip("\x00").strip()}
@@ -34,7 +34,7 @@ def _parse_device_info(bs: bytes) -> dict:
 
 def _parse_versions(bs: bytes) -> dict:
     """Registers 20-25 (6 words). Same layout as the Rover:
-    sw_version + hw_version + serial — 4 bytes each."""
+    sw_version + hw_version + serial, 4 bytes each."""
     if len(bs) < 15:
         return {}
     sw = bs[3:7]
@@ -84,7 +84,7 @@ def _parse_live_stats(bs: bytes) -> dict:
                                 bytes_to_int(bs, 23, 4, scale=0.001),
     }
     # Power: positive = charging, negative = discharging (signed
-    # current convention matches the rest of WattPost — Bank
+    # current convention matches the rest of WattPost, Bank
     # aggregation reads `power_w` directly).
     if voltage_v and current_a is not None:
         out["power_w"] = round(voltage_v * current_a, 2)

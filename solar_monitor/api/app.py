@@ -108,7 +108,7 @@ def health() -> dict[str, Any]:
     # subnet that's holding a Renogy BT-2 dongle will respond here
     # with the same string, and the wizard surfaces a hint so the
     # user doesn't burn a day debugging "why won't this dongle pair".
-    # Keep `service` exactly "wattpost" — the scanner string-matches.
+    # Keep `service` exactly "wattpost", the scanner string-matches.
     from .. import __version__
     return {
         "ok": True,
@@ -133,7 +133,7 @@ async def today(state: State) -> dict[str, Any]:
 @get("/api/today/soc-envelope")
 async def today_soc_envelope(state: State) -> dict[str, Any]:
     """Min/max of bank.soc_pct since local midnight. Powers the
-    "SoC today" cell on the Today tile — answers "did the bank get
+    "SoC today" cell on the Today tile, answers "did the bank get
     critically low overnight?" without opening History."""
     store: Store = state["store"]
     now = int(time.time())
@@ -179,7 +179,7 @@ async def runtime_forecast(state: State) -> dict[str, Any]:
         return {"ok": False, "reason": "no_bank"}
 
     bank_wh = float(cap_ah) * float(voltage)
-    reserve_pct = 10.0  # don't predict past 10% SoC — LFP wants headroom
+    reserve_pct = 10.0  # don't predict past 10% SoC, LFP wants headroom
     usable_wh = bank_wh * max(0.0, float(soc_pct) - reserve_pct) / 100.0
 
     # Rolling 1-hour average load (negative when discharging).
@@ -190,7 +190,7 @@ async def runtime_forecast(state: State) -> dict[str, Any]:
         if avg_w < -5:  # discharging at >5 W
             naive["hours_to_empty"] = round(usable_wh / abs(avg_w), 2)
         elif avg_w > 5:
-            # Charging — would never empty at this rate
+            # Charging, would never empty at this rate
             naive["status"] = "charging"
         else:
             naive["status"] = "idle"
@@ -266,7 +266,7 @@ async def battery_health(state: State, days: int = 30) -> dict[str, Any]:
     """SoC residency histogram + cycle/lifetime numbers for the Battery
     Health tile (#109).
 
-    Default window is 30 days — long enough to surface a real residency
+    Default window is 30 days, long enough to surface a real residency
     pattern, short enough to stay responsive on the 1-min/1-hour rollup
     tables. Caller can override via ?days=N (clamped 1-365)."""
     store: Store = state["store"]
@@ -337,7 +337,7 @@ async def set_device_display_name(
 ) -> dict[str, Any]:
     """Set or clear the user-facing display name for a device. The
     underlying device label is the immutable storage key (history,
-    samples, alerts, exporters all reference it) — this only changes
+    samples, alerts, exporters all reference it), this only changes
     what the dashboard shows. POST `{"display_name": "..."}` to set,
     or `{"display_name": ""}` (or null) to clear and fall back to the
     original label.
@@ -381,7 +381,7 @@ async def device_charger_stats(label: str, state: State) -> dict[str, Any]:
     """
     store: Store = state["store"]
     # Determine which power metric to integrate based on what fields
-    # exist on the device — `latest` is the source of truth.
+    # exist on the device, `latest` is the source of truth.
     all_latest = await store.get_latest()
     if label not in all_latest:
         raise NotFoundException(f"unknown device {label!r}")
@@ -434,7 +434,7 @@ async def device_settings(label: str, state: State) -> dict[str, Any]:
     their charger before the confirm-flow is in place.
 
     404 if the device isn't configured. Empty `items` if the driver
-    doesn't declare any writable settings (default — Victron devices
+    doesn't declare any writable settings (default, Victron devices
     are read-only forever per product scope, JK BMS write surface is
     a future phase, only Renogy Rover exposes settings today).
     """
@@ -542,7 +542,7 @@ async def patch_device_setting(
         raise HTTPException(
             status_code=503,
             detail=(
-                f"transport {cfg_dev.transport!r} not running — has the "
+                f"transport {cfg_dev.transport!r} not running, has the "
                 f"daemon finished its first poll cycle?"
             ),
         )
@@ -553,7 +553,7 @@ async def patch_device_setting(
         raise HTTPException(
             status_code=409,
             detail=(
-                "this device's transport is read-only (BLE broadcast) — "
+                "this device's transport is read-only (BLE broadcast), "
                 "writes aren't supported"
             ),
         )
@@ -610,7 +610,7 @@ async def patch_device_setting(
 @get("/api/devices/{label:str}/efficiency")
 async def device_efficiency(label: str, state: State) -> dict[str, Any]:
     """SoC-corrected charge efficiency for one battery pack over a
-    range of trailing windows. The shorter windows surface early — a
+    range of trailing windows. The shorter windows surface early, a
     7d efficiency drop tells you something's going wrong before the
     lifetime number catches up. The `reliable` flag on each window
     tracks whether the pack saw enough throughput for the number to
@@ -683,13 +683,13 @@ async def restart_daemon(state: State) -> dict[str, Any]:
     SPA sees a clean 202 → starts polling /api/health → notices the
     daemon is back ~5 s later.
 
-    Before exec we shut the scheduler down properly — that disconnects
+    Before exec we shut the scheduler down properly, that disconnects
     the BLE transports cleanly so BlueZ doesn't hold a phantom
     connection to the BT-2 across the process swap (otherwise the new
     process gets "device not advertising" for ~60 s and the dashboard
     fills up with "device errors on last poll" warnings).
 
-    Works whether or not a supervisor (systemd) is around — os.execv
+    Works whether or not a supervisor (systemd) is around, os.execv
     replaces the current process image in place, no orphan-process
     cleanup required."""
     scheduler: PollScheduler = state["scheduler"]
@@ -715,7 +715,7 @@ async def list_alerts(state: State) -> dict[str, Any]:
 
     Transport list is rebuilt from the current Config (not the engine's
     boot-time snapshot) so transports added via the admin endpoints
-    show up immediately — flagged `alive: false` until the daemon
+    show up immediately, flagged `alive: false` until the daemon
     restarts and picks them up.
     """
     scheduler: PollScheduler = state["scheduler"]
@@ -787,7 +787,7 @@ async def stream(state: State) -> Stream:
                 yield f"data: {json.dumps(first)}\n\n".encode("utf-8")
             except Exception:
                 # Don't tear down the stream just because the first snapshot
-                # failed — keep the connection alive and let the next poll
+                # failed, keep the connection alive and let the next poll
                 # fire the first real event.
                 pass
 
@@ -887,7 +887,7 @@ async def device_history_csv(
 def index() -> File:
     path = _web_dir() / "index.html"
     if not path.exists():
-        raise NotFoundException("index.html missing — was the package built correctly?")
+        raise NotFoundException("index.html missing, was the package built correctly?")
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
@@ -913,7 +913,7 @@ def login_page(request: Request, state: State) -> File | Response:
 
     Special case: when the request reached us via the Cloudflare
     Tunnel (CF-Ray header present), the password form is a dead
-    end — local-password sessions don't grant tunnel access by
+    end, local-password sessions don't grant tunnel access by
     design (#137). Serve a different page that explains "sign in
     via wattpost.cloud and click Open" rather than letting the
     user fill in a password that issues a session their next click
@@ -921,7 +921,7 @@ def login_page(request: Request, state: State) -> File | Response:
     from .. import web_auth as _wa
     if _wa.is_tunnel_origin(request.scope):
         # Broker-authed users are already signed in from the appliance's
-        # POV — every request from the cloud broker carries a valid
+        # POV, every request from the cloud broker carries a valid
         # X-WP-Broker-Auth HMAC. They have no business seeing the
         # "Sign in via wattpost.cloud" dead-end. Bounce them straight
         # to wherever they were heading (the `next` param) or the SPA.
@@ -1022,7 +1022,7 @@ def sso_redirect(request: Request, state: State, token: str = "") -> Response:
 
 async def _audit(state, *, event_type: str, payload: dict | None = None) -> None:
     """Helper: write_event to the signed audit log (Phase 8B).
-    Best-effort — never raises into the caller, since security
+    Best-effort, never raises into the caller, since security
     touchpoints must not break when audit logging hiccups."""
     try:
         from .. import signed_audit as _sa
@@ -1047,20 +1047,20 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
     user. The /login page itself shows a tunnel-specific message
     when it detects tunnel origin, so this is belt-and-braces.
 
-    Phase 8B (#310) — login outcomes recorded in the signed audit
+    Phase 8B (#310), login outcomes recorded in the signed audit
     log so brute-force probes leave a tamper-evident trace and the
     cloud's per-site security view (when wired) can flag anomalies."""
     from .. import web_auth as _wa
     if _wa.is_tunnel_origin(request.scope):
         return Response(
             {"ok": False,
-             "detail": "direct tunnel sign-in not supported — "
+             "detail": "direct tunnel sign-in not supported, "
                        "use wattpost.cloud and click Open"},
             status_code=403,
         )
     pw = (data or {}).get("password") or ""
     if not _wa.verify_password(pw):
-        # Record the failure with the client IP — useful for
+        # Record the failure with the client IP, useful for
         # detecting attempted brute force after the fact. Don't
         # include the attempted password (obvious anti-pattern).
         client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
@@ -1100,7 +1100,7 @@ def do_logout(request: Request) -> Response:
 @get("/sw.js", sync_to_thread=False)
 def service_worker() -> File:
     """Service worker must be served from the path it claims scope over
-    — at /sw.js it can intercept the whole site, at /web/sw.js it could
+   , at /sw.js it can intercept the whole site, at /web/sw.js it could
     only see /web/* requests. So we mirror the file at the root.
     Cache-Control: no-cache so a deployed SW update propagates next
     refresh instead of being held by the browser for a week."""
@@ -1135,7 +1135,7 @@ def build_app(
     # interval_seconds wins ONLY when the config doesn't specify one,
     # so the YAML value takes effect after the next daemon restart
     # without anyone having to re-edit a systemd unit. Retention
-    # windows mutate `store` directly — also persisted via the
+    # windows mutate `store` directly, also persisted via the
     # /api/system/history_settings PATCH endpoint.
     hist = getattr(config, "history", None)
     if hist:
@@ -1164,7 +1164,7 @@ def build_app(
         app.state["scheduler"] = scheduler
         app.state["config"] = config
         app.state["config_path"] = config_path
-        # Scheduled local-snapshot service — only spins up the loop if
+        # Scheduled local-snapshot service, only spins up the loop if
         # backup.enabled is set in config.yaml. The on-demand endpoints
         # in api/backup.py work whether or not this service is running.
         from ..config import BackupCfg
@@ -1193,7 +1193,7 @@ def build_app(
         # Make the BackupService reachable from CloudService so the
         # cloud-triggered `backup_now` command (#165) can call
         # snapshot_now() through the same code path as the scheduled
-        # weekly backup — same naming, same upload, same prune.
+        # weekly backup, same naming, same upload, same prune.
         setattr(scheduler, "backup_service", backup_svc)
 
     async def on_shutdown(app: Litestar) -> None:
@@ -1214,7 +1214,7 @@ def build_app(
 
     # Demo-mode read-only middleware. When WATTPOST_DEMO=1 we 403 any
     # state-changing HTTP method except a small allowlist of paths the
-    # dashboard needs to function (none currently — the local
+    # dashboard needs to function (none currently, the local
     # dashboard's POSTs are all writes, so this is empty). Pure ASGI
     # middleware so we can match by request scope without going through
     # Litestar's route system.
@@ -1277,7 +1277,7 @@ def build_app(
     #     → 401 (for /api/*) or redirect to /login (for HTML routes)
     from .. import web_auth as _web_auth
     # Allow GETs on any path while we ship the strict default. This
-    # gives existing installs a soft landing — the password is set
+    # gives existing installs a soft landing, the password is set
     # silently, the UI keeps loading, and writes start prompting for
     # login. Operator can flip strict mode in Settings later.
     _READONLY_PUBLIC = True
@@ -1293,7 +1293,7 @@ def build_app(
             # Bypass: demo mode (public read-only by design) OR real
             # loopback (curl from the Pi, SSH port-forward, daemon
             # talking to itself). is_loopback_source returns False
-            # for tunnel-origin requests — see the CF-header sniff
+            # for tunnel-origin requests, see the CF-header sniff
             # in web_auth.is_loopback_source.
             #
             # "no password set" is NO LONGER a bypass condition. Until
@@ -1326,7 +1326,7 @@ def build_app(
                 _kiosk_tok = (config.cloud.kiosk_token if config.cloud else "") or ""
                 if _kiosk_tok:
                     qs = scope.get("query_string", b"") or b""
-                    # Tiny parse — querystring is short, fine to scan.
+                    # Tiny parse, querystring is short, fine to scan.
                     supplied = None
                     for part in qs.split(b"&"):
                         if part.startswith(b"key="):
@@ -1343,7 +1343,7 @@ def build_app(
             # local copy of sso_secret. Valid header = the cloud has
             # already authenticated this user; we trust the request
             # exactly as if it had a valid SSO session. No session
-            # cookie is issued — broker traffic is stateless per
+            # cookie is issued, broker traffic is stateless per
             # request.
             broker_header: bytes | None = None
             _cf_ray: str | None = None
@@ -1375,7 +1375,7 @@ def build_app(
                     header_age_s=_age,
                     cf_ray=_cf_ray,
                     # Capture the raw header shape only when the verify
-                    # failed — costs nothing on the happy path, and gives
+                    # failed, costs nothing on the happy path, and gives
                     # us the exact bytes to diagnose cloud↔appliance
                     # wire-format drift like the one #225 caused.
                     header_prefix=(
@@ -1407,7 +1407,7 @@ def build_app(
             # not configured" message), NEVER let the request through.
             if not _web_auth.password_is_set():
                 # /login + /api/login + static assets are always
-                # allowed — the user needs SOMETHING to render.
+                # allowed, the user needs SOMETHING to render.
                 _p = scope.get("path", "/")
                 if not _web_auth.is_anonymous_path(_p):
                     if _p.startswith("/api/"):
@@ -1434,7 +1434,7 @@ def build_app(
             method = scope.get("method", "GET").upper()
             # READONLY_PUBLIC bypass: allow GET reads on LAN without a
             # session, so kiosks-on-wifi keep working unchanged. Does
-            # NOT apply to tunnel-origin requests — a leaked tunnel
+            # NOT apply to tunnel-origin requests, a leaked tunnel
             # URL would otherwise leak every metric on the appliance
             # to anonymous viewers.
             tunnel = _web_auth.is_tunnel_origin(scope)
@@ -1601,7 +1601,7 @@ def build_app(
             do_login,
             do_logout,
             sso_redirect,
-            # Identity v2 Phase 3 (#305) — LAN OIDC login. Both
+            # Identity v2 Phase 3 (#305), LAN OIDC login. Both
             # endpoints 404 when oidc_config.json is absent (i.e.
             # the appliance hasn't completed v2 upgrade yet), so
             # registering them is safe even on pre-v2 appliances.

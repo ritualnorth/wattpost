@@ -2,14 +2,14 @@
 // Vanilla JS, no build step. Renders the convergent off-grid dashboard:
 //   - conditional alert banner
 //   - hero with SOC donut + remaining-time + net W
-//   - data-driven power flow strip (sources / battery / loads — tiles
+//   - data-driven power flow strip (sources / battery / loads, tiles
 //     appear and disappear with installed devices)
 //   - today's totals strip
 //   - cell balance grid
 //   - history chart (uPlot)
 //   - per-device detail cards
 //
-// All values from the daemon's /api are SI. UI doesn't convert — display
+// All values from the daemon's /api are SI. UI doesn't convert, display
 // in SI; future user pref can convert at the edge.
 //
 // --------------- DEVICE → FLOW MAPPING --------------------
@@ -20,12 +20,12 @@
 
 // ---------- inline icons (line-art SVG strings, tint via currentColor) ----------
 const ICONS = {
-  // Sun — for PV / solar sources
+  // Sun, for PV / solar sources
   sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="4.2"/>
     <path d="M12 2v2.5M12 19.5V22M3.5 12H6M18 12h2.5M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>
   </svg>`,
-  // Battery — for the bank / storage tile
+  // Battery, for the bank / storage tile
   battery: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <rect x="2.5" y="7" width="17" height="10" rx="2"/>
     <line x1="21.5" y1="10" x2="21.5" y2="14"/>
@@ -33,11 +33,11 @@ const ICONS = {
     <rect x="9" y="9.5" width="3" height="5" rx=".4" fill="currentColor"/>
     <rect x="13" y="9.5" width="3" height="5" rx=".4" fill="currentColor"/>
   </svg>`,
-  // Lightning bolt — AC loads / inverter output
+  // Lightning bolt, AC loads / inverter output
   bolt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>
   </svg>`,
-  // Plug — DC loads
+  // Plug, DC loads
   plug: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M9 2v4M15 2v4"/>
     <path d="M7 6h10v6a5 5 0 0 1-10 0V6z"/>
@@ -56,20 +56,20 @@ const ICONS = {
     <circle cx="12" cy="12" r="3.5"/>
     <path d="M12 3v3.5M12 17.5V21M3 12h3.5M17.5 12H21"/>
   </svg>`,
-  // Question mark — fallback / unknown
+  // Question mark, fallback / unknown
   unknown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="9"/>
     <path d="M9.5 9.5a2.5 2.5 0 1 1 4.6 1.4c-.6.8-1.6 1-1.6 2.1"/>
     <line x1="12" y1="17" x2="12" y2="17.01"/>
   </svg>`,
-  // House — for inferred "everything else" loads (heater, fridge, lights,
+  // House, for inferred "everything else" loads (heater, fridge, lights,
   // anything pulling from the bank that doesn't go through the controller)
   house: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 11l9-7 9 7"/>
     <path d="M5 9.5V21h14V9.5"/>
     <path d="M10 21v-6h4v6"/>
   </svg>`,
-  // Plug-in / external power feed — unmeasured source (mains charger, etc.)
+  // Plug-in / external power feed, unmeasured source (mains charger, etc.)
   feed: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 12h8"/>
     <path d="M7 8v8"/>
@@ -78,7 +78,7 @@ const ICONS = {
   </svg>`,
 };
 
-// Returns the user-visible name for a device — the override set via
+// Returns the user-visible name for a device, the override set via
 // /api/devices/<label>/display-name if present, else the underlying
 // label. Use this everywhere a device is *displayed* to a human; keep
 // the raw label for routing, storage keys, and API paths.
@@ -110,7 +110,7 @@ const KIND_ICON = {
   shunt: "battery",
   bms: "battery",
   load_disconnect: "plug",
-  // Synthetic aggregate — re-uses the battery glyph but the label
+  // Synthetic aggregate, re-uses the battery glyph but the label
   // (and a CSS hook in styles.css, .dev-card.kind-bank) sets it
   // apart so users read it as "the whole bank" not "another pack".
   bank: "battery",
@@ -136,7 +136,7 @@ const FLOW_MAPPING = {
   smart_battery: { battery: true },
   shunt:         { battery: true },
   bms:           { battery: true },  // Victron Lynx Smart BMS, JK BMS
-  // Renogy DCC50S / DCC30S / DCC25S / DCC15S — alternator + MPPT
+  // Renogy DCC50S / DCC30S / DCC25S / DCC15S, alternator + MPPT
   // combos. The unit has TWO input sides: an engine-driven DC-DC
   // (alternator) AND a built-in MPPT (PV). Both render as separate
   // source nodes so a customer with solar wired into their DCC sees
@@ -161,7 +161,7 @@ const FLOW_MAPPING = {
   // current/voltage; we surface the OUTPUT power as the contribution
   // to the bank (input - efficiency = output, the output is what
   // actually reaches the busbar). Colour `dc` (amber) same as the
-  // Renogy combo above — both are "engine-driven DC input."
+  // Renogy combo above, both are "engine-driven DC input."
   dcdc:    { sources: [{ id: "alt", label: "DC-DC", color: "dc", icon: "alternator",
                           metric: "output_power_w",
                           vMetric: "output_voltage_v", aMetric: "output_current_a" }] },
@@ -171,7 +171,7 @@ const FLOW_MAPPING = {
   // Victron AC chargers (Blue Smart IP22 / IP65 / Phoenix Smart).
   // Up to 3 outputs but most installs use output 1 only; we surface
   // output_1 here. Multi-output models would need this expanded to
-  // sum all three or render them separately — out of scope for now
+  // sum all three or render them separately, out of scope for now
   // since output_2 / output_3 are rare in van/cabin installs.
   ac_charger: {
     sources: [{ id: "ac_chg", label: "AC Charger", color: "grid", icon: "plug",
@@ -181,12 +181,12 @@ const FLOW_MAPPING = {
   inverter: {
     // Hybrid inverter (Voltronic + EG4 XP families). Has a PV-input
     // side AND an AC-output side AND a battery side all on one
-    // device — so it contributes to every node of the flow strip.
+    // device, so it contributes to every node of the flow strip.
     // The Solar source uses pv_power_w; the AC load uses
     // ac_output_power_w; battery: {} routes battery V/A back to
     // the bank-net calculation with the inverter's per-domain
     // field names instead of generic voltage_v/current_a (which
-    // on an inverter would be ambiguous — there are five voltages).
+    // on an inverter would be ambiguous, there are five voltages).
     sources: [{ id: "pv", label: "Solar", color: "pv", icon: "sun",
                 metric: "pv_power_w",
                 vMetric: "pv_voltage_v", aMetric: "pv_current_a" }],
@@ -197,7 +197,7 @@ const FLOW_MAPPING = {
                pMetric: "battery_power_w" },
   },
   // Deye / Sunsynk / Sol-Ark single-phase + split-phase + three-phase.
-  // Same flow-tile shape as the generic inverter — split out only
+  // Same flow-tile shape as the generic inverter, split out only
   // because the device_kind enum is finer-grained. (We could have
   // collapsed to kind=inverter and stored phase-info separately, but
   // the two-kind split is honest about the chassis difference and
@@ -224,7 +224,7 @@ const FLOW_MAPPING = {
   },
   // Victron SmartBatteryProtect / similar load-disconnect modules.
   // Their telemetry is mostly state (connected / disconnected / fault)
-  // not power — we don't have a clean "watts through" reading to plot,
+  // not power, we don't have a clean "watts through" reading to plot,
   // so they don't appear in the flow strip directly. They show up in
   // the device cards under Devices instead. Listed here so the kind
   // is "known" to FLOW_MAPPING (avoids the "Other source" inferred
@@ -308,12 +308,12 @@ const _frame = { nowSec: 0, bank: null, flowModel: null };
 // ---------- demo-mode banner (one-shot, runs at boot) ----------
 // /api/system/info exposes `demo: true|false` from the WATTPOST_DEMO=1
 // container env. The Settings → About flow also reads this and toggles
-// the banner, but Settings isn't visited on most page loads — pull the
+// the banner, but Settings isn't visited on most page loads, pull the
 // check up to boot so the banner appears immediately on every page,
 // kiosk mode included.
 //
 // Exposed as a top-level promise so renderStatus() can await it before
-// triggering the "Setup needed" wizard redirect — without this gate,
+// triggering the "Setup needed" wizard redirect, without this gate,
 // the SSE snapshot can arrive first and demo visitors get yanked into
 // the wizard before the banner classifies them as a demo session.
 window._demoReady = (async () => {
@@ -515,11 +515,11 @@ const KIOSK_KEY_PARAM = (() => {
 // True when the dashboard is being served via the cloud broker
 // (`<slug>.wattpost.cloud` / legacy `.wattpost.io`) rather than
 // directly on the appliance's LAN IP. Used to suppress UI bits
-// that only make sense for someone with full local access — most
+// that only make sense for someone with full local access, most
 // notably the Kiosk → Exit button, which on broker would dump
 // the customer into the Settings/Devices/etc full chrome that
 // app.wattpost.cloud is supposed to own. Locally (192.168.x or
-// wattpost.local) Exit stays — the van/cabin operator wants to
+// wattpost.local) Exit stays, the van/cabin operator wants to
 // flip between the SoC kiosk and the dashboard freely.
 const IS_BROKER_VIEW = (() => {
   try {
@@ -545,8 +545,8 @@ async function api(path) {
 // here. The frame shape (devices / poll_run / today) is the same in both
 // directions so this stays a one-liner per renderer.
 //
-// Snapshot lock (#162): every renderer derived from `devices` — hero,
-// flow tile, alerts — used to call aggregateBank() independently, each
+// Snapshot lock (#162): every renderer derived from `devices`, hero,
+// flow tile, alerts, used to call aggregateBank() independently, each
 // recomputing its own staleness floor against a freshly-read Date.now().
 // On the 90 s boundary that meant the hero could include a battery the
 // flow tile had just classed as silent, leaving the two tiles in visible
@@ -556,7 +556,7 @@ function applySnapshot(frame) {
   devices = frame.devices || [];
   lastRun = frame.poll_run?.last_run || null;
   // Keep the Settings tab's Daemon row in sync when poll data arrives
-  // (no-op if the row isn't in the DOM yet — it's only rendered when
+  // (no-op if the row isn't in the DOM yet, it's only rendered when
   // Settings is active).
   renderDaemonStatus();
   todayAggregate = frame.today || null;
@@ -570,12 +570,12 @@ function applySnapshot(frame) {
   renderHero();
   renderFlow();
   // Kiosk view shares aggregateBank/buildFlowModel but lives in a
-  // separate DOM tree — mirror the flow strip into it on every frame.
+  // separate DOM tree, mirror the flow strip into it on every frame.
   const kioskFlow = $("#kiosk-flow");
   if (kioskFlow) renderFlow(kioskFlow);
   renderToday();
   renderWeather();
-  renderLocationTile();  // #264 — "Where you are" map
+  renderLocationTile();  // #264, "Where you are" map
   renderWeek();
   renderCells();
   renderSensors();
@@ -640,7 +640,7 @@ async function refresh() {
 
 // ---------- live stream (SSE) ----------
 // EventSource is the lightest live-update mechanism the browser ships
-// with — auto-reconnects, no protocol upgrade, plain HTTP. We open one
+// with, auto-reconnects, no protocol upgrade, plain HTTP. We open one
 // on boot; the server hand-delivers a full snapshot immediately and a
 // new one after every poll. Polling stays around as a fallback.
 let eventStream = null;
@@ -696,7 +696,7 @@ function stopPollingFallback() {
 }
 
 async function _maybeFirstBootRedirect() {
-  // Wait for /api/system/info to resolve before deciding — without
+  // Wait for /api/system/info to resolve before deciding, without
   // this gate, the SSE snapshot can arrive first and demo visitors
   // get yanked into the wizard before the demo flag classifies them.
   try { await window._demoReady; } catch (_) {}
@@ -710,12 +710,12 @@ async function _maybeFirstBootRedirect() {
 }
 
 function renderStatus(run) {
-  // Daemon-side issues first — if the scheduler's not running or the
+  // Daemon-side issues first, if the scheduler's not running or the
   // last_run is stale, nothing else matters.
   if (!run.scheduler_running) { setStatus("err", "Offline"); return; }
   const t = run.transports || {};
   // Demo mode (demo.wattpost.io) has a synthetic poller and no real
-  // transports — the wizard redirect and "Setup needed" / "BLE not
+  // transports, the wizard redirect and "Setup needed" / "BLE not
   // connected" warnings are nonsense there. Body class is set by the
   // /api/system/info bootstrap at the top of this file.
   const isDemo = document.body.classList.contains("is-demo");
@@ -752,14 +752,14 @@ function renderStatus(run) {
 //
 //   1. A `shunt` device measures the real busbar current/voltage and tracks
 //      SoC against a user-declared bank capacity. If one is present, it wins
-//      for the bank's headline numbers — that's the case for users with
+//      for the bank's headline numbers, that's the case for users with
 //      dumb LiFePO4 packs + a Victron SmartShunt / Renogy 500A monitor.
 //
 //   2. Otherwise, we sum across smart batteries (the typical Renogy rig).
 //
 //   3. With nothing addressable, we return null and the dashboard hides
 //      the bank hero.
-// Bank-level aggregator — mirrors the server-side reconciliation in
+// Bank-level aggregator, mirrors the server-side reconciliation in
 // solar_monitor/storage/sqlite.py:_compute_bank_aggregate (#121).
 //
 // Two distinct layers:
@@ -767,13 +767,13 @@ function renderStatus(run) {
 //     shunt when present, otherwise the BMS pack-sum. "Source" tag
 //     in the output tells consumers which side fed the numbers.
 //   * Cell metrics (min/max V across packs, worst pack drift) ALWAYS
-//     come from BMSes — shunts don't have per-cell data. Surfaced
+//     come from BMSes, shunts don't have per-cell data. Surfaced
 //     alongside the system metrics even when the shunt is driving.
 //
 // When BOTH a shunt and one or more BMSes are present AND their SoC
 // readings disagree by >5 percentage points, attach a `disagreement`
 // object so the hero tile can render a quiet "shunt 65%, BMS 72%,
-// showing shunt — tap to investigate" hint.
+// showing shunt, tap to investigate" hint.
 function aggregateBank() {
   // Return the cached frame value if applySnapshot already computed one
   // (#162). Without this, hero + flow + alerts each re-derive their own
@@ -782,7 +782,7 @@ function aggregateBank() {
   if (_frame.bank !== null) return _frame.bank;
   // Skip devices whose latest poll is stale (>90 s). Without this,
   // an offline Renogy BT-2 keeps feeding the bank aggregate from a
-  // snapshot 50+ minutes old — the SoC donut and Net-power tile then
+  // snapshot 50+ minutes old, the SoC donut and Net-power tile then
   // claim "live 96.8 % · -80 W" when the truth is "we haven't heard
   // from that BMS for an hour." Mirrors the buildFlowModel staleness
   // check; same 90 s threshold (~1.5 poll cycles of grace).
@@ -866,7 +866,7 @@ function aggregateBank() {
     };
   }
 
-  // Inverter view — last-resort source when neither shunt nor BMS is
+  // Inverter view, last-resort source when neither shunt nor BMS is
   // configured. The inverter knows SoC + battery V/A but NOT capacity
   // (capacity is bank-config knowledge that lives on a shunt/BMS),
   // so totalCap/totalRem are left at 0 and the "time to empty" hint
@@ -917,7 +917,7 @@ function aggregateBank() {
 
 function computeRemaining(bank) {
   if (!bank) return { primary: "—", secondary: "" };
-  // Prefer the shunt's time_to_go_minutes when it's available — it's
+  // Prefer the shunt's time_to_go_minutes when it's available, it's
   // a Coulomb-counted estimate that knows about your actual recent
   // discharge curve, much better than our V*I extrapolation.
   if (typeof bank.timeToGoMinutes === "number" && bank.timeToGoMinutes > 0) {
@@ -928,12 +928,12 @@ function computeRemaining(bank) {
   }
   const i = bank.sumI;
   const absI = Math.abs(i);
-  // The 1.5 A "Idle" guard is one-sided — it only protects the
+  // The 1.5 A "Idle" guard is one-sided, it only protects the
   // discharge case. Reporting "2 days until empty" off a 0.6 A
   // standby draw is misleading (the moment real load kicks in,
   // the estimate is wildly wrong). But applying the same threshold
   // to charging would label slow MPPT trickle as "Idle", which is
-  // worse — the user IS charging, just slowly. So: only suppress
+  // worse, the user IS charging, just slowly. So: only suppress
   // the discharge estimate; always show charging.
   if (i > 0) {
     if (absI < 0.2) {
@@ -949,7 +949,7 @@ function computeRemaining(bank) {
     };
   }
   // Discharging at a meaningful rate. Trim a 10% reserve off the
-  // remaining capacity before the divide — LFP wants to stay above
+  // remaining capacity before the divide, LFP wants to stay above
   // 10% SoC, and the BMS will cut earlier than 0% anyway. Keeps the
   // estimate from over-promising runtime that the battery will
   // never actually deliver.
@@ -1017,7 +1017,7 @@ function renderHero() {
     discharging: `${bank.sumI.toFixed(2)} A · discharging`,
   }[powerState];
 
-  // Donut wrapper state — drives ring gradient + leading-edge dot color
+  // Donut wrapper state, drives ring gradient + leading-edge dot color
   // + flow-pill color. Four states:
   //   critical    SoC < 15 (urgent palette overrides flow direction)
   //   charging    netW > +1  AND SoC ≥ 15
@@ -1027,7 +1027,7 @@ function renderHero() {
   // not the calmer amber, regardless of direction.
   //
   // The 1 W threshold is tight on purpose. The old 5 W rule called a
-  // 4 W discharge "holding" while the side label read "↑ 4 W out" —
+  // 4 W discharge "holding" while the side label read "↑ 4 W out",
   // visually contradictory. Anything ≥1 W gets classified honestly
   // by direction so the donut + flow-pill + watts line tell the same
   // story.
@@ -1036,7 +1036,7 @@ function renderHero() {
   else if (Math.abs(bank.netW) < 1) donutState = "holding";
   else if (bank.netW > 0) donutState = "charging";
   else donutState = "discharging";
-  // Flow-direction modifier — drives the leading-edge dot + halo
+  // Flow-direction modifier, drives the leading-edge dot + halo
   // colour independently of the arc colour. Only applied when the
   // bank has >1 W of net flow (the "holding" band keeps its neutral
   // blue head). The visible case this unlocks: critical SoC + net
@@ -1053,7 +1053,7 @@ function renderHero() {
     positionDonutHead(el, pct);
   });
   // The flow pill colors still hook off the legacy charging/discharging/
-  // idle classes — keep those applied alongside the new state so existing
+  // idle classes, keep those applied alongside the new state so existing
   // .donut-state.charging .donut-flow rules still match.
   document.querySelectorAll(".donut-state").forEach(el => el.classList.add(powerState));
   const flowText = $("#donut-flow .donut-flow-text");
@@ -1074,11 +1074,11 @@ function renderHero() {
   $("#bank-time").textContent = rem.primary;
   $("#bank-time-sub").textContent = rem.secondary;
   // The forecast-aware line is populated by refreshRuntimeForecast()
-  // on its own cadence — render here just keeps the existing values.
+  // on its own cadence, render here just keeps the existing values.
 
   // Source-disagreement hint (#121). Only rendered when both a
   // shunt and one or more BMSes are present AND their SoC readings
-  // differ by >5 pp. Single quiet line — not an alarm.
+  // differ by >5 pp. Single quiet line, not an alarm.
   const dis = $("#donut-disagreement");
   if (dis) {
     if (bank.disagreement) {
@@ -1103,7 +1103,7 @@ function renderHero() {
     }
   }
 
-  // #293 — Battery health one-liner under the donut. Aggregates the
+  // #293, Battery health one-liner under the donut. Aggregates the
   // worst current signal across the battery surfaces so the user
   // sees a single status without having to scroll to the Health
   // panel. Three colour bands match the Health panel itself.
@@ -1123,16 +1123,16 @@ function renderHero() {
   $("#bank-voltage").textContent = bank.meanV.toFixed(2);
   $("#bank-capacity").textContent = bank.totalCap.toFixed(0);
   $("#bank-remaining").textContent = bank.totalRem.toFixed(1);
-  // Bank meta is a long string (e.g. "3× RBT100LFP12S-G1") — shrink to
+  // Bank meta is a long string (e.g. "3× RBT100LFP12S-G1"), shrink to
   // text style so it fits the small grid cell on mobile.
   const bankMetaTile = $("#bank-meta").closest(".hero-stat-val");
   if (bankMetaTile) bankMetaTile.classList.add("is-text");
   // Two patterns:
-  //   * Shunt-only install (#115 "no-BMS mode") — there are no
+  //   * Shunt-only install (#115 "no-BMS mode"), there are no
   //     declared packs, so the count would render "0× SmartShunt 500A"
   //     which reads as broken. Drop the count when packs=0 and just
   //     show the model.
-  //   * Standard BMS install — "3× RBT100LFP12S-G1".
+  //   * Standard BMS install, "3× RBT100LFP12S-G1".
   const shortModel = (bank.model || "")
     .replace(/^RBT/, "RBT")
     .replace(/-G\d$/, "");
@@ -1141,7 +1141,7 @@ function renderHero() {
     : shortModel;
 }
 
-// One-liner battery health badge (#293). Pure — takes the bank
+// One-liner battery health badge (#293). Pure, takes the bank
 // model + returns {band, text, detail} or null when there's no
 // reading worth surfacing. Worst-of-signals wins: cell spread
 // > SoC critical > SoC low > healthy.
@@ -1183,12 +1183,12 @@ function buildFlowModel() {
     // Silent-device check (#171). Two cases collapse into one
     // "treat as silent" branch:
     //
-    //  1. Stale broadcast — Victron BLE drivers stamp
+    //  1. Stale broadcast, Victron BLE drivers stamp
     //     `advertisement_age_s` on every poll; > 60 s means we
     //     haven't decoded a fresh broadcast (charger switched off
     //     at the wall, dongle out of range, etc.).
     //
-    //  2. Explicitly idle — the device IS still broadcasting fresh
+    //  2. Explicitly idle, the device IS still broadcasting fresh
     //     adverts but the payload reports it's not producing. Most
     //     common on Victron AC chargers in standby: the radio keeps
     //     blasting the LAST V/A readings (e.g. 13.7 V · 15.00 A ·
@@ -1200,14 +1200,14 @@ function buildFlowModel() {
     // explains which kind of silent it is.
     const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
     const isStale = ageS != null && ageS > 60;
-    // Generic poll-freshness check — covers vendors that DON'T stamp
+    // Generic poll-freshness check, covers vendors that DON'T stamp
     // their own advertisement_age_s (Renogy and JK BMS today). Every
     // /api/devices entry carries `_updated_at` (Unix seconds) of the
     // last successful poll. If that's older than ~90 s, the transport
     // has been failing to reach the device and what we're rendering
     // is a snapshot from however long ago. Without this check, an
     // offline Renogy charge controller silently shows its last-known
-    // V/A/W as if they were live — same lie as the old v0.1.15 AC
+    // V/A/W as if they were live, same lie as the old v0.1.15 AC
     // charger bug, just one vendor over.
     const STALE_POLL_SECONDS = 90;
     const updatedAt = +(l._updated_at) || +(dev.last_seen) || null;
@@ -1232,22 +1232,22 @@ function buildFlowModel() {
         // No fresh poll for ≥90s. Cover Renogy / JK BMS / any vendor
         // that doesn't stamp advertisement_age_s itself. Wording mirrors
         // the Victron stale messages so the dashboard reads consistently.
-        if (pollAgeS < 5400)  return `Stale — last poll ${Math.round(pollAgeS / 60)} min ago`;
-        if (pollAgeS < 86000) return `Stale — last poll ${(pollAgeS / 3600).toFixed(1)} h ago`;
-        return "Stale — no poll since restart";
+        if (pollAgeS < 5400)  return `Stale, last poll ${Math.round(pollAgeS / 60)} min ago`;
+        if (pollAgeS < 86000) return `Stale, last poll ${(pollAgeS / 3600).toFixed(1)} h ago`;
+        return "Stale, no poll since restart";
       }
       if (isExplicitlyIdle && !isStale) {
-        // Fresh broadcast says "I'm off" — be specific rather than
+        // Fresh broadcast says "I'm off", be specific rather than
         // pretending we haven't heard from it.
         if (l.charging_state === "off")       return "Off";
         if (l.charging_state === "low_power") return "Standby (low power)";
-        if (l.charging_state === "fault")     return "Fault — not producing";
+        if (l.charging_state === "fault")     return "Fault, not producing";
         return "Idle";
       }
-      if (ageS < 90)     return `Silent — last heard ${Math.round(ageS)} s ago`;
-      if (ageS < 5400)   return `Silent — last heard ${Math.round(ageS / 60)} min ago`;
-      if (ageS < 86000)  return `Silent — last heard ${(ageS / 3600).toFixed(1)} h ago`;
-      return "Silent — no broadcast since restart";
+      if (ageS < 90)     return `Silent, last heard ${Math.round(ageS)} s ago`;
+      if (ageS < 5400)   return `Silent, last heard ${Math.round(ageS / 60)} min ago`;
+      if (ageS < 86000)  return `Silent, last heard ${(ageS / 3600).toFixed(1)} h ago`;
+      return "Silent, no broadcast since restart";
     })();
 
     if (mapping.battery) {
@@ -1262,7 +1262,7 @@ function buildFlowModel() {
       const aKey = overrides?.aMetric || "current_a";
       const pKey = overrides?.pMetric || "power_w";
       if (isSilent) {
-        // pass — stale battery contributes nothing
+        // pass, stale battery contributes nothing
       } else if (typeof l[vKey] === "number" && typeof l[aKey] === "number") {
         batteryNetW += l[vKey] * l[aKey];
       } else if (typeof l[pKey] === "number") {
@@ -1271,7 +1271,7 @@ function buildFlowModel() {
     }
     // Sources: ALWAYS render configured sources, even when they're at 0 W.
     // A user who's set up an MPPT wants to see it on the dashboard at all
-    // times — "0 W idle" is informative; hiding the tile makes the system
+    // times, "0 W idle" is informative; hiding the tile makes the system
     // look misconfigured.
     //
     // Solar-pause overlay (#163): when the daemon's solar-pause rule
@@ -1321,7 +1321,7 @@ function buildFlowModel() {
              : subFromState,
       });
     }
-    // Loads: keep the onlyIf filter — the Rover's load output really is
+    // Loads: keep the onlyIf filter, the Rover's load output really is
     // off for most users, and showing "DC Load: 0 W idle" would be clutter,
     // not signal. Inferred bus-loads are still surfaced separately below.
     for (const lo of mapping.loads || []) {
@@ -1363,9 +1363,9 @@ function buildFlowModel() {
   // above this is genuine system load (or an unmeasured source).
   //
   // We always surface the inferred figure now, not just above some 10 W
-  // threshold — otherwise the dashboard reads as "PV 71 W → battery 66 W →
+  // threshold, otherwise the dashboard reads as "PV 71 W → battery 66 W →
   // load 0 W" and users (correctly) think the maths is broken. Showing
-  // the small 5 W difference as load — with an "estimated" sub-label —
+  // the small 5 W difference as load, with an "estimated" sub-label,
   // makes the totals reconcile and tells the truth: load is computed
   // from energy balance unless a real load meter is wired in.
   const INFERRED_NOISE_W = 1;
@@ -1395,7 +1395,7 @@ function buildFlowModel() {
       // quiet on BLE but is still physically pushing watts that
       // the bank is measuring.  Attributing the gap back to the
       // silent device is more honest than rendering a separate
-      // "Other source" alongside — the user sees one tile, knows
+      // "Other source" alongside, the user sees one tile, knows
       // why it's marked estimated, and the maths still balances.
       const silentSources = sources.filter((s) => s.silent && (+s.power || 0) === 0);
       if (silentSources.length === 1) {
@@ -1403,7 +1403,7 @@ function buildFlowModel() {
         silent.power    = -inferred;
         silent.active   = -inferred > 50;
         silent.inferred = true;  // dashed border + asterisk
-        // Keep the "Silent — last heard …" sub-label so the user
+        // Keep the "Silent, last heard …" sub-label so the user
         // still sees why the value is estimated rather than measured.
         silent.sub = silent.sub
           ? `${silent.sub} · estimated from bank`
@@ -1448,7 +1448,7 @@ function renderFlow(targetHost) {
   // nodes, and a separate battery card below the diagram. Modelled
   // on the Powerwall-Dashboard / Tesla-app aesthetic. The kiosk view
   // passes its own host so we can mount a second copy inside the
-  // kiosk layout — the SVG scales with the host width.
+  // kiosk layout, the SVG scales with the host width.
   const host = targetHost || $("#flow");
   const sub  = host === $("#flow") ? $("#flow-sub") : null;
   const cap  = host === $("#flow") ? document.getElementById("flow-cap") : null;
@@ -1470,7 +1470,7 @@ function renderFlow(targetHost) {
   const battNetW   = Math.round(model.batteryNetW || 0);
 
   // Always render the battery as a node in the SVG when a bank
-  // exists. Off-grid users want their battery visible at all times —
+  // exists. Off-grid users want their battery visible at all times,
   // the "uncluttered diagram" intent of hiding it below 10 W made
   // the flow diagram lie about which devices were in the system and
   // people genuinely couldn't find their bank on the dashboard. The
@@ -1478,7 +1478,7 @@ function renderFlow(targetHost) {
   // disappear from the picture.
   const showBattInSvg = !!model.bank;
 
-  // Battery-only topology — no sources, no loads (e.g. bank shunt + dumb packs).
+  // Battery-only topology, no sources, no loads (e.g. bank shunt + dumb packs).
   if (!hasSources && !hasLoads) {
     host.classList.add("flow--idle");
     if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
@@ -1507,7 +1507,7 @@ function renderFlow(targetHost) {
 // flows visibly stream faster.
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-// v3 layout — grew viewBox + node radius to give the diagram more
+// v3 layout, grew viewBox + node radius to give the diagram more
 // presence. Old 400×260 with r=22 felt cramped on mobile;
 // 440×290 with r=28 reads as a hero, not a footer chart.
 const FLOW_W = 440, FLOW_H = 290;
@@ -1517,7 +1517,7 @@ const FLOW_NODE_R = 28;            // main ring radius (was 22)
 const FLOW_NODE_ICON = 28;         // inner icon edge length (was 22)
 const FLOW_BATT_SOC_R = 33;        // SoC arc just outside the ring
 const FLOW_JUNCTION_R = 5;         // explicit centre-node radius
-// Colour stops keyed by colorKeyOf() — drive the gradient defs on
+// Colour stops keyed by colorKeyOf(), drive the gradient defs on
 // each active path so a segment visibly originates in its source
 // colour and arrives in its destination colour. Single source of
 // truth; CSS still drives the static node ring colours.
@@ -1554,7 +1554,7 @@ function buildFlowSvgV2(model, opts) {
   const svg = document.createElementNS(SVG_NS, "svg");
   svg.setAttribute("class", "flow-svg-v2");
   svg.setAttribute("viewBox", `0 0 ${FLOW_W} ${FLOW_H}`);
-  // Removed aria-hidden — nodes are now interactive (drill-in clicks);
+  // Removed aria-hidden, nodes are now interactive (drill-in clicks);
   // each <g class="flow-node-clickable"> carries an accessible label.
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", "Live power flow diagram");
@@ -1563,14 +1563,14 @@ function buildFlowSvgV2(model, opts) {
   // kiosk) don't collide their mpath / gradient references.
   const idPrefix = `fv2-${++FLOW_PATH_SEQ}`;
 
-  // Gradient defs container — gradient stops are built per path as
+  // Gradient defs container, gradient stops are built per path as
   // we discover their source/dest colours.
   const defs = document.createElementNS(SVG_NS, "defs");
   svg.appendChild(defs);
 
   const activePaths = [];
 
-  // Dominant source detection — whichever source/battery carries the
+  // Dominant source detection, whichever source/battery carries the
   // most W gets a soft pulse halo. Sources here are "power feeding
   // the bus": active sources OR (when battery is discharging)
   // the battery. Loads never dominate.
@@ -1647,7 +1647,7 @@ function buildFlowSvgV2(model, opts) {
   // Particles on each active path. Density + speed scale with W.
   activePaths.forEach(p => addFlowParticles(svg, p.id, p.color, p.w));
 
-  // Mid-line W labels — only show for installs with 3+ active edges
+  // Mid-line W labels, only show for installs with 3+ active edges
   // (1-2 edges + node labels already convey the same info; cluttering
   // a simple 2-source layout makes things worse). Honest secondary
   // styling so they read as captions, not primary numbers.
@@ -1655,11 +1655,11 @@ function buildFlowSvgV2(model, opts) {
     activePaths.forEach(p => addFlowSegmentLabel(svg, p.mx, p.my, p.w));
   }
 
-  // Junction node — explicit centre marker at the bus. Pulses softly
+  // Junction node, explicit centre marker at the bus. Pulses softly
   // when sources ≈ loads (battery isn't doing much); grows when the
   // battery is making up a shortfall to draw the eye to "we're
   // burning bank capacity right now". Hidden in the battery-only
-  // edge case (no sources, no loads) — that path returns earlier.
+  // edge case (no sources, no loads), that path returns earlier.
   const totalSrc = model.sources.reduce((a, s) => a + (s.power || 0), 0);
   const totalLoad = model.loads.reduce((a, l) => a + (l.power || 0), 0);
   const imbalance = Math.abs(totalSrc - totalLoad);
@@ -1695,7 +1695,7 @@ function buildFlowSvgV2(model, opts) {
   return svg;
 }
 
-// Drill-in routing. Hash routes — using location.href would break
+// Drill-in routing. Hash routes, using location.href would break
 // inside the broker tunnel (humnb7h4n6.wattpost.cloud), which only
 // proxies the SPA shell + /api/*. Anything else returns the raw
 // 404 JSON. Hash routes stay within the SPA and work everywhere.
@@ -1716,7 +1716,7 @@ function _onFlowSvgClick(e) {
   if (!node) return;
   const dest = node.getAttribute("data-flow-drill");
   if (!dest) return;
-  // Hash navigation only — see drillTargetFor for why.
+  // Hash navigation only, see drillTargetFor for why.
   if (dest.startsWith("#")) location.hash = dest.slice(1);
   else                       location.href = dest;
 }
@@ -1792,14 +1792,14 @@ function positionFlowNodes(n, y, [xMin, xMax]) {
 function addFlowPath(svg, id, x1, y1, x2, y2, active, strokeOverride) {
   // Smooth bezier between two points. Control points are vertically
   // stretched so the curve enters/exits the nodes pointing up/down
-  // — keeps source-to-bus arcs feeling like a real wiring diagram.
+  //, keeps source-to-bus arcs feeling like a real wiring diagram.
   const midY = (y1 + y2) / 2;
   const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
   const el = document.createElementNS(SVG_NS, "path");
   el.setAttribute("id", id);
   el.setAttribute("d", d);
   el.setAttribute("class", `flow-conn-v2${active ? " active" : ""}`);
-  // Optional stroke override — used to point at the per-segment
+  // Optional stroke override, used to point at the per-segment
   // linearGradient so the line visually originates in its source
   // colour and arrives in its destination colour.
   if (strokeOverride) el.setAttribute("stroke", strokeOverride);
@@ -1831,7 +1831,7 @@ function addFlowParticles(svg, pathId, colorKey, w) {
   }
 }
 
-// Local-clock-based sun opacity. No sunrise/sunset API hit — we just
+// Local-clock-based sun opacity. No sunrise/sunset API hit, we just
 // want a visual hint that the dashboard knows it's night. Fades in
 // 06-08, full 08-17, fades out 17-21, dim 21-06.
 function sunTimeOpacity() {
@@ -1845,7 +1845,7 @@ function sunTimeOpacity() {
 function addFlowNode(svg, x, y, t, isSource, extras) {
   const color = colorKeyOf(t);
   // "Idle" = explicit power=0 reading; subtly dimmed (still
-  // visible — the user added it to the config). "Silent" = device
+  // visible, the user added it to the config). "Silent" = device
   // hasn't reported recently; visibly dimmer because the data is
   // genuinely stale.
   const silent = t.silent && (t.power || 0) < 1;
@@ -1870,10 +1870,10 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
     group.setAttribute("data-flow-drill", drillTo);
     group.setAttribute("role", "button");
     group.setAttribute("tabindex", "0");
-    group.setAttribute("aria-label", `${t.label || color} node — opens detail`);
+    group.setAttribute("aria-label", `${t.label || color} node, opens detail`);
   }
 
-  // Watt label — above for sources, below for loads/battery. Padded
+  // Watt label, above for sources, below for loads/battery. Padded
   // a few extra pixels to keep the bigger node ring + label spacing
   // proportional.
   const lbl = document.createElementNS(SVG_NS, "text");
@@ -1884,7 +1884,7 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
   lbl.textContent = `${Math.round(t.power || 0)} W`;
   group.appendChild(lbl);
 
-  // SoC arc — only on the battery node. Drawn as a circle with
+  // SoC arc, only on the battery node. Drawn as a circle with
   // stroke-dasharray to subtend just the right fraction. Rotated
   // -90° so 0% starts at the top (matches the hero SoC donut).
   if (typeof socPct === "number") {
@@ -1902,8 +1902,8 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
   }
 
   // Ring (single stroked circle). Battery node also gets a tinted
-  // fill driven by tone — pink-wash when discharging, green-wash
-  // when charging — so direction reads at a glance even before the
+  // fill driven by tone, pink-wash when discharging, green-wash
+  // when charging, so direction reads at a glance even before the
   // user looks at the arrow / SoC ring / card below.
   const ring = document.createElementNS(SVG_NS, "circle");
   ring.setAttribute("cx", x);
@@ -1914,12 +1914,12 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
     `flow-node-ring ${tone}${isBattery ? " flow-node-ring-batt" : ""}`);
   group.appendChild(ring);
 
-  // Direction arrow — battery node only. ↓ for charging (energy
+  // Direction arrow, battery node only. ↓ for charging (energy
   // INTO the bank), ↑ for discharging (energy OUT). Tone-down from
   // v0.1.90's first cut: chip sits just OUTSIDE the ring (not
   // overlapping the SoC arc) and shrank from r=9 to r=7 so it reads
   // as a badge rather than a competing element. Fill-wash dropped
-  // entirely — the ring colour + arrow already say everything;
+  // entirely, the ring colour + arrow already say everything;
   // pink-on-pink-on-pink was colour soup.
   if (isBattery && (t.power || 0) >= 1) {
     const charging = tone === "batt";
@@ -1934,7 +1934,7 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
     chip.setAttribute("r", 7);
     chip.setAttribute("class", `flow-node-dir-chip ${tone}`);
     group.appendChild(chip);
-    // Triangle — points down (charging, going INTO bank) or up
+    // Triangle, points down (charging, going INTO bank) or up
     // (discharging, going OUT). Sized for r=7 chip.
     const arrow = document.createElementNS(SVG_NS, "path");
     const d = charging
@@ -1952,7 +1952,7 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
   const iconHalf = FLOW_NODE_ICON / 2;
   ig.setAttribute("transform", `translate(${x - iconHalf} ${y - iconHalf})`);
   ig.setAttribute("class", `flow-node-icon ${tone}`);
-  // Time-of-day fade applies only to the sun (PV) icon — at night
+  // Time-of-day fade applies only to the sun (PV) icon, at night
   // the panels aren't doing anything anyway, dimming the icon makes
   // that visually honest without changing the underlying node state.
   if (iconKey === "sun") {
@@ -1973,12 +1973,12 @@ function addFlowNode(svg, x, y, t, isSource, extras) {
 function colorKeyOf(t) {
   // Map flow-model colour tag to a tone class shared with CSS.
   //
-  // "discharge" was missing from the allowlist since v2 — meant the
+  // "discharge" was missing from the allowlist since v2, meant the
   // battery node fell through to "neutral" (grey ring + grey icon)
   // every time the bank was draining, even though the CSS author
   // shipped `.flow-node-ring.discharge { stroke: #f06292 }` expecting
   // it to fire. Card-below was pink, node was grey. Caught while
-  // adding the v3 fill-tint + direction-arrow work — fixed in v0.1.90.
+  // adding the v3 fill-tint + direction-arrow work, fixed in v0.1.90.
   const c = (t && t.color) || "";
   if (c === "pv" || c === "batt" || c === "load" || c === "grid"
       || c === "ac" || c === "dc" || c === "discharge") return c;
@@ -1996,7 +1996,7 @@ function buildBatCard(bank, battNetW) {
   // tiny float trickle so users don't see amber discharging at 100 %.
   // The old "Resting" middle tier was dropped because it labelled a
   // 4 W discharge "Resting" while the side label still read "↑ 4 W
-  // out" — contradictory. Anything ≥1 W now reads honestly by
+  // out", contradictory. Anything ≥1 W now reads honestly by
   // direction; <1 W (genuinely idle) reads as "Idle".
   let state, tone;
   if (soc < 15 && battNetW > 0)      { state = "Low · Charging"; tone = "red"; }
@@ -2040,7 +2040,7 @@ function flowCaption(model, totalSourceW, totalLoadW) {
   const sourcesActive = totalSourceW >= 1;
   const loadsActive   = totalLoadW   >= 1;
   const soc = model.bank.soc || 0;
-  // "Effectively full" — MPPTs go into float around 98-100%. We use
+  // "Effectively full", MPPTs go into float around 98-100%. We use
   // 98 so we catch the "100.0 % shown, 99.6 actual" case too.
   const bankFull = soc >= 98;
 
@@ -2051,7 +2051,7 @@ function flowCaption(model, totalSourceW, totalLoadW) {
     return "";
   }
 
-  // Bank is full and the MPPT is loafing — pulling just enough sun
+  // Bank is full and the MPPT is loafing, pulling just enough sun
   // to cover the load (and a few W of bus maintenance). This is the
   // most common "wait, why is solar only 94 W when it's sunny?"
   // case, so we call it out before the generic discharge text.
@@ -2090,7 +2090,7 @@ function makeFlowDonut(bank, batteryNetW) {
   const sumI  = typeof bank.sumI  === "number" ? bank.sumI  : null;
 
   // State drives colour. Treat ≥98% SoC as "Full" regardless of small
-  // discharge noise — at full SoC a tiny −5 W trickle is the MPPT in
+  // discharge noise, at full SoC a tiny −5 W trickle is the MPPT in
   // float, not a real discharge alert.
   let state, label;
   if (soc < 15)                       { state = "critical";    label = "Low"; }
@@ -2101,7 +2101,7 @@ function makeFlowDonut(bank, batteryNetW) {
 
   // Direction line inside the donut. ↓ = energy flowing INTO the
   // battery (charging), ↑ = energy LEAVING the battery (discharging).
-  // We never label this in bus terms — it's strictly battery-relative.
+  // We never label this in bus terms, it's strictly battery-relative.
   let flowHTML = "";
   if (aNetW >= 1) {
     const arrow = netW > 0 ? "↓" : "↑";
@@ -2315,7 +2315,7 @@ async function ensureWeather(force = false) {
 
 // WMO weather code → human label + minimal SVG icon. We pick from a
 // small palette (clear, partly cloudy, cloud, fog, rain, snow,
-// thunder) rather than the full WMO ladder — anything more fine-
+// thunder) rather than the full WMO ladder, anything more fine-
 // grained than that doesn't read at this size.
 const WMO = {
   describe(code, isDay) {
@@ -2364,7 +2364,7 @@ const WMO = {
 };
 
 // Map a WMO weather_code + is_day flag to a panel-tint class.
-// Kept narrow — six daytime moods + clear-night + partly-night.
+// Kept narrow, six daytime moods + clear-night + partly-night.
 // Everything else falls back to a neutral "cloudy" tint rather
 // than guess; the tile is meant to whisper, not shout.
 function weatherTintClass(code, isDay) {
@@ -2380,7 +2380,7 @@ function weatherTintClass(code, isDay) {
   return "wx-bg-cloudy";
 }
 
-// #264 — "Where you are" location tile. Pulled from /api/location/status
+// #264, "Where you are" location tile. Pulled from /api/location/status
 // (LOCAL view, never gated by share-with-cloud). Cached + only re-painted
 // when coordinates actually move so we don't churn Leaflet on every dashboard
 // poll. Leaflet is defer-loaded; if it's not ready when this runs we just
@@ -2429,7 +2429,7 @@ async function renderLocationTile() {
       // card renders).
       zoomControl: true, scrollWheelZoom: false, attributionControl: false,
     });
-    // Map / Satellite toggle — same wp-map-mode key as the cloud
+    // Map / Satellite toggle, same wp-map-mode key as the cloud
     // surfaces so the user's preference is consistent across both.
     const mapLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
       subdomains: "abcd",
@@ -2492,10 +2492,10 @@ function renderWeather() {
   });
 }
 
-// "Next few hours" strip — Apple-Weather-style hourly preview at the
+// "Next few hours" strip, Apple-Weather-style hourly preview at the
 // bottom of the Right-now tile. Each cell: HH:00 label · tiny WMO
 // icon · °C. We always render from the next upcoming hour (drop any
-// slice whose timestamp is already in the past — provider may send
+// slice whose timestamp is already in the past, provider may send
 // the current hour as the first slice, which would duplicate the
 // hero reading).
 function renderWeatherHourly(hourly) {
@@ -2566,7 +2566,7 @@ async function refreshAccuracyLine() {
   } catch (e) { row.hidden = true; }
 }
 
-// Tomorrow tile was folded into Today (see renderToday) — the standalone
+// Tomorrow tile was folded into Today (see renderToday), the standalone
 // renderTomorrow() / drawTomorrowSpark() entry points are gone. Anything
 // the dashboard used to do for tomorrow lives inside renderToday now.
 
@@ -2577,7 +2577,7 @@ function renderWeek() {
   ensureForecast().then(f => {
     if (!f) { panel.hidden = true; return; }
     const buckets = bucketByDay(f.points);
-    // Drop any buckets with no real energy — Solcast's window can
+    // Drop any buckets with no real energy, Solcast's window can
     // include an in-progress past day that gives 0 kWh. Cap at 5
     // days so the grid stays balanced even when Solcast returns the
     // full 7-day window; reads better at every viewport width.
@@ -2596,7 +2596,7 @@ function drawWeekStrip(days) {
   const host = $("#week-strip");
   if (!host) return;
   // Common scale across all day cards so a quiet day visually reads
-  // as quiet next to a sunny one — otherwise each card auto-fits its
+  // as quiet next to a sunny one, otherwise each card auto-fits its
   // own peak and the comparison loses meaning.
   const peakWAcrossWeek = Math.max(...days.flatMap(d => d.points.map(p => p.w)), 1);
   const todayMid = (() => { const d = new Date(); d.setHours(0,0,0,0); return Math.floor(d.getTime()/1000); })();
@@ -2609,7 +2609,7 @@ function drawWeekStrip(days) {
     const kwh = (d.wh / 1000).toFixed(1);
     const peakKw = d.peak ? (d.peak.w / 1000).toFixed(2) : "—";
     const peakAt = d.peak ? new Date(d.peak.ts * 1000).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : "";
-    // Today is the "you are here" anchor — matches the Today tile above.
+    // Today is the "you are here" anchor, matches the Today tile above.
     const isToday = d.dayMid === todayMid;
     return `
       <div class="week-card ${isToday ? "week-card--featured" : ""}">
@@ -2647,7 +2647,7 @@ function weekSparkSvg(points, peakWAcrossWeek) {
 // Headline tile: today's PV-so-far + a forecast curve for the rest of
 // the day + sub-stats + one-line Tomorrow preview. After sunset (no PV
 // expected today + tomorrow forecast available), the tile flips so
-// Tomorrow becomes the headline and today demotes to a "final" line —
+// Tomorrow becomes the headline and today demotes to a "final" line,
 // the dashboard's "operational moment" stays unambiguous.
 function renderToday() {
   const rover = devices.find(d => d.kind === "charge_controller");
@@ -2700,7 +2700,7 @@ function renderToday() {
     }
   }
 
-  // Today's SoC envelope — answers "did the bank get critically low
+  // Today's SoC envelope, answers "did the bank get critically low
   // overnight?" at a glance. Sourced from /api/today_soc_minmax
   // (fresh endpoint, cheap MIN/MAX over today's bank.soc_pct
   // samples). Render lazily so we don't block the rest of the tile;
@@ -2716,7 +2716,7 @@ function renderToday() {
     }).catch(() => { socEnvEl.textContent = "—"; });
   }
 
-  // Yesterday-accuracy line lives under this tile now — refresh on the
+  // Yesterday-accuracy line lives under this tile now, refresh on the
   // same cadence as the dashboard poll; the API call is cheap and the
   // result hides itself if no archive exists yet.
   refreshAccuracyLine();
@@ -2805,7 +2805,7 @@ function renderToday() {
           sub.textContent = `${provLabel} · refreshed ${fmt.ago(f.fetched_at)}`;
         }
       }
-      // Tomorrow preview footer — only shown when the forecast
+      // Tomorrow preview footer, only shown when the forecast
       // window has tomorrow's data populated.
       if (s.tomorrowWh > 0 && foot) {
         foot.hidden = false;
@@ -2829,7 +2829,7 @@ function _fmtHm(ts) {
 // originally forecast it), post-now points draw dashed + faded so the
 // "still to come" portion is visually distinct from history. A faint
 // vertical line marks "now". When nowTs is null the curve is rendered
-// uniformly bright — used by sleep mode for tomorrow.
+// uniformly bright, used by sleep mode for tomorrow.
 function drawTodaySpark(points, nowTs, host) {
   host = host || $("#today-spark");
   if (!host || !points || !points.length) { if (host) host.innerHTML = ""; return; }
@@ -2858,7 +2858,7 @@ function drawTodaySpark(points, nowTs, host) {
   const pastStr   = past.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
   const futureStr = future.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
   const nowX = Math.min(Math.max(xOf(nowTs), padX), W - padX);
-  // Area only under the past — emphasises what has actually happened.
+  // Area only under the past, emphasises what has actually happened.
   const pastArea = past.length
     ? `<path d="M${xOf(past[0].ts).toFixed(1)},${H - padY} L ${pastStr} L ${nowX.toFixed(1)},${H - padY} Z" fill="rgba(210,153,34,0.18)"/>`
     : "";
@@ -2873,7 +2873,7 @@ function drawTodaySpark(points, nowTs, host) {
 
 // ---------- ALERTS ----------
 // Friendly per-category short labels for the banner summary. Keep
-// them tight — 1-2 words; the summary line ellipsises if too long.
+// them tight, 1-2 words; the summary line ellipsises if too long.
 const ALERT_CAT_LABELS = {
   comms_stale:      "Comms slow",
   comms_alarm:      "No recent poll",
@@ -2926,7 +2926,7 @@ function renderAlerts() {
       lbl: "Bank SoC low", value: `${bank.soc.toFixed(1)} %` });
   }
 
-  // Per-device alerts — tagged with device_label so groupable later.
+  // Per-device alerts, tagged with device_label so groupable later.
   for (const dev of devices.filter(d => d.kind === "smart_battery")) {
     const l = dev.latest || {};
     const cells = [];
@@ -3025,7 +3025,7 @@ function renderAlerts() {
   catsEl.textContent = cats.slice(0, 3).join(" · ")
     + (cats.length > 3 ? ` · +${cats.length - 3}` : "");
 
-  // Detail rows — built once per render. The banner stays collapsed
+  // Detail rows, built once per render. The banner stays collapsed
   // until the user taps the summary; collapse state is preserved
   // across renders via the [aria-expanded] attribute on the summary.
   detail.innerHTML = grouped.map(g => `
@@ -3069,7 +3069,7 @@ function renderCells() {
     else if (spread >= 0.10) panel.classList.add("drift-warn");
   }
 
-  // Hide the panel entirely if we have nothing to show — scenario B users
+  // Hide the panel entirely if we have nothing to show, scenario B users
   // (shunt + dumb packs) have no cell data anywhere on the system.
   if (batteries.length === 0 || allV.length === 0) {
     if (panel) panel.hidden = true;
@@ -3176,7 +3176,7 @@ function efficiencyHeadline(data) {
 // polling stops without the user having to restart the daemon.
 async function deleteDeviceFromList(label, slaveId, transport) {
   if (!transport) {
-    alert(`Can't delete "${label}" — couldn't find its transport. ` +
+    alert(`Can't delete "${label}", couldn't find its transport. ` +
           `Try Setup → Find my dongle to re-confirm the link.`);
     return;
   }
@@ -3206,7 +3206,7 @@ async function deleteDeviceFromList(label, slaveId, transport) {
 //
 // Renders the Mopeka / Govee / Ruuvi readings as a separate panel
 // rather than mixing them into the power flow tile. The flow tile
-// is about energy in/out — sensors are environmental state, kept
+// is about energy in/out, sensors are environmental state, kept
 // visually distinct. Panel auto-hides when no tank/ambient devices
 // are paired so non-vanlife users never see it.
 function renderSensors() {
@@ -3276,7 +3276,7 @@ function _renderSensorCard(dev) {
   }
 
   const staleNote = stale
-    ? `<div class="sensor-card-stale">no fresh advert — last seen ${
+    ? `<div class="sensor-card-stale">no fresh advert, last seen ${
         isFinite(age) ? fmt.ago(Math.floor(Date.now() / 1000) - age) : "never"
       }</div>`
     : "";
@@ -3297,7 +3297,7 @@ function _renderSensorCard(dev) {
 function renderDeviceCards() {
   const host = $("#device-cards");
   host.innerHTML = "";
-  // Bank pinned to the top — it's the headline "what's actually in
+  // Bank pinned to the top, it's the headline "what's actually in
   // my battery bank right now" reading, so users expect to see it
   // alongside the per-pack cards even though it's a synthetic
   // aggregate, not real hardware. Sort: bank first, then everything
@@ -3327,7 +3327,7 @@ function renderDeviceCards() {
     left.append(iconSpan, name);
     const right = document.createElement("div");
     right.className = "dev-card-head-right";
-    // Bank is a synthetic aggregate — there's nothing on disk to
+    // Bank is a synthetic aggregate, there's nothing on disk to
     // delete. Real devices get a trash icon next to the slave label
     // that hits /api/setup/devices/<slave>?transport=… and refreshes
     // the list. Stop-propagation so a tap doesn't also navigate
@@ -3386,11 +3386,11 @@ function renderDeviceCards() {
       const ageStr = ageS < 90 ? `${Math.round(ageS)} s`
                   : ageS < 5400 ? `${Math.round(ageS / 60)} min`
                   : `${(ageS / 3600).toFixed(1)} h`;
-      silent.textContent = `Silent — last heard ${ageStr} ago`;
+      silent.textContent = `Silent, last heard ${ageStr} ago`;
       card.appendChild(silent);
     }
 
-    // Lifetime stats strip for smart batteries — cycles + Ah throughput.
+    // Lifetime stats strip for smart batteries, cycles + Ah throughput.
     // Fetched in the background; injected when ready.
     if (dev.kind === "smart_battery") {
       const lifeBar = document.createElement("div");
@@ -3514,7 +3514,7 @@ function onDeviceChanged(preferMetric) {
   refreshChart();
 }
 
-// Custom-range state — populated when the user picks dates in the
+// Custom-range state, populated when the user picks dates in the
 // datetime-local inputs. Both are unix seconds.
 let customSince = null;
 let customUntil = null;
@@ -3533,7 +3533,7 @@ function sinceForRange(r) {
 
 // Custom range returns [since, bucket, until]. Bucket size is picked so the
 // chart has roughly 300 points regardless of how wide a window the user
-// chose — keeps payload + render cheap and ticks readable.
+// chose, keeps payload + render cheap and ticks readable.
 function customRangeParams() {
   if (customSince == null || customUntil == null) return null;
   const span = customUntil - customSince;
@@ -3546,7 +3546,7 @@ function customRangeParams() {
 //
 // Toggle persists across page loads so the user's preference sticks.
 // Only effective when the selected device is a smart_battery AND
-// there are >=2 smart_battery devices configured — otherwise the
+// there are >=2 smart_battery devices configured, otherwise the
 // checkbox is greyed out and refreshChart() falls through to the
 // single-series path.
 let compareMode = localStorage.getItem("compareMode") === "1";
@@ -3612,14 +3612,14 @@ async function refreshChart() {
   updateStatStrip(metric, data);
 
   // PV forecast overlay: only meaningful when viewing pv_power_w (the
-  // charge controller's incoming PV). Best-effort — a missing or
+  // charge controller's incoming PV). Best-effort, a missing or
   // unconfigured forecast just falls through to a normal chart.
   let forecast = null;
   if (metric === "pv_power_w") {
     try {
       const f = await api("/api/forecast/pv");
       if (f?.points?.length) forecast = f;
-    } catch (e) { /* swallow — no forecast is fine */ }
+    } catch (e) { /* swallow, no forecast is fine */ }
   }
   drawChart(label, metric, data, forecast);
 }
@@ -3629,7 +3629,7 @@ async function refreshChartCompare(metric, selectedLabel) {
   const urls = packs.map(p => [p.label, buildHistoryURL(p.label, metric)])
                     .filter(([, u]) => u != null);
   if (!urls.length) return;
-  // Parallel fetch — a 3-pack rig with the daemon on LAN comes back in
+  // Parallel fetch, a 3-pack rig with the daemon on LAN comes back in
   // well under 200 ms total, so no need for a request-coalescing layer.
   let results;
   try {
@@ -3641,7 +3641,7 @@ async function refreshChartCompare(metric, selectedLabel) {
     console.error("compare-packs fetch failed:", e);
     return;
   }
-  // Stat strip reflects the device the dropdown is on — keeps the
+  // Stat strip reflects the device the dropdown is on, keeps the
   // "selected pack" semantic intact even when we render N of them.
   const sel = results.find(r => r.label === selectedLabel) || results[0];
   if (sel) updateStatStrip(metric, sel.data);
@@ -3818,7 +3818,7 @@ async function refreshEnergyOverview(rangeKey) {
   const soc    = (s.soc_pct || []).map(v => (v == null || v <= 0) ? null : v);
 
   // Cloud cover, aligned to the chart grid by the weather endpoint.
-  // null when unavailable — drawEnergyChart skips the series rather
+  // null when unavailable, drawEnergyChart skips the series rather
   // than rendering a flat zero line.
   const cloudAvailable = !!(weather && weather.available && weather.series?.cloud_cover_pct);
   const cloud = cloudAvailable
@@ -3848,7 +3848,7 @@ async function refreshEnergyOverview(rangeKey) {
   setText("es-batin",  kwh(totals.bank_charged_wh));
   setText("es-batout", kwh(totals.bank_discharged_wh));
 
-  // Self-powered breakdown — bar + legend rows.
+  // Self-powered breakdown, bar + legend rows.
   const bd = payload.self_powered || {};
   const bars = document.getElementById("energy-self-bars");
   const leg  = document.getElementById("energy-self-legend");
@@ -3897,7 +3897,7 @@ function drawEnergyChart(root, ts, series) {
 
   // Cloud cover (0-100%) on a hidden Y axis. Shares the same 0..100
   // range as SoC but drawn behind everything else as a soft grey
-  // wash — looks like "shade behind the energy curves". Only added
+  // wash, looks like "shade behind the energy curves". Only added
   // when weather data is available.
   const hasCloud = Array.isArray(series.cloud) && series.cloud.some(v => v != null);
 
@@ -3913,7 +3913,7 @@ function drawEnergyChart(root, ts, series) {
     cursor: { drag: { x: true, y: false } },
     scales: {
       x: { time: true },
-      // Power axis (signed — battery discharge dips below 0).
+      // Power axis (signed, battery discharge dips below 0).
       y: { auto: true },
       // SoC + cloud cover share the 0..100 right axis. Both are
       // percentages, both belong on a fixed scale so the line is
@@ -3924,26 +3924,26 @@ function drawEnergyChart(root, ts, series) {
       {},
       // Cloud cover first so the energy series paint on top.
       ...cloudSeries,
-      // Solar — yellow filled area, ≥0.
+      // Solar, yellow filled area, ≥0.
       { label: "Solar",       stroke: "#f0c849", width: 1.2, fill: "rgba(240,200,73,0.35)",
         value: (_u, v) => fmtW(v) },
-      // Charger — grey filled area, ≥0.
+      // Charger, grey filled area, ≥0.
       { label: "Charger",     stroke: "#b1b9c2", width: 1.0, fill: "rgba(177,185,194,0.25)",
         value: (_u, v) => fmtW(v) },
-      // Load — purple LINE (no fill) drawn on top of sources so the
+      // Load, purple LINE (no fill) drawn on top of sources so the
       // line is legible against the yellow/grey area overlap. Earlier
       // versions filled this too, but on heavy-source days the load
       // line vanished behind the charger area; line-on-top reads
       // better at glance.
       { label: "Load",        stroke: "#a48cff", width: 1.8,
         value: (_u, v) => fmtW(v) },
-      // Battery in — green filled area, ≥0.
+      // Battery in, green filled area, ≥0.
       { label: "Into battery", stroke: "#56d364", width: 1.0, fill: "rgba(86,211,100,0.30)",
         value: (_u, v) => fmtW(v) },
-      // Battery out — pink filled area, ≤0 (drawn below zero).
+      // Battery out, pink filled area, ≤0 (drawn below zero).
       { label: "Out of battery", stroke: "#f06292", width: 1.0, fill: "rgba(240,98,146,0.30)",
         value: (_u, v) => v == null ? "·" : fmtW(-v) },
-      // SoC — red line on right axis.
+      // SoC, red line on right axis.
       { label: "SoC", stroke: "#ff5e57", width: 1.6, scale: "y2",
         value: (_u, v) => fmtPct(v) },
     ],
@@ -3955,7 +3955,7 @@ function drawEnergyChart(root, ts, series) {
       { stroke: pal.axis, scale: "y2", side: 1, grid: { show: false },
         values: (_u, splits) => splits.map(v => v == null ? "" : v.toFixed(0) + "%") },
     ],
-    // No built-in legend on the Energy chart — we render a static
+    // No built-in legend on the Energy chart, we render a static
     // colour-chip legend below the chart in HTML, so the uPlot one
     // would duplicate it.
     legend: { show: false },
@@ -3983,7 +3983,7 @@ function updateStatStrip(metric, data) {
   $("#cs-max").textContent = fmtV(s.max);
 
   // Resolution = bucket / table info: tell the user how dense the data
-  // is. Moved out of the stat strip — it's debug context, not a stat —
+  // is. Moved out of the stat strip, it's debug context, not a stat,
   // into a small subtitle line under the chart controls. The Range
   // cell (max - min) was redundant with Min + Max and got dropped.
   const tableLabel = {
@@ -4035,9 +4035,9 @@ function drawChart(label, metric, data, forecast = null) {
 
   // Build series + data matrix in lockstep so indices always line up.
   //   series[0] = x (always)
-  //   series[1] = min — invisible line that anchors the band's bottom edge
-  //   series[2] = max — invisible line, paired with min by `bands`
-  //   series[3] = avg — the visible line
+  //   series[1] = min, invisible line that anchors the band's bottom edge
+  //   series[2] = max, invisible line, paired with min by `bands`
+  //   series[3] = avg, the visible line
   // Without bands: series[1] = avg, data = [ts, vals]
   const pal = chartPalette();
   const series = [{}];
@@ -4058,7 +4058,7 @@ function drawChart(label, metric, data, forecast = null) {
     bands = [{ series: [2, 1], fill: pal.bandFill }];
   }
 
-  // Main line — last historic series, always visible.
+  // Main line, last historic series, always visible.
   series.push({
     label: prettyKey(metric),
     stroke: pal.accent,
@@ -4077,7 +4077,7 @@ function drawChart(label, metric, data, forecast = null) {
   //   - p90 (invisible anchor, upper band edge)
   //   - median (the dashed line the user actually sees)
   // The fill between p10 and p90 visualises Solcast's stated
-  // confidence interval — a wide band means the forecast model
+  // confidence interval, a wide band means the forecast model
   // isn't sure, a narrow one means high confidence.
   let combinedTs = ts.slice();
   if (forecastFuture.length) {
@@ -4128,7 +4128,7 @@ function drawChart(label, metric, data, forecast = null) {
     dataCols[0] = combinedTs;
   }
 
-  // Auto-fit X scale to whatever timeline we ended up with — historical
+  // Auto-fit X scale to whatever timeline we ended up with, historical
   // only, or historical + forecast extension.
   const tsMin = combinedTs.length ? combinedTs[0] : null;
   const tsMax = combinedTs.length ? combinedTs[combinedTs.length - 1] : null;
@@ -4156,7 +4156,7 @@ function drawChart(label, metric, data, forecast = null) {
         stroke: pal.axis,
         grid:  { stroke: pal.grid },
         ticks: { stroke: pal.gridStrong },
-        // Fewer ticks, more vertical space per tick — keeps labels
+        // Fewer ticks, more vertical space per tick, keeps labels
         // breathable and lets us afford slightly longer text.
         space: 36,
         // Computed below from the actual longest label.
@@ -4168,7 +4168,7 @@ function drawChart(label, metric, data, forecast = null) {
         },
         values: (_u, splits) => {
           // Pick decimals based on the smallest gap between consecutive
-          // ticks — guarantees each tick is distinct. Cap at 3 decimals so
+          // ticks, guarantees each tick is distinct. Cap at 3 decimals so
           // tiny-noise data (e.g. bank Ah jiggling in the third decimal)
           // doesn't produce 11-character monster labels like "246.8120 Ah".
           let minDelta = Infinity;
@@ -4223,7 +4223,7 @@ async function refreshDriftSparkline() {
   const batts = devices.filter(d => d.kind === "smart_battery");
   if (batts.length === 0) return;
 
-  // Pick the pack with the highest current drift — that's the one worth
+  // Pick the pack with the highest current drift, that's the one worth
   // tracking. Fetch its cell_drift_v over the last 24h.
   let target = batts[0].label;
   let maxDrift = -1;
@@ -4280,7 +4280,7 @@ async function refreshDriftSparkline() {
 }
 
 // ---------- runtime prediction (#99) ----------
-// The Hero tile's "Remaining" line is naive — current power × current SoC.
+// The Hero tile's "Remaining" line is naive, current power × current SoC.
 // This fetcher overlays a forecast-aware line below it: "Forecast: lasts
 // 4.5 days" (sunny) or "depleted Wed 02:00" (cloudy). Driven from a
 // rolling 1-hour avg load and the cached Open-Meteo / Solcast forecast.
@@ -4302,7 +4302,7 @@ async function refreshRuntimeForecast() {
 
   if (fc.available) {
     if (fc.reserves_indefinite) {
-      // Forecast says you stay above 10% across the horizon — express
+      // Forecast says you stay above 10% across the horizon, express
       // as "reserve days" using the naive rate.
       if (naive.hours_to_empty != null) {
         const days = naive.hours_to_empty / 24;
@@ -4326,7 +4326,7 @@ async function refreshRuntimeForecast() {
       title = "Hourly walk of avg load minus forecast PV until SoC hits 10 % reserve.";
     }
   } else if (naive.hours_to_empty != null) {
-    // No forecast — show the naive rolling-average view as a secondary line.
+    // No forecast, show the naive rolling-average view as a secondary line.
     const hours = naive.hours_to_empty;
     if (hours < 24) {
       text = `1h-avg load: ~${hours.toFixed(1)}h to 10%`;
@@ -4352,7 +4352,7 @@ async function refreshRuntimeForecast() {
 // ---------- battery health tile (#109) ----------
 // SoC residency histogram + cycle/lifetime numbers. Refreshed on
 // route-enter and on every dashboard tick alongside the drift
-// sparkline. Cheap query — single rollup-table scan plus a couple
+// sparkline. Cheap query, single rollup-table scan plus a couple
 // of latest-table lookups.
 
 // Show/clear a small "from BMS" / "from shunt" caption beneath a
@@ -4393,12 +4393,12 @@ async function refreshBatteryHealth() {
   const bars = document.getElementById("bhealth-bars");
 
   // Cycle + lifetime layered fallback (#295):
-  //   1. BMS-reported (cleanest — manufacturer cycle definition)
+  //   1. BMS-reported (cleanest, manufacturer cycle definition)
   //   2. Shunt-reported (Junctek surfaces its own counter; most don't)
-  //   3. Shunt-derived (cumulative_discharge_ah ÷ bank capacity —
+  //   3. Shunt-derived (cumulative_discharge_ah ÷ bank capacity,
   //      works on any Renogy / Junctek shunt because they all expose
   //      the lifetime Ah counter)
-  //   4. "BMS or shunt only" — no upstream reports it.
+  //   4. "BMS or shunt only", no upstream reports it.
   // Provenance lives in the title tooltip so the headline number
   // stays uncluttered. The label hint shows where it came from in
   // small grey text below the number.
@@ -4469,7 +4469,7 @@ async function refreshBatteryHealth() {
     dy.textContent = data.days_online != null ? `${data.days_online}` : "·";
   }
 
-  // Residency histogram — 10 bars, % time in each 10% SoC band. A
+  // Residency histogram, 10 bars, % time in each 10% SoC band. A
   // healthy LFP bank lives in 50-95%; visible weight at the low end
   // means the user's draining too deep and shortening lifespan.
   const resid = data.soc_residency || [];
@@ -4489,7 +4489,7 @@ async function refreshBatteryHealth() {
     if (total === 0) {
       bars.innerHTML = '<div class="empty-spark">collecting…</div>';
     } else {
-      // Bars coloured by SoC band — red for low, amber mid, green high.
+      // Bars coloured by SoC band, red for low, amber mid, green high.
       const palette = ["#dc4d4d", "#dc7a4d", "#e0a04a", "#e0c04a", "#c6c04a",
                        "#8fc04a", "#5fc06a", "#4fbf7f", "#43b88f", "#3aa080"];
       const maxPct = Math.max(...resid.map(r => r.pct || 0), 1);
@@ -4549,7 +4549,7 @@ function drawHeatmap(root, data) {
         // HSL warm-gold→red ramp. In dark mode low values start as dim
         // charcoal and climb to vivid red. In light mode we invert the
         // brightness ramp so low values are near-white and high values
-        // are saturated red — the same temperature reading on either bg.
+        // are saturated red, the same temperature reading on either bg.
         const hue = 50 - 50 * intensity;
         const light = document.documentElement.getAttribute("data-theme") === "light";
         const sat = light ? (40 + 50 * intensity) : (35 + 60 * intensity);
@@ -4583,11 +4583,11 @@ const VALID_ROUTES = new Set(["dashboard", "history", "devices", "setup", "setti
 // Anonymous LAN viewers (kiosks, family members on the WiFi) get
 // dashboard / history / devices / docs / kiosk for free; the moment
 // they hit Settings or Setup they're bounced to /login. Backend
-// mutation endpoints stay gated regardless — this is a UX guard,
+// mutation endpoints stay gated regardless, this is a UX guard,
 // not a security boundary on its own.
 const AUTH_GATED_ROUTES = new Set(["settings", "setup"]);
 
-// Cached auth state — populated by wireHeaderAuth's auth-status
+// Cached auth state, populated by wireHeaderAuth's auth-status
 // fetch, refreshed on logout. setRoute() reads this when gating
 // AUTH_GATED_ROUTES; null = unknown (treat as anonymous to be safe).
 let _authState = null;
@@ -4607,7 +4607,7 @@ function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
   const m = raw.match(/^device\/(.+)$/);
   if (m) return { name: "device", label: decodeURIComponent(m[1]) };
-  // docs/<slug> — strip the slug into a separate field.
+  // docs/<slug>, strip the slug into a separate field.
   const d = raw.match(/^docs\/(.+)$/);
   if (d) return { name: "docs", slug: d[1] };
   if (raw === "docs") return { name: "docs", slug: null };
@@ -4627,7 +4627,7 @@ function setRoute(_unused) {
   // open Settings or Setup. Demo mode skips (no auth at all). If we
   // haven't yet resolved the auth state (race with the bootstrap
   // /api/system/auth-status fetch), fall back to a quick synchronous
-  // check via fetch — UX cost is small (one round-trip on first nav
+  // check via fetch, UX cost is small (one round-trip on first nav
   // to settings).
   if (AUTH_GATED_ROUTES.has(route.name)
       && !document.body.classList.contains("is-demo")) {
@@ -4650,7 +4650,7 @@ function setRoute(_unused) {
           }
         })
         .catch(() => {
-          // Network error — assume unauthed and bounce.
+          // Network error, assume unauthed and bounce.
           window.location.href = "/login?next=/%23/" + encodeURIComponent(route.name);
         });
       return;
@@ -4693,11 +4693,11 @@ function setRoute(_unused) {
 
 window.addEventListener("hashchange", () => setRoute(currentRouteName()));
 
-// White-label branding — applied once at page load. Cached via the
+// White-label branding, applied once at page load. Cached via the
 // cloud heartbeat into the appliance kv table; /api/branding hands
 // it back here. When unset (Hobby/Pro accounts, or no cloud pair),
 // stays on the default WattPost mark. Re-renders on next page load
-// after a heartbeat picks up changes (no live hot-swap needed —
+// after a heartbeat picks up changes (no live hot-swap needed,
 // branding updates are rare).
 (async function applyBranding() {
   let b;
@@ -4725,7 +4725,7 @@ window.addEventListener("hashchange", () => setRoute(currentRouteName()));
 })();
 
 // Set the Daemon row based on whatever poll data we have. Pulled out
-// of renderSettings() so applySnapshot can call it too — otherwise the
+// of renderSettings() so applySnapshot can call it too, otherwise the
 // Settings tab opens before the first snapshot, shows "starting…",
 // and never refreshes until the user navigates away and back.
 function renderDaemonStatus() {
@@ -4762,10 +4762,10 @@ function renderSettings() {
   wireBackupRunNow();
   refreshCloudBackups();
   refreshDiscoveryToggle();
-  refreshHistorySettings();  // #172 — editable poll interval + retention
-  refreshSolarPauseSettings();  // #163 — solar-aware charger pause
-  refreshLocationPanel();    // #263/#264 — share-with-cloud toggle
-  wireResetToDefaults();     // #138 — Danger zone
+  refreshHistorySettings();  // #172, editable poll interval + retention
+  refreshSolarPauseSettings();  // #163, solar-aware charger pause
+  refreshLocationPanel();    // #263/#264, share-with-cloud toggle
+  wireResetToDefaults();     // #138, Danger zone
 }
 
 async function refreshLocationPanel() {
@@ -4816,10 +4816,10 @@ async function updateLocationShare(mode) {
     const data = await r.json();
     if (msgEl) {
       msgEl.textContent = mode === "off"
-        ? "Off — cloud will receive no location data from the next heartbeat."
+        ? "Off, cloud will receive no location data from the next heartbeat."
         : (mode === "approx"
-            ? "Approximate — coordinates rounded to ~10km before transmission."
-            : "Precise — exact lat/lon will be shared on the next heartbeat.");
+            ? "Approximate, coordinates rounded to ~10km before transmission."
+            : "Precise, exact lat/lon will be shared on the next heartbeat.");
     }
   } catch (e) {
     if (msgEl) { msgEl.style.color = "var(--red)"; msgEl.textContent = "Save failed: " + e.message; }
@@ -4848,10 +4848,10 @@ async function refreshSolarPauseSettings() {
   const sel = document.getElementById("sp-output");
   if (sel) {
     sel.innerHTML = "";
-    // Sensible targets: smart plugs (the recommended path — they cut
+    // Sensible targets: smart plugs (the recommended path, they cut
     // mains upstream of the AC charger and work regardless of charger
     // vendor) plus any future native AC-charger writes. We deliberately
-    // skip the Renogy Rover's DC load output here — it's not the right
+    // skip the Renogy Rover's DC load output here, it's not the right
     // thing to put on this rule.
     const ok = (outputs.outputs || []).filter(o => {
       const k = (o.kind || "").toLowerCase();
@@ -5036,7 +5036,7 @@ async function refreshHistorySettings() {
       setVal("#hist-min",  d.retention_min_days);
       setVal("#hist-hour", d.retention_hour_days);
       const status = $("#hist-status");
-      if (status) status.textContent = "Defaults loaded — click Save to apply.";
+      if (status) status.textContent = "Defaults loaded, click Save to apply.";
     });
   }
 }
@@ -5087,7 +5087,7 @@ async function saveHistorySettings() {
 
 // Discovery telemetry (#129). Reads /api/system/discovery to render
 // the current opt-in state, wires the toggle to /toggle. Cheap +
-// idempotent — safe to call on every settings render.
+// idempotent, safe to call on every settings render.
 async function refreshDiscoveryToggle() {
   const btn = document.getElementById("discovery-toggle");
   const msg = document.getElementById("discovery-toggle-msg");
@@ -5300,14 +5300,14 @@ async function refreshCloudBackups() {
   const toggleMsg = document.getElementById("backup-cloud-toggle-msg");
   if (!list || !toggleBtn) return;
 
-  // Read schedule first — tells us whether cloud_upload is on
+  // Read schedule first, tells us whether cloud_upload is on
   // (and whether the local backup service is running at all).
   let sched;
   try { sched = await api("/api/system/backup/schedule"); }
   catch { sched = null; }
   const cloudOn = !!(sched && sched.cloud_upload_enabled);
 
-  // Always probe cloud-list — its response carries the cues we
+  // Always probe cloud-list, its response carries the cues we
   // need (paired? Pro/Installer tier? cloud on a build that
   // supports backups?) to decide what to show. Doing this before
   // wiring the toggle means we can grey-out for Hobby etc.
@@ -5380,7 +5380,7 @@ async function refreshCloudBackups() {
       <br><br>
       <span class="dash-sub" style="display:block;font-size:.85rem;color:var(--text-2);margin-top:.4rem;">
         Just restored from a cloud backup? Your previous credentials
-        were cleared for security — re-pair to reconnect.
+        were cleared for security, re-pair to reconnect.
       </span>
     </div>`;
     return;
@@ -5545,13 +5545,13 @@ async function refreshUpdateState() {
 
   const isDocker = u.deployment === "docker";
 
-  // "Latest available" row is ALWAYS visible — gives users a positive
+  // "Latest available" row is ALWAYS visible, gives users a positive
   // confirmation either way (the previous behaviour silently hid the
   // row when up-to-date, which read as "data missing"). Two shapes:
   //   has_update + latest_version → "v0.1.34 available" + Release-notes link
   //   otherwise                   → "Up to date" (no link, no apply btn)
   // The version-known guard still matters for the transient first-boot
-  // window where has_update=true but latest_version=null — we then
+  // window where has_update=true but latest_version=null, we then
   // render "Checking…" instead of the misleading "v—".
   const row = $("#settings-update-row");
   if (row) row.hidden = false;
@@ -5560,7 +5560,7 @@ async function refreshUpdateState() {
   if (pendingUpdate) {
     set("#settings-update-latest", "v" + u.latest_version + " available");
     if (a) {
-      // Always route to the in-app hash route — the appliance
+      // Always route to the in-app hash route, the appliance
       // dashboard uses hash routing (#/docs/<slug>), not server
       // paths. The manifest's release_url is shaped for the
       // wattpost.io marketing site and would 404 here.
@@ -5576,13 +5576,13 @@ async function refreshUpdateState() {
   }
 
   // Apply button: only on Pi installs with an actual pending update.
-  // Docker users update via `docker compose pull` on the host — no
+  // Docker users update via `docker compose pull` on the host, no
   // in-app button, by design (matches Immich, Pi-hole, Vaultwarden
   // conventions).
   const applyBtn = $("#settings-update-apply");
   if (applyBtn) applyBtn.hidden = isDocker || !pendingUpdate;
 
-  // "Updates: docker compose pull..." row — only when there's
+  // "Updates: docker compose pull..." row, only when there's
   // actually an update pending on a Docker install. Used to be
   // shown all the time on Docker, which read as "you need to do
   // something" even when up to date. The Docker-update path is
@@ -5592,7 +5592,7 @@ async function refreshUpdateState() {
 
   // Force-hide the in-flight progress row whenever refreshUpdateState
   // runs. The apply handler is the ONLY thing that should ever unhide
-  // it — previously, the row could get stuck visible after a daemon
+  // it, previously, the row could get stuck visible after a daemon
   // restart left the DOM in mid-apply state, showing a permanent
   // "waiting…" zombie to users who hadn't pressed Apply themselves.
   // Service workers caching the half-progress shell made it worse.
@@ -5609,7 +5609,7 @@ async function refreshUpdateState() {
   }
 }
 
-// Alert banner expand/collapse — toggles the detail panel + the chevron
+// Alert banner expand/collapse, toggles the detail panel + the chevron
 // rotation via the `expanded` class on the host. We deliberately use
 // addEventListener (not the inline onclick from the wireframe) so the
 // handler survives DOM diffs in renderAlerts (which only rewrites the
@@ -5633,7 +5633,7 @@ document.getElementById("settings-update-now")?.addEventListener("click", async 
   } finally {
     btn.disabled = false; btn.textContent = "Check now";
     // Drop focus so iOS Safari doesn't leave the button in its
-    // pressed/highlighted state after the action completes — users
+    // pressed/highlighted state after the action completes, users
     // see the colour stuck and assume the button is still busy.
     btn.blur();
   }
@@ -5643,7 +5643,7 @@ document.getElementById("settings-update-now")?.addEventListener("click", async 
 // helper and 202s immediately; we then poll /api/system/update/log
 // every 2s to surface progress. install.sh restarts the daemon mid-
 // flight so /api/system/update/log will briefly 502 (cloudflared not
-// proxying yet) — we tolerate that and resume polling once the daemon
+// proxying yet), we tolerate that and resume polling once the daemon
 // comes back up.
 document.getElementById("settings-update-apply")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget;
@@ -5689,7 +5689,7 @@ document.getElementById("settings-update-apply")?.addEventListener("click", asyn
     } catch (e) {
       consecutive502 += 1;
       if (consecutive502 > 40) {
-        // ~80s of unreachable daemon — give up auto-polling and let
+        // ~80s of unreachable daemon, give up auto-polling and let
         // the user refresh manually.
         if (out) out.textContent += `\n[connection lost. Refresh the page once the daemon is back]`;
         btn.disabled = false; btn.textContent = "Update now";
@@ -5818,7 +5818,7 @@ function renderIntegrationsPanel() {
                 // Used to display the raw CF Tunnel hostname here
                 // (humnb7h4n6.wattpost.io). Removed because (a) the
                 // tunnel URL is for cloud → appliance plumbing, not
-                // for end-user navigation — customers should use the
+                // for end-user navigation, customers should use the
                 // broker URL <slug>.wattpost.cloud from their cloud
                 // dashboard, and (b) surfacing it implied "you can
                 // share this link" which is exactly wrong (the tunnel
@@ -5964,7 +5964,7 @@ function _mqttPayload(form, enabled = true) {
     host:                form.elements["host"].value.trim(),
     port:                parseInt(form.elements["port"].value, 10),
     username:            form.elements["username"].value.trim(),
-    // Send "****" sentinel if blank — server preserves the existing one.
+    // Send "****" sentinel if blank, server preserves the existing one.
     password:            pwd === "" ? "****" : pwd,
     client_id:           form.elements["client_id"].value.trim(),
     topic_prefix:        form.elements["topic_prefix"].value.trim(),
@@ -6148,7 +6148,7 @@ async function pairCloud(form) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
-    // See note above — hot-start makes the daemon live immediately.
+    // See note above, hot-start makes the daemon live immediately.
     status.textContent = d.restart_required
       ? `✓ Paired (${d.label || "·"} #${d.appliance_id}). Restart the daemon to start heartbeats.`
       : `✓ Paired (${d.label || "·"} #${d.appliance_id}). Heartbeats are live now.`;
@@ -6321,7 +6321,7 @@ async function clearWeather() {
 function renderForecastForm(fc) {
   const apiKeyMasked = fc.api_key === "****";
   const provider = fc.provider || "solcast";
-  // Two distinct field sets — Solcast wants API creds, Open-Meteo
+  // Two distinct field sets, Solcast wants API creds, Open-Meteo
   // wants array geometry. We render both and JS shows/hides based on
   // the picker. Easier to maintain than two separate render funcs.
   return `
@@ -6449,7 +6449,7 @@ function _forecastPayload(form) {
       resource_id: form.elements["resource_id"].value.trim(),
     };
   }
-  // openmeteo — empty lat/lon means "inherit from weather block";
+  // openmeteo, empty lat/lon means "inherit from weather block";
   // send null so backend can apply that fallback.
   const _f = (k) => {
     const v = form.elements[k].value.trim();
@@ -6531,16 +6531,16 @@ async function clearForecast(form) {
 // ---------- alerts panel (full editor) ----------
 const ALERT_OP_LABEL = { lt: "<", lte: "≤", gt: ">", gte: "≥", eq: "=", neq: "≠" };
 // Common metric paths the user can pick without typing. Anything else
-// works too — the field falls back to a free-text input.
+// works too, the field falls back to a free-text input.
 const METRIC_SUGGESTIONS = [
-  // Bank-level metrics — the everyday "is the battery OK" stuff.
+  // Bank-level metrics, the everyday "is the battery OK" stuff.
   { value: "bank.soc_pct",              label: "Battery SoC (%)" },
   { value: "bank.netW",                 label: "Bank net power (W)" },
   { value: "bank.meanV",                label: "Bank voltage (V)" },
   { value: "bank.totalRem",             label: "Bank remaining (Ah)" },
   { value: "bank.totalCap",             label: "Bank capacity (Ah)" },
   { value: "bank.time_to_go_minutes",   label: "Time to empty (minutes, shunt-only)" },
-  // Cell-balance metrics (BMS-sourced) — early-warning for pack health.
+  // Cell-balance metrics (BMS-sourced), early-warning for pack health.
   { value: "bank.worst_pack_drift_v",   label: "Worst pack drift (V)" },
   { value: "bank.cell_min_v",           label: "Lowest cell voltage (V)" },
   { value: "bank.cell_max_v",           label: "Highest cell voltage (V)" },
@@ -6636,7 +6636,7 @@ function renderAlertsPanel() {
   html += `<div class="alerts-sub-head"><h4>Alert rules</h4>
     <button class="alerts-add-btn" data-add="rule">+ Add rule</button></div>`;
 
-  // One-tap templates row — pre-fills the add-rule form with sensible
+  // One-tap templates row, pre-fills the add-rule form with sensible
   // thresholds for the most common alarms. Hidden when the form is
   // already open so we don't clutter the editing flow.
   if (!(alertsState.editing?.type === "rule" && alertsState.editing.mode === "add")) {
@@ -6650,7 +6650,7 @@ function renderAlertsPanel() {
 
   if (alertsState.editing?.type === "rule" && alertsState.editing.mode === "add") {
     // A `prefill` on the editing state means the user clicked a
-    // quick-template chip — pass the template rule into the form
+    // quick-template chip, pass the template rule into the form
     // so all the fields land pre-filled.
     html += renderRuleForm(alertsState.editing.prefill || null, transportIds);
   }
@@ -6941,7 +6941,7 @@ function wireAlertsHandlers() {
       renderAlertsPanel();
     });
   });
-  // Quick-template chips — open the add-rule form pre-filled with the
+  // Quick-template chips, open the add-rule form pre-filled with the
   // template's metric, op, threshold, severity, cooldown.
   host.querySelectorAll("[data-alert-template]").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -7006,7 +7006,7 @@ function wireAlertsHandlers() {
   });
   host.querySelectorAll("form[data-form='quiet_hours']").forEach(f => {
     // Disabling the toggle greys the hour inputs so the form's intent
-    // is obvious — saving with the box unchecked clears the window.
+    // is obvious, saving with the box unchecked clears the window.
     const enable = f.elements["enabled"];
     const sync = () => {
       const dis = !enable.checked;
@@ -7090,7 +7090,7 @@ async function submitTransportForm(form) {
     if (el.type === "checkbox") {
       extra[el.name] = el.checked;
     } else if (el.value !== "" || (editing && SECRET_FIELDS.has(el.name))) {
-      // On edit, an empty secret means "leave the existing one alone" —
+      // On edit, an empty secret means "leave the existing one alone",
       // skip it so the PUT doesn't blank it out. On create, fall through
       // so an empty value is sent (and server-side validation can flag it).
       if (editing && SECRET_FIELDS.has(el.name) && el.value === "") return;
@@ -7187,7 +7187,7 @@ async function testAlert(ruleId) {
 }
 
 // ---------- wiring ----------
-// Theme picker — System / Dark / Light.
+// Theme picker, System / Dark / Light.
 document.querySelectorAll(".theme-opt").forEach(btn => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.themePref));
 });
@@ -7195,7 +7195,7 @@ applyTheme(themePref());  // paints meta-color + button selection state
 
 // Kiosk default toggle + exit button. The default-on-this-device flag
 // only triggers a redirect if the user landed without an explicit route
-// in the URL — otherwise an inbound link to /#/history or /#/devices
+// in the URL, otherwise an inbound link to /#/history or /#/devices
 // would be silently stomped on every refresh.
 const kioskToggle = $("#kiosk-default-toggle");
 if (kioskToggle) {
@@ -7209,7 +7209,7 @@ if (kioskExitBtn) {
   // Hide Exit Kiosk for two cases:
   //   - kiosk-token share URL (#150): visitor has no session at
   //     all, would land in the dashboard with no auth and see
-  //     401s everywhere — bad UX.
+  //     401s everywhere, bad UX.
   //   - Cloud-broker view: customer IS authed via the cloud, but
   //     the broker dashboard at xyz.wattpost.cloud should be
   //     SoC-kiosk-only. Full Settings / Devices / Setup chrome
@@ -7228,7 +7228,7 @@ if (kioskExitBtn) {
     if (KIOSK_KEY_PARAM) {
       window.location.href = "/";
     } else if (IS_BROKER_VIEW) {
-      // Broker — stay put, no breakout.
+      // Broker, stay put, no breakout.
       return;
     } else {
       window.location.hash = "#/";
@@ -7239,9 +7239,9 @@ const restartBtn = $("#restart-daemon-btn");
 if (restartBtn) {
   restartBtn.addEventListener("click", restartDaemon);
 }
-// Rotate web password — Settings → System → "Rotate web password".
+// Rotate web password, Settings → System → "Rotate web password".
 // Generates a fresh ~16-char random password on the appliance and
-// shows it once. Docker users specifically asked for this — they
+// shows it once. Docker users specifically asked for this, they
 // don't have wattpost-config TUI access on the host. Old hash is
 // replaced atomically; existing sessions on OTHER browsers stay
 // valid until they natural-expire (so you don't sign yourself out
@@ -7287,8 +7287,8 @@ if (rotatePwBtn) {
     }
   });
 }
-// #292 — Make the SoC donut click into the bank detail page.
-// The bank device's label is the literal string "bank" — set by
+// #292, Make the SoC donut click into the bank detail page.
+// The bank device's label is the literal string "bank", set by
 // the aggregator. Clicking the donut routes to /#/device/bank
 // where buildBankDetail() renders per-pack mini-cards + summary
 // stats. cursor:pointer + role=button + ARIA so it's discoverable.
@@ -7306,11 +7306,11 @@ if (rotatePwBtn) {
   });
 })();
 
-// Sign-out button — lives inside Settings → System (the only place
+// Sign-out button, lives inside Settings → System (the only place
 // where being signed in actually matters; mutations require a
 // session, everything else on LAN is anonymous read-only). Hidden
 // when the user isn't authed (no session to end). Sign-IN is
-// triggered implicitly by tapping Settings or Setup — the SPA
+// triggered implicitly by tapping Settings or Setup, the SPA
 // router (AUTH_GATED_ROUTES) bounces unauthed visitors to /login.
 (function wireSignout() {
   const signoutBtn = document.getElementById("signout-btn");
@@ -7363,10 +7363,10 @@ if (rotatePwBtn) {
       // Broker-origin: skip SSE, use polling. iOS Safari serialises
       // its small per-host HTTP connection pool around a long-lived
       // EventSource through the Cloudflare tunnel, queuing every
-      // /api/* fetch behind the SSE — dashboard sits at "connecting"
+      // /api/* fetch behind the SSE, dashboard sits at "connecting"
       // forever even though the data is one request away. Polling
       // every 5 s is plenty for a remote view and dodges the trap.
-      // Local LAN keeps SSE — it works fine on a fresh connection.
+      // Local LAN keeps SSE, it works fine on a fresh connection.
       if (authed && origin === "broker") {
         if (typeof eventStream !== "undefined" && eventStream) {
           try { eventStream.close(); } catch (_) {}
@@ -7383,7 +7383,7 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
 // ---------- kiosk share URL (Settings → Kiosk share URL) ----------
 // Surfaces the per-appliance kiosk_token as a copy-paste-able URL
 // + lets the user rotate it (revoke a leaked URL with one click).
-// Hidden until the cloud tunnel is provisioned — share URL needs
+// Hidden until the cloud tunnel is provisioned, share URL needs
 // a slug to point anywhere.
 (function wireKioskShare() {
   const block    = document.getElementById("kiosk-block");
@@ -7451,7 +7451,7 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
   });
 
   // Lazy-load when Settings tab is opened, not on every page load.
-  // Re-uses the same hashchange firing setRoute() — when route ==
+  // Re-uses the same hashchange firing setRoute(), when route ==
   // settings AND we haven't loaded yet, fetch once.
   let loaded = false;
   function maybeLoad() {
@@ -7465,7 +7465,7 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
   maybeLoad();
 })();
 
-// Status pill legend popover — click the pill to open, click outside or
+// Status pill legend popover, click the pill to open, click outside or
 // the close button to dismiss.
 const statusEl = $("#status");
 const legendEl = $("#status-legend");
@@ -7592,7 +7592,7 @@ window.addEventListener("resize", () => {
   }
 });
 
-// Range buttons above the Energy chart — single delegated click
+// Range buttons above the Energy chart, single delegated click
 // listener (the buttons are in static HTML so the listener can be
 // installed once, no rebinding needed when refreshEnergyOverview
 // toggles is-active classes).
@@ -7642,11 +7642,11 @@ function renderDeviceDetail(label) {
   const fw = dev.latest?.firmware_version || dev.latest?.firmware_version_raw || "";
   const shown = dispName(dev);
   const renamed = shown !== dev.label;
-  // #297-4 — escape every DB-derived string before it lands in
+  // #297-4, escape every DB-derived string before it lands in
   // innerHTML. display_name + label come from user-edited rename
   // input; vendor/kind/model from device drivers; all become tainted
   // if a malicious backup restores a poisoned DB row. Defense in
-  // depth alongside #297-1 (config sanitiser) — even if a row slips
+  // depth alongside #297-1 (config sanitiser), even if a row slips
   // through, rendering can't execute attacker JS.
   host.innerHTML = `
     <div class="dev-detail-head">
@@ -7687,7 +7687,7 @@ function renderDeviceDetail(label) {
   // Rename button → prompt → PUT /display-name → optimistic refresh.
   wireDeviceRename(dev);
   // Async-fetch controllable outputs registered against this device.
-  // Renders nothing if the device has none — Rovers get a Load panel,
+  // Renders nothing if the device has none, Rovers get a Load panel,
   // smart batteries / shunts get nothing today (until #114 adds JK BMS
   // charge/discharge MOS outputs).
   renderDeviceOutputs(dev.label);
@@ -8025,7 +8025,7 @@ function wireOutputPanel(o) {
 // reveals an inline form that posts to the API and re-renders the
 // list. Sunrise/sunset triggers carry a ± offset; time triggers
 // carry an HH:MM. Day-mask is rendered as 7 toggleable letter chips
-// (M T W T F S S, Monday is bit 0 — matches `datetime.weekday()`).
+// (M T W T F S S, Monday is bit 0, matches `datetime.weekday()`).
 
 const DAY_LABELS = ["M","T","W","T","F","S","S"];
 
@@ -8373,7 +8373,7 @@ function buildControllerDetail(dev) {
 
 function buildAcChargerDetail(dev) {
   const l = dev.latest || {};
-  // Each output channel as a column — many Blue Smart IP65 chargers
+  // Each output channel as a column, many Blue Smart IP65 chargers
   // have 3 outputs feeding separate banks (engine / aux / start).
   const outs = [1, 2, 3].map(n => {
     const v = l[`output_${n}_voltage_v`];
@@ -8465,7 +8465,7 @@ async function wireChargerStats(dev) {
     `;
   }
 
-  // Ribbon — single horizontal bar of colored state segments over 24h.
+  // Ribbon, single horizontal bar of colored state segments over 24h.
   const ribbonHost = panel.querySelector("[data-chgstats-ribbon]");
   if (ribbonHost) {
     const segs = stats.state_ribbon || [];
@@ -8530,7 +8530,7 @@ async function wireDeviceRename(dev) {
       });
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
       const data = await r.json();
-      // Optimistic update — patch the in-memory devices entry so the
+      // Optimistic update, patch the in-memory devices entry so the
       // header re-renders correctly even before the next snapshot.
       const target = devices.find(d => d.label === dev.label);
       if (target) target.display_name = data.display_name;
@@ -8545,10 +8545,10 @@ async function wireDeviceRename(dev) {
   });
 }
 
-// #292 — Battery detail page. Tap the SoC donut on the dashboard
+// #292, Battery detail page. Tap the SoC donut on the dashboard
 // and you land here. Three sections stacked:
 //   1. Bank summary stats (SoC, V, A, W, capacity, source)
-//   2. Per-pack mini-card grid — each pack is a tap target into
+//   2. Per-pack mini-card grid, each pack is a tap target into
 //      its own smart_battery detail page for cells/temps/firmware
 //   3. Standard history chart for any bank metric
 //
@@ -8602,7 +8602,7 @@ function buildBankDetail(dev) {
 function _renderPackMiniCard(pack) {
   const l = pack.latest || {};
   // BMSes don't always report soc_pct directly; rely on what the
-  // driver surfaces. Voltage is universal — show it as the primary.
+  // driver surfaces. Voltage is universal, show it as the primary.
   const v = l.voltage_v;
   const a = l.current_a;
   const drift = l.cell_drift_v != null ? Math.round(l.cell_drift_v * 1000) : null;
@@ -8720,7 +8720,7 @@ function wireDeviceDetailChart(dev) {
     .filter(([k, v]) => typeof v === "number" && !k.startsWith("_"))
     .map(([k]) => k)
     .sort();
-  // #297-4 defense-in-depth — escape driver-supplied metric keys
+  // #297-4 defense-in-depth, escape driver-supplied metric keys
   // even though they're code-defined today, in case a restored DB
   // surfaces an attacker-supplied row through latest.* somehow.
   select.innerHTML = keys.map(k => `<option value="${escHtml(k)}">${escHtml(prettyKey(k))}</option>`).join("");
@@ -8817,7 +8817,7 @@ function wireDeviceDetailChart(dev) {
         if (winLabel) winLabel.textContent = h.window;
         cell.classList.toggle("lt-cell--unreliable", !h.reliable);
       }
-      // Per-window breakdown table — only shown on the device detail page
+      // Per-window breakdown table, only shown on the device detail page
       const grid = detail?.querySelector("[data-eff-grid]");
       if (!grid) return;
       const order = ["7d", "30d", "90d", "lifetime"];
@@ -8840,7 +8840,7 @@ function wireDeviceDetailChart(dev) {
 
 // ---------- setup wizard ----------
 // Two REST endpoints carry it: /api/setup/transports + /api/setup/probe +
-// /api/setup/add_device. UI is intentionally bare — no modals, no router —
+// /api/setup/add_device. UI is intentionally bare, no modals, no router,
 // just an inline state machine that walks transport → scan → add per row.
 let wizState = { transport: null, scanResults: null, knownKeys: new Set() };
 
@@ -8939,7 +8939,7 @@ async function wizLoadTransports() {
           <div id="wiz-find-results" class="wiz-results"></div>
         </div>
       </div>`;
-    // Wire the collapsible "Add another" panel — same two scan
+    // Wire the collapsible "Add another" panel, same two scan
     // buttons reuse wizFindDongle / wizFindUsb so the BLE+USB
     // mixed-install path is identical regardless of whether the
     // user is adding their first or fifth transport.
@@ -8949,7 +8949,7 @@ async function wizLoadTransports() {
     });
     document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
     document.getElementById("wiz-find-usb-btn")?.addEventListener("click", wizFindUsb);
-    // No `disabled` on offline rows — the scan endpoint auto-reopens
+    // No `disabled` on offline rows, the scan endpoint auto-reopens
     // a dropped BLE link, so users should always be able to select
     // and try. The pill text tells them what to expect.
     const selectTransport = (id) => {
@@ -8975,7 +8975,7 @@ async function wizLoadTransports() {
         port:    btn.dataset.editPort,
       }));
     });
-    // Auto-select when there's only one transport — there's no
+    // Auto-select when there's only one transport, there's no
     // meaningful "pick" to make, so making the user tap a row before
     // Scan works is friction with no upside. The previous fix told
     // users to "Pick a transport above first" but the wizard didn't
@@ -8994,7 +8994,7 @@ async function wizScan() {
   const status = $("#wiz-scan-status");
   const host = $("#wiz-scan-results");
   if (!wizState.transport) {
-    // Don't silently no-op — the previous version did, which left
+    // Don't silently no-op, the previous version did, which left
     // a user clicking with no feedback when their transport
     // selection was lost (e.g. after a page refresh).
     if (status) {
@@ -9006,7 +9006,7 @@ async function wizScan() {
   host.innerHTML = "";
   status.innerHTML = `<span class="wiz-spinner" aria-hidden="true"></span> Starting scan…`;
 
-  // Live state — devices found so far, used both to render
+  // Live state, devices found so far, used both to render
   // progressively and to feed renderScanResults at the end.
   const alive = [];
   let total = 0;
@@ -9060,7 +9060,7 @@ async function wizScan() {
           if (ev.alive) alive.push(ev);
           repaint();
         } else if (ev.done) {
-          // Final summary — fall through to the "finished" block.
+          // Final summary, fall through to the "finished" block.
         }
       }
     }
@@ -9072,7 +9072,7 @@ async function wizScan() {
       renderScanResults(alive, /*partial*/ false);
     }
   } catch (e) {
-    // A save's hot-reload kills the scan stream — that's expected,
+    // A save's hot-reload kills the scan stream, that's expected,
     // not an error. Detect via the wizState.saveInFlight counter:
     // any save in flight when the stream tore down means the abort
     // came from us, not from a real failure. Tell the user honestly
@@ -9095,7 +9095,7 @@ function renderScanResults(alive, partial = false) {
   const host = $("#wiz-scan-results");
   if (!alive.length) {
     // While the scan is still running, don't drop the long help
-    // text in — it'd flash on screen for milliseconds before the
+    // text in, it'd flash on screen for milliseconds before the
     // first device arrives and feel jumpy. Show a simple
     // placeholder; the full troubleshooter appears only if the
     // scan finishes with zero hits.
@@ -9215,7 +9215,7 @@ async function wizEditTransport({ id, type, address, port }) {
     if (v2.trim()) body[second.field] = v2.trim();
   }
   if (Object.keys(body).length === 0) {
-    // Nothing to update — let them know rather than silently no-op.
+    // Nothing to update, let them know rather than silently no-op.
     alert("Nothing changed.");
     return;
   }
@@ -9299,7 +9299,7 @@ function wizExpandRow(row) {
     save.disabled = true;
     save.textContent = "Saving…";
     // Tell the scan loop "an in-flight save is about to kill your
-    // stream — don't treat that as a real error." Cleared after the
+    // stream, don't treat that as a real error." Cleared after the
     // save settles, regardless of outcome. Concurrent saves bump
     // the counter so the last one to finish clears it.
     wizState.saveInFlight = (wizState.saveInFlight || 0) + 1;
@@ -9334,7 +9334,7 @@ function wizExpandRow(row) {
       const data = await r.json();
       wizState.knownKeys.add(wizKnownKey(wizState.transport, slave));
       row.classList.add("known");
-      // #297-4 — data.label is user-supplied; escape before innerHTML.
+      // #297-4, data.label is user-supplied; escape before innerHTML.
       row.querySelector(".wiz-row-action").innerHTML = `<span class="wiz-saved">Saved · ${escHtml(data.label)}</span>`;
       if (data.restart_required) showRestartBanner();
     } catch (e) {
@@ -9348,7 +9348,7 @@ function wizExpandRow(row) {
       wizState.saveInFlight = Math.max(0, (wizState.saveInFlight || 1) - 1);
       // Refresh server-side state so the UI doesn't drift if a
       // previous save's response was eaten by the stream tear-down.
-      // Best-effort — failures here are silent.
+      // Best-effort, failures here are silent.
       try {
         const kr = await fetch("/api/setup/known_devices");
         if (kr.ok) {
@@ -9376,7 +9376,7 @@ function onEnterSetup() {
   wizCheckBleStatus();
 }
 
-// "Find my dongle" — scans BLE for ~8 s and surfaces every advertising
+// "Find my dongle", scans BLE for ~8 s and surfaces every advertising
 // device the host can see. User picks theirs by name pattern (BT-2
 // dongles advertise as BT-TH-…) or by the MAC printed on the dongle.
 async function wizFindDongle() {
@@ -9408,7 +9408,7 @@ async function wizFindDongle() {
   stat.textContent = `Found ${data.devices?.length || 0} device(s) in ${data.scanned_seconds || 8} s`;
   btn.disabled = false;
 
-  // Build the "recently disappeared" panel first if any — this is
+  // Build the "recently disappeared" panel first if any, this is
   // the #1 debugging signal for "where did my Renogy BT-2 go?"
   // shown ABOVE the live results so users notice it before they
   // give up assuming nothing's there.
@@ -9447,17 +9447,17 @@ async function wizFindDongle() {
     let keyFormHtml = "";
     if (vendor === "victron") {
       // The Victron-specific device class (when we could detect it
-      // from the payload header — SmartShunt/SmartSolar/Orion-Tr etc.)
+      // from the payload header, SmartShunt/SmartSolar/Orion-Tr etc.)
       // makes the badge richer than just "Victron".
       const dc = d.victron_device_class || "Victron device";
       const dcRaw = d.victron_device_class || "";
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">${escHtml(dc)}</span>`;
       // Stash device_class on the Pair button so the Save handler can
-      // pass it to the backend — needed to pick the right device_kind
+      // pass it to the backend, needed to pick the right device_kind
       // when auto-creating the device row (#159-adjacent fix).
       actionHtml = `<button class="btn-action btn-action--primary" data-pair-victron="${escHtml(d.address)}" data-victron-class="${escHtml(dcRaw)}">Pair Victron</button>`;
       // The key form is rendered hidden and revealed when the user
-      // taps "Pair Victron" — keeps the scan-results card compact.
+      // taps "Pair Victron", keeps the scan-results card compact.
       keyFormHtml = `
         <div class="wiz-victron-key" data-victron-key-for="${escHtml(d.address)}" hidden style="margin-top:.6rem;padding:.7rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
           <p class="settings-foot" style="margin:0 0 .5rem">
@@ -9490,7 +9490,7 @@ async function wizFindDongle() {
       hintHtml = `<span class="wiz-vendor-hint">Renogy BT-2 / BT-1</span>`;
       actionHtml = `<button class="btn-action btn-action--primary" data-use-mac="${escHtml(d.address)}" data-use-name="${escHtml(d.name || '')}">Use this</button>`;
     } else if (vendor === "mopeka") {
-      // Mopeka tank sensor — plaintext, no key dance. Single-tap pair.
+      // Mopeka tank sensor, plaintext, no key dance. Single-tap pair.
       hintHtml = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Mopeka tank sensor</span>`;
       actionHtml = `<button class="btn-action btn-action--primary" data-pair-mopeka="${escHtml(d.address)}">Pair Mopeka</button>`;
     } else if (vendor === "govee") {
@@ -9519,11 +9519,11 @@ async function wizFindDongle() {
       ${keyFormHtml}`;
   }).join("");
 
-  // Renogy / fallback path — unchanged.
+  // Renogy / fallback path, unchanged.
   list.querySelectorAll("[data-use-mac]").forEach(b => {
     b.addEventListener("click", () => wizAddTransportFromMac(b.dataset.useMac, b.dataset.useName));
   });
-  // Mopeka pairing — single-tap, no key prompt.
+  // Mopeka pairing, single-tap, no key prompt.
   list.querySelectorAll("[data-pair-mopeka]").forEach(b => {
     b.addEventListener("click", () => {
       b.disabled = true;
@@ -9531,7 +9531,7 @@ async function wizFindDongle() {
       wizAddTransportFromMopeka(b.dataset.pairMopeka, b);
     });
   });
-  // Govee + Ruuvi — same single-tap, different transport type.
+  // Govee + Ruuvi, same single-tap, different transport type.
   list.querySelectorAll("[data-pair-govee]").forEach(b => {
     b.addEventListener("click", () => {
       b.disabled = true;
@@ -9546,7 +9546,7 @@ async function wizFindDongle() {
       wizAddPassiveBleTransport("ble_ruuvi_advertise", b.dataset.pairRuuvi, "Pair Ruuvi", b);
     });
   });
-  // Victron pairing — show + wire the key-entry form.
+  // Victron pairing, show + wire the key-entry form.
   list.querySelectorAll("[data-pair-victron]").forEach(b => {
     const mac = b.dataset.pairVictron;
     b.addEventListener("click", () => {
@@ -9601,7 +9601,7 @@ async function wizFindDongle() {
 
 function renderMissingPanel(missing) {
   if (!missing || !missing.length) return "";
-  // Format "30 seconds ago" / "3 min ago" — a generic relative
+  // Format "30 seconds ago" / "3 min ago", a generic relative
   // string is more useful than "37 seconds ago" precision.
   const ago = (s) => {
     if (s == null) return "recently";
@@ -9753,10 +9753,10 @@ async function wizAddTransportFromMopeka(mac, button) {
   await wizLoadTransports();
 }
 
-// USB-RS485 path — same shape as wizFindDongle/wizAddTransportFromMac
+// USB-RS485 path, same shape as wizFindDongle/wizAddTransportFromMac
 // but driven by /api/setup/usb_scan + the serial_modbus transport type.
 // Customers who skip the BT-2 (or replace it with a wired dongle for
-// reliability — sub-ms round-trips, no BLE timeouts, proper FC06 acks)
+// reliability, sub-ms round-trips, no BLE timeouts, proper FC06 acks)
 // pair through here.
 async function wizFindUsb() {
   const btn  = document.getElementById("wiz-find-usb-btn");
@@ -9799,11 +9799,11 @@ async function wizFindUsb() {
     const serial = a.serial ? ` · S/N ${escHtml(a.serial)}` : "";
 
     // Brief read-back classification from the backend:
-    //   modbus_rtu — silent serial, hint Modbus (the dominant case).
-    //   nmea_gps   — emitted GPS sentences during the sniff window.
-    //   ve_direct  — Victron VE.Direct text frames at 19200 baud.
-    //   unknown    — port opens but bytes don't match anything we know.
-    //   busy       — port held by another process (probably us).
+    //   modbus_rtu, silent serial, hint Modbus (the dominant case).
+    //   nmea_gps  , emitted GPS sentences during the sniff window.
+    //   ve_direct , Victron VE.Direct text frames at 19200 baud.
+    //   unknown   , port opens but bytes don't match anything we know.
+    //   busy      , port held by another process (probably us).
     const proto = a.protocol || "unknown";
     let badge = "";
     let action = `<button class="btn-action btn-action--primary"
@@ -9811,7 +9811,7 @@ async function wizFindUsb() {
                 data-use-label="${escHtml(a.product || a.port)}">Use as Modbus</button>`;
     if (proto === "ve_direct") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--victron">Victron VE.Direct</span>`;
-      // Wire the VE.Direct path directly — only sensible action for
+      // Wire the VE.Direct path directly, only sensible action for
       // a port emitting Victron frames is to add it as a ve_direct
       // transport. The device-kind selection (shunt vs MPPT vs Phoenix
       // inverter) happens in the next wizard step.
@@ -9823,7 +9823,7 @@ async function wizFindUsb() {
     } else if (proto === "nmea_gps") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--gps">NMEA GPS</span>`;
       // GPS receiver path lands with #125. Until then we surface the
-      // detection but block the wrong action — adding a GPS as a
+      // detection but block the wrong action, adding a GPS as a
       // Modbus transport would just sit there failing every poll.
       action = `<button class="btn-action" disabled
                   title="GPS support is on the roadmap (#125). Coming soon">
@@ -9837,7 +9837,7 @@ async function wizFindUsb() {
                 </button>`;
     } else if (proto === "unknown") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">unknown output</span>`;
-      // Still offer Modbus — user may know what it is even if we don't.
+      // Still offer Modbus, user may know what it is even if we don't.
     }
     return `
       <div class="wiz-result-row">
@@ -10093,7 +10093,7 @@ async function refreshDiagLog() {
     host.textContent = "(no log lines captured yet. Daemon just started)";
     return;
   }
-  // Escape HTML — log lines may contain < > & from tracebacks etc.
+  // Escape HTML, log lines may contain < > & from tracebacks etc.
   const esc = (s) => String(s).replace(/[&<>"']/g, c => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
@@ -10115,7 +10115,7 @@ function stopDiagTimer() {
 }
 
 // ---------- docs (markdown topics) ----------
-// Tiny markdown renderer — handles the subset our bundled docs use:
+// Tiny markdown renderer, handles the subset our bundled docs use:
 // # ## ### headings, **bold**, *italic*, `inline code`, ```fences```,
 // - / * / 1. lists, > blockquotes, --- rules, [text](url) links,
 // pipe tables, and plain paragraphs. Escapes HTML in source text so
@@ -10181,7 +10181,7 @@ function renderMarkdown(src) {
       out.push(`<blockquote>${renderMarkdown(buf.join("\n"))}</blockquote>`);
       continue;
     }
-    // Ordered list — captures multi-line items: any subsequent line
+    // Ordered list, captures multi-line items: any subsequent line
     // indented by 2+ spaces (and not a new marker) is folded into the
     // current item. Without this, hard-wrapped 80-char list items
     // render as half-bullet/half-paragraph with mismatched fonts.
@@ -10201,7 +10201,7 @@ function renderMarkdown(src) {
       out.push(`<ol>${items.map(it => `<li>${renderInline(it)}</li>`).join("")}</ol>`);
       continue;
     }
-    // Unordered list — same continuation rule as ordered.
+    // Unordered list, same continuation rule as ordered.
     if (/^\s*[-*]\s+/.test(ln)) {
       const items = [];
       while (i < lines.length) {
@@ -10229,7 +10229,7 @@ function renderMarkdown(src) {
     }
     // Blank line
     if (/^\s*$/.test(ln)) { i++; continue; }
-    // Paragraph — gather consecutive non-blank, non-special lines.
+    // Paragraph, gather consecutive non-blank, non-special lines.
     const para = [ln];
     i++;
     while (i < lines.length && lines[i].trim() && !/^(#{1,6}\s|>\s?|---|\s*[-*]\s|\s*\d+\.\s|```)/.test(lines[i])) {
@@ -10258,7 +10258,7 @@ async function onEnterDocs(slug) {
   if (slug) {
     loadDocPage(slug);
   } else if (docsIndex.topics?.length) {
-    // No slug — auto-open the first topic so the user isn't staring at
+    // No slug, auto-open the first topic so the user isn't staring at
     // an empty pane.
     window.location.hash = `#/docs/${docsIndex.topics[0].slug}`;
   }

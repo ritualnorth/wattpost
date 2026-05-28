@@ -1,6 +1,6 @@
-"""Victron Smart Lithium battery driver — read-only.
+"""Victron Smart Lithium battery driver, read-only.
 
-The Smart Lithium series is Victron's own LFP product line — drop-in
+The Smart Lithium series is Victron's own LFP product line, drop-in
 12V/24V/48V LFP batteries with built-in BMS that advertise pack
 voltage + per-cell voltages + battery temperature + balancer state
 over BLE Instant Readout.
@@ -42,7 +42,7 @@ class VictronSmartLithium(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — requires ble_victron_advertise"]
+            result["_errors"] = ["wrong transport type, requires ble_victron_advertise"]
             return result
         from ._silent import mark_silent, stamp_advertisement_age
         parsed = transport.get_latest()

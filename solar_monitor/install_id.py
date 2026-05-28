@@ -7,7 +7,7 @@ distinct unpaired installs + show version drift across the
 fleet without anybody having to pair into the SaaS tier.
 
 What this identifier is:
-  * A random UUID v4 — no derivation from hardware, no MAC,
+  * A random UUID v4, no derivation from hardware, no MAC,
     no email, no IP.
   * Persistent across daemon restarts (saved to disk).
   * Reset on `wattpost-config → Reset to defaults` or by
@@ -19,12 +19,12 @@ What it is NOT:
     population only).
   * Privacy-affecting beyond what the update poll already
     leaks (the appliance has to fetch /api/releases/latest
-    over HTTPS no matter what — the install_id just lets the
+    over HTTPS no matter what, the install_id just lets the
     server deduplicate distinct callers instead of counting
     raw requests).
 
 Customers can opt out via `local_telemetry: off` in
-config.yaml — the update poll still fires (we need it for the
+config.yaml, the update poll still fires (we need it for the
 "Update available" badge) but the install_id query param is
 suppressed.
 
@@ -47,7 +47,7 @@ log = logging.getLogger(__name__)
 
 DEFAULT_PATH = "/var/lib/wattpost/install-id"
 
-# UUID v4 hex form with dashes — strict regex so a corrupted /
+# UUID v4 hex form with dashes, strict regex so a corrupted /
 # tampered file doesn't poison the beacon with arbitrary input.
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -65,15 +65,15 @@ def load_or_create(path: str = DEFAULT_PATH) -> str:
             existing = p.read_text(encoding="utf-8").strip().lower()
             if _UUID_RE.match(existing):
                 return existing
-            log.warning("install-id at %s is malformed (%r) — regenerating", path, existing[:64])
+            log.warning("install-id at %s is malformed (%r), regenerating", path, existing[:64])
     except Exception as e:
-        log.warning("install-id read failed at %s: %s — regenerating", path, e)
+        log.warning("install-id read failed at %s: %s, regenerating", path, e)
 
     new = str(uuid.uuid4())
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         # Write then rename so concurrent reads never see a half-
-        # written file. Permissions 0o644 — readable by anyone who
+        # written file. Permissions 0o644, readable by anyone who
         # can already read /var/lib/wattpost/, which the daemon
         # user owns by default.
         tmp = p.with_suffix(p.suffix + ".tmp")
@@ -81,9 +81,9 @@ def load_or_create(path: str = DEFAULT_PATH) -> str:
         os.replace(tmp, p)
     except Exception as e:
         # Container with no writable state volume, read-only root,
-        # etc. — fall through with the in-memory ID. The cloud will
+        # etc., fall through with the in-memory ID. The cloud will
         # see the install for the lifetime of this process; that's
         # better than no data and the fallback path doesn't need
         # any new operator-visible error.
-        log.info("install-id persist failed (%s) — using process-local UUID", e)
+        log.info("install-id persist failed (%s), using process-local UUID", e)
     return new

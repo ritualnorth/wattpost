@@ -18,7 +18,7 @@ class PvForecastPoint(msgspec.Struct):
     # Watts. Provider native units (Solcast: kW) are normalised to W in
     # the provider class so consumers always see one unit.
     pv_w: float
-    # P10 / P90 confidence interval, also in W. Both optional —
+    # P10 / P90 confidence interval, also in W. Both optional,
     # forecast.solar doesn't return them.
     pv_w_p10: float | None = None
     pv_w_p90: float | None = None
@@ -42,5 +42,5 @@ class ForecastProvider(abc.ABC):
     @abc.abstractmethod
     async def fetch(self) -> PvForecast:
         """Return the latest PV forecast. May raise on transient errors
-        — the service is responsible for retry + logging; we don't try
+       , the service is responsible for retry + logging; we don't try
         to recover at this layer."""

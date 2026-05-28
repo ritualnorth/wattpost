@@ -1,4 +1,4 @@
-"""Open-Meteo PV forecast provider — physical estimate from irradiance.
+"""Open-Meteo PV forecast provider, physical estimate from irradiance.
 
 Solcast is the gold standard for fixed-roof installs (it trains an ML
 model on years of site-specific data) BUT it's site-based, not lat/lon
@@ -23,7 +23,7 @@ from Open-Meteo, plus the array config (capacity_kW, tilt, azimuth):
                                           1000 (STC reference)
 
 `tilt_factor` is a cheap geometric correction for the panel not being
-horizontal — we compute the cosine of the angle between the panel
+horizontal, we compute the cosine of the angle between the panel
 normal and the sun. Below a small floor we clamp to the floor rather
 than going negative (sub-horizon = no direct beam, but real panels
 get some diffuse).
@@ -108,7 +108,7 @@ class OpenMeteoForecastProvider(ForecastProvider):
             "hourly":           "shortwave_radiation,cloud_cover",
             "timezone":         "UTC",   # easier than localising on our side
             "forecast_days":    FORECAST_DAYS,
-            # We don't need current weather here — the weather service
+            # We don't need current weather here, the weather service
             # owns that. Requesting only `hourly` keeps the payload tight.
         }
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
@@ -127,7 +127,7 @@ class OpenMeteoForecastProvider(ForecastProvider):
         ghi   = hourly.get("shortwave_radiation") or []
         if not times or not ghi:
             raise RuntimeError(
-                "Open-Meteo returned no shortwave_radiation array — "
+                "Open-Meteo returned no shortwave_radiation array, "
                 "the location might be malformed or the API changed shape"
             )
 
@@ -159,7 +159,7 @@ class OpenMeteoForecastProvider(ForecastProvider):
         Cheap solar-geometry model: compute the sun's elevation +
         azimuth from time + location, derive the cosine of the angle
         between the panel normal and the sun vector, multiply by GHI.
-        Doesn't separate direct / diffuse components — that's the
+        Doesn't separate direct / diffuse components, that's the
         biggest simplification vs proper POA transposition, and the
         biggest accuracy hit on overcast days (when diffuse dominates
         and the tilt factor matters less than this model implies).
@@ -167,10 +167,10 @@ class OpenMeteoForecastProvider(ForecastProvider):
         if ghi_w <= 0:
             return 0.0
         # Solar position from NOAA approximation. Good enough for hourly
-        # forecasts — we're not navigating spacecraft.
+        # forecasts, we're not navigating spacecraft.
         elev, sun_az = _solar_position(ts, self.lat, self.lon)
         if elev <= 0:
-            # Sun below horizon — no direct beam. Some diffuse might
+            # Sun below horizon, no direct beam. Some diffuse might
             # still be in the GHI value (post-sunset twilight) but the
             # contribution is tiny; floor to zero rather than feed
             # negative cos values into the panel-angle calc.
@@ -209,7 +209,7 @@ def _solar_position(ts: int, lat: float, lon: float) -> tuple[float, float]:
     """Return (sun_elevation_rad, sun_azimuth_rad) at a given unix-
     second timestamp + location.
 
-    Simplified NOAA solar-position algorithm — accurate to within
+    Simplified NOAA solar-position algorithm, accurate to within
     ~1° of arc over a +/-100-year window, which is way more than
     enough for an hourly PV forecast estimate. Azimuth convention:
     0 = south, +west, mirror image to our panel azimuth convention.

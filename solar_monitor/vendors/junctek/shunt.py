@@ -25,7 +25,7 @@ class JunctekShunt(DeviceDriver):
             "_slave_id": self.slave_id,
         }
         if not hasattr(transport, "get_latest"):
-            result["_errors"] = ["wrong transport type — Junctek requires ble_junctek"]
+            result["_errors"] = ["wrong transport type, Junctek requires ble_junctek"]
             return result
 
         age = getattr(transport, "last_frame_age_s", lambda: None)()

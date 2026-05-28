@@ -2,7 +2,7 @@
 
 Voltronic / Axpert / MPP Solar / EG4 hybrids expose a Cypress
 USB-HID interface (default VID:PID 0665:5161) that speaks the same
-ASCII protocol as the RS-232 port — every request is an ASCII
+ASCII protocol as the RS-232 port, every request is an ASCII
 command + XMODEM CRC + 0x0D, and every response comes back the
 same shape starting with '('.
 
@@ -12,7 +12,7 @@ with 0x00; we reassemble the response until we see 0x0D.
 Read-only. We never send a write command (no PSAVE/POP/PCP/PBT/etc.)
 on this transport. The protocol does expose writes but every model's
 acceptable parameter ranges are firmware-version-specific and one
-bad value bricks the inverter until manual reset — same risk model
+bad value bricks the inverter until manual reset, same risk model
 as Victron writes, same "no" answer.
 
 Contract:
@@ -20,7 +20,7 @@ Contract:
   * `open()` opens the HID device.
   * `query(cmd, timeout)` sends an ASCII command, returns the
     decoded payload (the bytes between '(' and the CRC).
-  * `request()` raises — Voltronic doesn't speak Modbus.
+  * `request()` raises, Voltronic doesn't speak Modbus.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover - optional dep
 log = logging.getLogger(__name__)
 
 
-# Cypress HID-to-UART chip ID — the overwhelming majority of
+# Cypress HID-to-UART chip ID, the overwhelming majority of
 # Voltronic-derived inverters ship with this combo. Some EG4
 # variants ship 0001:0000; expose as config so installers can
 # override without a firmware patch.
@@ -55,7 +55,7 @@ MAX_RESPONSE = 256  # longest documented response (QPIGS2) fits comfortably
 class UsbHidVoltronicTransport(Transport):
     """Request/response over USB-HID for Voltronic-family inverters.
 
-    Not a Modbus transport — drivers using this must override poll()
+    Not a Modbus transport, drivers using this must override poll()
     and call query() directly. The Voltronic family is the only HID
     transport in the codebase today; everything else is Modbus over
     BLE/serial.
@@ -78,7 +78,7 @@ class UsbHidVoltronicTransport(Transport):
     async def open(self) -> None:
         if hid is None:
             raise TransportError(
-                f"{self.id}: hidapi not installed — pip install hid"
+                f"{self.id}: hidapi not installed, pip install hid"
             )
         if self._dev is not None:
             return
@@ -112,7 +112,7 @@ class UsbHidVoltronicTransport(Transport):
         self, frame: bytes, expected_response_len: int, timeout: float = 5.0,
     ) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on a Voltronic transport — "
+            f"{self.id}: request() is unsupported on a Voltronic transport, "
             "drivers must override poll() and call query()"
         )
 
@@ -134,7 +134,7 @@ class UsbHidVoltronicTransport(Transport):
         wire = frame_command(cmd)
         # HID write protocol: report id byte 0x00 then up to REPORT_SIZE
         # data bytes, padded with 0x00. Pad the final chunk so every
-        # write is exactly REPORT_SIZE bytes long — every Voltronic
+        # write is exactly REPORT_SIZE bytes long, every Voltronic
         # firmware I've seen complains about short reports.
         for i in range(0, len(wire), REPORT_SIZE):
             chunk = wire[i:i + REPORT_SIZE]
@@ -167,14 +167,14 @@ class UsbHidVoltronicTransport(Transport):
             )
 
         # Trim at the first 0x0D (anything after is from the next
-        # response — unlikely with the lock held, but cheap to guard).
+        # response, unlikely with the lock held, but cheap to guard).
         end = buf.index(0x0D)
         frame = bytes(buf[:end + 1])
-        # Drop the leading '(' framing byte before CRC verification —
+        # Drop the leading '(' framing byte before CRC verification,
         # voltronic_crc validates the payload only.
         if not frame.startswith(b"("):
             raise ValueError(
-                f"{self.id}: response to {cmd!r} did not start with '(' — got {frame[:8]!r}"
+                f"{self.id}: response to {cmd!r} did not start with '(', got {frame[:8]!r}"
             )
         # Strip the trailing 0x00 padding the firmware sometimes adds
         # inside the last 8-byte HID report before the CR.

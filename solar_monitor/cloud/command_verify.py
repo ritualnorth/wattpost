@@ -8,7 +8,7 @@ attacker INSERT a forged appliance_commands row.
 
 canonical_repr MUST match cloud/wattpost_cloud/command_signing.py
 byte-for-byte. Any drift means every cloud-signed command fails
-verify here — treat the two functions as one logical unit when
+verify here, treat the two functions as one logical unit when
 making changes.
 
 Behaviour:
@@ -17,7 +17,7 @@ Behaviour:
                                 + signed_audit.write_event so
                                 the rejection becomes a tamper-
                                 evident record
-  * Unsigned cmd (no kid/sig/nonce — pre-rollout cloud, or a row
+  * Unsigned cmd (no kid/sig/nonce, pre-rollout cloud, or a row
     inserted before migration 0052) → grandfather: dispatch with a
     warning. Once the cloud has rolled out 0052 + signing for ~1
     deploy cycle, we can flip the default to reject-unsigned.
@@ -80,7 +80,7 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
         a warning is logged so the count is visible.
 
     False paths:
-      * Partial signature (some fields present, others NULL) — likely
+      * Partial signature (some fields present, others NULL), likely
         tampering with the heartbeat payload mid-transit.
       * Unknown kid (mid-rotation we'll refresh JWKS once; still
         unknown → reject).
@@ -95,11 +95,11 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
     nonce     = cmd.get("nonce")
     queued_at = cmd.get("queued_at")
 
-    # Grandfather path — fully unsigned command. Common during the
+    # Grandfather path, fully unsigned command. Common during the
     # transition; warn but allow.
     if not (sig_b64 or kid or nonce):
         log.warning(
-            "command_verify: cmd id=%s has NO signature — grandfathering "
+            "command_verify: cmd id=%s has NO signature, grandfathering "
             "(cloud pre-0.1.105 or signing key absent)",
             cmd.get("id"),
         )
@@ -109,7 +109,7 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
     if not (sig_b64 and kid and nonce and queued_at):
         log.warning(
             "command_verify: cmd id=%s has PARTIAL signature "
-            "(sig=%s kid=%s nonce=%s qat=%s) — refusing dispatch",
+            "(sig=%s kid=%s nonce=%s qat=%s), refusing dispatch",
             cmd.get("id"), bool(sig_b64), bool(kid), bool(nonce), bool(queued_at),
         )
         return False
@@ -117,10 +117,10 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
     cfg = oidc_config.load()
     if cfg is None:
         # Appliance pre-upgrade or post-pair-but-no-OIDC-yet. We have
-        # no JWKS to verify against. Grandfather rather than refuse —
+        # no JWKS to verify against. Grandfather rather than refuse,
         # the alternative is bricking commands on transitional boxes.
         log.warning(
-            "command_verify: no oidc_config (pre-upgrade?) — "
+            "command_verify: no oidc_config (pre-upgrade?), "
             "grandfathering cmd id=%s", cmd.get("id"),
         )
         return True
@@ -152,17 +152,17 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
             keys = await oidc_rp.fetch_jwks(cfg.jwks_url, force=True)
             match = next((k for k in keys if k.get("kid") == kid), None)
     except Exception as e:
-        log.warning("command_verify: JWKS fetch failed (%s) — refusing cmd id=%s",
+        log.warning("command_verify: JWKS fetch failed (%s), refusing cmd id=%s",
                     e, cmd.get("id"))
         return False
     if match is None:
-        log.warning("command_verify: unknown kid %r for cmd id=%s — refusing",
+        log.warning("command_verify: unknown kid %r for cmd id=%s, refusing",
                     kid, cmd.get("id"))
         return False
 
     vk = oidc_rp._verify_key_from_jwk(match)
     if vk is None:
-        log.warning("command_verify: unsupported JWK shape for kid %r — refusing", kid)
+        log.warning("command_verify: unsupported JWK shape for kid %r, refusing", kid)
         return False
 
     try:
@@ -170,7 +170,7 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
         sig = base64.urlsafe_b64decode(sig_b64 + pad)
         vk.verify(repr_str.encode("utf-8"), sig)
     except Exception as e:
-        log.warning("command_verify: sig verify FAILED for cmd id=%s (%s) — refusing",
+        log.warning("command_verify: sig verify FAILED for cmd id=%s (%s), refusing",
                     cmd.get("id"), e)
         return False
 

@@ -48,7 +48,7 @@ async def toggle_output(
     if not row.get("safety_confirmed"):
         raise HTTPException(
             status_code=409,
-            detail="safety gate not passed — POST /api/outputs/<id>/confirm first",
+            detail="safety gate not passed, POST /api/outputs/<id>/confirm first",
         )
     try:
         result = await scheduler.outputs.toggle(output_id, data.on, by="user")
@@ -57,7 +57,7 @@ async def toggle_output(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     if not result.get("ok"):
-        # 502 — the underlying transport/adapter reported the write
+        # 502, the underlying transport/adapter reported the write
         # didn't land. Keep the detail in the body so the UI can show
         # the real reason rather than a generic toast.
         raise HTTPException(status_code=502, detail=result)
@@ -78,7 +78,7 @@ async def confirm_output_safety(output_id: str, state: State) -> dict[str, Any]:
 # ---------- schedules (#117) ----------
 
 class ScheduleRequest(msgspec.Struct):
-    """All fields optional on create — server defaults action="on",
+    """All fields optional on create, server defaults action="on",
     trigger_kind="time", days_mask=127, enabled=True. PUT can send any
     subset of fields to patch."""
     action:       str | None = None       # "on" | "off"
@@ -102,7 +102,7 @@ def _validate_schedule_fields(
             detail="trigger_kind must be 'time', 'sunrise', or 'sunset'",
         )
     if trigger_kind == "time" and trigger_time:
-        # Strict HH:MM check — the scheduler's parser is lenient but
+        # Strict HH:MM check, the scheduler's parser is lenient but
         # nice to fail fast at API boundary.
         if ":" not in trigger_time:
             raise HTTPException(status_code=400, detail="trigger_time must be 'HH:MM'")
@@ -113,7 +113,7 @@ def _validate_schedule_fields(
         except ValueError:
             raise HTTPException(status_code=400, detail="trigger_time must be 'HH:MM'")
     if offset_min is not None and not (-720 <= offset_min <= 720):
-        # ±12h cap — beyond that the user probably meant a different
+        # ±12h cap, beyond that the user probably meant a different
         # trigger kind. Hard fence keeps the scheduler maths sane.
         raise HTTPException(
             status_code=400,
@@ -181,7 +181,7 @@ async def update_output_schedule(
         days_mask=data.days_mask,
     )
     # Apply only the fields the client actually sent. msgspec.Struct
-    # with `None` defaults makes this easy — None means "don't change".
+    # with `None` defaults makes this easy, None means "don't change".
     fields: dict[str, Any] = {}
     if data.action       is not None: fields["action"]       = data.action
     if data.trigger_kind is not None: fields["trigger_kind"] = data.trigger_kind
@@ -246,7 +246,7 @@ async def patch_solar_pause(
     """Persist + hot-apply solar-pause settings (#163).
 
     Validates the threshold ordering before touching disk so an
-    inconsistent payload never lands in config.yaml — a partial
+    inconsistent payload never lands in config.yaml, a partial
     write here previously locked users into a config that the
     daemon refused to load."""
     import yaml as _yaml

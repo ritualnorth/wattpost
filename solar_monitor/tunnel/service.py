@@ -2,7 +2,7 @@
 
 The cloud allocates one Cloudflare Tunnel per appliance at pair
 time. The token we get back from `/api/pair/exchange` is the only
-thing cloudflared needs — it embeds the account / tunnel / secret
+thing cloudflared needs, it embeds the account / tunnel / secret
 triple, and cloudflared knows the rest (where to connect, how to
 identify itself).
 
@@ -16,7 +16,7 @@ Lifecycle:
     wattpost` tail surfaces tunnel events.
 
 Errors here NEVER affect the rest of the daemon. The local UI, the
-poll loop, the alert engine — all keep running if the tunnel can't
+poll loop, the alert engine, all keep running if the tunnel can't
 come up.
 """
 from __future__ import annotations
@@ -54,7 +54,7 @@ class TunnelService:
             return False
         if shutil.which("cloudflared") is None:
             log.warning(
-                "tunnel: cloudflared not found on PATH — "
+                "tunnel: cloudflared not found on PATH, "
                 "install from https://github.com/cloudflare/cloudflared/releases "
                 "to expose this appliance at %s",
                 cfg.tunnel_hostname or "<slug>.wattpost.io",
@@ -97,7 +97,7 @@ class TunnelService:
     async def _supervise(self) -> None:
         """Run cloudflared. If it exits, log + sleep + retry until
         stop() is called. Resets the backoff counter when a run
-        survives 60+ seconds — short crashes get exponential,
+        survives 60+ seconds, short crashes get exponential,
         stable-but-occasional-disconnect runs don't get punished."""
         while not self._stop.is_set():
             try:
@@ -122,7 +122,7 @@ class TunnelService:
 
     async def _run_once(self) -> None:
         """Spawn cloudflared once. Returns when the process exits
-        for any reason — supervisor decides whether to respawn."""
+        for any reason, supervisor decides whether to respawn."""
         cmd = ["cloudflared", "tunnel", "--no-autoupdate", "run",
                "--token", self.cfg.tunnel_token]
         # Logs go to our logger at INFO so the daemon's existing log

@@ -144,13 +144,13 @@ def _parse_iso(s):
     try:
         # Some endpoints append seconds; some don't. fromisoformat
         # handles both. Treat naive datetimes as UTC for stability
-        # across daylight-savings transitions — open-meteo gives us
+        # across daylight-savings transitions, open-meteo gives us
         # them in the requested timezone (`auto`) so the offset is
         # implicit, but converting to UTC requires that timezone
         # context. We approximate by assuming the daemon and the lat/lon
         # share a timezone, treating the timestamp as if it were UTC.
         # The dashboard re-renders with `Date(ts * 1000)` which then
-        # applies the *browser's* timezone — so anyone viewing this
+        # applies the *browser's* timezone, so anyone viewing this
         # over a VPN from another timezone sees the local sunrise
         # of where the appliance sits.
         dt = datetime.fromisoformat(s)

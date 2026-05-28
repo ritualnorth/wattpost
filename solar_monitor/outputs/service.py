@@ -1,4 +1,4 @@
-"""Outputs service — glues storage, adapters, and the live config together.
+"""Outputs service, glues storage, adapters, and the live config together.
 
 Responsibilities:
   * On startup, walk the device snapshot, ask each adapter what
@@ -11,7 +11,7 @@ Responsibilities:
     record the command + result, schedule a follow-up state refresh.
 
 The service holds references to live infrastructure (scheduler,
-config, store) rather than re-resolving them on every call —
+config, store) rather than re-resolving them on every call,
 matches the pattern AlertEngine / ForecastService follow elsewhere
 in the daemon.
 """
@@ -46,7 +46,7 @@ class OutputsService:
 
     async def discover_all(self) -> None:
         """Walk the current device snapshot and register every output
-        any adapter wants to expose. Idempotent — re-discovery
+        any adapter wants to expose. Idempotent, re-discovery
         preserves runtime state via the storage layer's UPSERT.
 
         Smart plugs (#163 followup) are registered alongside Modbus-
@@ -289,10 +289,10 @@ class OutputsService:
         self, output_id: str, on: bool, *, by: str,
     ) -> dict[str, Any]:
         """Apply a state change. Returns a dict suitable for direct
-        JSON response — includes the WriteResult plus the resolved
+        JSON response, includes the WriteResult plus the resolved
         output row so the caller doesn't need a second round-trip."""
         if output_id not in self._known:
-            # Stale UI — re-discover and try once more before giving up.
+            # Stale UI, re-discover and try once more before giving up.
             await self.discover_all()
             if output_id not in self._known:
                 raise KeyError(f"unknown output {output_id!r}")
@@ -300,7 +300,7 @@ class OutputsService:
 
         # Smart plugs talk HTTP directly to a LAN host. They share the
         # same toggle() entry point as Modbus outputs but skip the
-        # transport-resolution dance — there's no shared BLE link, no
+        # transport-resolution dance, there's no shared BLE link, no
         # slave id; the adapter knows its own host.
         is_plug = output.kind == "smart_plug"
         if is_plug:
@@ -313,7 +313,7 @@ class OutputsService:
             transport = self.scheduler.get_transport(transport_id)
             if transport is None:
                 raise RuntimeError(
-                    f"transport {transport_id!r} not running — has the daemon "
+                    f"transport {transport_id!r} not running, has the daemon "
                     f"finished its first poll cycle?"
                 )
 

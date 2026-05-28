@@ -1,8 +1,8 @@
-"""System endpoints — disk usage, uptime, update flow, history settings.
+"""System endpoints, disk usage, uptime, update flow, history settings.
 
 Kept out of api/app.py so the route factory stays readable. The
 restart + logs endpoints already in app.py would naturally live here
-too — leaving them in place to avoid a churn move; this file's the
+too, leaving them in place to avoid a churn move; this file's the
 right home for any future system-level handlers.
 """
 from __future__ import annotations
@@ -48,7 +48,7 @@ _DAEMON_STARTED_AT = time.time()
 def _proc_uptime_seconds() -> float | None:
     """Return how long the WattPost daemon has been running.
 
-    Used to be a /proc/uptime read — which on bare metal gave the
+    Used to be a /proc/uptime read, which on bare metal gave the
     box's uptime (fine) but in a Docker container with host /proc
     leakage gave the host's uptime (e.g. '3d 23h' on a laptop
     that's just had the container restarted ten minutes ago). The
@@ -64,7 +64,7 @@ async def kiosk_status(state: State) -> dict[str, Any]:
     `share_url` is the public URL the user copy-pastes to wherever
     they want to display the kiosk view. `null` when no cloud tunnel
     is provisioned (the appliance needs a slug for the URL to point
-    anywhere — pair to enable).
+    anywhere, pair to enable).
     """
     config = state["config"]
     if config.cloud is None:
@@ -84,7 +84,7 @@ async def kiosk_status(state: State) -> dict[str, Any]:
 @post("/api/system/kiosk/rotate", status_code=200)
 async def rotate_kiosk_token(state: State) -> dict[str, Any]:
     """Generate a new kiosk_token, persist to config, return the new
-    public share URL. Old token instantly stops working — any
+    public share URL. Old token instantly stops working, any
     already-shared URLs break, which IS the intent ("I leaked the
     URL, kill it").
 
@@ -96,7 +96,7 @@ async def rotate_kiosk_token(state: State) -> dict[str, Any]:
     config_path = state.get("config_path", "config.yaml")
     if config.cloud is None:
         raise HTTPException(status_code=400,
-                            detail="cloud not configured — pair first")
+                            detail="cloud not configured, pair first")
     new_tok = _secrets.token_urlsafe(24)
     config.cloud.kiosk_token = new_tok
     # Persist via the same _save_config helper that cloud_admin uses;
@@ -108,7 +108,7 @@ async def rotate_kiosk_token(state: State) -> dict[str, Any]:
     _save_config(config_path, _mutate)
     log.info("kiosk token rotated")
     # Construct the public URL the user should now share. Assumes the
-    # cloud broker subdomain `<slug>.wattpost.cloud` — the appliance
+    # cloud broker subdomain `<slug>.wattpost.cloud`, the appliance
     # doesn't directly know its slug; pass the tunnel_hostname's
     # slug-half if available.
     share_url = None
@@ -124,12 +124,12 @@ async def auth_status(request: Request, state: State) -> dict[str, Any]:
     """Read-only signal of whether the current request is authed,
     and by what mechanism. Three positive cases:
 
-      1. Local session cookie — set by /api/login after a password
+      1. Local session cookie, set by /api/login after a password
          sign-in. origin="local".
-      2. SSO session cookie — set by /sso after a cloud-minted token
+      2. SSO session cookie, set by /sso after a cloud-minted token
          (e.g. dashboard "Open" button → broker-redirect-with-token).
          origin="sso".
-      3. Broker HMAC header — every request via the cloud broker
+      3. Broker HMAC header, every request via the cloud broker
          (<slug>.wattpost.cloud) carries X-WP-Broker-Auth signed by
          the per-appliance sso_secret. Stateless, per-request.
          origin="broker".
@@ -200,7 +200,7 @@ async def diagnostics_bundle(state: State) -> Response:
     All secrets are scrubbed via `_redact`. The user can attach the
     resulting file to a support email without revealing tokens.
 
-    Works identically on Pi and Docker — no journalctl / docker-logs
+    Works identically on Pi and Docker, no journalctl / docker-logs
     dependency. The in-memory LOG_RING (solar_monitor.diagnostics)
     keeps the last ~500 lines across both deployment shapes.
     """
@@ -267,7 +267,7 @@ async def broker_auth_log() -> dict[str, Any]:
     (#148-class bug); `ok` for the failing path = bug post-auth.
 
     Lives under /api/diagnostics/ not /api/system/ to keep the
-    Diagnostics UI page from having to also gate by admin role —
+    Diagnostics UI page from having to also gate by admin role,
     middleware applies the same session/broker rules as everything
     else; on the broker side the user already authenticated cloud-
     side to reach here.
@@ -289,7 +289,7 @@ async def system_info() -> dict[str, Any]:
         # (e.g. an external USB SSD on a Pi).
         "disk_state": _disk_usage("/var/lib/wattpost")
                       if _disk_usage_exists("/var/lib/wattpost") else None,
-        # Demo flag — the UI renders a persistent banner when this is
+        # Demo flag, the UI renders a persistent banner when this is
         # true so visitors to demo.wattpost.io understand the data is
         # synthetic. Set by WATTPOST_DEMO=1 on the demo container.
         "demo": os.environ.get("WATTPOST_DEMO") == "1",
@@ -311,7 +311,7 @@ async def update_state(state: State) -> dict[str, Any]:
     """Current vs latest version of WattPost, from the daily manifest
     poll. UI uses this to surface "Update available" on Settings →
     About. Also reports the deployment type so the UI shows the right
-    update path — Docker users can't fire wattpost-update, they need
+    update path, Docker users can't fire wattpost-update, they need
     `docker compose pull` on the host."""
     deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
     scheduler = state["scheduler"]
@@ -337,7 +337,7 @@ async def slot_state() -> dict[str, Any]:
     which slot the auto-rollback would swap to, and the version each
     one is carrying. Returns empty dict on Docker installs and on
     legacy /opt/wattpost layouts that haven't been migrated to slots
-    yet — UI should hide the slot card in those cases."""
+    yet, UI should hide the slot card in those cases."""
     deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
     if deployment == "docker":
         return {"applicable": False, "reason": "docker-install"}
@@ -379,23 +379,23 @@ async def slot_rollback() -> dict[str, Any]:
     wattpost-rollback helper that the OnFailure watchdog uses, so
     behaviour is identical between manual and auto rollback.
 
-    Requires that a previous slot is recorded — fresh installs that
+    Requires that a previous slot is recorded, fresh installs that
     have never updated have nothing to roll back to and get a 400."""
     if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
         raise HTTPException(
             status_code=400,
-            detail="rollback isn't supported on Docker installs — "
+            detail="rollback isn't supported on Docker installs, "
                    "downgrade by pulling an earlier image tag.",
         )
     if not os.path.exists("/usr/local/bin/wattpost-rollback"):
         raise HTTPException(
             status_code=400,
-            detail="wattpost-rollback helper not found — reinstall to fix",
+            detail="wattpost-rollback helper not found, reinstall to fix",
         )
     if not os.path.islink("/opt/wattpost-slots/previous"):
         raise HTTPException(
             status_code=400,
-            detail="no previous slot recorded — this appliance has "
+            detail="no previous slot recorded, this appliance has "
                    "never been updated via wattpost-update, so there's "
                    "nothing to roll back to.",
         )
@@ -416,14 +416,14 @@ async def slot_rollback() -> dict[str, Any]:
 @post("/api/system/web-password/rotate")
 async def rotate_web_password() -> dict[str, Any]:
     """Generate a new local web password and persist it. Returns the
-    new plaintext exactly once — caller must show it to the user
+    new plaintext exactly once, caller must show it to the user
     immediately, we don't store it anywhere readable post-rotation
     apart from the on-disk mirror file (which is mode 0640 root only).
 
     Reachable from Settings → System on the dashboard. Already
     requires a session (the middleware enforces it for POSTs), so
     rotation is gated to logged-in users only. Stale sessions are
-    NOT invalidated — the user who's rotating is logged in on this
+    NOT invalidated, the user who's rotating is logged in on this
     browser, and we don't want to log them out of their own tab.
     Other browser sessions stay valid until they natural-expire (30d)
     OR until the user clicks "Sign out all sessions" elsewhere."""
@@ -438,7 +438,7 @@ async def rotate_web_password() -> dict[str, Any]:
             status_code=500,
             detail=f"couldn't write the new password hash: {e}",
         )
-    # Mirror plaintext for the "I forgot it" case — same path the
+    # Mirror plaintext for the "I forgot it" case, same path the
     # first-boot helper uses, same 0640 root-only perms. Best-effort;
     # rotation isn't a hard failure if the mirror write throws.
     try:
@@ -451,7 +451,7 @@ async def rotate_web_password() -> dict[str, Any]:
 
 @post("/api/system/update/check", status_code=202)
 async def update_check_now(state: State) -> dict[str, Any]:
-    """Force a one-off manifest fetch — Settings UI's "Check now"
+    """Force a one-off manifest fetch, Settings UI's "Check now"
     button. Independent of the 24h background loop."""
     scheduler = state["scheduler"]
     updater = getattr(scheduler, "_updater", None)
@@ -465,7 +465,7 @@ async def update_check_now(state: State) -> dict[str, Any]:
 async def appliance_branding(state: State) -> dict[str, Any]:
     """White-label branding for this appliance, cached from the cloud
     on each heartbeat. Empty dict when the owner isn't on Installer
-    tier (or hasn't paired to the cloud at all) — the dashboard
+    tier (or hasn't paired to the cloud at all), the dashboard
     falls back to the default WattPost brand in that case."""
     store = state["store"]
     try:
@@ -485,7 +485,7 @@ async def appliance_branding(state: State) -> dict[str, Any]:
 async def release_changelog(state: State) -> Response:
     """Cached upstream CHANGELOG.md, refreshed by the update checker
     on every manifest poll. Lets the dashboard preview release notes
-    for a not-yet-installed version — bundled docs only know about
+    for a not-yet-installed version, bundled docs only know about
     versions <= the running release. Returns 204 if the cache is
     empty (e.g. first-boot before the initial manifest poll); JS
     falls back to the bundled /web/docs/release-notes.md."""
@@ -512,20 +512,20 @@ async def update_apply() -> dict[str, Any]:
     runs install.sh. Live log at /var/log/wattpost-update.log.
     """
     if not os.path.exists("/usr/local/bin/wattpost-update"):
-        # 400, not 500 — Litestar hides the `detail` on 5xx so the user
+        # 400, not 500, Litestar hides the `detail` on 5xx so the user
         # would see a useless "Internal Server Error" otherwise. This
         # branch happens on Docker installs (no helper bundled) and on
         # broken Pi installs; both are precondition failures, not
         # server-side bugs.
         raise HTTPException(
             status_code=400,
-            detail="wattpost-update helper not found — Docker installs "
+            detail="wattpost-update helper not found, Docker installs "
                    "should run `docker compose pull && docker compose up -d` "
                    "on the host instead.",
         )
     # setsid + nohup so the child survives this Python process getting
     # SIGTERM'd by install.sh's `systemctl restart wattpost`. We don't
-    # await the result — the caller gets a 202 immediately and polls
+    # await the result, the caller gets a 202 immediately and polls
     # /api/system/update/log for progress.
     try:
         await asyncio.create_subprocess_exec(
@@ -546,7 +546,7 @@ async def update_apply() -> dict[str, Any]:
 
 @get("/api/system/update/log")
 async def update_log() -> dict[str, Any]:
-    """Tail of /var/log/wattpost-update.log — UI polls this every few
+    """Tail of /var/log/wattpost-update.log, UI polls this every few
     seconds during an in-progress update to render live progress."""
     path = "/var/log/wattpost-update.log"
     if not os.path.exists(path):
@@ -635,7 +635,7 @@ async def patch_history_settings(
     config_path: str = state.get("config_path", "config.yaml")
 
     # Clamp + validate. Reject obvious nonsense; tier ordering is the
-    # main invariant — raw must be shortest, hour longest.
+    # main invariant, raw must be shortest, hour longest.
     if data.poll_interval_seconds is not None:
         if not (5 <= data.poll_interval_seconds <= 3600):
             raise HTTPException(
@@ -666,7 +666,7 @@ async def patch_history_settings(
 
     # Apply live BEFORE persisting. Order matters: if the YAML write
     # fails the user sees a 500 but the values are already in effect
-    # — better than failing silently after persisting.
+    #, better than failing silently after persisting.
     if data.poll_interval_seconds is not None:
         scheduler.interval_seconds = int(data.poll_interval_seconds)
         log.info("history: live poll interval = %ds", scheduler.interval_seconds)

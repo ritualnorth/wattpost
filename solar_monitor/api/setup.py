@@ -3,7 +3,7 @@
 The SPA's Setup route uses these to scan for new devices on an already-open
 transport, identify them by reading the vendor-specific model register, and
 append a validated device entry to config.yaml. The live daemon keeps
-polling on its own loop while a probe runs — the transport's request lock
+polling on its own loop while a probe runs, the transport's request lock
 serialises so the two callers don't collide.
 
 A daemon restart is required for new devices to start polling. The endpoint
@@ -49,7 +49,7 @@ async def _hot_reload_bg(state: State) -> None:
     Wizard-side callers don't have to wait the ~5s for the running
     poll cycle to drain before the user gets a "Saved" response.
 
-    Failures are logged but not surfaced to the original caller —
+    Failures are logged but not surfaced to the original caller,
     by the time this runs, the HTTP response is long gone. The
     daemon health pill on the dashboard surfaces a non-running
     scheduler if the reload bricks itself."""
@@ -64,12 +64,12 @@ async def _hot_reload(state: State) -> dict[str, Any]:
     """Replace the running scheduler with a fresh one built from the
     on-disk config.yaml. Used after wizard writes (add-transport,
     add-device) so the user doesn't have to manually restart the
-    daemon — flow ends with "polling started" instead of "now click
+    daemon, flow ends with "polling started" instead of "now click
     Restart daemon".
 
     Strategy:
       1. Re-read config.yaml from disk.
-      2. await scheduler.stop()  — waits for any in-flight poll.
+      2. await scheduler.stop() , waits for any in-flight poll.
       3. Construct a new PollScheduler with the same Store (so the
          database connection survives and history is uninterrupted).
       4. await new_scheduler.start().
@@ -77,7 +77,7 @@ async def _hot_reload(state: State) -> dict[str, Any]:
          scheduler + config.
 
     Returns a dict so the caller can include reload status / errors
-    in their own response. Never raises — if reload fails, we keep
+    in their own response. Never raises, if reload fails, we keep
     the old scheduler stopped and log the failure; the dashboard
     surfaces it via the daemon-stopped state on the next poll.
     """
@@ -88,7 +88,7 @@ async def _hot_reload(state: State) -> dict[str, Any]:
     try:
         new_config = load_config(config_path)
     except Exception as e:
-        log.exception("hot-reload: config parse failed (%s) — keeping old scheduler", e)
+        log.exception("hot-reload: config parse failed (%s), keeping old scheduler", e)
         return {"reloaded": False, "error": f"config parse: {e}"}
 
     old_scheduler: PollScheduler = state["scheduler"]
@@ -99,7 +99,7 @@ async def _hot_reload(state: State) -> dict[str, Any]:
     try:
         await old_scheduler.stop()
     except Exception as e:
-        log.exception("hot-reload: old scheduler stop raised (%s) — continuing anyway", e)
+        log.exception("hot-reload: old scheduler stop raised (%s), continuing anyway", e)
 
     new_scheduler = PollScheduler(
         new_config, store,
@@ -111,18 +111,18 @@ async def _hot_reload(state: State) -> dict[str, Any]:
     except Exception as e:
         log.exception("hot-reload: new scheduler start failed (%s)", e)
         # state["scheduler"] is the now-stopped old one. Leave it in
-        # place so health endpoints can read its dead state — better
+        # place so health endpoints can read its dead state, better
         # than silently swallowing the start failure.
         return {"reloaded": False, "error": f"start failed: {e}"}
 
     state["scheduler"] = new_scheduler
     state["config"]    = new_config
-    log.info("hot-reload: scheduler swapped — %d transports, %d devices, %d alerts",
+    log.info("hot-reload: scheduler swapped, %d transports, %d devices, %d alerts",
              len(new_config.transports), len(new_config.devices), len(new_config.alerts))
     return {"reloaded": True}
 
 
-# Slave IDs we try by default — covers Renogy factory conventions:
+# Slave IDs we try by default, covers Renogy factory conventions:
 #   1, 16:      charge controllers (Rover/Wanderer/Adventurer)
 #   32–55:      smart batteries (battery_index + 32, or 48-63)
 #   96, 97:     hub-mode addresses
@@ -135,7 +135,7 @@ DEFAULT_PROBE_IDS: tuple[int, ...] = (
 
 # Register slots that hold a model-name ASCII string for each vendor we
 # probe. The wizard tries each entry in order until one comes back with
-# usable ASCII. Order matters — DCC + inverter blocks come first because
+# usable ASCII. Order matters, DCC + inverter blocks come first because
 # they're more specific; the generic Rover block at register 12 is the
 # fallback catch-all for any other Renogy device that happens to keep
 # the model string there.
@@ -149,11 +149,11 @@ _MODEL_PROBES: list[tuple[str, str, int, int]] = [
 ]
 
 # Per-vendor heuristics that map a model string → recommended device kind.
-# Order matters — more specific patterns first (DCC, inverter) so the
+# Order matters, more specific patterns first (DCC, inverter) so the
 # generic Rover catch-all doesn't claim them by mistake.
 def _classify_renogy(model: str) -> str | None:
     m = (model or "").upper()
-    # Shunt / Battery Monitor — RBM-S100 / S300 / S500. Must come BEFORE
+    # Shunt / Battery Monitor, RBM-S100 / S300 / S500. Must come BEFORE
     # the smart-battery RBT check; RBM and RBT differ by one letter but
     # are completely different products. Also catches "SHUNT" in case
     # newer firmware names it that way.
@@ -166,7 +166,7 @@ def _classify_renogy(model: str) -> str | None:
     # DC-DC + MPPT combo (DCC50S, DCC30S, DCC25S, DCC15S). Sometimes
     # the model string is just "DCC50S"; sometimes "RNG-DCC50S". Match
     # both. These MUST be checked before the generic charge_controller
-    # patterns — they'd otherwise match "RNG-" and end up routed to
+    # patterns, they'd otherwise match "RNG-" and end up routed to
     # the wrong driver.
     if "DCC" in m and any(c.isdigit() for c in m):
         return "dcdc"
@@ -174,7 +174,7 @@ def _classify_renogy(model: str) -> str | None:
     # "RNG-INVT-". Both have INV in them so we just match on that.
     if "INV" in m or m.startswith("RIV"):
         return "inverter"
-    # Charge controllers — the catch-all bucket. Covers Rover, Rover
+    # Charge controllers, the catch-all bucket. Covers Rover, Rover
     # Elite, Rover Boost, Wanderer (all current/Li/PG variants),
     # Adventurer, Voyager, plus the generic "RNG-CTRL-" prefix used
     # on newer model SKUs.
@@ -205,7 +205,7 @@ def _clean_ascii(b: bytes) -> str:
 async def ble_status() -> dict[str, Any]:
     """List BLE adapters visible to the daemon. Used by the Setup
     wizard to surface "Bluetooth is reaching the container / Pi"
-    vs "no radio detected — check the dongle".
+    vs "no radio detected, check the dongle".
 
     Parses `bluetoothctl list` (and falls back to nothing if the
     command isn't installed). Each adapter shows its name (hci0,
@@ -280,7 +280,7 @@ async def ble_diagnose() -> dict[str, Any]:
 
     Returns counts from both scanners + a verdict the wizard can
     render directly. The endpoint is intentionally synchronous from
-    the user's POV — they pressed "Run diagnostics" and expect a
+    the user's POV, they pressed "Run diagnostics" and expect a
     result, not a stream. Total time budget ~8 seconds: 3s bleak,
     3s bluetoothctl, plus a bit of subprocess startup.
     """
@@ -290,7 +290,7 @@ async def ble_diagnose() -> dict[str, Any]:
     bctl_count: int | None = None
     bctl_err: str | None = None
 
-    # 1. Bleak scan — same coexistence guards as the regular wizard
+    # 1. Bleak scan, same coexistence guards as the regular wizard
     #    scan so a running Victron passive scanner doesn't make us
     #    look broken when actually the radio is shared.
     try:
@@ -417,14 +417,14 @@ class BleScanRequest(msgspec.Struct):
 
 # In-memory MAC last-seen cache. Keyed by uppercase MAC, value is
 # {last_seen_ts, last_rssi, name}. Used to populate the
-# `seen_recently_missing` field — MACs we saw in a prior scan but
+# `seen_recently_missing` field, MACs we saw in a prior scan but
 # aren't in the current one. Big quality-of-life signal for "my
 # dongle was here a minute ago, now it isn't" debug.
 #
 # Module-level, in-memory only. Resets on daemon restart, which is
 # fine: the cache is a hint, not a source of truth.
 _BLE_SEEN_CACHE: dict[str, dict[str, Any]] = {}
-_BLE_SEEN_TTL_S = 15 * 60   # 15 min — long enough to catch most
+_BLE_SEEN_TTL_S = 15 * 60   # 15 min, long enough to catch most
                             # "happened a minute ago" cases without
                             # holding onto stale entries forever.
 
@@ -432,19 +432,19 @@ _BLE_SEEN_TTL_S = 15 * 60   # 15 min — long enough to catch most
 @post("/api/setup/ble_scan")
 async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     """Scan BLE advertisements for `seconds`. Returns a list of every
-    advertising device the host can see — MAC, name (if advertised),
+    advertising device the host can see, MAC, name (if advertised),
     RSSI. The UI dedupes and shows them so the user can pick their
     Renogy BT-2 dongle by name pattern (`BT-TH-…`) or by MAC printed
     on the dongle itself.
 
-    Also returns `seen_recently_missing` — MACs we saw in a previous
+    Also returns `seen_recently_missing`, MACs we saw in a previous
     scan within the last 15 minutes that AREN'T in the current scan.
     A Renogy BT-2 that suddenly disappears between scans is almost
     always being held by the Renogy mobile app (the BT-2 only allows
     one BLE master at a time). Surfacing that to the user saves a
     long debug session.
 
-    Clamped to 2..30 seconds. Eight is the default — long enough that
+    Clamped to 2..30 seconds. Eight is the default, long enough that
     a slow-advertising dongle shows up, short enough that the user
     doesn't think the page froze.
     """
@@ -456,7 +456,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
 
     log.info("ble_scan: discover for %ds", secs)
     # Two coexistence steps (same pattern as the Renogy transport's
-    # _open_once — see ble_modbus.HCI_DISCOVER_LOCK):
+    # _open_once, see ble_modbus.HCI_DISCOVER_LOCK):
     #
     #   1. Acquire HCI_DISCOVER_LOCK so we don't collide with a
     #      simultaneous Renogy reconnect (also a BleakScanner.discover).
@@ -495,7 +495,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
             # `return_adv=True` makes BleakScanner give us each device's
             # latest advertisement_data alongside the BLEDevice object.
             # We need the manufacturer_data map to identify Victron Instant
-            # Readout broadcasts (#118) — their advertisements carry a
+            # Readout broadcasts (#118), their advertisements carry a
             # payload under manufacturer ID 0x02E1.
             devices_with_adv = await BleakScanner.discover(
                 timeout=secs, return_adv=True,
@@ -503,7 +503,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
         except Exception as e:
             # Most failures here are bluez transport problems: adapter
             # powered off, DBus passthrough broken in Docker, etc.
-            # Surface the message — it's the most useful debugging hint.
+            # Surface the message, it's the most useful debugging hint.
             raise HTTPException(
                 status_code=500,
                 detail=f"BLE scan failed: {e}. Check the BLE adapter "
@@ -548,7 +548,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     MOPEKA_HW_IDS = {0x03, 0x05, 0x06, 0x08, 0x09}
     # Govee thermo-hygrometers (H507x / H510x) share a single manufacturer ID.
     GOVEE_MFR_ID = 0xEC88
-    # Ruuvi Innovations — RuuviTag environmental sensors.
+    # Ruuvi Innovations, RuuviTag environmental sensors.
     RUUVI_MFR_ID = 0x0499
     for mac, (d, ad) in devices_with_adv.items():
         mac = (mac or "").upper()
@@ -597,7 +597,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
             rec["protocol"] = "ruuvi_ambient"
             rec["vendor"]   = "ruuvi"
 
-        # Name-based hints stay as before — covers Renogy BT-* and
+        # Name-based hints stay as before, covers Renogy BT-* and
         # any other vendor identifiable by advertised name.
         nm = (d.name or "").lower()
         if not rec.get("vendor"):
@@ -610,7 +610,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
 
         # For the discovery telemetry path (#129), stash enough of the
         # advertisement to build a fingerprint for unknown devices.
-        # These fields are NOT serialised to the UI — they're stripped
+        # These fields are NOT serialised to the UI, they're stripped
         # below before the response is returned. We only use them
         # internally when discovery is opted-in.
         if not rec.get("vendor"):
@@ -673,7 +673,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
     seen_recently_missing.sort(key=lambda d: d.get("seconds_ago", 99999))
     log.info("ble_scan: %d devices, %d recently-missing",
              len(out), len(seen_recently_missing))
-    # Anonymous discovery telemetry (#129). Strict opt-in — config
+    # Anonymous discovery telemetry (#129). Strict opt-in, config
     # block discovery.enabled must be true AND the appliance must be
     # cloud-paired. Fire-and-forget; failures are logged but never
     # bubble up to the scan response. Stripping the underscore-prefixed
@@ -686,7 +686,7 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
             rec.pop(k, None)
 
     # LAN peer hint (#184). Only fire when this scan turned up zero
-    # Renogy devices — that's the symptom of "BT-2 held by another
+    # Renogy devices, that's the symptom of "BT-2 held by another
     # host". If Renogy gear is already advertising at us, the
     # single-master collision isn't happening and a network probe is
     # just noise. Same /24 + same default WattPost port; see
@@ -718,7 +718,7 @@ async def _maybe_push_discovery(
     if cfg.cloud is None or not (
         cfg.cloud.bearer_token and cfg.cloud.endpoint
     ):
-        return  # paired-only — discovery POST is bearer-authed
+        return  # paired-only, discovery POST is bearer-authed
     fps: list[dict[str, Any]] = []
     for rec in scanned:
         enriched = dict(rec)
@@ -741,7 +741,7 @@ async def _maybe_push_discovery(
         )
     except Exception:
         # Never let telemetry break the user-facing scan.
-        log.debug("discovery push raised — swallowing", exc_info=True)
+        log.debug("discovery push raised, swallowing", exc_info=True)
 
 
 @get("/api/setup/hid_scan")
@@ -751,7 +751,7 @@ async def hid_scan() -> dict[str, Any]:
     The wizard calls this from the "Add hybrid inverter" branch to
     show installers which of their plugged-in HID devices match a
     supported family. Falls back gracefully when the `hid` Python
-    package isn't installed (default on every install today —
+    package isn't installed (default on every install today,
     optional dep) so the wizard can render a clear "install hidapi
     on this host" hint instead of a 500.
 
@@ -759,7 +759,7 @@ async def hid_scan() -> dict[str, Any]:
       vid + pid             integers, ready for AddTransportRequest
       manufacturer + product strings from the device descriptor
       serial_number          for multi-inverter installs
-      match                  "voltronic" | None — tells the wizard
+      match                  "voltronic" | None, tells the wizard
                              whether to default to usbhid_voltronic
                              on Add.
     """
@@ -782,7 +782,7 @@ async def hid_scan() -> dict[str, Any]:
     # community reports + mpp-solar's device list. Add new entries
     # here as customer reports come in.
     VOLTRONIC_VID_PIDS = {
-        (0x0665, 0x5161),  # Cypress HID chip — Axpert / MPP / Mecer / Effekta
+        (0x0665, 0x5161),  # Cypress HID chip, Axpert / MPP / Mecer / Effekta
         (0x0001, 0x0000),  # EG4 6500EX-48 variant
     }
 
@@ -820,18 +820,18 @@ async def usb_scan() -> dict[str, Any]:
     chip name) AND a brief protocol sniff per device so the wizard
     can route the user correctly:
 
-      * `nmea_gps`         — emitted NMEA sentences (`$GP…` / `$GN…`).
+      * `nmea_gps`        , emitted NMEA sentences (`$GP…` / `$GN…`).
                              Routed to GPS setup (when #125 lands).
-      * `modbus_rtu`       — silent at 1s of read, plausible Modbus
-                             host — routed through the existing
+      * `modbus_rtu`      , silent at 1s of read, plausible Modbus
+                             host, routed through the existing
                              "Use as Modbus" flow.
-      * `unknown`          — port opens, no recognisable output —
+      * `unknown`         , port opens, no recognisable output,
                              user can still pick it manually.
-      * `busy`             — port couldn't be opened (held by the
+      * `busy`            , port couldn't be opened (held by the
                              daemon or another process).
 
     Protocol sniff is read-only: open at 9600 baud, read for ~700 ms,
-    classify by what landed. We don't write a Modbus probe here — the
+    classify by what landed. We don't write a Modbus probe here, the
     existing `/api/setup/probe` endpoint does that once the user has
     selected a transport, and writing blindly could clobber something
     else on the bus.
@@ -845,7 +845,7 @@ async def usb_scan() -> dict[str, Any]:
         rec: dict[str, Any] = {"port": path}
         leaf = path.rsplit("/", 1)[-1]
         sys_base = f"/sys/class/tty/{leaf}/device"
-        # Walk up the sysfs chain to find the USB device node — the
+        # Walk up the sysfs chain to find the USB device node, the
         # immediate `device` symlink is a per-driver wrapper that
         # doesn't carry idVendor / idProduct, but its grand-parent
         # (or great-grand-parent for FTDI) does.
@@ -871,7 +871,7 @@ async def usb_scan() -> dict[str, Any]:
 
         # Friendly chip label so the UI doesn't need to map VID/PIDs.
         # These four IDs cover ~95% of consumer USB-RS485 adapters in
-        # the wild — FTDI, WCH (CH340/CH341), Prolific, Silicon Labs.
+        # the wild, FTDI, WCH (CH340/CH341), Prolific, Silicon Labs.
         vid = rec.get("vendor_id", "").lower()
         pid = rec.get("product_id", "").lower()
         chip = None
@@ -883,7 +883,7 @@ async def usb_scan() -> dict[str, Any]:
         if chip:
             rec["chip"] = chip
 
-        # Protocol sniff. Best-effort — any failure tags the device
+        # Protocol sniff. Best-effort, any failure tags the device
         # as `unknown` rather than blocking the scan.
         rec["protocol"] = await _asyncio.get_event_loop().run_in_executor(
             None, _sniff_serial_protocol, path,
@@ -897,20 +897,20 @@ async def usb_scan() -> dict[str, Any]:
 def _sniff_serial_protocol(port: str) -> str:
     """Open a serial port, read briefly, classify what came out.
 
-    Runs in a thread-pool executor — pyserial is synchronous and we
+    Runs in a thread-pool executor, pyserial is synchronous and we
     don't want a long-read to block the event loop while scanning a
     handful of devices.
 
     Classifications:
-      * 'nmea_gps' — at least one `$GP…` / `$GN…` / `$GL…` / `$GA…`
+      * 'nmea_gps', at least one `$GP…` / `$GN…` / `$GL…` / `$GA…`
         sentence within the read window. Reliable signal: NMEA
         receivers emit ~10 sentences per second at 9600 baud.
-      * 'modbus_rtu' — zero bytes received. Silent serial ports are
+      * 'modbus_rtu', zero bytes received. Silent serial ports are
         the Modbus default: the device only speaks when polled. NOT a
         guarantee (could be an unplugged adapter), but the right
         default for routing in the wizard.
-      * 'unknown' — bytes received but no recognised pattern.
-      * 'busy' — port couldn't be opened (already in use).
+      * 'unknown', bytes received but no recognised pattern.
+      * 'busy', port couldn't be opened (already in use).
     """
     try:
         import serial as _serial
@@ -959,7 +959,7 @@ def _sniff_serial_protocol(port: str) -> str:
         if line.startswith(("$GP", "$GN", "$GL", "$GA", "$GB", "$BD")):
             return "nmea_gps"
 
-    # Got bytes but no NMEA pattern — could be a Victron VE.Direct
+    # Got bytes but no NMEA pattern, could be a Victron VE.Direct
     # device emitting at 19200 baud (we were reading at 9600 so any
     # frames came out as garbled symbols). Re-sniff at 19200 looking
     # for the VE.Direct frame signature (`\r\nPID\t` or `Checksum\t`).
@@ -1009,7 +1009,7 @@ def _own_route_ip() -> str | None:
     This is the IP a peer on the same LAN would see when we connect
     to them, which makes it the right anchor for "what's my subnet".
     Distinct from `_own_lan_ips()` (below) because that returns ALL
-    of our NIC IPs — including the docker0 bridge `172.17.0.1` when
+    of our NIC IPs, including the docker0 bridge `172.17.0.1` when
     we're in a host-network container, which would wrongly anchor
     the subnet scan to the docker bridge instead of the LAN.
     """
@@ -1033,7 +1033,7 @@ def _own_lan_ips() -> set[str]:
 
     Includes the docker bridge (`172.17.0.1`), secondary NICs, and
     whatever else the kernel knows about. Don't use this to pick the
-    subnet anchor — that's what `_own_route_ip()` is for. This is
+    subnet anchor, that's what `_own_route_ip()` is for. This is
     only for "don't probe ourselves".
     """
     import socket as _socket
@@ -1069,13 +1069,13 @@ async def _scan_lan_for_wattpost_peers(
 
     Trade-offs deliberately accepted:
       * Only scans a /24 around our own IP. A /16 or bridged-AP
-        network would miss peers; that's fine — the wizard hint is a
+        network would miss peers; that's fine, the wizard hint is a
         speculative cause, not a guarantee.
       * Probes the *default* WattPost port. A peer on a non-default
         port (the wattpost-config TUI can change it) won't be found.
       * Identification is via our own `/api/health` returning
         `{"service": "wattpost"}`. A peer running an older version
-        without that field will be skipped silently — also fine.
+        without that field will be skipped silently, also fine.
 
     Returns a list of `{ip, version}` for confirmed peers, EXCLUDING
     this host's own IPs. Never raises; on any failure returns [].
@@ -1170,7 +1170,7 @@ class AddTransportRequest(msgspec.Struct):
     # BLE Modbus (Renogy BT-2 etc.): provide `address` (MAC).
     # serial_modbus (USB-RS485 dongle):  provide `port` (e.g. /dev/ttyUSB0)
     #                                    + optional `baudrate` (defaults to
-    #                                    9600 — Renogy default).
+    #                                    9600, Renogy default).
     # ble_victron_advertise (Victron Instant Readout):
     #                                    provide `address` (MAC) + `encryption_key`
     #                                    (32-char hex from VictronConnect →
@@ -1178,7 +1178,7 @@ class AddTransportRequest(msgspec.Struct):
     # usbhid_voltronic (Axpert / MPP / EG4 hybrid inverter, USB-HID):
     #                                    provide `vid` + `pid` (default 0665:5161,
     #                                    the Cypress HID chip in every Voltronic
-    #                                    rebadge — EG4 6500EX uses 0001:0000),
+    #                                    rebadge, EG4 6500EX uses 0001:0000),
     #                                    + optional `serial_number` if multiple
     #                                    inverters are wired to the same host.
     # Discriminated by `type` so a single endpoint handles every transport
@@ -1241,7 +1241,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         default_label = f"BLE dongle {mac[-5:]}"
 
     elif data.type == "ble_victron_advertise":
-        # Victron Instant Readout — passive BLE advertisement decode.
+        # Victron Instant Readout, passive BLE advertisement decode.
         # Needs the device's encryption key (revealed in VictronConnect
         # under Product info → Show device key). 32-char hex, tolerant
         # of common separator clutter.
@@ -1263,7 +1263,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
                        "VictronConnect shows under Product info → Show "
                        "device key)",
             )
-        # Dedupe on MAC across both BLE transport types — a single
+        # Dedupe on MAC across both BLE transport types, a single
         # physical device can't be polled by two different transports
         # at once.
         for t in current_transports:
@@ -1344,7 +1344,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         default_label = f"Govee {mac[-5:]}"
 
     elif data.type == "ble_ruuvi_advertise":
-        # RuuviTag — passive BLE, format-5 plaintext payload, no key.
+        # RuuviTag, passive BLE, format-5 plaintext payload, no key.
         mac = (data.address or "").strip().upper()
         if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
             raise HTTPException(
@@ -1367,10 +1367,10 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         default_label = f"Ruuvi {mac[-5:]}"
 
     elif data.type == "ble_mopeka_advertise":
-        # Mopeka tank-level sensor — passive BLE, plaintext payload,
+        # Mopeka tank-level sensor, passive BLE, plaintext payload,
         # NO encryption key. Just a MAC. Auto-creates the device row
         # so the user doesn't have to (Mopeka has no slave-ID concept
-        # any more than Victron does — one MAC, one device).
+        # any more than Victron does, one MAC, one device).
         mac = (data.address or "").strip().upper()
         if not re.fullmatch(r"[0-9A-F]{2}(:[0-9A-F]{2}){5}", mac):
             raise HTTPException(
@@ -1397,7 +1397,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         # rebadges) over USB-HID. Default VID:PID matches the Cypress
         # HID chip every Voltronic firmware ships with; EG4 6500EX
         # variants overlay 0001:0000 so the wizard accepts either.
-        # Treat 0 as a real value — EG4's PID literally is 0x0000.
+        # Treat 0 as a real value, EG4's PID literally is 0x0000.
         vid = int(0x0665 if data.vid is None else data.vid)
         pid = int(0x5161 if data.pid is None else data.pid)
         if not (0 <= vid <= 0xFFFF and 0 <= pid <= 0xFFFF):
@@ -1471,14 +1471,14 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"unsupported transport type {data.type!r} — wizard "
+            detail=f"unsupported transport type {data.type!r}, wizard "
                    f"supports 'ble_modbus', 'serial_modbus', "
                    f"'ble_victron_advertise', 've_direct', "
                    f"'ble_mopeka_advertise', 'ble_govee_advertise', "
                    f"'ble_ruuvi_advertise' and 'usbhid_voltronic'",
         )
 
-    # Bump id if collision (rare — different MAC, same tail).
+    # Bump id if collision (rare, different MAC, same tail).
     existing_ids = {t.get("id") for t in current_transports}
     base = new_id; n = 2
     while new_id in existing_ids:
@@ -1495,7 +1495,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     # Victron Instant Readout transports auto-create their corresponding
     # device row. Unlike Modbus transports (where the user runs a slave-ID
     # scan to discover devices), a Victron passive transport IS the
-    # device — one MAC, one device, one driver. Without this row the
+    # device, one MAC, one device, one driver. Without this row the
     # daemon happily listens for advertisements but has no DeviceCfg to
     # bind the decoded data to. The wizard's slave-ID scan button
     # doesn't apply (Victron has no slave_id), so the user has no path
@@ -1505,7 +1505,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         # Map victron-ble's device-class names → WattPost device_kind.
         # Filled when the wizard scan passes data.device_class; falls
         # back to "ac_charger" (a safe poll-anything kind) if we don't
-        # know — the driver's payload-classifier will still parse,
+        # know, the driver's payload-classifier will still parse,
         # just under a less-specific kind label.
         VICTRON_CLASS_TO_KIND = {
             "AcCharger":           "ac_charger",
@@ -1523,7 +1523,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
             "vendor":    "victron",
             "kind":      kind,
             "transport": new_id,
-            # slave_id intentionally omitted — Victron BLE is MAC-addressed.
+            # slave_id intentionally omitted, Victron BLE is MAC-addressed.
             # DeviceCfg.slave_id is `int | None = None` so this is valid.
             "label":     label,
         }
@@ -1545,7 +1545,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         log.info("setup wizard: auto-added mopeka tank device for transport %s",
                  new_id)
 
-    # Same pattern for Govee + Ruuvi — passive transports, one
+    # Same pattern for Govee + Ruuvi, passive transports, one
     # device row per MAC.
     if data.type == "ble_govee_advertise":
         raw.setdefault("devices", []).append({
@@ -1588,7 +1588,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
     log.info("setup wizard: added transport %s type=%s address=%s label=%s",
              new_id, data.type, mac, label)
 
-    # Background hot-reload — see _hot_reload_bg. Save returns
+    # Background hot-reload, see _hot_reload_bg. Save returns
     # immediately; daemon health pill catches reload failures.
     asyncio.create_task(_hot_reload_bg(state))
 
@@ -1611,7 +1611,7 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
       * `ble_modbus` / `serial_modbus`: a GATT or serial connection is
         actually held open. `_client.is_connected` (bleak) or the
         socket-style equivalent is the signal.
-      * `ble_victron_advertise`: PASSIVE — no connection is ever held.
+      * `ble_victron_advertise`: PASSIVE, no connection is ever held.
         The transport is "open" iff its passive listener is registered
         with the shared scanner AND we've seen an advertisement
         recently (within 60s). Otherwise we'd mark a perfectly-healthy
@@ -1707,7 +1707,7 @@ class EditTransportRequest(msgspec.Struct, kw_only=True):
     the Victron encryption key when the device is factory-reset, the
     BLE MAC when a dongle is replaced, the serial port path when a
     USB-RS485 adapter moves to a different tty. The transport `id`
-    is the stable handle and is never renamed — devices reference
+    is the stable handle and is never renamed, devices reference
     it, history rows are keyed off it, MQTT topics include it."""
     address:        str | None = None
     encryption_key: str | None = None
@@ -1791,7 +1791,7 @@ async def edit_setup_transport(
     if not changes:
         raise HTTPException(status_code=400, detail="no editable fields supplied")
 
-    # Apply, persist, hot-reload — same pattern as add/delete.
+    # Apply, persist, hot-reload, same pattern as add/delete.
     target.update(changes)
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
@@ -1818,7 +1818,7 @@ async def delete_setup_transport(
 ) -> dict[str, Any]:
     """Remove a transport AND every device that referenced it, then
     hot-reload so the BLE connection closes immediately. Cascade is
-    deliberate — a transport with orphan devices wouldn't poll
+    deliberate, a transport with orphan devices wouldn't poll
     anyway, and leaving them in the yaml is confusing."""
     config_path: str = state.get("config_path", "config.yaml")
     path = Path(config_path)
@@ -1875,7 +1875,7 @@ class ProbeRequest(msgspec.Struct):
 
 async def _probe_one(t, sid: int) -> dict[str, Any]:
     """Probe a single slave ID. Tries each model-register guess in
-    order — first one that returns plausible ASCII wins."""
+    order, first one that returns plausible ASCII wins."""
     if not (1 <= sid <= 247):
         return {"slave_id": sid, "alive": False, "vendor": None,
                 "kind": None, "model": None, "error": "id out of range"}
@@ -1883,7 +1883,7 @@ async def _probe_one(t, sid: int) -> dict[str, Any]:
     for v, suggested_kind, register, count in _MODEL_PROBES:
         try:
             frame = build_read_holding(sid, register, count)
-            # 2.5 s timeout — first probe after a fresh BLE connect
+            # 2.5 s timeout, first probe after a fresh BLE connect
             # often hits ~1.5 s on its first round-trip before settling.
             # 1.2 s was clipping legit responses on cold links.
             resp = await t.request(
@@ -1911,13 +1911,13 @@ async def _probe_one(t, sid: int) -> dict[str, Any]:
 @post("/api/setup/probe")
 async def probe(data: ProbeRequest, state: State) -> Stream:
     """Sweep slave IDs on a transport. Streams one NDJSON record per
-    probe — so the wizard UI can show "Probing #16 → found Rover
+    probe, so the wizard UI can show "Probing #16 → found Rover
     RVR40" live instead of staring at a spinner for 60s while the
     full sweep finishes. Last record is a `{"done": true, ...}`
     summary.
 
     Reopens the transport at scan start so an idle-dropped BLE link
-    gets reconnected automatically — the user shouldn't have to
+    gets reconnected automatically, the user shouldn't have to
     restart the daemon to scan a second time.
 
     The transport's own lock serialises against the scheduler's polls."""
@@ -1929,7 +1929,7 @@ async def probe(data: ProbeRequest, state: State) -> Stream:
     ids = tuple(data.slave_ids) if data.slave_ids else DEFAULT_PROBE_IDS
 
     async def gen():
-        # Reopen the link if it's dropped — idle BLE connections can
+        # Reopen the link if it's dropped, idle BLE connections can
         # die after a few minutes of no traffic.
         reopened = False
         try:
@@ -1980,7 +1980,7 @@ class AddDeviceRequest(msgspec.Struct):
 @post("/api/setup/add_device")
 async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
     """Append a new device to config.yaml after validating it. Returns a
-    flag the SPA uses to show a "restart required" banner — the running
+    flag the SPA uses to show a "restart required" banner, the running
     Poller is configured at boot, so it won't poll the new device until
     the daemon restarts."""
     config: Config = state["config"]
@@ -2030,7 +2030,7 @@ async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
     log.info("setup wizard: added %s/%s @ %s slave=%d label=%s",
              data.vendor, data.kind, data.transport, data.slave_id, label)
 
-    # Schedule the hot-reload to run in the background — it can take
+    # Schedule the hot-reload to run in the background, it can take
     # ~5s while the in-flight poll cycle drains, and there's no
     # reason for the user's "Saved" feedback to wait that long. The
     # device starts polling within a few seconds after the response
@@ -2042,7 +2042,7 @@ async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
     return {
         "ok": True,
         "label": label,
-        # Decoupled flow — we always assume reload will succeed
+        # Decoupled flow, we always assume reload will succeed
         # (we just wrote the config we're reloading). If it doesn't,
         # the daemon health pill catches it. Pre-decoupling these
         # two fields were derived from the await result.

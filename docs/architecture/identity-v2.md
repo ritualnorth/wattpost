@@ -1,4 +1,4 @@
-# Identity v2 — Design RFC
+# Identity v2, Design RFC
 
 **Status:** DRAFT (Phase 0 of EPIC #301)
 **Author:** Claude (co-architect with Ritual North)
@@ -13,14 +13,14 @@
 WattPost today has three independent authentication mechanisms wired
 in parallel, none of which compose cleanly:
 
-1. **LAN password** — first-boot generated, single shared credential
+1. **LAN password**, first-boot generated, single shared credential
    per appliance. Read-only-public bypass means anyone on the LAN
    can browse Settings without it. (Concretely surfaced in Ritual North's
    conversation on 2026-05-24: "I went to the settings page and it
    didn't ask me to login.")
-2. **Cloud account password + TOTP** — separate identity, separate
+2. **Cloud account password + TOTP**, separate identity, separate
    realm, no relationship to the LAN credential.
-3. **HMAC broker auth** — cloud signs every proxied request with a
+3. **HMAC broker auth**, cloud signs every proxied request with a
    per-appliance `sso_secret`. Compromise of the cloud = compromise
    of every paired appliance, with no countersignature path.
 
@@ -56,13 +56,13 @@ SSO, and standard OIDC patterns.
    issued by an OIDC server in the cloud. Same token verified the
    same way across dashboard, broker, kiosk, command queue.
 4. **Cloud compromise has a hard ceiling.** Without the per-device
-   private key, a compromised cloud cannot forge new commands —
+   private key, a compromised cloud cannot forge new commands,
    only relay ones the appliance has already signed. Destructive
    commands require a fresh user re-auth on top.
 5. **Offline-first still works.** Appliance functions for N days
    without cloud reachability via a pre-cached refresh token; an
    explicit local-emergency credential is the floor.
-6. **Standards-compliant.** OIDC + WebAuthn + mTLS + JWT — all
+6. **Standards-compliant.** OIDC + WebAuthn + mTLS + JWT, all
    primitives an auditor can recognise. No bespoke crypto, no
    home-rolled token format.
 7. **SOC2-evidence-ready.** Audit log entries cryptographically
@@ -77,7 +77,7 @@ SSO, and standard OIDC patterns.
 - Hardware-backed key storage *required* in v2 (#312 is optional
   Phase 10). Software-encrypted private key on disk is the
   v2 baseline; HSM/secure-element is an enterprise upgrade.
-- Federation with external IdPs (Okta, Auth0, Azure AD) — desirable
+- Federation with external IdPs (Okta, Auth0, Azure AD), desirable
   long-term but out of scope for v2. The OIDC layer we build is the
   *foundation* that enables this later.
 
@@ -136,23 +136,23 @@ cached cloud public key.
 ### Scopes
 
 ```
-dashboard:read              — view tiles, devices, history, energy
-dashboard:write             — change rules, add/edit devices, settings
-kiosk:read                  — narrow read-only subset for shared displays
-appliance:admin             — pairing, unpair, update, restore, disk_cleanup
-appliance:command:destructive  — destructive subset (restore, fleet update, delete site, billing)
+dashboard:read             , view tiles, devices, history, energy
+dashboard:write            , change rules, add/edit devices, settings
+kiosk:read                 , narrow read-only subset for shared displays
+appliance:admin            , pairing, unpair, update, restore, disk_cleanup
+appliance:command:destructive , destructive subset (restore, fleet update, delete site, billing)
                                  requires acr=high
 billing:read
 billing:write
 account:read
-account:write               — change password, manage 2FA, manage WebAuthn keys
-fleet:read                  — multi-site view for installer / building-operator
-fleet:write                 — bulk operations across sites
-admin:tenant                — tenant admin (RBAC, user invites)
-admin:platform              — WattPost staff only
+account:write              , change password, manage 2FA, manage WebAuthn keys
+fleet:read                 , multi-site view for installer / building-operator
+fleet:write                , bulk operations across sites
+admin:tenant               , tenant admin (RBAC, user invites)
+admin:platform             , WattPost staff only
 ```
 
-Destructive operations check both scope AND `acr` claim — a long-
+Destructive operations check both scope AND `acr` claim, a long-
 lived "remember me" session has scope=dashboard:write but acr=low,
 so it can't trigger restore without a re-auth bump to acr=high.
 
@@ -208,7 +208,7 @@ Key properties:
 - **Cloud's public key (JWKS) is fetched at pair time and cached
   forever** (with rotation handled via JWKS endpoint kid header).
 - **Refresh token is the only credential the appliance holds for
-  the cloud account** — short-lived; rotated on each use. Cloud-side
+  the cloud account**, short-lived; rotated on each use. Cloud-side
   revocable.
 
 ### Sequence: LAN login (cloud customer)
@@ -270,7 +270,7 @@ Key properties:
 - **User logs in once on the cloud** (passkey or TOTP). No separate
   LAN password.
 - **Appliance does NOT call the cloud during the cookie's lifetime**
-  — JWT signature verification is offline using the cached JWKS.
+ , JWT signature verification is offline using the cached JWKS.
 - **Refresh happens silently** when JWT expires (browser still has
   cloud session cookie via cloud's domain).
 - **If cloud is unreachable**, the LAN session cookie is still
@@ -352,15 +352,15 @@ When the appliance can't reach the cloud:
    reachable), and fall through to the **emergency local login**.
 3. **Emergency local credentials** are set during pairing OR by the
    user explicitly in Settings. Username + password, rate-limited,
-   audit-logged. Intended as the floor — "the internet is down and
+   audit-logged. Intended as the floor, "the internet is down and
    I need to look at my dashboard".
 4. **Destructive commands cannot be triggered offline.** They
    require a fresh cloud auth (acr=high), which is impossible
-   without the cloud. This is intentional — the only time you
+   without the cloud. This is intentional, the only time you
    should be running a restore is when you have full faith in the
    auth chain.
 5. **Local-only appliances (never paired)** use emergency local
-   credentials as their primary auth. No OIDC dance — login form
+   credentials as their primary auth. No OIDC dance, login form
    posts straight to local password verification. This is the
    off-grid customer who never wanted the cloud.
 
@@ -387,7 +387,7 @@ Appliance-issued kiosk JWTs (for local-only customers without a
 cloud account) have `iss=<slug>.wattpost.cloud` and validate
 against the appliance's own kiosk-signing key.
 
-**Same JWT validation code path** — issuer determines which key to
+**Same JWT validation code path**, issuer determines which key to
 verify against, scope determines what's allowed. No parallel
 mechanisms.
 
@@ -397,17 +397,17 @@ mechanisms.
 
 These were originally framed as "open questions"; each has a
 standard industry answer. Resolved here without surfacing to Ritual North
-per [[user_role]] — these are technical implementation calls, not
+per [[user_role]], these are technical implementation calls, not
 strategic ones.
 
 | # | Decision | Reasoning |
 |---|---|---|
 | **1. Refresh-token rotation** | **Rotate on every use.** Old token marked `rotated_to=<new>` and rejected if presented again. | OIDC RFC 6749 §6 + OAuth 2.1 draft. Detects token theft (if both old and new ever present, both revoked + user alerted). Negligible load at our cadences. |
 | **2. Cloud signing key rotation** | **Quarterly. 48h overlap window** during which both old and new `kid` validate. Old key archived after overlap; can still verify already-issued tokens until their natural expiry (15 min). | Industry standard for OIDC IdPs (Okta, Auth0, AWS Cognito all use ~90-day rotation). 48h overlap handles clock skew + caching staleness in appliance JWKS caches. |
-| **3. Cloud key storage** | **Pre-launch:** ed25519 private keys sealed (libsodium sealed-box) on disk, master key in deploy-time env var on the Contabo VPS. **Post-paying-customers:** migrate to **AWS KMS** (or **Hashicorp Vault** if we keep self-hosted). Migration is a one-shot key-import job; can defer until billing is live. | KMS-managed keys are the SOC2 baseline. Pre-launch sealed-box-on-disk is fine for "few testers, no real customer data yet"; document the migration path so we don't have to think about it again. Don't ship Vault before we have someone to ask "should we just use AWS KMS" — pre-mature infra cost. |
+| **3. Cloud key storage** | **Pre-launch:** ed25519 private keys sealed (libsodium sealed-box) on disk, master key in deploy-time env var on the Contabo VPS. **Post-paying-customers:** migrate to **AWS KMS** (or **Hashicorp Vault** if we keep self-hosted). Migration is a one-shot key-import job; can defer until billing is live. | KMS-managed keys are the SOC2 baseline. Pre-launch sealed-box-on-disk is fine for "few testers, no real customer data yet"; document the migration path so we don't have to think about it again. Don't ship Vault before we have someone to ask "should we just use AWS KMS", pre-mature infra cost. |
 | **4. WebAuthn Relying Party ID** | **`wattpost.cloud`** (apex domain). Passkeys then work across `wattpost.cloud`, `app.wattpost.cloud`, `<slug>.wattpost.cloud`. | WebAuthn RP IDs must be the registrable suffix or a subdomain of it; using the apex means all our subdomains share credentials. Industry pattern (GitHub uses `github.com`, Google uses `google.com`). |
-| **5. mTLS cert renewal** | **1y validity, auto-renew 30 days before expiry** via fresh CSR over the existing heartbeat channel. If renewal fails for 30 days straight, cloud surfaces a "Cert expiring — manual action required" alert on the cloud dashboard. | Lets-Encrypt-style cadence. 30-day window gives 6 weekly retry chances before user intervention. Standard pattern in cloud-edge architectures. |
-| **6. JWT library** | **`authlib`** for signing + verification on cloud. **`pyjwt`** for verify-only on appliance (smaller dep, simpler API). | `python-jose` unmaintained since 2024 (per pypi). `authlib` is the actively-maintained spec-complete OIDC + OAuth2 lib for Python. `pyjwt` is a strict subset — fine for appliance which only verifies tokens, never signs cloud-bound ones. |
+| **5. mTLS cert renewal** | **1y validity, auto-renew 30 days before expiry** via fresh CSR over the existing heartbeat channel. If renewal fails for 30 days straight, cloud surfaces a "Cert expiring, manual action required" alert on the cloud dashboard. | Lets-Encrypt-style cadence. 30-day window gives 6 weekly retry chances before user intervention. Standard pattern in cloud-edge architectures. |
+| **6. JWT library** | **`authlib`** for signing + verification on cloud. **`pyjwt`** for verify-only on appliance (smaller dep, simpler API). | `python-jose` unmaintained since 2024 (per pypi). `authlib` is the actively-maintained spec-complete OIDC + OAuth2 lib for Python. `pyjwt` is a strict subset, fine for appliance which only verifies tokens, never signs cloud-bound ones. |
 | **7. Schema migration mechanism** | **Alembic, additive-only during v1+v2 cycle.** New tables added in v0.2.0; legacy `appliances.sso_secret` + `bearer_token` columns dropped in v0.3.0. Each migration tested against a copy of prod data before deploy. | Standard SQLAlchemy + Alembic stack we already use. Additive migrations are safe to roll back; column drops only happen after deprecation cycle ends. |
 | **8. Breaking-change handling** | **One-tap re-pair migration** via the cloud banner described in the migration section. Every paired appliance shows "Security upgrade available" until upgraded. v0.3.0 drops v1 entirely; appliances on v1 at that point are forced to re-pair from scratch (well-flagged in changelog + email). | Matches the "upgrade your password" UX every serious SaaS uses (Stripe, GitHub). One-tap because the appliance does all the keypair work; user only consents. |
 
@@ -433,7 +433,7 @@ storage.
 
 ## Database schema
 
-### Cloud — new tables
+### Cloud, new tables
 
 ```sql
 -- OIDC clients. The appliance (per pairing) is registered as a
@@ -557,7 +557,7 @@ CREATE TABLE appliance_client_certs (
 );
 ```
 
-### Cloud — modified tables
+### Cloud, modified tables
 
 ```sql
 ALTER TABLE appliances
@@ -571,7 +571,7 @@ ALTER TABLE users
   -- password column kept; deprecated to fallback-only for v2 customers.
 ```
 
-### Appliance — on-disk layout
+### Appliance, on-disk layout
 
 ```
 /var/lib/wattpost/keys/
@@ -586,7 +586,7 @@ ALTER TABLE users
 └── client_key.sealed            # mTLS client key, same sealed-box pattern
 ```
 
-### Appliance — SQLite tables
+### Appliance, SQLite tables
 
 ```sql
 -- Browser cookies for local sessions. 90d default expiry, scoped
@@ -641,9 +641,9 @@ GET /.well-known/openid-configuration
 ```
 
 Returns standard OIDC discovery doc. Custom fields:
-- `scopes_supported` — the WattPost scope catalogue
-- `acr_values_supported` — `["high", "med", "low", "kiosk"]`
-- `wp_supported_amr` — `["webauthn", "totp", "password"]`
+- `scopes_supported`, the WattPost scope catalogue
+- `acr_values_supported`, `["high", "med", "low", "kiosk"]`
+- `wp_supported_amr`, `["webauthn", "totp", "password"]`
 
 ### JWKS
 
@@ -699,7 +699,7 @@ Returns:
   "expires_in": 900,
   "refresh_token": "<opaque>",
   "scope": "dashboard:write appliance:admin",
-  "id_token": "<JWT — same claims minus scope>"
+  "id_token": "<JWT, same claims minus scope>"
 }
 ```
 
@@ -779,7 +779,7 @@ table with a special grant_type marker.
 
 ```
 POST /pair/exchange
-(no auth — code is the auth)
+(no auth, code is the auth)
 
 { "code": "ABC-XYZ" }
 ```
@@ -897,12 +897,12 @@ no appliance is forced into a hard cut-over.
 | Threat | Mitigation in v2 |
 |---|---|
 | T1 (internet) | TLS everywhere; 2FA / passkey on all login; rate limits (#156 extended in Phase 9); DDoS hardening (#145); no anonymous /healthz/deep leaks (#155) |
-| T2 (stolen session) | acr=low for long cookies — can read dashboard but cannot trigger destructive ops without fresh re-auth (Phase 9). Restore is impossible without webauthn tap. Client-encrypted backups (#300) mean even if attacker downloads them they can't decrypt. |
+| T2 (stolen session) | acr=low for long cookies, can read dashboard but cannot trigger destructive ops without fresh re-auth (Phase 9). Restore is impossible without webauthn tap. Client-encrypted backups (#300) mean even if attacker downloads them they can't decrypt. |
 | T3 (compromised cloud) | **The core architectural win.** Compromised cloud holds: cloud signing key (can mint JWTs), refresh tokens (can extend sessions). Does NOT hold: appliance private keys (can't forge appliance-signed audit entries; can't make appliance trust forged data on restore). Hash-chained audit log signed by appliances means tampering detectable. Backup encryption with appliance-held key means cloud can't decrypt or forge backups. |
 | T4 (LAN attacker) | Strict-default auth (no anonymous GET). LAN access requires either OIDC SSO via cloud (so attacker needs the user's cloud creds) or the emergency local credential (rate limited, audit logged). No more browse-Settings-as-anon. |
-| T5 (physical) | Software keys are sealed against a machine-id-derived secret — meaningful work to extract but not absolute. Phase 10 with ATECC608A or YubiKey provides hardware-bound key storage. Audit log + remote attestation (future) can detect tamper. |
-| T6 (insider) | Audit log is appliance-signed — staff at cloud can't backdoor entries without appliance cooperation. Tenant isolation in DB (RBAC). Per-action approval requirements for staff cross-tenant queries. SOC2 evidence trail backs this. |
-| T7 (supply chain) | OUT OF SCOPE for v2 — separate hardening story. Mitigations to ship later: cosign-signed Docker images, SBOM in every release, dependency pinning + scanning, reproducible builds. Backlog as separate epic. |
+| T5 (physical) | Software keys are sealed against a machine-id-derived secret, meaningful work to extract but not absolute. Phase 10 with ATECC608A or YubiKey provides hardware-bound key storage. Audit log + remote attestation (future) can detect tamper. |
+| T6 (insider) | Audit log is appliance-signed, staff at cloud can't backdoor entries without appliance cooperation. Tenant isolation in DB (RBAC). Per-action approval requirements for staff cross-tenant queries. SOC2 evidence trail backs this. |
+| T7 (supply chain) | OUT OF SCOPE for v2, separate hardening story. Mitigations to ship later: cosign-signed Docker images, SBOM in every release, dependency pinning + scanning, reproducible builds. Backlog as separate epic. |
 
 ### Residual risks
 
@@ -914,9 +914,9 @@ These are bounded by v2 but not eliminated:
 
 ### Abuse cases worth modeling explicitly
 
-- "Disgruntled installer with fleet:write tries to nuke a customer's site after losing the account" — destructive command requires fresh re-auth + audit log shows the trigger; cloud-side allowlist of which installers can act on which sites enforces tenancy.
-- "Customer wants to revoke a stolen phone with passkeys on it" — account settings show passkey list with last-used dates + per-key revoke. Revoking a passkey invalidates all sessions ever issued with that passkey present in amr.
-- "Cloud staff member tries to query a customer's database for 'support reasons'" — every cross-tenant query through the admin tool is logged in `signed_audit_log` (signed cloud-side; can be cross-checked against the customer's appliance log). Customer can export their audit history.
+- "Disgruntled installer with fleet:write tries to nuke a customer's site after losing the account", destructive command requires fresh re-auth + audit log shows the trigger; cloud-side allowlist of which installers can act on which sites enforces tenancy.
+- "Customer wants to revoke a stolen phone with passkeys on it", account settings show passkey list with last-used dates + per-key revoke. Revoking a passkey invalidates all sessions ever issued with that passkey present in amr.
+- "Cloud staff member tries to query a customer's database for 'support reasons'", every cross-tenant query through the admin tool is logged in `signed_audit_log` (signed cloud-side; can be cross-checked against the customer's appliance log). Customer can export their audit history.
 
 ---
 
@@ -989,27 +989,27 @@ No scaling concerns at our target customer counts.
 - [x] Threat model (attackers × mitigations matrix)
 - [x] Residual risks called out explicitly
 - [x] Performance characteristics (latency + storage + CPU + bandwidth)
-- [x] **Open questions resolved** — see "Technical decisions"
+- [x] **Open questions resolved**, see "Technical decisions"
   section. All 8 closed with industry-standard answers.
 - [x] **Strategic shape signed off** by Ritual North (enterprise ambition
-  + best-practice posture). No further review needed — technical
+  + best-practice posture). No further review needed, technical
   implementation calls are mine.
 
 ---
 
 ## Next steps
 
-1. ~~Ritual North reviews this doc~~ — not needed; Ritual North is CEO, not
+1. ~~Ritual North reviews this doc~~, not needed; Ritual North is CEO, not
   engineer (see [[user_role]]). Technical decisions resolved
   above without his input.
-2. ~~Resolve the 8 open questions~~ — done; see "Technical
+2. ~~Resolve the 8 open questions~~, done; see "Technical
   decisions" section.
-3. Mark Phase 0 (#302) **completed** — done.
-4. **Phase 1 (#303)** — appliance keypair foundation. ~1 week.
+3. Mark Phase 0 (#302) **completed**, done.
+4. **Phase 1 (#303)**, appliance keypair foundation. ~1 week.
   Ready to start.
-5. **Phase 5 (#307)** — WebAuthn / passkey on cloud. Parallel
+5. **Phase 5 (#307)**, WebAuthn / passkey on cloud. Parallel
   with Phase 1, doesn't block.
 
 Phase 1 lands on its own merits (per-appliance signed commands)
-even if the OIDC layer isn't finished — it's a meaningful security
+even if the OIDC layer isn't finished, it's a meaningful security
 upgrade on its own.

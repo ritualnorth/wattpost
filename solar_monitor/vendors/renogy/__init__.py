@@ -2,7 +2,7 @@
 
 Covers Renogy charge controllers (Rover/Wanderer/Adventurer) and Renogy smart
 batteries (RBT100LFP12S-G1 and the LFP family). Speaks Modbus RTU over any
-transport — BT-1 / BT-2 BLE dongle or direct RS-485.
+transport, BT-1 / BT-2 BLE dongle or direct RS-485.
 """
 from ..base import VendorInfo
 from ..registry import register_vendor

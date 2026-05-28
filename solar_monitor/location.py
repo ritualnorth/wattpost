@@ -2,17 +2,17 @@
 
 Two distinct concerns lumped into one module:
 
-1. ``current_location(scheduler, config)`` — what IS the appliance's
+1. ``current_location(scheduler, config)``, what IS the appliance's
    location right now? Used by the appliance's own dashboard map
    tile, weather queries, forecast estimators. Returns the best
    available source: live GPS fix if present, else the static
    ForecastCfg.lat/lon, else None.
 
-2. ``location_for_cloud(scheduler, config)`` — what should we ship
+2. ``location_for_cloud(scheduler, config)``, what should we ship
    in the heartbeat extras? Honours the LocationCfg.share_with_cloud
    privacy gate: returns None when share mode is "off", coordinates
    rounded to the approx grid when "approx", or full precision when
-   "precise". The gate is customer-controlled and authoritative —
+   "precise". The gate is customer-controlled and authoritative,
    see [[location-opt-in]] memory.
 
 Splitting these two prevents the easy-to-miss bug where the cloud
@@ -59,7 +59,7 @@ def _static_latlon(config) -> tuple[float, float] | None:
 
 def current_location(scheduler, config) -> dict[str, Any] | None:
     """Best available location for LOCAL use (dashboard map tile,
-    weather queries). Ignores the cloud-share gate — local UI
+    weather queries). Ignores the cloud-share gate, local UI
     always knows where it is even when the cloud doesn't.
 
     Returns ``{lat, lon, source, fix_age_s}`` or None when no
@@ -87,7 +87,7 @@ def _snap_to_grid(lat: float, lon: float, grid_km: float) -> tuple[float, float]
     lon_step = grid_km / max(1.0, 111.0 * math.cos(math.radians(lat)))
     snapped_lat = round(lat / lat_step) * lat_step
     snapped_lon = round(lon / lon_step) * lon_step
-    # 4dp ≈ 11m — well below any sensible grid_km, but caps the wire
+    # 4dp ≈ 11m, well below any sensible grid_km, but caps the wire
     # representation so we don't ship 17 digits of float.
     return round(snapped_lat, 4), round(snapped_lon, 4)
 
@@ -95,7 +95,7 @@ def _snap_to_grid(lat: float, lon: float, grid_km: float) -> tuple[float, float]
 def location_for_cloud(scheduler, config) -> dict[str, Any] | None:
     """The location payload to include in heartbeat extras, AFTER
     applying the customer's share-with-cloud preference. Returns None
-    when the customer has opted out — heartbeat should then omit the
+    when the customer has opted out, heartbeat should then omit the
     location key entirely.
 
     Payload shape:
@@ -110,7 +110,7 @@ def location_for_cloud(scheduler, config) -> dict[str, Any] | None:
     loc_cfg = getattr(config, "location", None)
     mode = (getattr(loc_cfg, "share_with_cloud", "off") or "off").lower()
     if mode not in ("approx", "precise"):
-        return None  # off (or any unrecognised value — fail closed)
+        return None  # off (or any unrecognised value, fail closed)
     loc = current_location(scheduler, config)
     if loc is None:
         return None

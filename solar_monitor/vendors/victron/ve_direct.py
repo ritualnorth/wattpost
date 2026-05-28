@@ -1,21 +1,21 @@
-"""VE.Direct device drivers — wired alternative to BLE Instant Readout (#197).
+"""VE.Direct device drivers, wired alternative to BLE Instant Readout (#197).
 
 Three device-kind drivers covering the consumer VE.Direct surface:
 
-  - `VictronVeDirectShunt`   — SmartShunt / BMV-7xx
-  - `VictronVeDirectMppt`    — SmartSolar MPPT
-  - `VictronVeDirectPhoenix` — Phoenix Inverter VE.Direct
+  - `VictronVeDirectShunt`  , SmartShunt / BMV-7xx
+  - `VictronVeDirectMppt`   , SmartSolar MPPT
+  - `VictronVeDirectPhoenix`, Phoenix Inverter VE.Direct
 
 Each one consumes the dict that `VeDirectTransport.get_latest()`
 returns (label → string value, plus `_pid_int` when available) and
 emits the *same* normalised result fields as its BLE counterpart.
 The dashboard, exporters, and bank-aggregation code don't see which
-transport produced the readings — both paths flow into the same
+transport produced the readings, both paths flow into the same
 field names with the same units.
 
 Read-only. VE.Direct doesn't expose writes for normal settings
 (those are VictronConnect / VRM / Cerbo only) and we wouldn't
-expose them if it did — Victron is read-only by deliberate scope
+expose them if it did, Victron is read-only by deliberate scope
 (project_victron_scope memo).
 
 Field-mapping references: Victron VE.Direct Protocol PDF (public).
@@ -63,7 +63,7 @@ def _require_ve_direct(transport, result, kind_name: str) -> bool:
     otherwise stamps `_errors` and tells the caller to bail."""
     if not hasattr(transport, "get_latest"):
         result["_errors"] = [
-            f"wrong transport type — VE.Direct {kind_name} requires "
+            f"wrong transport type, VE.Direct {kind_name} requires "
             "the ve_direct transport"
         ]
         return False
@@ -211,7 +211,7 @@ class VictronVeDirectMppt(DeviceDriver):
 
 class VictronVeDirectPhoenix(DeviceDriver):
     """Phoenix Inverter VE.Direct. Smaller pure-sine inverters that
-    expose a serial port. Read-only — AC side state, battery side,
+    expose a serial port. Read-only, AC side state, battery side,
     alarms. Doesn't cover MultiPlus / Quattro (those need VE.Bus
     + an MK3 interface and are explicitly out of scope)."""
     vendor_id = "victron_vedirect"

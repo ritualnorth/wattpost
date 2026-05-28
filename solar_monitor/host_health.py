@@ -18,7 +18,7 @@ import socket
 import time
 from typing import Any
 
-# Daemon start time — same module-level pin as api/system.py so the
+# Daemon start time, same module-level pin as api/system.py so the
 # uptime reported in the heartbeat matches what Settings → About shows.
 # (Imported there too so an "import ordering" surprise doesn't reset it.)
 _DAEMON_STARTED_AT = time.time()
@@ -44,7 +44,7 @@ def _disk(path: str = "/") -> dict[str, Any]:
 def _memory() -> dict[str, Any]:
     """MemTotal + MemAvailable from /proc/meminfo. MemAvailable is the
     right "free for new processes" number, not MemFree (which doesn't
-    count reclaimable cache). Linux-only — returns {} on non-Linux."""
+    count reclaimable cache). Linux-only, returns {} on non-Linux."""
     try:
         kv: dict[str, int] = {}
         with open("/proc/meminfo", "r") as f:
@@ -103,9 +103,9 @@ def _hostname() -> str | None:
 
 def _lan_ip() -> str | None:
     """Best-effort LAN IP via the connected-socket trick. Doesn't
-    actually send a packet — the kernel just picks the source IP it
+    actually send a packet, the kernel just picks the source IP it
     would use to reach 8.8.8.8 (or any non-link-local). Returns None
-    when no default route exists (rare for a paired appliance — it
+    when no default route exists (rare for a paired appliance, it
     needs internet for the heartbeat anyway)."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -126,12 +126,12 @@ def _security_updates() -> dict[str, Any]:
     Docker containers without apt.
 
     Fields:
-      pending_count:    int   — packages with security pending
-      pending_security: int   — subset that are explicit security uploads
-      last_apt_update:  int   — unix ts of /var/cache/apt/pkgcache.bin mtime
-      last_uu_run:      int   — unix ts of last successful unattended-
+      pending_count:    int  , packages with security pending
+      pending_security: int  , subset that are explicit security uploads
+      last_apt_update:  int  , unix ts of /var/cache/apt/pkgcache.bin mtime
+      last_uu_run:      int  , unix ts of last successful unattended-
                                 upgrades run (from its log)
-      uu_active:        bool  — apt-config tells us unattended-upgrades
+      uu_active:        bool , apt-config tells us unattended-upgrades
                                 is enabled for this host
     """
     import os as _os
@@ -139,7 +139,7 @@ def _security_updates() -> dict[str, Any]:
 
     out: dict[str, Any] = {}
 
-    # APT cache freshness — easy proxy for "are we seeing fresh
+    # APT cache freshness, easy proxy for "are we seeing fresh
     # vuln advisories?". Stale by >2 days = patches we don't know
     # about yet.
     try:
@@ -164,7 +164,7 @@ def _security_updates() -> dict[str, Any]:
         pass
 
     # Unattended-upgrades enabled? `apt-config dump` is the canonical
-    # check but it's a shell-out; cheap heuristic instead — look for
+    # check but it's a shell-out; cheap heuristic instead, look for
     # 20auto-upgrades in /etc/apt/apt.conf.d/.
     try:
         body = open("/etc/apt/apt.conf.d/20auto-upgrades").read()

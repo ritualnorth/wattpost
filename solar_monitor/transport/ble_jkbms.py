@@ -1,6 +1,6 @@
 """BLE GATT transport for JK BMS battery management systems.
 
-JK BMS (JiKong) uses a proprietary BLE GATT protocol — not Modbus,
+JK BMS (JiKong) uses a proprietary BLE GATT protocol, not Modbus,
 not advertisement-only like Victron's Instant Readout. The BMS
 exposes a service at UUID 0xFFE0 with a single read/write/notify
 characteristic at 0xFFE1; you connect, subscribe to notifications,
@@ -39,7 +39,7 @@ JK_CHAR_UUID    = "0000ffe1-0000-1000-8000-00805f9b34fb"
 # Magic preamble that starts every JK frame. Used to find frame
 # boundaries when the accumulator buffer overflows or syncs.
 JK_FRAME_HEADER = bytes([0x55, 0xAA, 0xEB, 0x90])
-# Reverse-byte variant — some JK firmware notifications come in
+# Reverse-byte variant, some JK firmware notifications come in
 # with the header order flipped. Belt-and-braces detection.
 JK_FRAME_HEADER_ALT = bytes([0xAA, 0x55, 0x90, 0xEB])
 
@@ -52,7 +52,7 @@ FRAME_TYPE_SETTINGS    = 0x01
 # voltage array (64 bytes) + 32-cell resistance array (64 bytes)
 # + a long trailer (alarms, temps, SoC, cycle counts, etc.). The
 # total comes out around 300 bytes. We use this as the "buffer is
-# big enough to parse" threshold — too short means waiting for
+# big enough to parse" threshold, too short means waiting for
 # more chunks; too long means the previous frame went uncompleted
 # and we should resync on the next preamble.
 COMPLETE_FRAME_MIN = 200    # JK02_24S minimum
@@ -61,14 +61,14 @@ COMPLETE_FRAME_MAX = 320    # JK02_32S maximum
 STALE_AFTER_SECONDS = 60.0
 
 # Command frames the BMS understands. 20 bytes each. We only need
-# COMMAND_CELL_INFO on connect — the BMS auto-streams after that.
+# COMMAND_CELL_INFO on connect, the BMS auto-streams after that.
 def _build_command(register: int) -> bytes:
     """Build a 20-byte JK command frame. The single non-zero byte
     after the header is the register address that selects what
     the BMS should stream back."""
     frame = bytearray(20)
     frame[0] = 0xAA   # JK's write-side header (different order
-    frame[1] = 0x55   # from the read-side notification header —
+    frame[1] = 0x55   # from the read-side notification header,
     frame[2] = 0x90   # syssi's reference flips them).
     frame[3] = 0xEB
     frame[4] = register
@@ -92,7 +92,7 @@ class BleJkBmsTransport(Transport):
     notification subscription; the driver reads the latest cached
     frame via `get_latest_frame()`.
 
-    `request()` is unsupported — JK is a push protocol once you've
+    `request()` is unsupported, JK is a push protocol once you've
     asked it to start streaming. The driver overrides poll() and
     reads from the cache directly.
     """
@@ -162,10 +162,10 @@ class BleJkBmsTransport(Transport):
     async def request(self, frame: bytes, expected_response_len: int,
                       timeout: float = 5.0) -> bytes:
         # JK is a push protocol once told to stream. Drivers must
-        # override poll() and use get_latest_frame() — calling
+        # override poll() and use get_latest_frame(), calling
         # request() is a configuration mistake.
         raise TransportError(
-            f"{self.id}: request() is unsupported on ble_jkbms — "
+            f"{self.id}: request() is unsupported on ble_jkbms, "
             "drivers must override poll() and use get_latest_frame()"
         )
 
@@ -202,7 +202,7 @@ class BleJkBmsTransport(Transport):
             if idx >= 0 and (start < 0 or idx < start):
                 start = idx
         if start < 0:
-            # No header in view yet — discard accumulated junk past
+            # No header in view yet, discard accumulated junk past
             # a soft cap so we don't grow indefinitely.
             if len(self._buf) > 1024:
                 self._buf.clear()
@@ -211,7 +211,7 @@ class BleJkBmsTransport(Transport):
             del self._buf[:start]
 
         # Is the next-frame header visible after enough bytes? If
-        # so, the first frame is complete — split + parse.
+        # so, the first frame is complete, split + parse.
         while len(self._buf) >= COMPLETE_FRAME_MIN:
             next_idx = -1
             for header in (JK_FRAME_HEADER, JK_FRAME_HEADER_ALT):
@@ -221,10 +221,10 @@ class BleJkBmsTransport(Transport):
             if next_idx < 0:
                 # No next-frame header yet. If buffer's overgrown
                 # the max valid frame length, the BMS sent garbage
-                # — resync.
+                #, resync.
                 if len(self._buf) > COMPLETE_FRAME_MAX * 2:
                     log.warning("[%s] buffer overrun without next "
-                                "header — resyncing", self.id)
+                                "header, resyncing", self.id)
                     self._buf.clear()
                 return
             # Frame is the slice [0:next_idx]. Type byte at offset 4.

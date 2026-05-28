@@ -14,7 +14,7 @@ Protocol summary (Victron's VE.Direct Protocol PDF, public):
     that the unsigned sum of every byte in the frame (including
     the checksum line itself) modulo 256 equals zero.
   * Some firmware mixes "HEX protocol" framing between text frames
-    (lines starting with `:`). We skip those lines — they're for
+    (lines starting with `:`). We skip those lines, they're for
     bidirectional GET/SET, which Victron only exposes for a tiny
     subset of registers and which our scope memo locks out anyway.
 
@@ -28,9 +28,9 @@ Contract:
   * `open()` starts a background task that reads frames forever.
   * `get_latest()` returns the most recently parsed frame as a
     plain dict of {label: str_value, plus "_pid_int": int when
-    PID is present} — strings because every VE.Direct field is
+    PID is present}, strings because every VE.Direct field is
     a string on the wire. Per-device drivers convert.
-  * `request()` raises — VE.Direct is push-only, like the BLE
+  * `request()` raises, VE.Direct is push-only, like the BLE
     advertisement transport.
 """
 from __future__ import annotations
@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 # Stale-after: VE.Direct emits roughly once a second; 60 s of silence
 # means the cable is unplugged, the device is off, or something is
 # very wrong. Same threshold the BLE Victron transport uses for the
-# same reason — keeps the dashboard's "Silent" handling consistent.
+# same reason, keeps the dashboard's "Silent" handling consistent.
 STALE_AFTER_SECONDS = 60.0
 
 
@@ -71,10 +71,10 @@ def _parse_frame(raw: bytes) -> dict[str, str]:
     callers do the unit conversion that makes sense for their field.
 
     Frame lines look like `\r\n<label>\t<value>` except the Checksum
-    line whose value byte is binary, not text — we strip it before
+    line whose value byte is binary, not text, we strip it before
     text-parsing the rest.
     """
-    # Drop the trailing two bytes "Checksum\t<X>" — the X byte is the
+    # Drop the trailing two bytes "Checksum\t<X>", the X byte is the
     # one we just used to validate. The "Checksum" label leads-in is
     # variable length depending on whether there was a CR/LF before it.
     text = raw.decode("latin-1", errors="replace")
@@ -148,7 +148,7 @@ class VeDirectTransport(Transport):
         self, frame: bytes, expected_response_len: int, timeout: float = 5.0,
     ) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on a VE.Direct transport — "
+            f"{self.id}: request() is unsupported on a VE.Direct transport, "
             "drivers must override poll() and use get_latest()"
         )
 
@@ -210,7 +210,7 @@ class VeDirectTransport(Transport):
                 frame = bytes(buf[:end])
                 del buf[:end]
                 if not _verify_checksum(frame):
-                    # Bad frame — keep scanning forward. Discard
+                    # Bad frame, keep scanning forward. Discard
                     # nothing extra; the next iteration's find()
                     # picks up the next Checksum marker.
                     log.debug("[%s] dropped frame with bad checksum", self.id)
@@ -234,14 +234,14 @@ def _strip_hex_lines(buf: bytearray) -> bytearray:
     i = 0
     n = len(buf)
     while i < n:
-        # A HEX line starts with `:` at the line head — the byte just
+        # A HEX line starts with `:` at the line head, the byte just
         # before it is \n or \r, or it's the start of the buffer.
         at_line_start = (i == 0) or buf[i - 1] in (0x0A, 0x0D)
         if at_line_start and buf[i] == 0x3A:  # ':'
             # Skip until next LF.
             j = buf.find(b"\n", i)
             if j < 0:
-                # Incomplete HEX line — keep waiting for more data.
+                # Incomplete HEX line, keep waiting for more data.
                 # Truncate the buffer at i so the next read continues
                 # the HEX line collection.
                 break

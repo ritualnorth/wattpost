@@ -11,7 +11,7 @@ INFO = VendorInfo(
     id="junctek",
     display_name="Junctek shunt (KH-F / KG-F)",
     description=(
-        "ASCII-protocol BLE shunt — second-most-common cheap shunt "
+        "ASCII-protocol BLE shunt, second-most-common cheap shunt "
         "after AiLi. Reads from r50 (V/I/capacity), r51 "
         "(temperature + cumulative counters), r53 (SoC + TTG + W) "
         "merged into one shunt-shaped output. Read-only."

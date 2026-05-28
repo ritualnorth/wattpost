@@ -2,11 +2,11 @@
 
 Activated when `backup.cloud_upload: true` AND the appliance has a
 populated cloud pairing. The cloud-side endpoint enforces the
-Pro/Installer tier gate — a Hobby-tier upload returns 402 and we
+Pro/Installer tier gate, a Hobby-tier upload returns 402 and we
 record that as a (recoverable) failure on the BackupService so the
 Settings UI can surface "tier required, upgrade here".
 
-No retries here — if the upload fails the local snapshot still
+No retries here, if the upload fails the local snapshot still
 exists, and the next scheduled run will try again. We avoid silent
 re-uploads of the same file by short-circuiting if the cloud
 already has a row whose filename + size match this one.
@@ -48,10 +48,10 @@ def make_uploader(
             "X-WP-Backup-Keep": str(keep_count),
             "X-WP-Backup-Version": __version__,
         }
-        # #297-3 — sign the archive with the appliance ed25519 keypair
+        # #297-3, sign the archive with the appliance ed25519 keypair
         # so restore-time verification can refuse a swapped tarball.
         # Best-effort: if signing fails (no keypair, sealed-file
-        # broken, etc.) we still upload — old appliances without
+        # broken, etc.) we still upload, old appliances without
         # keypairs and pre-Identity-v2 installs need the upload path
         # to keep working. Restore-side warning surfaces the absence.
         try:
@@ -62,14 +62,14 @@ def make_uploader(
             headers["X-WP-Backup-Sig-Alg"]    = sig.alg
         except Exception as e:
             log.warning(
-                "cloud backup: signing skipped (%s) — uploading "
+                "cloud backup: signing skipped (%s), uploading "
                 "unsigned; restore from this row will warn", e,
             )
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT_S) as client:
             r = await client.post(url, content=data, headers=headers)
         if r.status_code == 402:
             log.warning(
-                "cloud backup: rejected as Hobby tier — upgrade for off-site backups",
+                "cloud backup: rejected as Hobby tier, upgrade for off-site backups",
             )
             return False
         if r.status_code >= 300:

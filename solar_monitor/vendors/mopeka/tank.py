@@ -1,4 +1,4 @@
-"""Mopeka tank-level driver — passive BLE.
+"""Mopeka tank-level driver, passive BLE.
 
 Reads the latest decoded Mopeka advertisement off
 `ble_mopeka_advertise` transport, normalises into the snapshot keys
@@ -6,27 +6,27 @@ the dashboard + storage layer expect.
 
 What we emit, and why:
 
-  * ``hardware_kind`` — "pro_check" etc., for the device detail page
+  * ``hardware_kind``, "pro_check" etc., for the device detail page
     to label the sensor model honestly. Mopeka sells five hardware
     revisions and they're not interchangeable when ordering replacement
     sensors, so users want this surfaced.
-  * ``battery_pct`` — coin cell SoC. Mopeka sensors are CR2032-powered
-    and customer support emails will be 30% "my sensor died" — show
+  * ``battery_pct``, coin cell SoC. Mopeka sensors are CR2032-powered
+    and customer support emails will be 30% "my sensor died", show
     the battery on the dashboard so users replace it proactively.
-  * ``temperature_c`` — sensor's own onboard thermometer. Not the
+  * ``temperature_c``, sensor's own onboard thermometer. Not the
     fluid; the ambient temp of the tank shell. Useful for "winter
     propane gel" + correlating with battery-bank temp.
-  * ``signal_quality`` — 0..3. 0 means the ultrasonic ping had no
+  * ``signal_quality``, 0..3. 0 means the ultrasonic ping had no
     clean reflection; we expose it so the device detail page can show
-    "Poor reflection — check sensor mount" rather than a fake reading.
-  * ``raw_distance_mm`` — ultrasonic time-of-flight as distance. The
+    "Poor reflection, check sensor mount" rather than a fake reading.
+  * ``raw_distance_mm``, ultrasonic time-of-flight as distance. The
     raw value, no calibration. Fluid level % needs per-install tank
     geometry that we don't ship until #257.
-  * ``tilted`` — bool derived from accelerometer X/Y. If the tank
+  * ``tilted``, bool derived from accelerometer X/Y. If the tank
     isn't level (van moving, cylinder being swapped) the distance
     reading is unreliable regardless of quality.
 
-Read-only — Mopekas don't accept BLE writes.
+Read-only, Mopekas don't accept BLE writes.
 """
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ class MopekaTank(DeviceDriver):
 
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Mopeka tank requires "
+                "wrong transport type, Mopeka tank requires "
                 "ble_mopeka_advertise"
             ]
             return result

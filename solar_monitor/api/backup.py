@@ -4,7 +4,7 @@ Single-button snapshot of the appliance's mutable state (SQLite DB +
 config.yaml + web-password hash) into a downloadable tar.gz, and the
 inverse restore endpoint that swaps it back into place and re-execs.
 
-Scope is deliberately blunt — one tarball, all-or-nothing. A more
+Scope is deliberately blunt, one tarball, all-or-nothing. A more
 granular "settings only" restore can come later if customers ask for
 it; for now the goal is "if my SD card dies, give me a one-click way
 back to where I was".
@@ -31,15 +31,15 @@ from litestar.exceptions import HTTPException, NotFoundException
 log = logging.getLogger(__name__)
 
 # Files that are NEVER backed up:
-#   - *-wal / *-shm — SQLite's write-ahead log + shared-memory sidecars;
+#   - *-wal / *-shm, SQLite's write-ahead log + shared-memory sidecars;
 #     the online .backup() API consolidates them into the main file.
-#   - *.bak — config rotation backups (we keep our own .bak when the
+#   - *.bak, config rotation backups (we keep our own .bak when the
 #     wizard mutates config; not useful to ship inside a snapshot).
-#   - *.legacy.bak — one-shot v0.0.60 DB-relocation safety net.
+#   - *.legacy.bak, one-shot v0.0.60 DB-relocation safety net.
 
 # Conventional location for the web-password hash on both Pi and Docker
 # installs. If the file isn't there (older install, or someone moved it)
-# we just skip it — the daemon will regenerate one on next first-login
+# we just skip it, the daemon will regenerate one on next first-login
 # flow.
 WEB_PASSWORD_HASH_PATH = Path("/etc/wattpost/web-password.hash")
 WEB_PASSWORD_PLAIN_PATH = Path("/etc/wattpost/web-password")
@@ -48,10 +48,10 @@ WEB_PASSWORD_PLAIN_PATH = Path("/etc/wattpost/web-password")
 def _sqlite_snapshot_to(src_path: str, dest_path: str) -> None:
     """Online backup: copy a live SQLite DB into `dest_path` without
     blocking writers for longer than each page-copy step. Safe to run
-    while the daemon is polling — the destination is a transactionally
+    while the daemon is polling, the destination is a transactionally
     consistent copy of the source as of when .backup() finishes.
 
-    Sync API on purpose — runs inside `asyncio.to_thread()` from the
+    Sync API on purpose, runs inside `asyncio.to_thread()` from the
     handler. aiosqlite's backup wrapper is fine too, but the stdlib
     sqlite3 connection is simpler and avoids holding the writer
     connection open longer than necessary.
@@ -80,7 +80,7 @@ def _resolve_db_path(state: State) -> Path:
 
 def build_archive_bytes(db_path: Path, config_path: Path | None) -> bytes:
     """Build the backup tarball as a bytes payload. Reusable by the
-    on-demand HTTP endpoint and the scheduled BackupService — same
+    on-demand HTTP endpoint and the scheduled BackupService, same
     archive layout, same SQLite online-backup safety, same MANIFEST."""
     from .. import __version__
     ts = int(time.time())
@@ -113,10 +113,10 @@ def build_archive_bytes(db_path: Path, config_path: Path | None) -> bytes:
 async def export_backup(state: State) -> Response:
     """Stream a tar.gz of the daemon's mutable state. Layout inside:
 
-      data.sqlite                — online-backup snapshot of the DB
-      config/config.yaml         — current config (if present)
-      config/web-password.hash   — hashed local-UI password (if set)
-      MANIFEST                   — version + timestamp + path map
+      data.sqlite               , online-backup snapshot of the DB
+      config/config.yaml        , current config (if present)
+      config/web-password.hash  , hashed local-UI password (if set)
+      MANIFEST                  , version + timestamp + path map
 
     The DB snapshot is taken via the sqlite3 online-backup API so it's
     safe to download mid-poll without locking writers."""
@@ -150,7 +150,7 @@ def _verify_archive(tar_bytes: bytes) -> dict[str, Any]:
         tar.close()
         raise HTTPException(
             status_code=400,
-            detail="archive missing data.sqlite — not a WattPost backup",
+            detail="archive missing data.sqlite, not a WattPost backup",
         )
 
     # Stage the DB to disk and run integrity_check before accepting it.
@@ -208,7 +208,7 @@ def _verify_archive(tar_bytes: bytes) -> dict[str, Any]:
     }
 
 
-# #297 mitigation 1 — allowlist for top-level config.yaml keys when
+# #297 mitigation 1, allowlist for top-level config.yaml keys when
 # restoring from cloud. Anything not on this list is dropped silently
 # (logged + listed in the restore summary). Defensive against a
 # compromised cloud account uploading a backup with an arbitrary
@@ -265,7 +265,7 @@ def _redact_credentials(value: Any, *, path: str, redacted: list) -> Any:
                 and any(s in k.lower() for s in _RESTORE_REDACT_SUBSTRINGS)
             )
             if looks_secret:
-                # Only redact non-empty strings — preserves boolean
+                # Only redact non-empty strings, preserves boolean
                 # toggles and blank defaults so the user only sees
                 # "re-enter this" for fields that were actually set.
                 if isinstance(v, str) and v != "":
@@ -291,7 +291,7 @@ def _stage_and_swap(
     eventual target, then rename atomically. Staging next to the
     target (rather than into a single shared tmpdir) matters because
     `/var/lib/wattpost` and `/etc/wattpost` are typically separate
-    bind mounts in Docker installs — a cross-filesystem `os.replace`
+    bind mounts in Docker installs, a cross-filesystem `os.replace`
     fails with EXDEV.
 
     Order: write all `.new` siblings first; then swap each over its
@@ -306,7 +306,7 @@ def _stage_and_swap(
     preserved values match what was in the backup anyway).
 
     The web-password files are *not* overwritten when the target
-    already exists — operator's current password on the fresh
+    already exists, operator's current password on the fresh
     install wins over whatever was in the backup, for the same
     reason: shouldn't have to know the old password to use the
     fresh box.
@@ -355,7 +355,7 @@ def _stage_and_swap(
                 if f is None:
                     continue
                 raw_bytes = f.read()
-                # #297-1 — ALWAYS sanitize the restored config.yaml
+                # #297-1, ALWAYS sanitize the restored config.yaml
                 # regardless of pairing-preserve path. Drop unknown
                 # top-level keys + redact credential-shaped fields so
                 # a compromised cloud account can't re-aim mqtt_out,
@@ -386,13 +386,13 @@ def _stage_and_swap(
                     if redacted:
                         log.warning(
                             "restore: redacted %d credential field(s) "
-                            "from restored config: %s — operator must "
+                            "from restored config: %s, operator must "
                             "re-enter via Settings",
                             len(redacted), redacted,
                         )
                         summary["redacted_credentials"] = redacted
                 except Exception:
-                    # Sanitizer / parse failed — fall back to wholesale
+                    # Sanitizer / parse failed, fall back to wholesale
                     # replace so the operator at least gets their DB
                     # back. Pairing-preserve also lost. Logged loudly.
                     log.exception(
@@ -402,12 +402,12 @@ def _stage_and_swap(
                     cfg_new.write_bytes(raw_bytes)
                 have_cfg = True
             elif member.name == "config/web-password.hash":
-                # Preserve existing — operator's current password on the
+                # Preserve existing, operator's current password on the
                 # fresh install shouldn't get clobbered by an old one
                 # they may not remember.
                 if existing_pw_hash:
                     continue
-                # #297-2 — on a true fresh install (no hash AND no
+                # #297-2, on a true fresh install (no hash AND no
                 # plaintext exist), DO NOT trust the restored hash.
                 # A compromised cloud could supply an attacker-chosen
                 # password. Instead leave the password files absent
@@ -417,7 +417,7 @@ def _stage_and_swap(
                 if not existing_pw_plain:
                     summary["fresh_install_password_regen"] = True
                     log.warning(
-                        "restore: fresh install detected — declining to "
+                        "restore: fresh install detected, declining to "
                         "restore web-password.hash from backup; first-"
                         "boot password generator will mint a new one"
                     )
@@ -431,7 +431,7 @@ def _stage_and_swap(
                 if existing_pw_plain:
                     continue
                 if not existing_pw_hash:
-                    # Same #297-2 rationale — don't trust restored
+                    # Same #297-2 rationale, don't trust restored
                     # plaintext on a true fresh install.
                     continue
                 f = tar.extractfile(member)
@@ -440,7 +440,7 @@ def _stage_and_swap(
                 pw_plain_new.write_bytes(f.read())
                 have_pw_plain = True
 
-    # All staged successfully — swap each one into place.
+    # All staged successfully, swap each one into place.
     try:
         if db_new.is_file():
             # Drop stale WAL/SHM so the new DB doesn't adopt them.
@@ -496,7 +496,7 @@ def _stage_and_swap(
 )
 async def import_backup(request: Request, state: State) -> dict[str, Any]:
     """Validate + apply a backup tarball uploaded as raw bytes (the JS
-    sends `application/gzip` directly — no multipart wrapping, keeps
+    sends `application/gzip` directly, no multipart wrapping, keeps
     the code on both sides simple).
 
     Order of operations:
@@ -504,7 +504,7 @@ async def import_backup(request: Request, state: State) -> dict[str, Any]:
       2. Verify it's a valid tar with a passing-integrity SQLite inside.
       3. Atomically swap DB + config + password into place.
       4. Schedule a re-exec so the daemon comes back up against the new
-         state — the response goes out first so the client sees 202
+         state, the response goes out first so the client sees 202
          and starts polling /api/health.
     """
     body = await request.body()
@@ -523,7 +523,7 @@ async def import_backup(request: Request, state: State) -> dict[str, Any]:
     )
 
     # Re-exec the daemon so it picks up the new DB and config cleanly.
-    # Same pattern as /api/system/restart — give the HTTP response 0.4s
+    # Same pattern as /api/system/restart, give the HTTP response 0.4s
     # to flush before exec replaces the process image.
     scheduler = state.get("scheduler")
 
@@ -551,7 +551,7 @@ async def import_backup(request: Request, state: State) -> dict[str, Any]:
 # The on-demand endpoint above is for "give me the current state as a
 # file right now"; these endpoints surface the local rotating snapshots
 # the BackupService writes on a timer. Same archive format, same
-# restore path — a scheduled .tar.gz is interchangeable with a manual
+# restore path, a scheduled .tar.gz is interchangeable with a manual
 # download for restore purposes.
 
 def _backup_service(state: State):
@@ -559,7 +559,7 @@ def _backup_service(state: State):
     if svc is None:
         raise HTTPException(
             status_code=503,
-            detail="backup service not running — set backup.enabled: true in config.yaml",
+            detail="backup service not running, set backup.enabled: true in config.yaml",
         )
     return svc
 
@@ -567,7 +567,7 @@ def _backup_service(state: State):
 def _safe_snapshot_path(svc, name: str) -> Path:
     """Resolve `name` to a real file under the backup dir, rejecting
     any path traversal. We never accept absolute paths or names
-    containing `/` — the only thing a client should send is the
+    containing `/`, the only thing a client should send is the
     basename of an entry from the list endpoint."""
     if "/" in name or name.startswith(".") or not name.endswith(".tar.gz"):
         raise HTTPException(status_code=400, detail="invalid snapshot name")
@@ -617,7 +617,7 @@ async def backup_schedule(state: State) -> dict[str, Any]:
 @post("/api/system/backup/run-now", status_code=200)
 async def backup_run_now(state: State) -> dict[str, Any]:
     """Trigger an immediate snapshot. Synchronous so the UI can show
-    the new file in the listing right away — for a few-hundred-MB DB
+    the new file in the listing right away, for a few-hundred-MB DB
     on a Pi this takes a couple of seconds, well within an HTTP
     request budget."""
     svc = _backup_service(state)
@@ -666,7 +666,7 @@ async def backup_delete_one(name: str, state: State) -> dict[str, Any]:
 #
 # Proxies through to wattpost.cloud's /api/internal/backups/* so the
 # Settings UI doesn't have to know cloud credentials. Returns 503
-# when the appliance isn't paired or cloud upload is disabled — the
+# when the appliance isn't paired or cloud upload is disabled, the
 # UI shows an explanatory placeholder in that case.
 
 
@@ -683,7 +683,7 @@ def _cloud_creds(state: State) -> tuple[str, str]:
 @get("/api/system/backup/cloud-list")
 async def backup_cloud_list(state: State) -> dict[str, Any]:
     """List the appliance's cloud-side backups. Bare proxy through
-    to /api/internal/backups/list on wattpost.cloud — auth handled
+    to /api/internal/backups/list on wattpost.cloud, auth handled
     by the appliance's bearer token.
 
     Maps a few upstream conditions to friendlier shapes so the UI
@@ -728,7 +728,7 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
 
     if enabled:
         # Pre-flight against the cloud. Same path the UI hits when
-        # rendering — `tier_required` for Hobby accounts,
+        # rendering, `tier_required` for Hobby accounts,
         # `not_yet_available` if the cloud is on an older build.
         try:
             endpoint, token = _cloud_creds(state)
@@ -769,7 +769,7 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail="config_path unset")
     path = Path(config_path)
 
-    # Mutate on-disk YAML — same pattern as alerts_admin._save_config.
+    # Mutate on-disk YAML, same pattern as alerts_admin._save_config.
     raw = _yaml.safe_load(path.read_text()) or {}
     backup_block = raw.get("backup") or {}
     backup_block["cloud_upload"] = enabled
@@ -825,7 +825,7 @@ async def discovery_toggle(request: Request, state: State) -> dict[str, Any]:
     """Flip `discovery.enabled` in the running config and persist.
     Body: `{enabled: bool}`.
 
-    No cloud preflight — the appliance just won't push when disabled,
+    No cloud preflight, the appliance just won't push when disabled,
     and the cloud endpoint is the same bearer-token surface anyone
     else hits. The user-facing setting is purely local consent.
     """

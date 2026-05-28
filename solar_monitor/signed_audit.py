@@ -1,27 +1,27 @@
 """Appliance-side hash-chained signed-audit log (Phase 8B, #310).
 
 Each entry binds:
-  occurred_at  — UTC timestamp (microsecond precision)
-  event_type   — short stable string ("login_failed", "password_changed", …)
-  payload      — JSON-serialisable dict of event-specific fields
-  prev_hash    — sha256 of the previous entry's `signed_repr`
-  issuer_kid   — the appliance keypair fingerprint at signing time
-  signed_repr  — canonical JSON of all the above (exact bytes signed)
-  signature    — ed25519 over signed_repr, by the appliance keypair
+  occurred_at , UTC timestamp (microsecond precision)
+  event_type  , short stable string ("login_failed", "password_changed", …)
+  payload     , JSON-serialisable dict of event-specific fields
+  prev_hash   , sha256 of the previous entry's `signed_repr`
+  issuer_kid  , the appliance keypair fingerprint at signing time
+  signed_repr , canonical JSON of all the above (exact bytes signed)
+  signature   , ed25519 over signed_repr, by the appliance keypair
 
 Canonical JSON matches the cloud's `signed_audit.py:_canonical_repr`
-byte-for-byte. Keep the two in lockstep — drift = chain breaks at
+byte-for-byte. Keep the two in lockstep, drift = chain breaks at
 ingest time. The fields, sort order, separators, and timestamp
 format are all load-bearing.
 
 Threat model:
 
   * Disk-only attacker who can read sealed keypair can also rewrite
-    rows + re-sign — Phase 10 hardware key closes that. Until then,
+    rows + re-sign, Phase 10 hardware key closes that. Until then,
     the chain's value is "tamper-EVIDENT" (cloud detects gaps /
     rewrites at sync time) rather than "tamper-PROOF".
   * Cloud compromise can't rewrite appliance entries that have
-    already been ingested — cloud verifies the appliance signature
+    already been ingested, cloud verifies the appliance signature
     on ingest and stores it as-is.
 
 Not in this module:
@@ -60,7 +60,7 @@ def _canonical_repr(
     occurred_at:   datetime,
 ) -> str:
     """EXACT byte string for sign + verify. Mirror of cloud
-    signed_audit._canonical_repr — keep them in lockstep."""
+    signed_audit._canonical_repr, keep them in lockstep."""
     return json.dumps(
         {
             "issuer":        issuer,

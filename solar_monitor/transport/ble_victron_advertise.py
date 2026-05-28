@@ -5,7 +5,7 @@ the device broadcasts encrypted "Instant Readout" advertisements
 ~once per second, and consumers decrypt them with a per-device
 encryption key (revealed in VictronConnect under "Product info →
 Show device key"). There's no GATT connection, no Modbus, no
-write capability — strictly read-only, but every metric you'd
+write capability, strictly read-only, but every metric you'd
 want is in the payload.
 
 Why a separate transport class (not BLE Modbus):
@@ -13,21 +13,21 @@ Why a separate transport class (not BLE Modbus):
   * The orchestrator's Transport ABC requires a `request()` method
     (the Modbus pattern). Victron is passive: requests don't exist,
     the device pushes data on its own schedule. We satisfy the ABC
-    by implementing `request()` that raises — Victron drivers
+    by implementing `request()` that raises, Victron drivers
     override `poll()` and never call it.
 
   * One BleakScanner per process is plenty; spinning one up per
     Victron transport instance would be wasteful and risks scan
     conflicts. We use a module-level singleton (`_GLOBAL_SCANNER`)
-    that every Victron transport instance registers with — the
+    that every Victron transport instance registers with, the
     scanner's detection callback routes advertisements by MAC to
     the right transport instance for decoding.
 
-  * Driver reads via `transport.get_latest()` — a dict of decoded
+  * Driver reads via `transport.get_latest()`, a dict of decoded
     fields or None if no advertisement landed yet / is stale.
 
 See [[project-target-customer]] in memory for why this matters:
-SmartShunt is the highest-leverage driver to add (Persona B —
+SmartShunt is the highest-leverage driver to add (Persona B,
 "budget upgrader who buys a shunt for first-time visibility").
 """
 from __future__ import annotations
@@ -88,7 +88,7 @@ class _SharedVictronScanner:
                 self._scanner = BleakScanner(detection_callback=self._on_detection)
                 await self._scanner.start()
                 self._scan_started_at = time.monotonic()
-                # Reset on every start — we're tracking "did we hear
+                # Reset on every start, we're tracking "did we hear
                 # ANY advert since the most recent scan-start".
                 self._last_any_advert_at = 0.0
                 log.info("victron scanner started (subscribers=%d)",
@@ -108,13 +108,13 @@ class _SharedVictronScanner:
     async def pause(self) -> bool:
         """Briefly stop the scanner so another transport can run its
         own discovery on the same adapter. BlueZ only allows one
-        in-flight discovery session per HCI adapter — without this,
+        in-flight discovery session per HCI adapter, without this,
         the Renogy BT-2 transport's `find_device_by_address` fights
         the Victron passive scanner and loses with
         `org.bluez.Error.InProgress`. Returns True if the scanner
         was actually running and got paused (so the caller knows
         to resume it). The lock is released between pause/resume
-        so the Victron transport can keep buffering messages — it
+        so the Victron transport can keep buffering messages, it
         just won't see new ones for the duration."""
         async with self._lock:
             if self._scanner is None:
@@ -129,7 +129,7 @@ class _SharedVictronScanner:
 
     async def resume(self) -> None:
         """Counterpart to pause(). Restarts the scanner if there are
-        still subscribers — if every Victron transport closed during
+        still subscribers, if every Victron transport closed during
         the pause window, leave it stopped (unregister-equivalent)."""
         async with self._lock:
             if self._scanner is not None or not self._subscribers:
@@ -146,13 +146,13 @@ class _SharedVictronScanner:
                 self._scanner = None
 
     def _on_detection(self, device, ad_data) -> None:
-        # Stamp adapter-alive marker before any filtering — receiving
+        # Stamp adapter-alive marker before any filtering, receiving
         # ANY advert means the dongle is delivering data, even if
         # none of them are Victron right now. Used by adapter_health()
         # to distinguish "wedged dongle" from "no Victron devices in
         # range".
         self._last_any_advert_at = time.monotonic()
-        # Cheap fast-path filter first — most advertisements on a
+        # Cheap fast-path filter first, most advertisements on a
         # crowded RF environment have nothing to do with Victron.
         mfr = getattr(ad_data, "manufacturer_data", None) or {}
         payload = mfr.get(VICTRON_MANUFACTURER_ID)
@@ -171,15 +171,15 @@ class _SharedVictronScanner:
         """Snapshot of the BLE adapter's state, from the scanner's
         perspective. Returns one of:
 
-          "ok"      — scanner running, received an advert recently
-          "wedged"  — scanner running ≥30s, but no callbacks at all.
+          "ok"     , scanner running, received an advert recently
+          "wedged" , scanner running ≥30s, but no callbacks at all.
                       Classic Realtek RTL8761B firmware lockup.
-          "idle"    — no subscribers / scanner not running
-          "warming" — scanner just started, hasn't been long enough
+          "idle"   , no subscribers / scanner not running
+          "warming", scanner just started, hasn't been long enough
                       to call it wedged yet
 
         Heartbeat extras surface this so the cloud dashboard can
-        render a "Bluetooth dongle not responding — try a power-cycle"
+        render a "Bluetooth dongle not responding, try a power-cycle"
         banner instead of the user seeing every Victron device
         independently appear silent."""
         if self._scanner is None or self._scan_started_at == 0.0:
@@ -188,14 +188,14 @@ class _SharedVictronScanner:
         running_for = now - self._scan_started_at
         if self._last_any_advert_at > 0.0:
             since = now - self._last_any_advert_at
-            # Within the last 90s — adapter is delivering.  Adverts
+            # Within the last 90s, adapter is delivering.  Adverts
             # from non-Victron devices are common enough in any
             # populated RF environment that even rural installs
             # should see *something*.
             if since < 90.0:
                 return "ok"
         # No callbacks at all yet.  Give the dongle 30s to warm up
-        # before declaring it wedged — BlueZ filter rearm + first
+        # before declaring it wedged, BlueZ filter rearm + first
         # scan window takes 5-10s on slow hosts.
         if running_for < 30.0:
             return "warming"
@@ -242,7 +242,7 @@ class BleVictronAdvertiseTransport(Transport):
         self.address = address.upper()
         # Encryption keys ship as 32-char hex (16 bytes AES-128). Tolerate
         # whitespace/separators the user may have pasted in. We keep the
-        # value as a hex *string* — victron-ble's Device class expects
+        # value as a hex *string*, victron-ble's Device class expects
         # the hex form and decodes internally on each parse() call.
         cleaned = encryption_key_hex.replace(" ", "").replace(":", "").replace("-", "")
         try:
@@ -262,7 +262,7 @@ class BleVictronAdvertiseTransport(Transport):
         # until the first advertisement lands and detect_device_type()
         # classifies it. Resolved lazily in _on_advertisement().
         self._device = None
-        # The latest parsed payload — typed as Any because the concrete
+        # The latest parsed payload, typed as Any because the concrete
         # class depends on the device (BatteryMonitorData,
         # SolarChargerData, …). Drivers cast / inspect as needed.
         self._latest: Any = None
@@ -291,7 +291,7 @@ class BleVictronAdvertiseTransport(Transport):
         # makes the misuse loud rather than silent.
         raise TransportError(
             f"{self.id}: request() is unsupported on a passive Victron "
-            "transport — drivers must override poll() and use get_latest()"
+            "transport, drivers must override poll() and use get_latest()"
         )
 
     # ---------- Victron-specific surface ----------
@@ -301,7 +301,7 @@ class BleVictronAdvertiseTransport(Transport):
         if no advertisement has arrived yet / the last one is stale.
 
         Per-device drivers (e.g. SmartShunt) call the appropriate
-        `parsed.get_voltage()` / `get_current()` / etc. — we don't
+        `parsed.get_voltage()` / `get_current()` / etc., we don't
         flatten to a dict here because each Victron device kind has
         a different set of methods and aux-mode-dependent semantics."""
         if self._latest is None:
@@ -313,7 +313,7 @@ class BleVictronAdvertiseTransport(Transport):
     def last_advertisement_age_s(self) -> float | None:
         """Real-time age of the last decoded advertisement. Unlike
         `get_latest()`, this keeps growing past STALE_AFTER_SECONDS so
-        drivers can record exactly how silent a device has gone — the
+        drivers can record exactly how silent a device has gone, the
         dashboard surfaces this as "Silent for X min" + greys out the
         device card (#171). Returns None if we've never seen an
         advertisement from this device."""
@@ -343,7 +343,7 @@ class BleVictronAdvertiseTransport(Transport):
             if device_class is None:
                 # Not a recognised Victron Instant Readout model. Could
                 # be an old-firmware GATT-only device, or a model the
-                # library doesn't decode yet. Log once and bail — we
+                # library doesn't decode yet. Log once and bail, we
                 # don't want to spam every advertisement.
                 if not getattr(self, "_unsupported_logged", False):
                     log.warning("[%s] payload not a known Victron model; "

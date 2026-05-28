@@ -1,9 +1,9 @@
-"""Victron SmartSolar MPPT driver — read-only via BLE Instant Readout.
+"""Victron SmartSolar MPPT driver, read-only via BLE Instant Readout.
 
 Covers every SmartSolar model: 75/15, 75/10, 100/20, 100/30, 100/50,
 150/35, 150/45, 150/60, 150/70, 150/85, 150/100, 250/60, 250/85,
 250/100. They all decode through the same `SolarCharger` model in
-victron-ble — one driver, the whole family.
+victron-ble, one driver, the whole family.
 
 Reuses #112's `ble_victron_advertise` transport. The biggest single
 Victron unlock in our coverage roadmap: every Victron solar install
@@ -39,7 +39,7 @@ class VictronSmartSolar(DeviceDriver):
         }
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Victron SmartSolar requires "
+                "wrong transport type, Victron SmartSolar requires "
                 "ble_victron_advertise"
             ]
             return result

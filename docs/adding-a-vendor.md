@@ -146,6 +146,6 @@ once those packages exist.
 
 The prioritised queue lives in
 [coverage-roadmap.md](coverage-roadmap.md). It's organised by paying-
-persona impact rather than alphabetically — pick the highest-tier
+persona impact rather than alphabetically, pick the highest-tier
 unowned entry rather than the most interesting one, unless a paying
 customer has asked for a specific device.

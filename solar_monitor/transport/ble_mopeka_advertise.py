@@ -4,9 +4,9 @@ Mopeka sells small ultrasonic sensors that magnetically mount to the
 bottom of a propane / water / oat / coffee tank and broadcast the
 fluid level over BLE. Three things to know:
 
-  * **Plaintext** advertisements — no encryption key needed (unlike
+  * **Plaintext** advertisements, no encryption key needed (unlike
     Victron, which requires a per-device AES key). Just listen.
-  * Manufacturer ID is **0x0059** (Nordic Semiconductor — Mopeka's
+  * Manufacturer ID is **0x0059** (Nordic Semiconductor, Mopeka's
     chip vendor). Several BLE devices use this prefix; the first
     byte of payload disambiguates Mopeka (hardware-id 0x03/0x05/
     0x06/0x08) from generic Nordic samples.
@@ -26,7 +26,7 @@ Why a separate shared scanner from Victron's:
     (their adapter-health debugging is enough surface as it is)
 
 See [[project-van-mode]] / [[project-target-customer]] in memory
-for why Mopeka specifically — it's the "vanlife killer feature"
+for why Mopeka specifically, it's the "vanlife killer feature"
 for the Persona A van-builder customer.
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ from .registry import register_transport
 log = logging.getLogger(__name__)
 
 # Nordic Semiconductor manufacturer ID. Mopeka uses Nordic nRF chips
-# and ships with this ID. Other Nordic devices exist too — we filter
+# and ships with this ID. Other Nordic devices exist too, we filter
 # further by the hardware-id byte at the start of the payload.
 MOPEKA_MANUFACTURER_ID = 0x0059
 
@@ -53,10 +53,10 @@ MOPEKA_MANUFACTURER_ID = 0x0059
 # `mopeka_iot_ble` Home Assistant integration's parser.
 _HW_KINDS = {
     0x03: "pro_check",           # Universal LPG / propane (most common)
-    0x05: "pro_plus",            # Pro Plus — extended range
-    0x06: "pro_check_h2o",       # Water tanks — different speed-of-sound
+    0x05: "pro_plus",            # Pro Plus, extended range
+    0x06: "pro_check_h2o",       # Water tanks, different speed-of-sound
     0x08: "pro_check_bottom",    # Bottom-mounted variant
-    0x09: "pro_universal",       # Newer firmware "Universal" — multi-fluid
+    0x09: "pro_universal",       # Newer firmware "Universal", multi-fluid
 }
 
 # How stale a decoded payload may be before get_latest() reports None.
@@ -85,7 +85,7 @@ def parse_mopeka_advertisement(mfr_data: bytes) -> dict[str, Any] | None:
     The raw distance + accelerometer let a driver compute a calibrated
     fluid level (with the tank's empty/full distance bounds + tilt
     rejection). We don't compute a fluid-level % here because that's
-    per-install — what we DO compute is everything we can without
+    per-install, what we DO compute is everything we can without
     knowing the tank.
     """
     if not mfr_data or len(mfr_data) < 8:
@@ -93,7 +93,7 @@ def parse_mopeka_advertisement(mfr_data: bytes) -> dict[str, Any] | None:
     hw_byte = mfr_data[0]
     kind = _HW_KINDS.get(hw_byte)
     if kind is None:
-        return None  # Not a Mopeka — some other Nordic device
+        return None  # Not a Mopeka, some other Nordic device
 
     # Battery: byte 1, lower 7 bits map to 2.2-3.45V via /32; convert to
     # a rough percentage (lithium coin cell discharge curve is roughly
@@ -144,7 +144,7 @@ def parse_mopeka_advertisement(mfr_data: bytes) -> dict[str, Any] | None:
 # ---------- module-level shared scanner ----------
 
 class _SharedMopekaScanner:
-    """Singleton — one BleakScanner that fans Mopeka adverts out to
+    """Singleton, one BleakScanner that fans Mopeka adverts out to
     the transport instance registered for the sending device's MAC."""
 
     def __init__(self) -> None:
@@ -238,7 +238,7 @@ def _scanner() -> _SharedMopekaScanner:
 class BleMopekaAdvertiseTransport(Transport):
     """Passive BLE transport for a single Mopeka tank sensor.
 
-    Configured with a MAC only — no encryption key. Driver reads via
+    Configured with a MAC only, no encryption key. Driver reads via
     `get_latest()`. `request()` is unsupported (passive).
     """
 
@@ -268,7 +268,7 @@ class BleMopekaAdvertiseTransport(Transport):
     ) -> bytes:
         raise TransportError(
             f"{self.id}: request() is unsupported on a passive Mopeka "
-            "transport — drivers must override poll() and use get_latest()"
+            "transport, drivers must override poll() and use get_latest()"
         )
 
     def _on_payload(self, parsed: dict[str, Any]) -> None:

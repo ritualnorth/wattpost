@@ -1,7 +1,7 @@
-"""Appliance ed25519 keypair — generation, sealed storage, load.
+"""Appliance ed25519 keypair, generation, sealed storage, load.
 
 Identity v2 Phase 1 (#303). See docs/architecture/identity-v2.md
-for the full design — this module ships the appliance-side half.
+for the full design, this module ships the appliance-side half.
 
 What this file owns:
 
@@ -12,8 +12,8 @@ What this file owns:
     `SecretBox` whose key is derived from a machine-anchored
     secret (`/etc/machine-id` if present, otherwise a long
     random file we own). HKDF-style derivation via BLAKE2b.
-    Not equivalent to TPM-backed storage — Phase 10 (#312)
-    swaps this for ATECC608A / YubiKey HSM where available —
+    Not equivalent to TPM-backed storage, Phase 10 (#312)
+    swaps this for ATECC608A / YubiKey HSM where available,
     but raises the bar meaningfully against a casual disk-
     pull attack.
   * **Public key + fingerprint** exposed for cloud upload.
@@ -86,7 +86,7 @@ class KeypairError(Exception):
 
 @dataclass(frozen=True)
 class Keypair:
-    """In-memory ed25519 keypair. The signing-key is sensitive — never
+    """In-memory ed25519 keypair. The signing-key is sensitive, never
     log it, never marshal it. Public + fingerprint are safe to share."""
     signing_key: nacl.signing.SigningKey
     verify_key:  nacl.signing.VerifyKey
@@ -102,7 +102,7 @@ class Keypair:
 
 def fingerprint_of(public_key: bytes) -> str:
     """Stable identifier for a public key. First 16 hex chars of
-    SHA-256(public_key) — collision probability negligible at our
+    SHA-256(public_key), collision probability negligible at our
     fleet size, short enough for log lines and JWT claims."""
     return hashlib.sha256(public_key).hexdigest()[:16]
 
@@ -111,26 +111,26 @@ def _machine_anchor(dir_: Path) -> bytes:
     """Source of entropy for the SecretBox key.
 
     Preference order:
-      1. PERSISTED anchor file under our own keys dir — wins whenever
+      1. PERSISTED anchor file under our own keys dir, wins whenever
          present. This is what survives Docker container recreates
          (the keys dir is bind-mounted; /etc/machine-id is NOT and
          gets re-minted by Docker on every recreate). Pi installs
          also benefit: /etc/machine-id is stable on Pi, but the
          persisted anchor still wins so the two storage modes share
          the same code path.
-      2. /etc/machine-id — used to SEED the persisted anchor on
+      2. /etc/machine-id, used to SEED the persisted anchor on
          first run when we have it (gives the anchor host-binding
          entropy beyond what secrets.token_bytes provides). Once
          persisted, we never re-read /etc/machine-id.
-      3. /var/lib/dbus/machine-id — older systems, same role as #2.
-      4. secrets.token_bytes — pure-random fallback. Used when no
+      3. /var/lib/dbus/machine-id, older systems, same role as #2.
+      4. secrets.token_bytes, pure-random fallback. Used when no
          machine-id source is available; still persisted so it
          survives restarts.
 
     Disk-clone defence: cloning a host's disk WITHOUT the keys dir
     re-runs path #1's miss → path #2/#3/#4 → fresh anchor → can't
     decrypt the original sealed key → forced re-pair. Cloning WITH
-    the keys dir gives the attacker decryptable keys — but that's
+    the keys dir gives the attacker decryptable keys, but that's
     no worse than today (the sealed key is also on the disk), and
     the proper hardware-bound defence ships in Phase 10.
 
@@ -171,9 +171,9 @@ def _machine_anchor(dir_: Path) -> bytes:
         os.chmod(anchor_file, 0o600)
     except OSError as e:
         # If we can't persist, we can still use it for THIS process
-        # lifetime — but any restart will mint a new key (and break
+        # lifetime, but any restart will mint a new key (and break
         # cloud pairing). Log loudly.
-        log.warning("machine-anchor persist failed at %s: %s — keys "
+        log.warning("machine-anchor persist failed at %s: %s, keys "
                     "won't survive restart", anchor_file, e)
     return seed
 
@@ -182,7 +182,7 @@ def _derive_box_key(anchor: bytes) -> bytes:
     """Derive a 32-byte SecretBox key from the machine anchor.
 
     BLAKE2b in keyed mode with a static salt + 32-byte digest. Standard
-    KDF shape — not as strong as Argon2 but the threat model is
+    KDF shape, not as strong as Argon2 but the threat model is
     "attacker has the sealed file but doesn't have the anchor", not
     "attacker is brute-forcing offline" (anchor itself is 32+ bytes
     of entropy, so brute-force is infeasible).
@@ -228,7 +228,7 @@ def load_or_create(dir_: Path | str = DEFAULT_DIR) -> Keypair:
     calls load the existing one from disk. Idempotent.
 
     Raises KeypairError if the existing file is present but won't
-    decrypt — that means either the machine-id changed (disk moved to
+    decrypt, that means either the machine-id changed (disk moved to
     a new host) or the file is corrupted. Caller decides whether to
     fail-loud or regenerate (default: fail-loud; regenerating without
     a deliberate user action would silently invalidate every cloud-
@@ -262,7 +262,7 @@ def load_or_create(dir_: Path | str = DEFAULT_DIR) -> Keypair:
             # records it as a key rotation in audit (rotated_from_
             # fingerprint), so trust history isn't lost.
             log.warning(
-                "appliance keypair decrypt failed: %s — auto-regenerating "
+                "appliance keypair decrypt failed: %s, auto-regenerating "
                 "(prior key is gone, cloud will record this as a rotation "
                 "on next /upgrade). Common cause: Docker container recreate "
                 "with the pre-v0.1.94 anchor scheme.", e,
@@ -284,7 +284,7 @@ def load_or_create(dir_: Path | str = DEFAULT_DIR) -> Keypair:
 
     dir_.mkdir(parents=True, exist_ok=True)
     sealed_blob = _seal(raw_private, box_key)
-    # Write atomically — rename is atomic on POSIX, so a crashed mid-
+    # Write atomically, rename is atomic on POSIX, so a crashed mid-
     # write doesn't leave a half-file the next boot can't read.
     tmp = sealed_path.with_suffix(sealed_path.suffix + ".tmp")
     tmp.write_bytes(sealed_blob)

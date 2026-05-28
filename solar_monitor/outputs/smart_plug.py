@@ -104,7 +104,7 @@ class ShellyGen2Adapter:
     # Smart plugs aren't device-snapshot-driven so the protocol's
     # `discover(device)` doesn't apply; OutputsService walks them
     # directly via config. We still expose discover() for protocol
-    # conformance — always returns []. The output is registered
+    # conformance, always returns []. The output is registered
     # via build_output() instead.
     def discover(self, device: dict[str, Any]) -> list[ControllableOutput]:
         return []

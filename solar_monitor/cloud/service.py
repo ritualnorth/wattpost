@@ -5,7 +5,7 @@ plus today's energy aggregates from the scheduler, packages them
 into a small JSON payload, and POSTs to `<endpoint>/api/heartbeat`
 with the bearer token.
 
-Failures are swallowed — losing internet must not break the local
+Failures are swallowed, losing internet must not break the local
 dashboard. Each failure is logged at WARNING for diagnostics.
 """
 from __future__ import annotations
@@ -25,9 +25,9 @@ log = logging.getLogger(__name__)
 class CloudService:
     def __init__(self, config_or_cfg, scheduler) -> None:
         """Accepts either a Config (preferred) or a bare CloudCfg
-        (legacy callers — Settings save still passes one in). When
+        (legacy callers, Settings save still passes one in). When
         given a Config we hold a reference to the parent so reading
-        `self.cfg` always reflects the current `config.cloud` — even
+        `self.cfg` always reflects the current `config.cloud`, even
         after Settings save rebinds the parent's `.cloud` attribute
         to a freshly-built CloudCfg. Otherwise a heartbeat firing
         after a user clicked Save in Settings → Cloud could mutate
@@ -64,7 +64,7 @@ class CloudService:
             return self._config.cloud
         return self._direct_cfg
 
-    # Top-level Config.alerts (NOT a CloudCfg attribute — getattr
+    # Top-level Config.alerts (NOT a CloudCfg attribute, getattr
     # against self.cfg silently returns [] and every alert-related
     # cloud feature no-ops). All rule-unification paths (#261) read
     # / write through this accessor so the same mistake can't recur.
@@ -79,14 +79,14 @@ class CloudService:
 
     async def start(self) -> None:
         if not self.cfg.bearer_token:
-            log.info("cloud: no bearer_token configured — skipping heartbeat loop")
+            log.info("cloud: no bearer_token configured, skipping heartbeat loop")
             return
         self._stop.clear()
-        # Identity v2 (#303) — fire-and-forget keypair upgrade check.
+        # Identity v2 (#303), fire-and-forget keypair upgrade check.
         # If the appliance has an ed25519 keypair on disk but the cloud
         # doesn't know about it (or no keypair at all), generate +
         # upload. Idempotent; safe to run on every boot. Doesn't
-        # block heartbeat startup — failure here logs and moves on,
+        # block heartbeat startup, failure here logs and moves on,
         # since v1 bearer-token auth still works during the transition.
         asyncio.create_task(self._identity_v2_upgrade_bg(),
                             name="identity-v2-upgrade")
@@ -105,10 +105,10 @@ class CloudService:
             self._task = None
 
     async def _identity_v2_upgrade_bg(self) -> None:
-        """Identity v2 (#303) — generate ed25519 keypair if missing,
+        """Identity v2 (#303), generate ed25519 keypair if missing,
         register public key with cloud if cloud doesn't have it yet.
 
-        Idempotent and best-effort. Failures here log + move on —
+        Idempotent and best-effort. Failures here log + move on,
         v1 bearer-token auth still works during the transition, so
         a cloud or network blip doesn't block heartbeats.
 
@@ -119,7 +119,7 @@ class CloudService:
             from ..auth import load_or_create as _kp_load
             from ..auth.keypair import fingerprint as _kp_fp_disk
         except ImportError as e:
-            log.debug("identity v2 module not available: %s — skipping", e)
+            log.debug("identity v2 module not available: %s, skipping", e)
             return
 
         try:
@@ -147,7 +147,7 @@ class CloudService:
                         log.info("identity v2: already registered (fingerprint=%s)",
                                  keypair.fingerprint)
                         # Phase 3 (#305): /status now also returns OIDC
-                        # client config — capture it so existing v2
+                        # client config, capture it so existing v2
                         # appliances pick up LAN OIDC on boot without
                         # having to re-trigger /upgrade.
                         if all(body.get(k) for k in (
@@ -167,7 +167,7 @@ class CloudService:
                                     "identity v2: failed to persist OIDC "
                                     "config from /status response",
                                 )
-                        # Phase 6B (#308) — ensure mTLS leaf cert is
+                        # Phase 6B (#308), ensure mTLS leaf cert is
                         # current. Idempotent; returns immediately if
                         # cert is fresh. Until Phase 6B-B wires the
                         # heartbeat to use it, the cert just sits
@@ -181,7 +181,7 @@ class CloudService:
                         except Exception:
                             log.exception(
                                 "identity v2 phase 6B: mTLS cert "
-                                "issuance failed (non-fatal — heartbeat "
+                                "issuance failed (non-fatal, heartbeat "
                                 "still uses bearer)"
                             )
                         return
@@ -189,7 +189,7 @@ class CloudService:
                     # Cloud doesn't have the endpoint yet (older cloud
                     # deploy than appliance). Skip silently; we'll try
                     # again on next boot.
-                    log.debug("identity v2: cloud endpoint 404 — older deploy?")
+                    log.debug("identity v2: cloud endpoint 404, older deploy?")
                     return
 
                 # Upload our public key. Cloud will either register
@@ -214,7 +214,7 @@ class CloudService:
                 # downstream code can assume "if oidc_config.load() is
                 # not None, all fields are present and consistent".
                 # Older clouds (pre-Phase 2) won't return these fields
-                # — skip silently in that case so we don't churn the
+                #, skip silently in that case so we don't churn the
                 # disk on partial upgrade.
                 if all(body.get(k) for k in (
                     "oidc_client_id", "oidc_redirect_uri",
@@ -229,7 +229,7 @@ class CloudService:
                             discovery_url=body["oidc_discovery_url"],
                         )
                     except Exception:
-                        # Non-fatal — Phase 3 OIDC client is additive;
+                        # Non-fatal, Phase 3 OIDC client is additive;
                         # legacy cookie auth still works without it.
                         log.exception(
                             "identity v2 phase 3: failed to persist OIDC "
@@ -237,7 +237,7 @@ class CloudService:
                             "the legacy password flow",
                         )
 
-                # Phase 6B (#308) — issue mTLS leaf cert. Runs on
+                # Phase 6B (#308), issue mTLS leaf cert. Runs on
                 # the SAME upgrade-bg task path so a newly-upgraded
                 # appliance has a cert by the end of its first boot.
                 try:
@@ -249,10 +249,10 @@ class CloudService:
                 except Exception:
                     log.exception(
                         "identity v2 phase 6B: mTLS cert issuance "
-                        "failed (non-fatal — heartbeat still uses bearer)"
+                        "failed (non-fatal, heartbeat still uses bearer)"
                     )
         except Exception as e:
-            log.warning("identity v2: cloud round-trip failed: %s — "
+            log.warning("identity v2: cloud round-trip failed: %s, "
                         "will retry on next boot", e)
 
     async def heartbeat_once(self) -> bool:
@@ -261,7 +261,7 @@ class CloudService:
         Settings UI's "Send heartbeat now" button.
 
         Also dispatches any commands the cloud handed back. Dispatch
-        happens AFTER the heartbeat returns 2xx — so a flaky network
+        happens AFTER the heartbeat returns 2xx, so a flaky network
         round-trip doesn't half-execute a command. Each command's
         status transitions are PATCHed back to the cloud as the
         appliance progresses through pick-up → apply → terminal."""
@@ -277,9 +277,9 @@ class CloudService:
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
         }
-        # Phase 6B alt-C (#308) — sign the heartbeat with the Phase 1
+        # Phase 6B alt-C (#308), sign the heartbeat with the Phase 1
         # ed25519 keypair so a leaked bearer alone is useless.
-        # Signed form: "v1\n<ts>\n<body>" — version tag pinned so a
+        # Signed form: "v1\n<ts>\n<body>", version tag pinned so a
         # future scheme change can be rejected, ts fresh-checked
         # cloud-side (5min window) to cap replay attacks. The cloud
         # grandfathers heartbeats without these headers during the
@@ -299,7 +299,7 @@ class CloudService:
                 _b64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii")
             )
         except Exception:
-            log.exception("heartbeat sign skipped — uploading bearer-only")
+            log.exception("heartbeat sign skipped, uploading bearer-only")
         try:
             # follow_redirects=True so an appliance still pointing at
             # an older hostname (e.g. https://wattpost.io after we
@@ -317,11 +317,11 @@ class CloudService:
             log.warning("cloud heartbeat HTTP %s: %s", r.status_code, r.text[:200])
             return False
 
-        # Phase 8B (#310) — flip uploaded_at on any audit rows the
+        # Phase 8B (#310), flip uploaded_at on any audit rows the
         # cloud confirmed it ingested, so they drop out of the next
         # heartbeat's pending list. Best-effort: if this fails we'll
         # just re-ship them next time (idempotent on the cloud side
-        # too — duplicate signed_repr would fail the UNIQUE
+        # too, duplicate signed_repr would fail the UNIQUE
         # constraint on the cloud SignedAuditLogEntry.signed_repr
         # path, which currently doesn't exist; cloud uses prev_hash
         # chain check instead, also idempotent in effect).
@@ -343,13 +343,13 @@ class CloudService:
             pass
 
         # Dispatch any commands the cloud queued for us. Best-effort
-        # — failures dispatching one command shouldn't stop the
+        #, failures dispatching one command shouldn't stop the
         # heartbeat from being considered successful, since the
         # heartbeat write itself already succeeded.
         try:
             body = r.json()
             commands = body.get("commands") or []
-            # #299 — verify cloud-signed commands BEFORE dispatching.
+            # #299, verify cloud-signed commands BEFORE dispatching.
             # Reject paths refuse to fire the command (it stays in the
             # cloud queue marked queued; cloud admins can investigate).
             # Grandfather paths (unsigned cmd) log + dispatch with a
@@ -363,7 +363,7 @@ class CloudService:
                 try:
                     ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
                 except Exception:
-                    log.exception("command verify raised — treating as untrusted")
+                    log.exception("command verify raised, treating as untrusted")
                     ok = False
                 if not ok:
                     # Record the rejection in our signed-audit chain
@@ -416,7 +416,7 @@ class CloudService:
 
     def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
         """Save the cloud-issued SSO HMAC key if we don't already have
-        one. Idempotent — if our copy matches, no-op. If it differs
+        one. Idempotent, if our copy matches, no-op. If it differs
         (cloud rotated), trust the cloud and update. Persistence goes
         through the same config.yaml write path the pair flow uses,
         so the appliance survives restarts."""
@@ -461,8 +461,8 @@ class CloudService:
         transitions back to /api/heartbeat/command/{id} as it goes.
 
         Handled kinds:
-          update      — run wattpost-update (Pi installs only)
-          backup_now  — snapshot + upload to cloud (#165)
+          update     , run wattpost-update (Pi installs only)
+          backup_now , snapshot + upload to cloud (#165)
 
         Unknown kinds get marked failed with a clear error message
         so they don't sit forever as 'queued' on the dashboard."""
@@ -480,7 +480,7 @@ class CloudService:
             await self._dispatch_restore_from_cloud(cmd_id, cmd)
             return
 
-        # #261 slice 2 — bidirectional rules sync. Cloud edits to a
+        # #261 slice 2, bidirectional rules sync. Cloud edits to a
         # local rule arrive as set_local_rule / delete_local_rule
         # commands carrying the rule spec in `payload_json`.
         if kind == "set_local_rule":
@@ -492,9 +492,9 @@ class CloudService:
 
         # #270 auto-rollback. Cloud queues these when the update
         # watchdog times out an `applying` update. Per install_method:
-        #   pin_image_tag  — Docker: tell wattpost-updater to pull a
+        #   pin_image_tag , Docker: tell wattpost-updater to pull a
         #                    specific image tag instead of :latest.
-        #   rollback       — Pi: spawn /usr/local/bin/wattpost-rollback
+        #   rollback      , Pi: spawn /usr/local/bin/wattpost-rollback
         #                    which swings the slot symlink.
         if kind == "pin_image_tag":
             await self._dispatch_pin_image_tag(cmd_id, cmd)
@@ -503,7 +503,7 @@ class CloudService:
             await self._dispatch_rollback(cmd_id, cmd)
             return
 
-        # #279 Phase 1 — non-destructive housekeeping. Prunes local
+        # #279 Phase 1, non-destructive housekeeping. Prunes local
         # snapshots, vacuums journal, clears apt cache. Run on demand
         # from the cloud "Free up disk" button or auto-queued by the
         # watchdog when host_health.disk.percent ≥ 90.
@@ -527,7 +527,7 @@ class CloudService:
         target = (cmd.get("target_version") or "").strip()
         from .. import __version__ as _running
         if target and target == _running:
-            log.info("cloud update: cmd %d already at target v%s — "
+            log.info("cloud update: cmd %d already at target v%s, "
                      "no-op", cmd_id, target)
             await self._patch_command_status(cmd_id, "picked_up")
             await self._patch_command_status(cmd_id, "success")
@@ -535,7 +535,7 @@ class CloudService:
 
         # Docker installs go via a Watchtower sidecar (#265). The
         # daemon takes a snapshot first (gives the user a rollback
-        # path if the new image is bad — Pi has slot-based atomic
+        # path if the new image is bad, Pi has slot-based atomic
         # swap, Docker doesn't), then POSTs the watchtower HTTP API
         # to pull + restart. Container restart kills this process
         # mid-flight, so we don't await; cloud reconciles via the
@@ -556,13 +556,13 @@ class CloudService:
                 return
 
             await self._patch_command_status(cmd_id, "picked_up")
-            # Snapshot first — best-effort. If backup service isn't
+            # Snapshot first, best-effort. If backup service isn't
             # configured we log and continue: blocking updates on
             # backup wedge would be worse than letting the update
             # proceed with no rollback safety net (the user gets the
             # warning surface on the cloud detail page anyway).
             # On retry within the same cmd, reuse the snapshot from
-            # the first attempt — otherwise each watchtower-call
+            # the first attempt, otherwise each watchtower-call
             # failure would multiply pre-update snapshots in the
             # cloud backup list.
             backup_svc = getattr(self.scheduler, "backup_service", None)
@@ -613,7 +613,7 @@ class CloudService:
 
         await self._patch_command_status(cmd_id, "picked_up")
         await self._patch_command_status(cmd_id, "applying")
-        # Invoke wattpost-update detached — it'll restart this
+        # Invoke wattpost-update detached, it'll restart this
         # daemon mid-flight, so we have no way to await it OR to
         # PATCH the terminal status from here. The cloud auto-
         # reconciles: when the next heartbeat arrives with a newer
@@ -637,7 +637,7 @@ class CloudService:
     async def _dispatch_pin_image_tag(
         self, cmd_id: int, cmd: dict[str, Any],
     ) -> None:
-        """#270 — Docker auto-rollback. Cloud queues this when the
+        """#270, Docker auto-rollback. Cloud queues this when the
         update watchdog times out a failed update; we pin the wattpost
         container back to the previous image tag via the wattpost-
         updater sidecar. Same Bearer auth + HTTP shape as the regular
@@ -649,7 +649,7 @@ class CloudService:
         if os.environ.get("WATTPOST_DEPLOYMENT") != "docker":
             await self._patch_command_status(
                 cmd_id, "failed",
-                error="pin_image_tag is Docker-only — Pi rollbacks use "
+                error="pin_image_tag is Docker-only, Pi rollbacks use "
                       "kind=rollback (wattpost-rollback slot revert)",
             )
             return
@@ -658,7 +658,7 @@ class CloudService:
         if not (wt_url and wt_token):
             await self._patch_command_status(
                 cmd_id, "failed",
-                error="WATCHTOWER_URL/TOKEN not configured — sidecar "
+                error="WATCHTOWER_URL/TOKEN not configured, sidecar "
                       "missing from compose; can't auto-rollback",
             )
             return
@@ -710,7 +710,7 @@ class CloudService:
     async def _dispatch_rollback(
         self, cmd_id: int, cmd: dict[str, Any],
     ) -> None:
-        """#270 — Pi auto-rollback. Spawns the existing wattpost-
+        """#270, Pi auto-rollback. Spawns the existing wattpost-
         rollback helper that the OnFailure watchdog (#221) uses.
         Detached + best-effort: the helper restarts the daemon at the
         end, so the terminal status reconciles via the next heartbeat
@@ -719,14 +719,14 @@ class CloudService:
         if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
             await self._patch_command_status(
                 cmd_id, "failed",
-                error="kind=rollback is Pi-only — Docker uses "
+                error="kind=rollback is Pi-only, Docker uses "
                       "kind=pin_image_tag (sidecar tag-pin)",
             )
             return
         if not os.path.exists("/usr/local/bin/wattpost-rollback"):
             await self._patch_command_status(
                 cmd_id, "failed",
-                error="wattpost-rollback helper not found — reinstall to fix",
+                error="wattpost-rollback helper not found, reinstall to fix",
             )
             return
         await self._patch_command_status(cmd_id, "picked_up")
@@ -769,7 +769,7 @@ class CloudService:
         op_names = ", ".join(o["op"] for o in report["ops"] if o.get("ok"))
         msg = f"freed {freed_mb:.1f} MB · ran: {op_names or 'no ops'}"
         # Per-op errors are downgraded to a warning in the message rather
-        # than failing the whole cmd — if snapshot_prune worked but
+        # than failing the whole cmd, if snapshot_prune worked but
         # apt_autoremove timed out, the user still got value.
         if report["errors"]:
             err_names = ", ".join(
@@ -790,7 +790,7 @@ class CloudService:
 
         If `cloud_upload` is OFF in config (Hobby tier user with cloud
         paired but no cloud-backup retention) we still take the LOCAL
-        snapshot — clicking "Take backup now" from the cloud UI should
+        snapshot, clicking "Take backup now" from the cloud UI should
         never be a silent no-op. The user gets a fresh local snapshot
         either way; the cloud-side ApplianceBackup row only appears if
         the uploader was wired at startup.
@@ -816,7 +816,7 @@ class CloudService:
         # Did the cloud-upload arm succeed? snapshot_now() stores the
         # result on the service for the local Settings UI; we surface
         # it here too so the dashboard can render "snapshot stored on
-        # cloud" vs "local-only — enable cloud backups in Settings".
+        # cloud" vs "local-only, enable cloud backups in Settings".
         if (backup_svc.cfg.cloud_upload
                 and backup_svc.cloud_uploader is not None
                 and backup_svc.last_cloud_upload_ok is False):
@@ -841,7 +841,7 @@ class CloudService:
 
         Critical UX note: the live `cloud.bearer_token`,
         `cloud.sso_secret`, and `cloud.tunnel_token` are preserved by
-        `_stage_and_swap` (#146 phase-2 fix) — pairing survives the
+        `_stage_and_swap` (#146 phase-2 fix), pairing survives the
         restore. Without that the appliance would come back online
         un-paired and the user would have to re-pair to see it on the
         dashboard.
@@ -883,7 +883,7 @@ class CloudService:
             return
 
         body = r.content
-        # #297-3 — verify the appliance-keypair signature BEFORE we
+        # #297-3, verify the appliance-keypair signature BEFORE we
         # touch _verify_archive (which spends real CPU on the SQLite
         # integrity check). The signature is on the response headers
         # echoed back from cloud's appliance_backups row.
@@ -905,7 +905,7 @@ class CloudService:
                     "(fp=%s...)", backup_id, sig_fp[:8] if sig_fp else "?",
                 )
             else:
-                # Grandfather path — pre-0.1.99 backup with no sig.
+                # Grandfather path, pre-0.1.99 backup with no sig.
                 # Warn loudly + proceed (alternative would lock users
                 # out of their own pre-rollout history).
                 log.warning(
@@ -917,14 +917,14 @@ class CloudService:
         except _sig.BackupSigError as e:
             await self._patch_command_status(
                 cmd_id, "failed",
-                error=f"backup signature verification failed: {e} — "
+                error=f"backup signature verification failed: {e}, "
                       "refusing restore. If this is a legitimate "
                       "backup from a previous keypair, contact "
                       "support@wattpost.io.",
             )
             return
 
-        # Re-use the appliance's restore plumbing — same code path as
+        # Re-use the appliance's restore plumbing, same code path as
         # the user-initiated restore endpoint.
         try:
             from ..api.backup import _stage_and_swap, _verify_archive
@@ -972,7 +972,7 @@ class CloudService:
             "cloud restore_from_cloud: cmd %d applied backup %d, re-execing",
             cmd_id, backup_id,
         )
-        # Phase 8B (#310) — record the restore in the signed audit
+        # Phase 8B (#310), record the restore in the signed audit
         # log BEFORE re-exec, otherwise the in-flight write would die
         # with the process image. Best-effort.
         try:
@@ -986,7 +986,7 @@ class CloudService:
                 await store._db.commit()
         except Exception:
             log.exception("signed_audit: restore_applied write failed")
-        # Report success BEFORE re-exec — once execv runs the process
+        # Report success BEFORE re-exec, once execv runs the process
         # image is replaced and any in-flight PATCH dies with it.
         await self._patch_command_status(cmd_id, "success")
 
@@ -1001,7 +1001,7 @@ class CloudService:
         asyncio.create_task(_delayed_exec())
 
     async def _dispatch_set_local_rule(self, cmd_id: int, cmd: dict[str, Any]) -> None:
-        """#261 slice 2 — apply a cloud-edited rule to the local engine.
+        """#261 slice 2, apply a cloud-edited rule to the local engine.
 
         Payload mirrors the appliance's /api/alerts/rules POST shape
         (id, name, metric, op, threshold, severity, cooldown_seconds,
@@ -1027,7 +1027,7 @@ class CloudService:
                 cooldown_seconds = int(payload.get("cooldown_seconds") or 1800),
                 transports       = list(payload.get("transports") or []),
             )
-            # In-place replace or append, via _all_rules accessor —
+            # In-place replace or append, via _all_rules accessor,
             # writing to self.cfg.alerts silently no-ops (CloudCfg has
             # no .alerts attribute, that lives on top-level Config).
             rules = list(self._all_rules)
@@ -1047,7 +1047,7 @@ class CloudService:
             )
 
     async def _dispatch_delete_local_rule(self, cmd_id: int, cmd: dict[str, Any]) -> None:
-        """#261 slice 2 — remove a rule the cloud deleted. Idempotent:
+        """#261 slice 2, remove a rule the cloud deleted. Idempotent:
         if it's already gone (e.g. user also deleted on the appliance)
         we still report success."""
         import json as _json
@@ -1075,10 +1075,10 @@ class CloudService:
 
     async def _persist_alerts_to_yaml(self) -> None:
         """Atomic-write config.yaml's `alerts:` section. Mirrors the
-        pattern in api/alerts_admin._save_config — same backup +
+        pattern in api/alerts_admin._save_config, same backup +
         tmp+replace dance so a crash mid-write doesn't truncate.
 
-        Resolves the config path via the scheduler — `build_app` stashes
+        Resolves the config path via the scheduler, `build_app` stashes
         it on the scheduler so background services (us, BackupService)
         can mutate config.yaml without needing Litestar state."""
         import shutil
@@ -1120,7 +1120,7 @@ class CloudService:
         self, cmd_id: int, status: str, *, error: str | None = None,
     ) -> None:
         """PATCH /api/heartbeat/command/{id} to report a status
-        transition. Best-effort — failures here are logged but
+        transition. Best-effort, failures here are logged but
         don't cascade (a half-reported command on the dashboard
         is preferable to crashing the heartbeat path)."""
         url = (f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat/"
@@ -1148,7 +1148,7 @@ class CloudService:
 
     async def _build_payload(self) -> dict[str, Any]:
         """Pull SoC + net power from the store's `bank` pseudo-device.
-        Defensive about every step — a half-built snapshot during
+        Defensive about every step, a half-built snapshot during
         startup should not crash the heartbeat task.
 
         Why the store and not scheduler.last_result: `last_result` is
@@ -1172,7 +1172,7 @@ class CloudService:
             log.exception("cloud heartbeat: could not read bank state")
 
         # Free-form extras for the cloud dashboard to render later.
-        # Keep this concise — the cloud caps extras at 2 KiB.
+        # Keep this concise, the cloud caps extras at 2 KiB.
         extras: dict[str, Any] = {}
         # BLE adapter health (#244). Surfaces "wedged" Realtek dongles
         # to the cloud so users see "Bluetooth dongle not responding"
@@ -1195,7 +1195,7 @@ class CloudService:
         # 'pi'.
         import os as _os
         extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
-        # #267 — host-health snapshot (disk, memory, load, uptime,
+        # #267, host-health snapshot (disk, memory, load, uptime,
         # hostname, LAN IP). Cheap stdlib reads; the cloud renders
         # this as a Device-health card on /app/site/{id} and uses it
         # for fleet-view "disk almost full" warnings.
@@ -1204,7 +1204,7 @@ class CloudService:
             extras["host_health"] = _hh.snapshot()
         except Exception:
             log.exception("cloud heartbeat: host_health snapshot failed")
-        # #263/#264 — location (lat/lon) gated by LocationCfg.
+        # #263/#264, location (lat/lon) gated by LocationCfg.
         # OPT-IN by default; returns None unless the customer has
         # explicitly set share_with_cloud to "approx" or "precise".
         # Approx mode rounds on this side BEFORE transmission so the
@@ -1220,7 +1220,7 @@ class CloudService:
         # The cloud dashboard's "Kiosk" button reads this and builds
         # the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`.
         # Safe to ship in extras: it IS the public bearer for the
-        # share URL — anyone with the URL has it anyway. Stays out
+        # share URL, anyone with the URL has it anyway. Stays out
         # of the audit log + isn't sensitive like the bearer_token.
         if self.cfg.kiosk_token:
             extras["kiosk_token"] = self.cfg.kiosk_token
@@ -1233,7 +1233,7 @@ class CloudService:
         except Exception:
             pass
 
-        # Phase 8B (#310) — appliance-signed audit log entries waiting
+        # Phase 8B (#310), appliance-signed audit log entries waiting
         # to sync to cloud. Cloud verifies signature + hash chain +
         # ingests; ack list comes back in the heartbeat response so
         # we can flip uploaded_at. Cap at 50 per heartbeat to keep
@@ -1277,15 +1277,15 @@ class CloudService:
         except Exception:
             log.exception("cloud heartbeat: local_alert_rules collection failed")
 
-        # #252 slice 1 — ship today's energy totals + the last 24h of
+        # #252 slice 1, ship today's energy totals + the last 24h of
         # hourly buckets so the cloud Energy page can render the same
         # multi-series chart we ship locally PLUS accumulate week /
         # month / year history. Two payloads:
         #
-        #   energy_today        — totals + self-powered breakdown for
+        #   energy_today       , totals + self-powered breakdown for
         #                          the current local calendar day.
         #                          ~150 bytes. Today-tile food.
-        #   energy_hourly_24h   — parallel arrays: ts + per-series.
+        #   energy_hourly_24h  , parallel arrays: ts + per-series.
         #                          24 hourly buckets, ~600 bytes.
         #                          Cloud accumulates these into a
         #                          per-site history table.
@@ -1365,7 +1365,7 @@ class CloudService:
                     self._alerts_pending_ts = max(e.ts for e in events)
         except Exception:
             log.exception("cloud heartbeat: recent_alerts collection failed")
-        # Today's energy aggregates — surface on the cloud card so the
+        # Today's energy aggregates, surface on the cloud card so the
         # user can see "RV: 1.4 kWh in, 0.6 kWh out today" without
         # opening the local site. One DB read per heartbeat (~5 min)
         # is cheap; failure to read is non-fatal.
@@ -1379,7 +1379,7 @@ class CloudService:
                      0, 0, 0, 0, 0, -1)
                 ))
                 tot = await store.today_aggregate(midnight, now)
-                # Round to whole Wh — the cloud renders in kWh anyway.
+                # Round to whole Wh, the cloud renders in kWh anyway.
                 # `sources_today_wh` = PV + AC charger + DC-DC (the
                 # headline "Today in" the cloud shows). Keep
                 # `pv_today_wh` for backwards compat with older cloud
@@ -1396,7 +1396,7 @@ class CloudService:
                 extras["sources_today_wh"]    = int(tot.get("sources_today_wh") or 0)
                 extras["load_today_wh"]       = int(tot.get("load_today_wh") or 0)
                 extras["bank_net_today_wh"]   = int(tot.get("bank_net_today_wh") or 0)
-                # Today's SoC envelope — answers "did the bank get
+                # Today's SoC envelope, answers "did the bank get
                 # critically low overnight?" at a glance, without
                 # opening History. One cheap SELECT per heartbeat.
                 try:
@@ -1415,7 +1415,7 @@ class CloudService:
                 # Time to empty (discharging) or time to full (charging),
                 # in minutes. Uses the same rolling-hour load average as
                 # the runtime-forecast endpoint, so it's the same number
-                # the local dashboard would show — keeps cloud + local
+                # the local dashboard would show, keeps cloud + local
                 # consistent. Skipped entirely when the bank is idle
                 # (-5 .. +5 W) or capacity is unknown.
                 try:
@@ -1429,7 +1429,7 @@ class CloudService:
                         avg_w = await store.rolling_load_avg(3600)
                         if avg_w is not None:
                             if avg_w < -5:  # discharging
-                                # 10% reserve — don't predict past LFP minimum
+                                # 10% reserve, don't predict past LFP minimum
                                 usable_wh = bank_wh * max(0.0, float(soc_now) - 10.0) / 100.0
                                 if usable_wh > 0:
                                     extras["time_to_empty_min"] = int(usable_wh / abs(avg_w) * 60)
@@ -1440,18 +1440,18 @@ class CloudService:
                 except Exception:
                     log.exception("cloud heartbeat: time-to-empty/full failed")
 
-                # Charger state pill — surface the BANK-LEVEL stage,
+                # Charger state pill, surface the BANK-LEVEL stage,
                 # not whichever device's label happened to sort first
                 # in get_latest(). On a multi-charger install (MPPT +
                 # AC charger + DC-DC) different chargers can be in
-                # different stages at the same instant — MPPT may
+                # different stages at the same instant, MPPT may
                 # have hit absorb voltage while AC charger is still
                 # in bulk, etc.
                 #
                 # Pick the most-active stage across every online
                 # charger. The pill is meant to answer the user's
                 # mental-model question "is my bank charging hard
-                # right now, or just maintaining?" — so if ANY
+                # right now, or just maintaining?", so if ANY
                 # charger is in bulk, the answer is "bulk".
                 #
                 # Skip silent devices (≥10 min since last broadcast):
@@ -1486,7 +1486,7 @@ class CloudService:
                     pass
 
                 # Per-device snapshot for the mobile per-site dashboard
-                # (#238). One concise row per device — name, vendor,
+                # (#238). One concise row per device, name, vendor,
                 # kind, online flag, headline value. Capped at 8
                 # devices and ~400 bytes total to stay inside the
                 # 2 KiB extras budget. Headline value differs by kind:
@@ -1502,12 +1502,12 @@ class CloudService:
                         vendor = str(dev.get("_vendor") or "")
                         last_seen = int(dev.get("_last_seen") or 0)
                         # "Online" if the device last reported within
-                        # 3× the poll cadence — generous enough to
+                        # 3× the poll cadence, generous enough to
                         # avoid false offlines on BLE re-scan, tight
                         # enough that a truly-silent device shows.
                         online = (now_ts - last_seen) < 600
                         headline: dict[str, Any] | None = None
-                        # Order matters — first match wins.  Battery
+                        # Order matters, first match wins.  Battery
                         # SoC trumps everything; chargers report power;
                         # shunts pick current.  Falls through to bus
                         # voltage as a last resort.
@@ -1540,7 +1540,7 @@ class CloudService:
 
         # Weather snapshot + PV forecast totals. Both live in the
         # local SQLite kv table (the same cache the dashboard reads
-        # from), so this is a cheap read — no third-party calls per
+        # from), so this is a cheap read, no third-party calls per
         # heartbeat. Keep the field set tight (~5 fields, ~100 bytes)
         # so the 2 KiB extras cap isn't a concern.
         try:

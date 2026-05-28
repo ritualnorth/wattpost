@@ -47,17 +47,17 @@ Read-only driver for the second-largest hybrid-inverter
 protocol family on Solar Assistant's coverage list. One Chinese
 OEM (Deye), three brand names (Deye, Sunsynk in UK/EU, Sol-Ark
 in US), one Modbus RTU register map. Closes the other half of
-#359 — combined with the Voltronic driver (v0.1.115) and EG4 XP
+#359, combined with the Voltronic driver (v0.1.115) and EG4 XP
 driver (v0.1.118) we now cover the three biggest hybrid-inverter
 protocol families on the market.
 
 Ships as a pair under one vendor:
 
-  * `vendors/deye/inverter_1p` — single-phase + split-phase
+  * `vendors/deye/inverter_1p`, single-phase + split-phase
     chassis. Deye SUN-5K/8K-SG04LP1, Sunsynk SG01LP1 line
     (3.6–16 kW), Sol-Ark 5K/8K/12K-1P, Sol-Ark 12K-2P US
     split-phase. Register base 59..194.
-  * `vendors/deye/inverter_3p` — three-phase commercial
+  * `vendors/deye/inverter_3p`, three-phase commercial
     chassis. Deye SUN-12K/15K/20K/25K-SG01HP3, Sunsynk
     Max-15K/20K, Sol-Ark 15K-3P. Register base 500..689.
     Up to four MPPT inputs (PV1-PV4) for the 20K+ models.
@@ -71,17 +71,17 @@ The driver catches three known footguns up-front by hard-coding
 the right scale per variant: battery_voltage ÷100 (1P) vs ÷10
 (3P), battery_power in watts × sign-flip (1P) vs deci-watts ×
 sign-flip (3P), PV power sign-flipped (1P) vs positive deci-watts
-(3P). Same protocol family, divergent conventions — got us once
+(3P). Same protocol family, divergent conventions, got us once
 in early drafts of the verify script.
 
-References (Apache-2.0 — see NOTICE):
-  * kellerza/sunsynk — primary register-map source.
-  * StephanJoubert/home_assistant_solarman — cross-reference.
+References (Apache-2.0, see NOTICE):
+  * kellerza/sunsynk, primary register-map source.
+  * StephanJoubert/home_assistant_solarman, cross-reference.
   * Deye Modbus PDF (mirror at domotica.solar).
 
 `scripts/verify_deye.py` exercises both variants with synthetic
 FC03 fixtures across status / temps / battery / grid / AC out /
-PV blocks — 66/66 assertions across sunny + grid-tied +
+PV blocks, 66/66 assertions across sunny + grid-tied +
 discharging + fault scenarios, plus the full mode-enum sweep.
 
 ## [0.1.119] · 2026-05-28
@@ -95,7 +95,7 @@ real off-grid customer (3× RBT100LFP12S, 28% SoC, 4 W discharge):
     10 W of net flow. Intent was "less clutter when float-charging";
     real outcome was "where the hell is my battery?" The threshold
     was load-bearing on a UX assumption that doesn't survive
-    contact with off-grid users — the battery IS the system, it
+    contact with off-grid users, the battery IS the system, it
     should never disappear from the picture. Drop the rule
     entirely: battery node always renders when a bank exists.
   * The donut label said "Resting" while the watts beside it
@@ -120,7 +120,7 @@ Read-only driver for EG4's Luxpower-derived inverter line:
 Luxpower-branded LXP siblings. (EG4's 6500EX is a Voltronic
 rebadge and stays in the `voltronic` vendor.) Speaks Modbus
 RTU over RS485 through the inverter's CT1 RJ45 port using
-the existing `serial_modbus` transport — same USB-RS485
+the existing `serial_modbus` transport, same USB-RS485
 dongle path Renogy and EPEVER customers already use.
 
 Driver covers device operating mode, battery V / SoC / SoH /
@@ -134,7 +134,7 @@ L1/L2 voltages populate optional `eps_l1_voltage_v` /
 Marked experimental: register addresses are confirmed across
 three independent public sources (EG4's own 18kPV-12LV Modbus
 PDF, joyfulhouse/eg4_web_monitor MIT, celsworth/lxp-bridge MIT
-— see NOTICE) but Luxpower firmwares occasionally ship
+, see NOTICE) but Luxpower firmwares occasionally ship
 `battery_temperature` ÷10 vs ÷1 and a couple of mode codes
 vary by family. First customer probe paste flips to stable.
 
@@ -157,7 +157,7 @@ Two patches in `solar_monitor/web/app.js`:
     is configured. Reads battery_voltage_v + battery_current_a
     + soc_pct from the inverter's canonical metric schema.
     Capacity-derived fields (remaining Ah, time-to-empty) stay
-    blank — those are bank-config knowledge the inverter
+    blank, those are bank-config knowledge the inverter
     legitimately doesn't have.
 
   * `FLOW_MAPPING.inverter` gains a `sources: [pv]` entry so
@@ -182,7 +182,7 @@ or smart-battery) now populates the `bank` pseudo-device with
 soc_pct, voltage_v, current_a, and power_w from the inverter's
 canonical metrics, so the dashboard's SoC donut and Power Flow
 tile have real data to render instead of an empty state. Auto
-mode still prefers shunt then BMS when present — the inverter
+mode still prefers shunt then BMS when present, the inverter
 fallback only fires when the more authoritative sources are
 absent.
 
@@ -193,11 +193,11 @@ and flags known Voltronic VID:PIDs (`0665:5161` Cypress chip,
 `0001:0000` EG4 variant). The wizard's Add-transport endpoint
 now accepts `type: usbhid_voltronic` with `vid` / `pid` /
 `serial_number`, dedupes on the triple, auto-creates the
-inverter device row, and hot-reloads the daemon — same shape
+inverter device row, and hot-reloads the daemon, same shape
 as the BLE-advert + VE.Direct flows.
 
 Falls back gracefully when the `hid` Python package isn't
-installed (the default — it's an optional dep): the scan
+installed (the default, it's an optional dep): the scan
 endpoint returns a clear "install hidapi" hint and a `200`
 with `hidapi_available: false` instead of a `500`.
 
@@ -216,7 +216,7 @@ on the scheduler so the wizard and the dashboard pill agree.
 ### Added · Voltronic-family inverter driver (#360, experimental)
 
 Read-only driver for the Voltronic / Axpert / MPP Solar / EG4
-hybrid-inverter family — one shared ASCII protocol covers ~11
+hybrid-inverter family, one shared ASCII protocol covers ~11
 manufacturer rebadges (Axpert, MPP PIP, EG4 6000XP/6500EX, Mecer,
 RCT, Infinisolar, Anenji, Datouboss, HZSolar, Effekta, LVTopSun,
 PowMr, Easun). New `usbhid_voltronic` transport speaks the
@@ -230,7 +230,7 @@ Marked experimental: the parse layer is built from the published
 protocol docs plus a community fixture, not lab hardware.
 Firmware variants diverge past QPIGS column ~17, so first-
 customer reports become the validation set. Setup-wizard
-integration lands once one rebadge is confirmed end-to-end — for
+integration lands once one rebadge is confirmed end-to-end, for
 now installers drop a `usbhid_voltronic` transport into
 `config.yaml` directly (see /docs/supported-hardware).
 
@@ -246,13 +246,13 @@ The catalogue collapsed from a 4-tier model (Free / Hobby / Pro /
 Installer) to a single Cloud tier at £6/mo or £60/yr, on top of
 the existing free local-only appliance. The Installer tier still
 exists as a separate Stripe price for fleet/multi-site customers
-but doesn't appear on `/pricing` — installers come in via a
+but doesn't appear on `/pricing`, installers come in via a
 contact-us door. The 14-day trial is now no-card upfront:
 customers sign up, get full Cloud features for 14 days, and the
 trial cancels at day 15 if they haven't added a payment method
 (`trial_settings.end_behavior.missing_payment_method = "cancel"`).
 The referral programme is disabled behind a `REFERRALS_ENABLED`
-feature flag — too easy to abuse pre-launch.
+feature flag, too easy to abuse pre-launch.
 
 ### Changed · Backup defaults: daily snapshots, 7-day rolling window (#336)
 
@@ -267,7 +267,7 @@ applied in well under a second.
 
 `account_billing.html.jinja` line 181 had a JavaScript comment
 that read "the {% if %} around the card". Jinja's lexer doesn't
-care that the literal is inside a `//` comment — it saw `{% if %}`
+care that the literal is inside a `//` comment, it saw `{% if %}`
 as a directive, found no condition expression, and raised
 `TemplateSyntaxError` on every render. The page had been silently
 500-ing since the `REFERRALS_ENABLED` flag landed. Caught via
@@ -286,7 +286,7 @@ still enforced.
 
 The Phase 8B signed-audit sync (#320) was importing
 `nacl.signing.VerifyKey`, but PyNaCl wasn't in the cloud
-container's dependency tree — every audit event from a paired
+container's dependency tree, every audit event from a paired
 appliance was raising `ModuleNotFoundError` and being silently
 dropped before persistence. Swapped to
 `cryptography.hazmat.primitives.asymmetric.ed25519.Ed25519PublicKey`
@@ -304,18 +304,18 @@ incorporation is a Companies Act 2006 s.1199 offence. Trading
 name "Ritual North" remains. UK GDPR Article 13(1)(a) controller
 identification stays satisfied by name + `support@wattpost.io`.
 
-### Added · Cloud observability — GlitchTip + Umami (#338)
+### Added · Cloud observability, GlitchTip + Umami (#338)
 
 Self-hosted Sentry-compatible error tracking now lives at
 `glitchtip.ritualnorth.com`, wired into the cloud Litestar app
 via `sentry_sdk.init`. A `before_send` hook drops `HTTPException`
-events with 4xx status codes — those are user errors, not server
+events with 4xx status codes, those are user errors, not server
 bugs. Within the first hour live it caught the state-machine
 4xx noise and the ed25519 signature import bug above.
 
 Umami analytics (cookieless, privacy-respecting) on the marketing
 pages from `analytics.ritualnorth.com`. Gated by Jinja conditional
-to exclude `/app/*` — logged-in dashboard activity stays out of
+to exclude `/app/*`, logged-in dashboard activity stays out of
 the analytics pipeline. CSP `script-src` + `connect-src` extended
 at the Caddy layer to allow the new origin.
 
@@ -334,13 +334,13 @@ collapsing the read-only hover state).
 
 A more honest "plausible-shaped" alternative landing was built at
 `/landing-v2` to compare against the live landing. Ritual North didn't
-like the tone — reverted. Existing landing stays.
+like the tone, reverted. Existing landing stays.
 
 ## [0.1.113] · 2026-05-25
 
 ### Changed · Settings split into a menu + 7 sub-pages (#328)
 
-The Settings tab was 16 cards stacked in one scrolling grid — top
+The Settings tab was 16 cards stacked in one scrolling grid, top
 of the page to "Reset to defaults" was a long scroll on mobile.
 Restructured around the same pattern as the cloud Account split:
 a menu landing at `#/settings`, with each row deep-linking to its
@@ -348,13 +348,13 @@ own sub-page (`#/settings/devices`, `#/settings/alerts`, etc.).
 
 New IA:
 
-- **Devices** — pair / scan / edit (the existing setup wizard CTA)
-- **Alerts** — threshold rules, transports, solar-aware charger pause
-- **Backup &amp; restore** — manual + automatic
-- **Privacy &amp; sharing** — location, kiosk URL, web password, discovery telemetry
-- **Integrations** — MQTT-out, MQTT-in
-- **Advanced** — history tiers + poll interval, retention, diagnostics, appearance/theme
-- **About** — version, update-now, session/sign-out, reset to defaults
+- **Devices**, pair / scan / edit (the existing setup wizard CTA)
+- **Alerts**, threshold rules, transports, solar-aware charger pause
+- **Backup &amp; restore**, manual + automatic
+- **Privacy &amp; sharing**, location, kiosk URL, web password, discovery telemetry
+- **Integrations**, MQTT-out, MQTT-in
+- **Advanced**, history tiers + poll interval, retention, diagnostics, appearance/theme
+- **About**, version, update-now, session/sign-out, reset to defaults
 
 Implementation is CSS-driven: each existing settings-block got a
 `data-subroute` attribute, the SPA router stamps `body[data-route-sub]`
@@ -388,9 +388,9 @@ already track these numbers in hardware (`cumulative_charge_ah`,
 
 Pick order per field:
 
-1. **BMS** if it reports — cleanest, manufacturer cycle definition
+1. **BMS** if it reports, cleanest, manufacturer cycle definition
 2. **Shunt counter** if the shunt exposes one (some Junctek models)
-3. **Estimated from shunt** — `cumulative_discharge_ah ÷ bank
+3. **Estimated from shunt**, `cumulative_discharge_ah ÷ bank
    capacity` for cycles, `× nominal V ÷ 1000` for kWh
 
 A small "from BMS" / "from shunt" caption sits under each value so
@@ -400,7 +400,7 @@ where the shunt doesn't track lifetime separately).
 
 ## [0.1.110] · 2026-05-24
 
-### Added · Energy chart — range buttons + weather overlay (#251)
+### Added · Energy chart, range buttons + weather overlay (#251)
 
 The Energy chart on /history was stuck on "today" and gave no
 context on why the curves looked the way they did. Two additions:
@@ -419,46 +419,46 @@ context on why the curves looked the way they did. Two additions:
   `/api/weather/history` returns the aligned series; 15-min cache
   keeps the upstream call light.
 
-Weather overlay is best-effort — no lat/lon configured or upstream
+Weather overlay is best-effort, no lat/lon configured or upstream
 unreachable just hides the layer, the energy chart still renders.
 
 ## [0.1.109] · 2026-05-24
 
-### Added · Battery detail page — drill in from the SoC donut (#292)
+### Added · Battery detail page, drill in from the SoC donut (#292)
 
 The hero SoC donut is now clickable. Tapping it opens a Battery
 detail page that breaks the bank aggregate down to per-pack mini-
 cards (voltage, current, temperature, cell-drift colour, last
-seen) and adds a 24h history chart. Bank-level summary stats —
-total Ah, total kWh, current SoC, current power — sit across the
+seen) and adds a 24h history chart. Bank-level summary stats,
+total Ah, total kWh, current SoC, current power, sit across the
 top so you don't lose context.
 
 Cell drift is colour-coded: green &lt;30mV, amber 30-80mV, red
 &gt;80mV. That's the headline number for spotting a sagging cell
 before it pulls the bank under load.
 
-### Changed · Cleaner Leaflet maps — kill the in-tile attribution strip
+### Changed · Cleaner Leaflet maps, kill the in-tile attribution strip
 
 The little `🇺🇦 Leaflet | © OpenStreetMap` text glued to the
 bottom-left of every map tile is gone. Attribution is still
 rendered (OSM + CARTO + Esri credit is part of the tile licenses
 and stays as a small caption underneath the map), it just doesn't
 bleed into the map graphic any more. Applied to all three render
-sites — appliance Location tile, cloud Fleet map, cloud per-site
+sites, appliance Location tile, cloud Fleet map, cloud per-site
 detail map.
 
 ## [0.1.108] · 2026-05-24
 
 ### Changed · Map tiles: CARTO Dark Matter → CARTO Voyager
 
-Ritual North called the maps "shite" — the old Dark Matter style had
+Ritual North called the maps "shite", the old Dark Matter style had
 washed-out labels against our dark card backgrounds. Switched
 all three map render sites (appliance Location tile, cloud
-Sites map, cloud per-site detail map) to CARTO Voyager — same
+Sites map, cloud per-site detail map) to CARTO Voyager, same
 provider, no API key, free tier. Voyager has more colour, clearer
 labels at every zoom, and is what Wikipedia + Foursquare use.
 
-Satellite alternative (Esri World Imagery) unchanged — the "Map /
+Satellite alternative (Esri World Imagery) unchanged, the "Map /
 Satellite" toggle still works, the dark-themed road map just got
 better.
 
@@ -484,7 +484,7 @@ mTLS CA, with a per-purpose info salt).
   unchanged via magic-byte sniff. Tier 2 blobs (WPENC1, ship
   in #323) are stored as-is cloud-side.
 - Site-detail "Cloud backups" card now shows: "Encrypted at
-  rest in our cloud. Pro tier adds Advanced Data Protection —
+  rest in our cloud. Pro tier adds Advanced Data Protection,
   encrypted with a key only you hold."
 
 Smoke-tested 5/5: roundtrip exact, legacy plaintext
@@ -499,11 +499,11 @@ The appliance now ed25519-signs every heartbeat body with its
 Phase 1 keypair. Cloud verifies the signature against the
 appliance's registered pubkey before ingesting. Closes the threat
 where a leaked bearer token alone is enough to impersonate the
-appliance — an attacker now also needs the kek-sealed private key.
+appliance, an attacker now also needs the kek-sealed private key.
 
 Originally Phase 6B was going to be mTLS heartbeats (full TLS
 handshake-level proof), but our CF-fronted setup terminates TLS
-at the Cloudflare edge — the client cert never reaches Caddy.
+at the Cloudflare edge, the client cert never reaches Caddy.
 Payload-signing achieves the same threat closure ("leaked bearer
 is useless without the sealed key") without touching Caddy, CF
 DNS, or adding a new bypass subdomain. The Phase 6B-A cert
@@ -519,7 +519,7 @@ Wire:
   any failure. Grandfather missing sig (older appliance) with an
   INFO log so the rollout is observable.
 * Smoke-tested 5/5: good roundtrip, body tamper, ts tamper, fp
-  mismatch, wrong key — all behave correctly.
+  mismatch, wrong key, all behave correctly.
 
 ## [0.1.106] · 2026-05-24
 
@@ -553,7 +553,7 @@ rule, etc.) is now ed25519-signed by the active cloud OIDC key
 at queue time. Appliance verifies the signature against its
 cached JWKS BEFORE dispatching. Closes the threat where a cloud
 DB compromise lets an attacker INSERT a forged appliance_commands
-row — without ALSO having the kek-sealed signing key, the
+row, without ALSO having the kek-sealed signing key, the
 appliance refuses the command and writes a `cloud_command_rejected`
 entry to its signed audit log.
 
@@ -563,7 +563,7 @@ entry to its signed audit log.
   `appliance_id` per command so the appliance can reconstruct the
   exact canonical_repr that was signed.
 * New `cloud/wattpost_cloud/command_signing.py` +
-  `solar_monitor/cloud/command_verify.py` — canonical_repr defined
+  `solar_monitor/cloud/command_verify.py`, canonical_repr defined
   identically in both, must be kept in lockstep (any drift = every
   cloud-signed command fails verify silently).
 * Replay defense: appliance_id is bound into the signature so a
@@ -583,7 +583,7 @@ appliance-id replay rejected; nonce-swap rejected.
 ### Fixed · Sign out on cloud-broker session: explain + redirect to cloud sign-out
 
 When you access your appliance via wattpost.cloud (the broker
-path), every request carries a Caddy-injected HMAC header — so
+path), every request carries a Caddy-injected HMAC header, so
 clearing the local LAN cookie did nothing; the next request would
 re-authenticate immediately, making "Sign out" look broken.
 
@@ -597,7 +597,7 @@ wattpost.cloud's sign-out.
 
 ### Added · OS security patches surface (#280)
 
-Appliance host_health now reports OS patch state — pending package
+Appliance host_health now reports OS patch state, pending package
 count, security-specific subset, apt cache age, unattended-upgrades
 last-run + enabled flag. Cloud site-detail's Device Health card
 renders a new "Security patches" tile that turns amber when apt is
@@ -606,7 +606,7 @@ security updates or apt is >14 days stale.
 
 Cheap (a couple of stat()s + a regex against the update-notifier
 file); no apt-get update fork on every heartbeat. Returns empty on
-non-Debian hosts and Docker containers without apt — the tile
+non-Debian hosts and Docker containers without apt, the tile
 auto-hides in those cases (Docker users' host OS handles its own
 patching).
 
@@ -648,13 +648,13 @@ mTLS leaf cert from cloud (`/api/internal/identity/v2/mtls/issue`)
 and persists it alongside its keypair under
 `/var/lib/wattpost/keys/`:
 
-* `appliance_cert.pem` — leaf cert binding the appliance ed25519
+* `appliance_cert.pem`, leaf cert binding the appliance ed25519
   pubkey to its identity (CN=apl_<id>, SPIFFE URI, slug DNS SAN).
-* `appliance_cert_key.pem` — ed25519 private key in PKCS#8 PEM
+* `appliance_cert_key.pem`, ed25519 private key in PKCS#8 PEM
   (hand-built from the raw seed; avoids adding `cryptography` as
   a heavy appliance dep).
-* `cloud_ca_chain.pem` — CA chain to verify cloud's TLS.
-* `appliance_cert_meta.json` — serial, fingerprint, not_after.
+* `cloud_ca_chain.pem`, CA chain to verify cloud's TLS.
+* `appliance_cert_meta.json`, serial, fingerprint, not_after.
 
 Auto-renewal when <30 days remain on the leaf; idempotent if cert
 is fresh. Best-effort: failures log + move on (heartbeats stay on
@@ -683,7 +683,7 @@ classification of the ~120 `innerHTML` callers surveyed.
 Every backup uploaded to cloud is now ed25519-signed with the
 appliance's Identity v2 keypair (#303). At restore time the
 appliance verifies the signature against its OWN public key
-before unpacking — if a compromised cloud account swaps the
+before unpacking, if a compromised cloud account swaps the
 tarball under a victim appliance's row, the victim refuses to
 apply it because the bytes weren't signed by its keypair.
 
@@ -695,7 +695,7 @@ apply it because the bytes weren't signed by its keypair.
 * Restore-from-cloud command verifies the signature first; on
   mismatch the command fails with a clear "either this isn't
   our backup or the keypair has rotated" error.
-* Pre-0.1.99 backups (no signature) are grandfathered — restore
+* Pre-0.1.99 backups (no signature) are grandfathered, restore
   logs a warning and proceeds, relying on the #297-1 config
   sanitiser + #297-2 fresh-install pw regen as defences.
 
@@ -711,9 +711,9 @@ as untrusted bytes from a (potentially) compromised cloud account:
 
 * **Top-level allowlist.** Only keys the appliance Config schema
   knows about survive a restore (`transports`, `devices`,
-  `cloud`, `mqtt_in`, etc.). Anything else — e.g. an attacker
+  `cloud`, `mqtt_in`, etc.). Anything else, e.g. an attacker
   `mqtt_out:` or `webhooks:` block crafted to exfil telemetry
-  or fire alert payloads at an attacker URL — is dropped, logged,
+  or fire alert payloads at an attacker URL, is dropped, logged,
   and listed in the restore summary.
 * **Credential redaction.** Any nested dict key containing
   `password`, `token`, `secret`, `bearer`, `api_key`,
@@ -725,7 +725,7 @@ as untrusted bytes from a (potentially) compromised cloud account:
 * **Fresh-install password regen.** On a true fresh install (no
   existing web-password.hash AND no plaintext), restore now
   *declines* to write the backup's password hash. The first-boot
-  generator mints a new random one instead — closes the attack
+  generator mints a new random one instead, closes the attack
   where a compromised cloud supplies an attacker-chosen password
   to a freshly-flashed appliance.
 
@@ -740,15 +740,15 @@ identified in `docs/security/restore-pivot-audit.md`.
 
 * The OIDC pending-state store on the appliance is now persisted to
   disk (`/var/lib/wattpost/keys/oidc_pending.json`) instead of being
-  in-memory only. A daemon restart — including `docker compose pull
-  && up -d`, which recreates the container — no longer wipes
+  in-memory only. A daemon restart, including `docker compose pull
+  && up -d`, which recreates the container, no longer wipes
   in-flight sign-in flows, so the callback from cloud completes
   instead of dead-ending with `OIDC state token unknown or expired`.
 * When the state token IS unknown (true CSRF mismatch, or session
   abandoned >5 min), `/auth/callback` now redirects to
   `/login?reauth=expired` with a friendly banner instead of
   returning a JSON 400. Users just tap "Sign in with WattPost
-  cloud" again — no more dead-end JSON page.
+  cloud" again, no more dead-end JSON page.
 
 ## [0.1.96] · 2026-05-24
 
@@ -760,16 +760,16 @@ identified in `docs/security/restore-pivot-audit.md`.
   glance without scrolling to the Battery health panel.
 * Battery health panel's BMS-only fields (Cycles, Lifetime
   energy) now read "BMS only" instead of the opaque "·" when no
-  BMS is reporting — tooltips name the BMSes (JK / Lynx) that
+  BMS is reporting, tooltips name the BMSes (JK / Lynx) that
   surface those metrics.
 
 ## [0.1.95] · 2026-05-24
 
-### Added · Sensors panel — Mopeka tanks + Govee/Ruuvi ambient (#257)
+### Added · Sensors panel, Mopeka tanks + Govee/Ruuvi ambient (#257)
 
 New dashboard panel that renders the BLE-paired tank + ambient
 sensors from the #254 (Mopeka) and #255 (Govee/Ruuvi) drivers.
-Auto-hides when no such devices are paired — cabin / non-vanlife
+Auto-hides when no such devices are paired, cabin / non-vanlife
 users never see the panel.
 
 * Tank cards: distance-to-liquid (raw mm; per-tank level%
@@ -777,7 +777,7 @@ users never see the panel.
   tilt status, silent-advert detection.
 * Ambient cards: temperature, humidity, battery % when reported.
 
-Lives next to the weather + location tiles — environmental data
+Lives next to the weather + location tiles, environmental data
 kept separate from the power-flow tile.
 
 ## [0.1.94] · 2026-05-24
@@ -796,7 +796,7 @@ after pulling.
 Fix: always prefer a persisted anchor file
 (`machine-anchor`, also in the bind-mounted keys dir) which
 survives container recreates. The first run still seeds the
-anchor from `/etc/machine-id` when available — the change is
+anchor from `/etc/machine-id` when available, the change is
 that subsequent runs read the persisted anchor instead of
 re-reading `/etc/machine-id`.
 
@@ -812,7 +812,7 @@ The fix is no-op there. Docker installs absolutely need this.
 
 ## [0.1.93] · 2026-05-24
 
-### Added · Identity v2 Phase 3 + 4 — LAN OIDC login (#305, #306)
+### Added · Identity v2 Phase 3 + 4, LAN OIDC login (#305, #306)
 
 Lets cloud-paired appliances delegate LAN-side login to
 wattpost.cloud. User clicks "Sign in with WattPost cloud" on the
@@ -822,22 +822,22 @@ receives + verifies an ed25519-signed id_token → issues a local
 session cookie.
 
 **Appliance:**
-- new `solar_monitor.auth.oidc_config` — atomic JSON persistence
+- new `solar_monitor.auth.oidc_config`, atomic JSON persistence
   of the cloud-returned OIDC client params under `/var/lib/wattpost/keys/`
-- new `solar_monitor.auth.oidc_rp` — RP primitives: JWKS fetch +
+- new `solar_monitor.auth.oidc_rp`, RP primitives: JWKS fetch +
   in-memory + on-disk cache, EdDSA JWT verify via PyNaCl, PKCE
   S256 generation, in-memory state store, /oidc/token exchange
-- new `solar_monitor.api.auth_oidc` — `/auth/lan/login` initiates
+- new `solar_monitor.api.auth_oidc`, `/auth/lan/login` initiates
   the OIDC redirect; `/auth/callback` completes it; both 404
   cleanly when OIDC isn't configured (pre-v2 firmware path is
   unchanged)
-- `/api/system/oidc-available` — lightweight status probe the
+- `/api/system/oidc-available`, lightweight status probe the
   login page uses to decide whether to surface the cloud button
 - login page now renders "Sign in with WattPost cloud" above the
   password form when OIDC is configured; password stays as the
   offline/legacy fallback
 
-**Cloud side (no version bump — auto-deploys):**
+**Cloud side (no version bump, auto-deploys):**
 - `identity_v2_upgrade` endpoint now auto-registers a per-appliance
   OIDC client (`apl_<id>_lan`) and returns the client_id,
   redirect_uri (broker hostname), jwks_url, and discovery_url in
@@ -845,19 +845,19 @@ session cookie.
 
 **Feature-flag-by-presence:** an appliance that has never reached
 the cloud, or whose cloud is on an older deploy, simply doesn't get
-an OIDC config — the cloud button stays hidden and the password
+an OIDC config, the cloud button stays hidden and the password
 form is the only path. No flag to toggle; the feature lights up the
 moment the upgrade round-trip succeeds.
 
 This pairs with Identity v2 Phase 2 (cloud OIDC server, shipped to
-wattpost.cloud earlier today) — together they implement the LAN-SSO
+wattpost.cloud earlier today), together they implement the LAN-SSO
 sequence in `docs/architecture/identity-v2.md`. Phases 5-10 (WebAuthn,
 mTLS, kiosk JWT unification, signed audit log, re-auth gate,
 hardware-backed keys) ship as separate releases.
 
 ## [0.1.92] · 2026-05-24
 
-### Added · Identity v2 Phase 1 — appliance keypair foundation (#303)
+### Added · Identity v2 Phase 1, appliance keypair foundation (#303)
 
 First code slice of the enterprise-grade auth rebuild (RFC at
 `docs/architecture/identity-v2.md`, EPIC #301). Lays the trust
@@ -866,7 +866,7 @@ root that every later phase stands on.
 **On the appliance:** new `solar_monitor.auth` package generates
 an ed25519 keypair on first boot under `/var/lib/wattpost/keys/`.
 Private key is sealed with libsodium `SecretBox` keyed off a
-machine-id-derived secret — pulling the SD card alone won't reveal
+machine-id-derived secret, pulling the SD card alone won't reveal
 the key without also having the machine-id. Idempotent: subsequent
 boots load the existing key rather than mint a new one.
 
@@ -874,16 +874,16 @@ boots load the existing key rather than mint a new one.
 stores per-appliance public keys + fingerprints. Two new
 internal endpoints:
 
-- `POST /api/internal/identity/v2/upgrade` — bearer-authed,
+- `POST /api/internal/identity/v2/upgrade`, bearer-authed,
   receives the appliance's public key + fingerprint, flips
   `appliances.identity_v2_enabled = TRUE`. Idempotent + handles
   key rotation with audit-trail continuity.
-- `GET /api/internal/identity/v2/status` — bearer-authed, returns
+- `GET /api/internal/identity/v2/status`, bearer-authed, returns
   current registration state so the appliance can check before
   re-uploading.
 
 **Migration UX (v1→v2):** appliance boot now runs a background
-upgrade check — if the cloud doesn't know our fingerprint, it
+upgrade check, if the cloud doesn't know our fingerprint, it
 posts the public key. Best-effort + non-blocking: a failed upload
 logs + retries next boot. v1 bearer-token auth keeps working
 during the transition; v2 only takes over for the new endpoints
@@ -901,7 +901,7 @@ the appliance image.
 
 ### Changed · Battery node tone-down
 
-v0.1.90's first cut at direction signal was too busy — pink ring +
+v0.1.90's first cut at direction signal was too busy, pink ring +
 pink fill wash + pink arrow chip overlapping the SoC arc was
 colour soup. Dropped the fill tint entirely (ring colour already
 says direction); shrank the arrow chip from r=9 to r=7 and moved
@@ -921,7 +921,7 @@ the affordance matches the destination.
 ### Fixed · Battery node was grey when discharging (since v2)
 
 `colorKeyOf()`'s allowlist accepted `pv/batt/load/grid/ac/dc` but
-not `"discharge"` — so the battery node fell through to the
+not `"discharge"`, so the battery node fell through to the
 `"neutral"` (grey) class every time the bank was draining, even
 though `.flow-node-ring.discharge { stroke: #f06292 }` was shipped
 in the CSS expecting that class. Result: card-below shouts pink
@@ -933,12 +933,12 @@ fill-tint work. Added `"discharge"` to the allowlist.
 Three layers of signal so users see at a glance whether their
 bank is filling or draining:
 
-- **Fill tint inside the ring** — pink-wash (`rgba(240,98,146,0.18)`)
+- **Fill tint inside the ring**, pink-wash (`rgba(240,98,146,0.18)`)
   when discharging, green-wash (`rgba(86,211,100,0.16)`) when
   charging. Smooth 550ms transition so direction flips morph
   instead of snapping.
 - **Direction-arrow chip** in the upper-right of the battery
-  node — ↓ for charging (energy INTO the bank), ↑ for discharging
+  node, ↓ for charging (energy INTO the bank), ↑ for discharging
   (energy OUT). Tesla / Powerwall app affordance; removes any
   ambiguity about which way the energy is moving.
 - The SoC ring around the node already changes colour with
@@ -953,7 +953,7 @@ Every tagged SD-image build since v0.1.45 has failed inside the
 chroot at `install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service"`
 with "cannot stat /opt/wattpost-src/packaging/systemd/wattpost.service".
 Docker + source-tarball builds were fine; only the SD image was
-affected, so it slipped past — until I noticed the inbox.
+affected, so it slipped past, until I noticed the inbox.
 
 Root cause: v0.1.45's slot-migration block does
 `mv /opt/wattpost-src ${ACTIVE_SLOT}/src` and patches `SOURCE` to
@@ -969,7 +969,7 @@ SOURCE rewrite.
 
 ## [0.1.88] · 2026-05-24
 
-### Changed · Power flow tile v3 — visual overhaul
+### Changed · Power flow tile v3, visual overhaul
 
 Twelve improvements landed in one pass after a UX review session.
 
@@ -987,22 +987,22 @@ the proportions stay clean.
 - Connection strokes transition over 450ms so charge↔discharge
   flips morph instead of snapping.
 - Per-segment linear gradients tint each line from its source
-  colour to its destination colour — solar→bus is yellow-to-grey,
+  colour to its destination colour, solar→bus is yellow-to-grey,
   battery→bus when discharging is pink-to-grey.
 
 **New visual elements.**
 
 - **Explicit junction node** at the bus point. Pulses softly when
   sources ≈ loads (system is humming along).
-- **SoC ring** around the battery node — thin coloured arc
+- **SoC ring** around the battery node, thin coloured arc
   outside the main ring showing current SoC %. Same colour
   language as the hero SoC donut. Two pieces of info on one node.
-- **Dominant-source halo** — whichever node is contributing the
+- **Dominant-source halo**, whichever node is contributing the
   most W gets a soft 2.6s pulse. Solar pulses at midday, battery
   at night.
 - **Mid-line W labels** on installs with 3+ active edges (skipped
   on simple 2-edge layouts where node labels already say enough).
-- **Time-of-day sun fade** — PV icon opacity follows local clock
+- **Time-of-day sun fade**, PV icon opacity follows local clock
   (full 08-17, fading at dawn/dusk, dim overnight).
 
 **Interactivity.**
@@ -1029,14 +1029,14 @@ cloud heartbeat sees MQTT-fed devices identical to native ones.
 
 Two ingest paths:
 
-- **HA-discovery (default on)** — subscribe to
+- **HA-discovery (default on)**, subscribe to
   `homeassistant/+/+/config` + `homeassistant/+/+/+/config`, parse
   each config payload, register the `state_topic`, then merge
   every state message as a metric on a virtual device named after
   the HA `device.identifier`. Most existing HA users will see
   dozens to hundreds of entities populate automatically with no
   per-sensor config.
-- **Manual `topics:` list** — escape hatch for devices that don't
+- **Manual `topics:` list**, escape hatch for devices that don't
   publish HA-discovery (Shelly gen1, custom ESP firmware, bespoke
   industrial gateways). Configure topic + label + metric +
   scalar/JSON extraction in YAML.
@@ -1046,7 +1046,7 @@ real entities: bare `{{ value }}` and dotted `{{ value_json.X }}`.
 More exotic Jinja (filters, arithmetic, conditionals) logs a
 one-shot info and skips that entity rather than failing silently.
 
-New config block (off by default — `mqtt_in: { enabled: false }`):
+New config block (off by default, `mqtt_in: { enabled: false }`):
 
 ```yaml
 mqtt_in:
@@ -1080,7 +1080,7 @@ exporter is unchanged).
 Second piece of the Van Mode sensor wave. Two new vendors via the
 same passive-BLE pattern as Mopeka.
 
-**Govee** (H5074, H5075, H5101, H5102) — cheap thermo-hygrometer,
+**Govee** (H5074, H5075, H5101, H5102), cheap thermo-hygrometer,
 £10-15 on Amazon. Two payload encodings:
 
 - H5074-style: explicit int16 temp + uint16 humidity + battery byte
@@ -1089,7 +1089,7 @@ same passive-BLE pattern as Mopeka.
 
 Emits `temperature_c`, `humidity_pct`, `battery_pct`, `hardware_kind`.
 
-**Ruuvi** (RuuviTag, RAWv2/format-5) — open-hardware environmental
+**Ruuvi** (RuuviTag, RAWv2/format-5), open-hardware environmental
 sensor, ~£25-35, much longer battery life than Govee. Adds
 **barometric pressure** which feeds future storm-warning rules.
 Format 3 (legacy) and format 8 (encrypted) deliberately rejected
@@ -1100,7 +1100,7 @@ Emits `temperature_c`, `humidity_pct`, `pressure_pa`, `pressure_hpa`,
 `battery_mv`, `battery_pct`.
 
 Both wire into the existing BLE-scan wizard with single-tap pair
-(no encryption key, no slave-ID scan — one MAC = one device).
+(no encryption key, no slave-ID scan, one MAC = one device).
 Scanner pause/resume is integrated so adding a Govee while a Mopeka
 is already advertising doesn't break either listener.
 
@@ -1112,25 +1112,25 @@ First piece of the Van Mode sensor wave. Mopeka makes the dominant
 after-market BLE tank sensors for vanlife propane / water bottles;
 this release adds passive-listen support for all five hardware
 variants (Pro Check, Pro Plus, Pro Check H2O, bottom-mounted Pro,
-Universal). Plaintext advertisements — no encryption key needed,
+Universal). Plaintext advertisements, no encryption key needed,
 unlike Victron's Instant Readout.
 
 What the driver emits:
 
-- `hardware_kind` — which Mopeka variant (`pro_check`, `pro_plus`, …)
-- `battery_pct` — CR2032 coin-cell SoC (so users replace before death)
-- `temperature_c` — sensor body temp (NOT fluid)
-- `signal_quality` — 0-3 (0 = no clean ultrasonic reflection)
-- `raw_distance_mm` — uncalibrated ultrasonic time-of-flight
-- `tilted` — derived from accelerometer; flag for ignore-this-reading
-- `advertisement_age_s` — Silent badge support, same pattern as Victron
+- `hardware_kind`, which Mopeka variant (`pro_check`, `pro_plus`, …)
+- `battery_pct`, CR2032 coin-cell SoC (so users replace before death)
+- `temperature_c`, sensor body temp (NOT fluid)
+- `signal_quality`, 0-3 (0 = no clean ultrasonic reflection)
+- `raw_distance_mm`, uncalibrated ultrasonic time-of-flight
+- `tilted`, derived from accelerometer; flag for ignore-this-reading
+- `advertisement_age_s`, Silent badge support, same pattern as Victron
 
-Fluid level percentage is deliberately NOT computed here — that
+Fluid level percentage is deliberately NOT computed here, that
 needs per-install tank geometry + fluid speed-of-sound calibration
 which lands with #257 (Tank + Ambient tile category).
 
 Setup wizard auto-detects Mopeka adverts during BLE scan (Nordic
-manufacturer ID 0x0059 + hardware-id byte). Single-tap pair —
+manufacturer ID 0x0059 + hardware-id byte). Single-tap pair,
 no key entry. Auto-creates the device row on save, no slave-ID
 scan needed (Mopeka is one MAC = one tank, same as Victron BLE).
 
@@ -1141,7 +1141,7 @@ scan needed (Mopeka is one MAC = one tank, same as Victron BLE).
 New "Email me on new alerts" toggle in the `/app/alerts` header.
 When on, every heartbeat that brings new alerts into the cloud
 inbox fires one batched digest email to the user. Default off
-(matches the daily-recap pattern — alert email is borderline-
+(matches the daily-recap pattern, alert email is borderline-
 spammy without explicit consent).
 
 Per-heartbeat batching means several alerts firing in the same
@@ -1171,7 +1171,7 @@ apt aren't applicable inside the container; docker image prune
 needs updater-sidecar access which is a Phase 1b follow-up).
 
 Explicitly does NOT do `apt upgrade` or anything that touches
-running software — see `[[security-patches-surface]]` (#280) for
+running software, see `[[security-patches-surface]]` (#280) for
 the right safety chain we'd need first.
 
 Auto-queue trigger (when `host_health.disk.percent ≥ 90`) is
@@ -1184,7 +1184,7 @@ Phase 1b; for now the user clicks the button.
 `/api/sites/{id}/commands` now defaults to 10 rows (was 30) and
 accepts `before_id` for cursor pagination. The Update history card
 on `/app/site/{id}` renders the first 10 and shows a "Load more"
-button below — click to fetch the next batch and append. Removes
+button below, click to fetch the next batch and append. Removes
 the wall-of-rows on appliances that have seen a lot of update
 churn (today's session pushed Garage past 15 entries). Fetch
 returns `has_more: true|false` so the button removes itself when
@@ -1198,8 +1198,8 @@ Tesla Powerwall + Victron VRM both let you flip between a map view
 and a satellite-photo view. We do the same now: a layer-control
 button in the top-right corner of every WattPost map (cloud
 `/app/map`, cloud per-site Location card, appliance dashboard
-"Where you are" tile). Default stays **Map** (Dark Matter — matches
-app theme). Satellite uses **Esri World Imagery** — free, no API
+"Where you are" tile). Default stays **Map** (Dark Matter, matches
+app theme). Satellite uses **Esri World Imagery**, free, no API
 key, no rate limit at our scale.
 
 Choice persists in `localStorage` under `wp-map-mode`, shared
@@ -1213,7 +1213,7 @@ the per-site tile and appliance dashboard remember.
 Docker Hub blocked three consecutive appliance image builds from the
 self-hosted runner's IP with 429 Too Many Requests on
 `python:3.12-slim`. Switched the `FROM` line in both Dockerfile.appliance
-and cloud/Dockerfile to `public.ecr.aws/docker/library/python:3.12-slim` —
+and cloud/Dockerfile to `public.ecr.aws/docker/library/python:3.12-slim`,
 AWS's free no-rate-limit mirror of the same image bits Docker Inc.
 publishes to Docker Hub. No runtime change; just gets us unblocked.
 The longer-term fix (Docker Hub auth in the workflow → 200 pulls/6h
@@ -1221,11 +1221,11 @@ instead of 100 unauthenticated) is backlogged as #283.
 
 ## [0.1.79] · 2026-05-23
 
-### Changed · Prettier map tiles — CartoDB Dark Matter
+### Changed · Prettier map tiles, CartoDB Dark Matter
 
 Swapped all three maps (cloud fleet, cloud per-site, appliance
 dashboard) from default OSM tiles to CartoDB Dark Matter. Dark
-base layer that matches the app theme — same OSM data underneath,
+base layer that matches the app theme, same OSM data underneath,
 CARTO just restyles + serves. Free, no API key, 4-subdomain
 parallelism + `@2x` retina tiles for crisper rendering on phones.
 
@@ -1239,7 +1239,7 @@ between Weather and Daily outlook, pinned at the appliance's current
 location. Reads `/api/location/status` so it shows the LIVE GPS fix
 (when present) or static `forecast.lat/lon` fallback.
 
-The local tile always renders if there's any location available —
+The local tile always renders if there's any location available,
 it's never gated by the share-with-cloud privacy toggle (you can
 see where YOU are; only TRANSMISSION is gated). Coordinates
 unchanged below ~11m skip the heavy re-paint to avoid GPS-jitter
@@ -1255,7 +1255,7 @@ the appliance. Cmd B's dispatch then saw the appliance already on
 the target, never produced a "version-bumped" heartbeat for the
 watchdog to observe, so the watchdog marked cmd B failed and
 auto-queued a downgrading rollback to `pre_update_version`. Caught
-+ manually cancelled before dispatch — but a customer wouldn't
++ manually cancelled before dispatch, but a customer wouldn't
 have, and would have woken up to their box silently downgraded.
 
 Belt + braces fix:
@@ -1281,16 +1281,16 @@ a Location card showing the appliance's current position.
 **Privacy is the headline.** A new `LocationCfg` block on the
 appliance gates cloud transmission with three modes:
 
-- `off` (default) — cloud receives no location data at all. Local
+- `off` (default), cloud receives no location data at all. Local
   dashboard still knows where it is; only transmission is gated.
-- `approx` — coordinates snapped to a ~10km grid ON the appliance
+- `approx`, coordinates snapped to a ~10km grid ON the appliance
   before transmission. The cloud literally never sees the precise
   number.
-- `precise` — real lat/lon. Required for geofences and the moving-
+- `precise`, real lat/lon. Required for geofences and the moving-
   van trail (future).
 
 Customer-side toggle in Settings → Location is authoritative. The
-cloud cannot override it — important for the upcoming OEM/builder
+cloud cannot override it, important for the upcoming OEM/builder
 GTM where a camper-build company shouldn't be able to track
 customer vans from their own fleet view.
 
@@ -1302,7 +1302,7 @@ CHANGED: Heartbeat extras now include `location` field (only when
 opted in). Cloud `/api/sites` lifts the location summary out of
 extras for fast map rendering across the fleet.
 
-NOT YET: appliance-side "Where am I" dashboard tile (#264) — to
+NOT YET: appliance-side "Where am I" dashboard tile (#264), to
 come in a follow-up release; the per-site cloud tile covers the
 "see where my van is" use-case for now.
 
@@ -1317,7 +1317,7 @@ heartbeat. Lets you triage "why's this offline?" without SSHing in.
 Appliance side: stdlib-only `host_health.snapshot()` reads
 /proc/meminfo + os.getloadavg + shutil.disk_usage + a connected-
 socket trick for LAN IP. Ships as `host_health` in heartbeat extras,
-no schema change cloud-side — site_detail just parses it out of the
+no schema change cloud-side, site_detail just parses it out of the
 existing `extras_json` blob.
 
 Tiles colour-code: amber when disk ≥75% or mem ≥75% or 1m load ≥1×
@@ -1330,7 +1330,7 @@ gracefully render the rest of the page unchanged.
 ### Fixed · Backup tables overflowing the card on mobile
 
 Both Local snapshots and Cloud backups tables on Settings were
-busting the right edge of the card on phones — Restore button
+busting the right edge of the card on phones, Restore button
 clipped to "Resto…", and the Uploaded + From column headers
 smashed together as "UploadedFrom" because column padding was
 vertical-only. Both tables now sit in an overflow-x: auto wrapper
@@ -1342,29 +1342,29 @@ visually.
 
 ## [0.1.73] · 2026-05-23
 
-### Added · Rules trilogy — defaults, cloud transport, empty-state nudge
+### Added · Rules trilogy, defaults, cloud transport, empty-state nudge
 
 Three companion changes that finish the Unified Rules story (#261).
 
-**#258 — Default rules on first boot.** Fresh appliance starts with
+**#258, Default rules on first boot.** Fresh appliance starts with
 Low SoC (30%/warn), Critical SoC (15%/alarm), High Temp (45°C/warn),
-Critical Temp (55°C/alarm) — system-voltage-agnostic so they work
+Critical Temp (55°C/alarm), system-voltage-agnostic so they work
 on 12/24/48V installs without auto-detection. `alerts_seeded: true`
 gets persisted so a user who deletes all rules won't get them
 silently re-added. Defaults ship with empty transports; the events
 still land in the local ring buffer and (for paired appliances) the
 cloud inbox via heartbeat extras.
 
-**#259 — Cloud transport for local rules.** A magic `cloud` transport
+**#259, Cloud transport for local rules.** A magic `cloud` transport
 id on any local rule routes the event to the user's cloud
 notification channels (web push + native app push + email via Resend)
 using whatever they've already enabled in their cloud notification
-prefs. The appliance does nothing locally for `cloud` transports —
+prefs. The appliance does nothing locally for `cloud` transports,
 the heartbeat ingest reads the per-event `transports` list and fans
 out post-commit. ON-CONFLICT dedup means flaky-link retransmits
 never double-page.
 
-**#260 — Empty-state nudge.** `/app/alerts` now distinguishes "no
+**#260, Empty-state nudge.** `/app/alerts` now distinguishes "no
 alerts" from "no rules". When the user has zero rules across their
 fleet (or for the selected site filter), the inbox renders a CTA
 to add their first rule instead of the misleading "no alerts yet"
@@ -1376,7 +1376,7 @@ copy. `rules_count` added to `/api/alerts` to drive the branch.
 
 The orange Update button on the dashboard fleet card and the
 Update-now button on /app/site/{id} stayed clickable while the
-cloud-triggered update was queued / picked_up / applying — so the
+cloud-triggered update was queued / picked_up / applying, so the
 user could double-fire the command (5-minute heartbeat interval
 makes the misclick window meaningful). Both buttons now check the
 appliance's in-flight command state and render as a disabled
@@ -1391,7 +1391,7 @@ list. Auto re-enables once the cmd reaches success / failed.
 ### Fixed · Don't snapshot twice when an update retries (#274)
 
 When a cloud-triggered Docker update failed at the watchtower-call
-step, the daemon would re-dispatch on the next heartbeat — and take
+step, the daemon would re-dispatch on the next heartbeat, and take
 a *fresh* pre-update snapshot every time, cluttering the cloud
 backup list with near-duplicate uploads. Now the daemon caches the
 snapshot path per cmd id and reuses it on retry. Cache is in-memory
@@ -1399,7 +1399,7 @@ only (daemon restart re-snapshots, which is correct: the on-disk
 snapshot file may be gone).
 
 Doesn't touch the always-on baseline (the daemon still takes one
-guaranteed pre-update snapshot per update event — that's the
+guaranteed pre-update snapshot per update event, that's the
 rollback safety net and shouldn't depend on cloud-backup freshness).
 
 ## [0.1.70] · 2026-05-23
@@ -1411,13 +1411,13 @@ project name `host-compose` (the bind-mount directory) instead of
 the user's actual project name (typically `wattpost`). Compose then
 believed the existing `wattpost` container belonged to a different
 project, tried to create a fresh one, and Docker rejected the name
-collision — so cloud Update-now succeeded on `pull` but failed on
+collision, so cloud Update-now succeeded on `pull` but failed on
 the actual swap. The updater now reads the compose project name
 straight from the running service container's
 `com.docker.compose.project` label, with `COMPOSE_PROJECT_NAME` env
 override and a final `wattpost` fallback. Adds `--no-deps` so the
 swap can never recreate the updater itself, plus `--pull never` on
-`up` (we already pulled in the previous step — no need for the
+`up` (we already pulled in the previous step, no need for the
 implicit re-pull to race with the explicit one).
 
 Verified end-to-end on Garage Stack (Ubuntu 24.04 LTS + Docker
@@ -1435,13 +1435,13 @@ a bare `update` command per site. Now it runs the same per-site
 safety chain shipped in #269 + #270 for single-appliance updates:
 
   - Pre-update local snapshot via `wattpost-update` / dispatcher
-    (universally — Pi + Docker)
+    (universally, Pi + Docker)
   - 24 h cloud-backup-fresh check; queues `backup_now` first if
     none exists (per site, independently)
   - `update` command captures `pre_update_version` so the cloud
     watchdog can auto-rollback if any individual site wedges
 
-Docker installs no longer get skipped — #265 + #268 + #270 give
+Docker installs no longer get skipped, #265 + #268 + #270 give
 them feature parity. The response shape gains per-site
 `install_method`, `backup_queued`, and `previous_version` so the
 fleet UI can show "Smith family: backup queued → updating →
@@ -1470,7 +1470,7 @@ of the same machinery. Confirmation dialog explains what'll happen
 as the last-resort path).
 
 New endpoint: `GET /api/sites/{id}/commands?limit=N` returns recent
-commands for that appliance — owner-scoped, uniform NotFound for
+commands for that appliance, owner-scoped, uniform NotFound for
 unowned IDs. `payload_json` added to the QueueCommandRequest msgspec
 so the rollback button can pass it through.
 
@@ -1479,7 +1479,7 @@ so the rollback button can pass it through.
 ### Added · Auto-rollback for failed updates (#270)
 
 If an update wedges, the cloud now restores the appliance to its
-previous version automatically — for both Pi and Docker. No more
+previous version automatically, for both Pi and Docker. No more
 "appliance offline, time to SSH in" follow-up.
 
 **Cloud-side**:
@@ -1510,12 +1510,12 @@ previous version automatically — for both Pi and Docker. No more
     `:tag` or `@digest`, rewrites to `repo:version`, leaves
     comments and surrounding whitespace untouched. Idempotent.
   - Compose bind-mount needs to be **read-write** for the rollback
-    rewrite to land — `docker-compose.example.yml` + docs updated.
+    rewrite to land, `docker-compose.example.yml` + docs updated.
 
 This is the second-to-last layer of the safety story shipped over
 the last few hours: backup before update (#269) → atomic update
 (#265 / pi-slots) → auto-rollback if it goes wrong (this) → cloud
-restore as final fallback (#146/164/165 — already exists).
+restore as final fallback (#146/164/165, already exists).
 
 ## [0.1.66] · 2026-05-23
 
@@ -1533,19 +1533,19 @@ to cloud storage before the update fires. Response includes a
 `prelude` object so the UI can show "Backup taken, then update"
 instead of a bare "Update queued".
 
-Also drops the now-stale "Docker can't update from cloud" 409 —
+Also drops the now-stale "Docker can't update from cloud" 409,
 #268's wattpost-updater sidecar gives Docker installs feature
 parity, so the cloud no longer pre-refuses.
 
 **Appliance side** (`packaging/cli/wattpost-update`): the Pi update
 helper now takes a local snapshot before touching the inactive
 slot. Slot atomic-swap protects against a bad binary, but DB
-schema migrations are forward-only — slot rollback brings old code
+schema migrations are forward-only, slot rollback brings old code
 back against a new schema. A snapshot before any work starts gives
 the user a clean restore path even if the slot machinery itself
 goes wrong.
 
-New `solar-monitor snapshot --config <path>` CLI command — local-
+New `solar-monitor snapshot --config <path>` CLI command, local-
 only backup invocation without going through the daemon's HTTP API
 (no auth dance). Used by wattpost-update; can also be called by
 operators directly.
@@ -1556,14 +1556,14 @@ operators directly.
 
 Docker installs can now apply updates from the cloud, with a
 backup-before-update safety net. Previously the cloud's update
-command was refused on Docker with a "do it manually" error —
+command was refused on Docker with a "do it manually" error,
 the only way to update remotely was to SSH in.
 
 How it works:
 
   1. Cloud queues `kind=update` (existing heartbeat command queue).
   2. Appliance takes an immediate snapshot (DB + config) and
-     uploads it to cloud storage if `cloud_upload` is on — same
+     uploads it to cloud storage if `cloud_upload` is on, same
      code path as "Take backup now".
   3. Appliance POSTs `http://localhost:8080/v1/update` on the
      Watchtower sidecar with a shared bearer token.
@@ -1572,7 +1572,7 @@ How it works:
      heartbeats with the new version; the cloud's existing
      10-minute reconciler marks the command success.
 
-Pre-update snapshot is best-effort — if the backup service isn't
+Pre-update snapshot is best-effort, if the backup service isn't
 running we log and continue rather than blocking the update.
 
 If a Docker install gets the update command without `WATCHTOWER_URL`
@@ -1580,7 +1580,7 @@ If a Docker install gets the update command without `WATCHTOWER_URL`
 link instead of going silent.
 
 Same Watchtower sidecar also runs scheduled auto-polls on its own
-`WATCHTOWER_POLL_INTERVAL` (default 86400 = daily) — set
+`WATCHTOWER_POLL_INTERVAL` (default 86400 = daily), set
 `auto_apply_updates` ON in the cloud per-appliance to fully
 hands-off, or OFF and trigger manually.
 
@@ -1596,7 +1596,7 @@ migration snippet in
 #261 rule unification shipped weeks ago but no local rules were
 ever appearing on `/app/rules` in the cloud, because the heartbeat
 ship-code (and the cloud-driven write-back paths) were reading
-`self.cfg.alerts` — and `self.cfg` resolves to `CloudCfg`, which
+`self.cfg.alerts`, and `self.cfg` resolves to `CloudCfg`, which
 has no `.alerts` attribute. `getattr(self.cfg, "alerts", [])`
 silently returned `[]`, the `if rules:` guard skipped the
 `local_alert_rules` ship, every alert sync no-opped.
@@ -1617,7 +1617,7 @@ chips as originally intended.
 ### Fixed · Chart taps now show the value at the cursor
 
 Tapping anywhere on a History chart used to highlight a point but
-display nothing — the legend that would normally show the value
+display nothing, the legend that would normally show the value
 was hidden (or set to `live: false` from the iOS-Safari tooltip
 work). Now every chart on the page has a floating tooltip that
 follows the cursor and lists each series' value at that x-position
@@ -1632,7 +1632,7 @@ Devices.
 Range (max − min, derivable from Min + Max) was dropped from the
 chart stat strip. Resolution (raw / 1-min avg / 1-hour avg / 1-day
 avg) moved out of the strip into a small right-aligned subtitle
-above the chart — it's debug context, not a stat. Strip is now
+above the chart, it's debug context, not a stat. Strip is now
 four cells: Now, Min, Avg, Max.
 
 ## [0.1.62] · 2026-05-22
@@ -1641,9 +1641,9 @@ four cells: Now, Min, Avg, Max.
 
 Appliance now includes two new extras blocks in heartbeat:
 
-- `energy_today` — totals + self-powered breakdown for the current
+- `energy_today`, totals + self-powered breakdown for the current
   local day. ~150 bytes.
-- `energy_hourly_24h` — parallel arrays of the last 24 hourly
+- `energy_hourly_24h`, parallel arrays of the last 24 hourly
   buckets (ts, solar_w, charger_w, bank_w, soc_pct). ~600 bytes.
 
 Both lifted from the same `compute_energy()` helper that powers
@@ -1651,14 +1651,14 @@ Both lifted from the same `compute_energy()` helper that powers
 endpoint so it's callable from the background heartbeat path
 without faking a Litestar state.
 
-No user-visible change in this release on its own — the cloud
+No user-visible change in this release on its own, the cloud
 ingest path (slice 2) is needed for the data to surface anywhere.
 Once both halves are deployed, the cloud Energy page becomes the
 multi-day / week / month / year chart that's been missing.
 
 ## [0.1.61] · 2026-05-22
 
-### Fixed · Renogy DCC50S/DCC30S — alternator side was showing 0 W
+### Fixed · Renogy DCC50S/DCC30S, alternator side was showing 0 W
 
 Latent bug since #123: the Power-flow model read `alt_power_w` but
 the Renogy DCC driver publishes `alternator_power_w`. DCC owners
@@ -1668,11 +1668,11 @@ have been seeing 0 W on the alternator side and not knowing why.
 
 The DCC50S / DCC30S et al. are alternator + MPPT in one box. They
 used to render as a single "Alternator" node, hiding the solar
-contribution entirely (or worse — counting it as alternator).
+contribution entirely (or worse, counting it as alternator).
 Now they split into two source nodes on the Power-flow tile:
 
-- **Alternator** — engine-driven DC, amber, alternator icon
-- **Solar** — built-in MPPT, yellow, sun icon
+- **Alternator**, engine-driven DC, amber, alternator icon
+- **Solar**, built-in MPPT, yellow, sun icon
 
 Both feed into the bus independently, with their own particles +
 W reading + voltage/current sub-line. Customers who wired panels
@@ -1685,10 +1685,10 @@ into a DCC will now see the harvest where they expect it.
 Three colour bugs on the Power-flow tile:
 
 - **DC-DC chargers + alternators rendered the same grey as AC
-  chargers** — a van running both showed two indistinguishable
+  chargers**, a van running both showed two indistinguishable
   grey sources. Fixed: DC-DC + alternator now use the existing
   `--dc` amber. AC charger stays grey (mains-tied semantic).
-- **Battery discharge particles were amber** — too close to solar
+- **Battery discharge particles were amber**, too close to solar
   yellow + DC-DC amber, the visual story ("is the battery feeding
   the load?") was lost in the wash of warm tones. Fixed: dedicated
   pink (`#f06292`) for any flow leaving the battery, matching the
@@ -1703,12 +1703,12 @@ users can read the diagram at a glance.
 
 ## [0.1.59] · 2026-05-22
 
-### Added · Bidirectional rule sync — edit local rules from the cloud (#261 slice 2)
+### Added · Bidirectional rule sync, edit local rules from the cloud (#261 slice 2)
 
 The other half of the unification. Cloud-side edits to an appliance-
 local rule now push down to the appliance via the existing command-
 queue, get applied locally (in-place mutate of `config.alerts`,
-atomic-write `config.yaml`, hot-reload the alerts engine — no daemon
+atomic-write `config.yaml`, hot-reload the alerts engine, no daemon
 restart), and re-surface on the next heartbeat to confirm.
 
 Two new command kinds the appliance handles: `set_local_rule` and
@@ -1717,7 +1717,7 @@ Two new command kinds the appliance handles: `set_local_rule` and
 0041 in the matching cloud deploy).
 
 The cloud Rules page lifts the Edit / Delete / toggle restrictions
-on rows tagged `Runs locally` — they all just work now, with the
+on rows tagged `Runs locally`, they all just work now, with the
 appliance picking up the change on next heartbeat. If the heartbeat
 or command fails, the rule re-appears on the appliance's snapshot
 and the user can retry.
@@ -1727,20 +1727,20 @@ and the user can retry.
 ### Added · Heartbeat ships local alert rules to cloud (#261 slice 1A)
 
 The appliance now includes a `local_alert_rules` array in heartbeat
-extras — full snapshot of currently-configured rules with metric,
+extras, full snapshot of currently-configured rules with metric,
 op, threshold, severity, cooldown, transports, and last-fired
 timestamp. Step 1 of the rules-unification work: the cloud Rules
 page will surface these as read-only rows with a "Runs locally"
 chip in the next cloud deploy, then editing-from-cloud and
 push-down via the appliance command queue follows. No user-visible
-change in this release on its own — the cloud ingest path needs
+change in this release on its own, the cloud ingest path needs
 to be deployed alongside.
 
 ## [0.1.57] · 2026-05-22
 
 ### Fixed · History chart legends came back
 
-v0.1.56's `legend: { show: false }` was too aggressive — it stripped
+v0.1.56's `legend: { show: false }` was too aggressive, it stripped
 the colour-swatch + series-name labels too, leaving the per-metric
 and compare-packs charts with no key at all. Switched to
 `legend: { live: false }` so the labels stay but the cursor-driven
@@ -1754,7 +1754,7 @@ HTML legend below.
 
 v0.1.55 only killed the live-legend on the new Energy chart, but
 the per-metric chart and the compare-packs chart both had the
-same `legend: { live: true }` config — and the same "Time: --,
+same `legend: { live: true }` config, and the same "Time: --,
 min: ·, max: ·" placeholder row appearing on touch devices where
 there's no hover. The stat strip above each chart already shows
 NOW/MIN/AVG/MAX, so the live legend was always redundant. Hidden
@@ -1775,7 +1775,7 @@ Two small things from the broker / mobile view:
   that nobody had flagged).
 - The Energy chart's built-in uPlot legend was showing
   permanent `·` placeholders on touch devices (no hover, so
-  the live legend never updates). Hidden — the static
+  the live legend never updates). Hidden, the static
   colour-chip legend below the chart already labels every
   series.
 
@@ -1786,7 +1786,7 @@ Two small things from the broker / mobile view:
 The `.kiosk-exit` author CSS had equal specificity to the UA
 `[hidden]` declaration and won by source order, so the JS's
 `hidden = true` for broker / kiosk-share visitors was silently
-ignored — Exit button kept rendering top-right on
+ignored, Exit button kept rendering top-right on
 `<slug>.wattpost.cloud`. Added a `.kiosk-exit[hidden]` rule with
 `!important` to honour the attribute.
 
@@ -1798,11 +1798,11 @@ Two readability bugs in v0.1.52's Energy-today chart:
 
 - SoC line drew a misleading drop-to-zero when a poll bucket missed.
   Now treat any SoC ≤ 0 as null so the line shows a gap instead
-  (0% is physically impossible — BMS would have cut off long
+  (0% is physically impossible, BMS would have cut off long
   before).
 - Load (purple) area was vanishing behind Solar / AC-charger areas
   on heavy-source days. Switched Load from filled area to a
-  thicker line drawn on top — clearly legible against everything.
+  thicker line drawn on top, clearly legible against everything.
 
 ## [0.1.52] · 2026-05-22
 
@@ -1834,7 +1834,7 @@ chart, and animated draw-in on poll updates.
 Replaces v0.1.50's central donut with a Tesla / Powerwall-Dashboard
 inspired layout:
 
-- Icon-only nodes at the perimeter — sun for solar, plug for AC
+- Icon-only nodes at the perimeter, sun for solar, plug for AC
   charger, house for load, battery for the bank when active
 - Watts as labels *outside* each node (not crammed inside)
 - Curved bezier connectors with animated particles flowing along
@@ -1859,7 +1859,7 @@ shows:
 - Percentage SoC big in the centre
 - State label underneath (Full / Charging / Discharging / Resting / Low)
 - Direction arrow + magnitude inside the donut (↓ X W in when charging,
-  ↑ X W out when discharging) — battery-relative, never bus-relative
+  ↑ X W out when discharging), battery-relative, never bus-relative
 - Bus voltage + shunt amperage as a small sub-line
 - Arc colour-coded by state (charging green, holding blue, discharging
   amber, critical red)
@@ -1874,7 +1874,7 @@ as flanking tiles, plain-English caption stays below.
 
 When the bank is at ≥98% SoC and the MPPT has dropped into float
 mode (only pulling enough sun to cover load + bus maintenance),
-the panel output looks artificially low — "three panels on a sunny
+the panel output looks artificially low, "three panels on a sunny
 day and only 94 W?". The power-flow caption now calls this out
 directly:
 
@@ -1887,7 +1887,7 @@ so people don't go hunting for a fault that isn't there.
 ### Changed · Power flow gets a plain-English caption
 
 The diagram was technically correct but kept producing "wait, why
-do the numbers not match?" moments — e.g. solar pushing 94 W, load
+do the numbers not match?" moments, e.g. solar pushing 94 W, load
 pulling 99 W, battery at 100% but quietly trickling 5 W into the
 gap. The numbers DO reconcile, but you had to know where to look.
 
@@ -1899,7 +1899,7 @@ Under the diagram there's now a single line in plain English:
 - "Sources matched to load · battery resting"
 
 The v0.1.46 "battery N W in/out" pill in the sub-header is dropped
-— it was bus-perspective wording that read backwards from how you
+, it was bus-perspective wording that read backwards from how you
 think about it.
 
 ## [0.1.47] · 2026-05-22
@@ -1909,7 +1909,7 @@ think about it.
 The connectors between sources / battery / loads were labelled with
 their bus-equivalent amperage (e.g. 94 W solar → "6.6 A"). Because
 the top connector visually terminates at the battery tile, that
-amperage read as "6.6 A flowing into the battery" — even when the
+amperage read as "6.6 A flowing into the battery", even when the
 bank's own shunt was reporting only ±0.3 A. When the bank is
 present we now drop the connector amperage and leave the watts on
 their own; the bank tile remains the source of truth for shunt
@@ -1922,14 +1922,14 @@ to put it).
 
 The "N sources · X W in · M loads · Y W out" header could appear
 off-balance when solar didn't quite cover the load and the battery
-was making up the difference — e.g. "94 W in · 99 W out" with no
+was making up the difference, e.g. "94 W in · 99 W out" with no
 hint that the missing 5 W came from the bank. The header now adds
 a `battery N W in/out` pill whenever the bank contribution is
 ≥ 1 W, so the totals reconcile.
 
 ## [0.1.45] · 2026-05-22
 
-### Fixed · SD-image build (pi-gen) — broken since v0.1.32
+### Fixed · SD-image build (pi-gen), broken since v0.1.32
 
 Every tagged SD-image build since v0.1.32 (the slot-directory
 refactor, #219) failed in the pi-gen chroot at the very last
@@ -1974,17 +1974,17 @@ rendered through a single set of helpers in
 
   `State of charge is 18.5% (threshold < 20%)`
 
-— with units inferred per metric (% / V / W / A / °C / min),
+, with units inferred per metric (% / V / W / A / °C / min),
 operator words humanised (< / > / ≤ / ≥), and per-metric
 rounding (SoC 1dp, voltage 2dp, watts integer).
 
 The SMTP local-alert email also gets a better subject:
-`WattPost warn: state of charge 18.5% (Low battery)` — leads
+`WattPost warn: state of charge 18.5% (Low battery)`, leads
 with the metric + current value so a phone preview answers
 "which?" + "how bad?" without opening.
 
 Machine-format transports (MQTT, webhook) keep raw JSON
-unchanged — downstream integrations render their own way.
+unchanged, downstream integrations render their own way.
 
 ## [0.1.43] · 2026-05-22
 
@@ -1995,12 +1995,12 @@ When the appliance's HTML was served via the cloud broker
 manifest` + apple-touch-icon + apple-mobile-web-app meta tags
 and registered its own service worker. A user who "Add to Home
 Screen"d while viewing the broker view ended up with a PWA
-scoped to that single broker subdomain — push notifications
+scoped to that single broker subdomain, push notifications
 register against the page's origin, so cloud-delivered alerts
 (sent from `wattpost.cloud`) never arrived, and there was no
 multi-site picker or alerts inbox inside the PWA.
 
-The canonical install target is `wattpost.cloud/app` — that
+The canonical install target is `wattpost.cloud/app`, that
 PWA's start_url is the fleet dashboard, push registers at the
 SaaS origin so alerts from any paired appliance fire, and the
 alerts inbox + account live inside the same install.
@@ -2010,7 +2010,7 @@ served via the broker), an early head-script strips the manifest
 link, apple-touch-icon, apple-mobile-web-app meta tags, and
 sets a flag that blocks SW registration further down the page.
 LAN access (192.168.x.x, .local, etc.) still installs the
-appliance PWA — that's still valid for the offline-first /
+appliance PWA, that's still valid for the offline-first /
 no-cloud user.
 
 ## [0.1.42] · 2026-05-22
@@ -2031,7 +2031,7 @@ for hours.
 
 **BLE-adapter-wedged surfacing.** The shared Victron scanner now
 tracks "did we receive ANY advertisement since scan-start" (not
-just Victron payloads — any advert proves the dongle is delivering
+just Victron payloads, any advert proves the dongle is delivering
 data). After 30s of zero callbacks the adapter is flagged
 `wedged`. Heartbeat extras carries the state field
 (`ble_adapter_state ∈ {ok, warming, wedged, idle}`); the cloud's
@@ -2053,7 +2053,7 @@ v0.1.41/0.1.42.
 **Fix once:** unplug the USB Bluetooth dongle from the appliance,
 wait 10 seconds, plug it back in. Soft resets (`systemctl restart
 bluetooth`, container restart, even VM reboots) often don't fully
-clear Realtek firmware state — a physical power-cycle does.
+clear Realtek firmware state, a physical power-cycle does.
 
 ## [0.1.41] · 2026-05-22
 
@@ -2062,7 +2062,7 @@ clear Realtek firmware state — a physical power-cycle does.
 The orchestrator's transport-liveness check assumed every transport
 exposed a GATT-style `_client` attribute with `is_connected`. The
 passive BLE-advertise listeners that drive Victron Instant Readout
-(IP22, SmartShunt, SmartSolar, etc.) deliberately don't — they
+(IP22, SmartShunt, SmartSolar, etc.) deliberately don't, they
 subscribe to a shared BlueZ scanner. So:
 
 ```python
@@ -2077,7 +2077,7 @@ deregistered the discovery filter, the listener rearmed, and
 adverts arriving during the settle window were silently lost.
 
 On most installs we'd still decode something in each 60 s
-window — Victron broadcasts every ~5 s, so the dropouts were
+window, Victron broadcasts every ~5 s, so the dropouts were
 brief enough to be invisible. On the Garage Stack appliance
 (Proxmox VM, USB-passed-through dongle) the timing's worse,
 and the loop killed every IP22 advert for 2+ hours before this
@@ -2092,7 +2092,7 @@ lifecycle; the orchestrator no longer interferes.
 ### Fixed · charger_state pill now reflects the bank, not whichever charger sorted first
 
 On a multi-charger install (MPPT + AC charger + DC-DC) different
-chargers can be in different stages at the same instant — MPPT
+chargers can be in different stages at the same instant, MPPT
 in absorption while the AC charger is still in bulk, or vice
 versa. Today we picked whichever charger sorted first by label
 in `get_latest()`, so the pill was effectively alphabetical
@@ -2103,7 +2103,7 @@ online charger:
 
   `bulk > mppt > absorption > equalize > float > storage > low_power > off > fault`
 
-If ANY charger is in bulk, the pill says bulk — matches the
+If ANY charger is in bulk, the pill says bulk, matches the
 user's mental model ("is my bank charging hard right now or
 just maintaining?"). Silent devices (≥10 min since last
 broadcast) are excluded so a dead BLE radio's stale "bulk"
@@ -2122,7 +2122,7 @@ stop broadcasting during float / storage stages):
   without any recency check, so an IP22 that broadcast `bulk`
   before going quiet kept showing as "bulk" on
   wattpost.cloud/app indefinitely. Now skips devices whose
-  `_last_seen` is more than 10 min old — same threshold the
+  `_last_seen` is more than 10 min old, same threshold the
   Devices snapshot uses for the online flag.
 - **Power Flow tile rendered a phantom "Other source · estimated"**:
   when reconciliation found unattributed watts flowing into the
@@ -2139,7 +2139,7 @@ stop broadcasting during float / storage stages):
 ### Changed · appliance ships device snapshot in heartbeat extras
 
 Each heartbeat now includes a `devices` field listing up to 8
-devices the appliance is polling — name, vendor, kind, online
+devices the appliance is polling, name, vendor, kind, online
 flag, and one headline value (battery SoC, charger PV power,
 shunt current, etc.). Capped at ~400 bytes total to stay
 inside the 2 KiB extras budget.
@@ -2147,7 +2147,7 @@ inside the 2 KiB extras budget.
 This powers the **Devices** section on the mobile per-site
 dashboard at `wattpost.cloud/app/site/{id}` so a Pro / Installer
 user opening the app sees their Renogy MPPT, JK BMS, and Victron
-shunt on one screen — without needing to open the appliance's
+shunt on one screen, without needing to open the appliance's
 own dashboard. Older appliances (≤0.1.37) keep working; the
 cloud simply hides the section when the field is absent.
 
@@ -2166,7 +2166,7 @@ appliance now hides:
   Account tab)
 
 Side effect: standalone PWA users on the appliance's local URL
-see the original layout — only the `WattPostApp/` UA flips this.
+see the original layout, only the `WattPostApp/` UA flips this.
 
 Cache-busters: `app.js?v=185`, `styles.css?v=122`,
 `sw.js CACHE_VERSION` → `wattpost-v98-app185-css122`.
@@ -2181,7 +2181,7 @@ the system status bar / display cutout no longer draws on top of
 the brand + Healthy pill + help button when the dashboard
 renders inside the Capacitor WebView (or any other mobile shell
 that opts into edge-to-edge layout). Desktop browsers see no
-change — `env()` resolves to 0.
+change, `env()` resolves to 0.
 
 Caught during the first WattPost mobile-app emulator test.
 
@@ -2197,7 +2197,7 @@ head dot independently shows whether the bank is charging (green
 pulse) or discharging (amber pulse).
 
 The visible case this unlocks: a bank at 11 % SoC that's actively
-charging shows a red ring (still low — don't sugarcoat it) with a
+charging shows a red ring (still low, don't sugarcoat it) with a
 green pulsing head (we're recovering). Before this change the
 head was red too, masking the recovery signal.
 
@@ -2211,16 +2211,16 @@ green and amber.
 
 Remote access via WattPost now goes through `wattpost.cloud` (pair
 your appliance, then use the cloud broker URL). The in-app
-Tailscale wiring — Settings → Network panel, install.sh sudoers
-fragment, /api/system/tailscale/* endpoints, MOTD URL — is all
+Tailscale wiring, Settings → Network panel, install.sh sudoers
+fragment, /api/system/tailscale/* endpoints, MOTD URL, is all
 gone in this release.
 
 If you were using Tailscale as your remote-access path, you have
 two choices:
-1. **Pair with wattpost.cloud** (recommended — handles HTTPS,
+1. **Pair with wattpost.cloud** (recommended, handles HTTPS,
    auth, no port-forwarding). Free Hobby tier covers one site.
    See docs/remote-access.md.
-2. **Run Tailscale yourself** — `curl -fsSL https://tailscale.com/install.sh | sh`
+2. **Run Tailscale yourself**, `curl -fsSL https://tailscale.com/install.sh | sh`
    on the appliance host, then `sudo tailscale up`. The WattPost
    daemon no longer manages it but doesn't conflict with it
    either.
@@ -2235,7 +2235,7 @@ the next `install.sh` run (which the auto-updater does anyway).
 `pv_today_wh` was reading MAX of the device's running counter,
 which doesn't reset on UTC midnight (it follows the MPPT's own
 clock). On a fresh morning poll the appliance was reporting
-~940 Wh of "harvested today" at 06:00 — yesterday's accumulated
+~940 Wh of "harvested today" at 06:00, yesterday's accumulated
 total bleeding through. Replaced with a positive-delta walk over
 ordered samples that resets cleanly on counter rollback. Live
 verified: 940 → 12 Wh on a real install.
@@ -2243,7 +2243,7 @@ verified: 940 → 12 Wh on a real install.
 ### Fixed · cloud broker "Open" intermittent white screen
 
 `broker_can_access` was checking the ASGI scope peer IP and
-rejecting requests it didn't recognise — but behind CF + Caddy
+rejecting requests it didn't recognise, but behind CF + Caddy
 that field intermittently reports a Cloudflare edge IP
 (141.101.x, 162.158.x) instead of the proxy. About 30 % of
 brokered requests were 403'ing as a result, surfacing to
@@ -2264,7 +2264,7 @@ freezing the panel.
 ### Fixed · cloud backup gate bypass on LIST endpoint
 
 The Hobby-tier cloud backup feature gate was applied to the
-UPLOAD endpoint but not the LIST endpoint — a Hobby user could
+UPLOAD endpoint but not the LIST endpoint, a Hobby user could
 toggle backups on in the UI and the appliance would happily
 list (empty) cloud backups, masking the upgrade prompt.
 LIST now honours `is_staff` / `is_comped` the same way UPLOAD
@@ -2283,7 +2283,7 @@ and kiosk exit-button hide-logic long after `docker compose pull`.
 `sentry-sdk` is now wired into the cloud Litestar app behind a
 `SENTRY_DSN` env var (silent no-op if unset). Catches 5xx
 tracebacks + integrates with Litestar + the logging chain.
-DSN is paste-only at the VPS — code path is live.
+DSN is paste-only at the VPS, code path is live.
 
 ## [0.1.32] · 2026-05-20
 
@@ -2314,7 +2314,7 @@ emit until they upgrade.
 of the raw `X-WP-Broker-Auth` header on non-ok verdicts. Lets
 operators diagnose cloud↔appliance wire-format drift without
 re-instrumenting the daemon. Captured only on `bad-format`,
-`bad-mac`, or `expired` — zero overhead on the happy path. Ring
+`bad-mac`, or `expired`, zero overhead on the happy path. Ring
 stays local: behind appliance auth, never leaves the box.
 
 ## [0.1.31] · 2026-05-20
@@ -2336,7 +2336,7 @@ What this gets you:
 - A bad release parks you on the previous working version within
   ~60s, no SSH required.
 - Installer-tier accounts can flip "Auto-apply updates fleet-wide"
-  on the cloud dashboard — zero-touch updates across every site,
+  on the cloud dashboard, zero-touch updates across every site,
   with the same safety net per appliance.
 
 New surface:
@@ -2356,7 +2356,7 @@ New surface:
 
 - `solar_monitor.cli._resolve_db_path` and `storage.sqlite.open`
   both choked on `:memory:` (treated as a filesystem path).
-  Fixed — SQLite-special paths now pass through verbatim. Needed
+  Fixed, SQLite-special paths now pass through verbatim. Needed
   by the atomic-swap health probe.
 - Cloudflare was caching `releases.wattpost.io/source/latest.tar.gz`
   longer than `publish-source.yml` expected, leaving the tarball
@@ -2369,12 +2369,12 @@ New surface:
 ### Fixed
 
 - **`wattpost-update` was silently doing nothing on Pi installs**
-  — `pyproject.toml` hardcodes `version = "0.0.1"` while the
+ , `pyproject.toml` hardcodes `version = "0.0.1"` while the
   daemon's `__version__` bumps in `solar_monitor/__init__.py`.
   pip's `--upgrade` saw "0.0.1 already installed, skip" and did
   not swap the venv contents. The on-disk source got swapped, the
   `/etc/wattpost/version` file got rewritten, and the UI said
-  "updated to vX.Y.Z" — but the running code stayed on whatever
+  "updated to vX.Y.Z", but the running code stayed on whatever
   the user originally installed. install.sh now passes
   `--force-reinstall --no-deps` so the venv actually moves. Verified
   end-to-end on a fresh Ubuntu host (v0.1.28 → v0.1.29 round-trip
@@ -2394,15 +2394,15 @@ New surface:
 
 Fleet visibility for the un-paired population. The appliance
 generates a random UUID at first boot (`/var/lib/wattpost/install-id`),
-then once a day — piggy-backed onto the existing update-check —
+then once a day, piggy-backed onto the existing update-check,
 POSTs three fields to `wattpost.cloud/api/local_installs/beacon`:
 the install_id, the daemon version, and `pi` vs `docker`.
 Cloudflare's country header is read server-side and persisted as
 a 2-letter ISO code; no IP, no email, no MAC, no battery data.
 
 Default ON. Opt out with `local_telemetry.enabled: false` in
-`config.yaml` (the update check still fires — we need it for the
-`Update available` badge — just without the install_id query).
+`config.yaml` (the update check still fires, we need it for the
+`Update available` badge, just without the install_id query).
 
 Customer-visible: a new `Privacy & telemetry` page in the docs
 spelling out every outbound flow and how to switch each one off.
@@ -2413,18 +2413,18 @@ Overview tile showing total / 7-day-active / version distribution
 
 ### Fixed
 
-- **`/api/snapshot` 500 in demo mode** — `build_snapshot` accessed
+- **`/api/snapshot` 500 in demo mode**, `build_snapshot` accessed
   `self._poller._transports` directly, but the synthetic poller
   used in demo / dev installs has no such attribute. Defaults
   configured/open transport counts to 0 when the poller doesn't
   expose them. Found during the appliance smoke sweep.
-- **Appliance 500s now log the traceback** — added an
+- **Appliance 500s now log the traceback**, added an
   `after_exception` hook on the Litestar app so unhandled
   exceptions print the full stack to stdout instead of vanishing
   into a generic "500 Internal Server Error". Mirrors what cloud
   got in #194; the snapshot bug above is what made the gap
   obvious.
-- **install.sh on non-Pi Debian/Ubuntu hosts** — the systemd unit
+- **install.sh on non-Pi Debian/Ubuntu hosts**, the systemd unit
   declares `SupplementaryGroups=bluetooth`, which fails with
   `216/GROUP` and crash-loops the daemon on hosts where bluez
   hasn't created the group yet (notably Ubuntu Server cloud-init
@@ -2439,14 +2439,14 @@ Overview tile showing total / 7-day-active / version distribution
 Third of the SaaS polish trio (after the alerts inbox #206 and
 the energy analytics page #207). The admin portal gets:
 
-- **Overview tab** — release adoption (% of fleet on each daemon
+- **Overview tab**, release adoption (% of fleet on each daemon
   version, sourced from `appliance.appliance_version` which
   heartbeat ingest already keeps fresh) plus a billing block
   (tier breakdown, subscription-state breakdown, estimated MRR
   from the local DB, recent cancels in last 30 days).
 - **Reset 2FA** button per user. Clears `totp_secret` +
   `totp_enabled_at` so the user can re-enrol on next login.
-  Doesn't drop `require_2fa` — losing your phone isn't a get-
+  Doesn't drop `require_2fa`, losing your phone isn't a get-
   out-of-policy card. Audit-logged.
 - **Comp month** button per appliance. Pushes
   `subscription_current_period_end` out by 30 days without
@@ -2482,7 +2482,7 @@ Plumbing:
 ### Fixed
 
 - Cloud alerts API was using `Appliance.owner_user_id` (the field
-  doesn't exist — the correct column is `owner_id`). Would have
+  doesn't exist, the correct column is `owner_id`). Would have
   500'd every request to the inbox; corrected before any traffic
   hit it.
 
@@ -2490,7 +2490,7 @@ Plumbing:
 
 ### Added · #206 Cloud alerts inbox (cross-site feed)
 
-New `/app/alerts` page in the cloud SaaS — chronological feed of
+New `/app/alerts` page in the cloud SaaS, chronological feed of
 every alert fired by any appliance the signed-in user owns.
 Filter by site, severity, read/unread. Mark-as-read individually
 or in bulk. Topbar gets an "Alerts" link with an unread-count
@@ -2526,13 +2526,13 @@ night".
 
 Five new vendor drivers shipped from public protocol docs +
 community reverse engineering. All marked **pending community
-validation** — first customer report against real hardware
+validation**, first customer report against real hardware
 becomes the real-world confirmation. Synthetic-frame smoke
 tests in `scripts/verify_new_drivers.py` lock the parse + field
 mapping in place so any regression shows up before customers
 see it.
 
-- **#201 JBD / Overkill Solar BMS.** Highest-impact unlock —
+- **#201 JBD / Overkill Solar BMS.** Highest-impact unlock,
   covers the BMS inside most cheap LFP packs (Battle Born,
   LiTime, Power Queen, many Eco-Worthy SKUs, anything sold
   rebranded with a "Smart BMS" app sticker). BLE GATT, FF00
@@ -2584,7 +2584,7 @@ add a Victron device over cable:
 ### Docs · README refresh
 
 The top-level README was still saying "Renogy and, soon, Victron
-and JK-BMS" and "Victron SmartShunt awaits hardware" — both
+and JK-BMS" and "Victron SmartShunt awaits hardware", both
 v0.0.x-era. Refreshed: top section reflects what actually ships,
 component table is current through v0.1.23, the architecture
 tree shows the new transport + adapter layers (smart_plug,
@@ -2598,10 +2598,10 @@ A second read path for Victron alongside BLE Instant Readout, for
 metal-van installs and dense-RF environments where BLE isn't
 reliable. Three device-kind drivers:
 
-- **VictronVeDirectShunt** — SmartShunt + BMV-700 / 702 / 712
-- **VictronVeDirectMppt** — SmartSolar MPPT (every model with a
+- **VictronVeDirectShunt**, SmartShunt + BMV-700 / 702 / 712
+- **VictronVeDirectMppt**, SmartSolar MPPT (every model with a
   VE.Direct port)
-- **VictronVeDirectPhoenix** — Phoenix Inverter VE.Direct (the
+- **VictronVeDirectPhoenix**, Phoenix Inverter VE.Direct (the
   small pure-sine line; MultiPlus / Quattro need VE.Bus + MK3
   and stay out of scope)
 

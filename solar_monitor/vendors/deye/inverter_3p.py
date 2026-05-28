@@ -5,7 +5,7 @@ Covers:
   * Sunsynk Max-15K / Max-20K
   * Sol-Ark 15K-3P
   * Sunsynk Max 3-Phase LV variants (share the common register
-    block at 500..689 — the HV-vs-LV diff is mostly battery-side
+    block at 500..689, the HV-vs-LV diff is mostly battery-side
     enums, not the live-watts surface this driver covers).
 
 Modbus RTU, holding registers (FC03), 9600 8N1, slave 1.
@@ -14,7 +14,7 @@ Register map (decimal, holding registers):
 
     Reg  Field                       Scale    Unit  Notes
     ---  --------------------------- -------- ----- ------------------
-    500  device_status               enum     —     same enum as 1P
+    500  device_status               enum    ,     same enum as 1P
     540  dc_transformer_temperature  ×0.1     °C
     541  radiator_temperature        ×0.1     °C
     586  battery_temperature         ×0.1     °C
@@ -45,7 +45,7 @@ Register map (decimal, holding registers):
 
 Footguns vs the single-phase variant:
   * battery_voltage on 3P is ÷10 (vs ÷100 on 1P). Easy mistake.
-  * battery_power on 3P is ×–10 — wire-value is in deci-watts.
+  * battery_power on 3P is ×–10, wire-value is in deci-watts.
     Multiply raw by 10 BEFORE sign-flipping.
   * PV powers on 3P are POSITIVE deci-watts (×10), not sign-flipped
     watts like 1P. Same protocol family, different conventions.
@@ -90,7 +90,7 @@ def _parse_temps(bs: bytes) -> dict[str, Any]:
 def _parse_battery(bs: bytes) -> dict[str, Any]:
     """Reg 586..591, 6 words. Battery temp / V / SoC / power /
     current. Note the per-register scale differences vs single-phase
-    — battery_voltage is ÷10 here (not ÷100), battery_power is in
+   , battery_voltage is ÷10 here (not ÷100), battery_power is in
     deci-watts and sign-flipped (×–10)."""
     out: dict[str, Any] = {}
     out["battery_temperature_c"] = round(s16(bs, 3) / 10.0, 1)

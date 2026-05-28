@@ -1,4 +1,4 @@
-"""Generic HTTP webhook transport — POST/PUT a JSON payload to any URL.
+"""Generic HTTP webhook transport, POST/PUT a JSON payload to any URL.
 
 Escape hatch for users plugging into their own systems (Zapier, n8n,
 Home Assistant webhook, IFTTT, a homemade Lambda…). Payload shape is

@@ -1,4 +1,4 @@
-"""JBD BMS driver — read-only, all fields from cmd 0x03 + 0x04.
+"""JBD BMS driver, read-only, all fields from cmd 0x03 + 0x04.
 
 Field semantics taken from the Overkill Solar reference doc + the
 canonical JBD protocol PDF that ships with the BMS. Multi-byte
@@ -19,7 +19,7 @@ cmd 0x03 (basic info) payload layout:
                                   we surface the raw int)
     12      2     balance_status_low  (bit per cell)
     14      2     balance_status_high (bit per cell)
-    16      2     protection_status   (bit flags — over/under V,
+    16      2     protection_status   (bit flags, over/under V,
                                        over/under T, over-current,
                                        short, IC error, …)
     18      1     software_version (BCD)
@@ -97,7 +97,7 @@ class JbdBms(DeviceDriver):
         }
         if not hasattr(transport, "get_latest_frame"):
             result["_errors"] = [
-                "wrong transport type — JBD BMS requires ble_jbd"
+                "wrong transport type, JBD BMS requires ble_jbd"
             ]
             return result
 
@@ -164,7 +164,7 @@ class JbdBms(DeviceDriver):
             key = "temperature_c" if i == 0 else f"temperature_{i}_c"
             result[key] = temp_c
 
-        # Protection bits — surfaced as a comma-joined list of the
+        # Protection bits, surfaced as a comma-joined list of the
         # active conditions plus the raw bitmask for power users.
         active = [name for bit, name in _PROTECTION_BITS.items()
                   if protection & (1 << bit)]

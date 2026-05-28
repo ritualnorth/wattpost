@@ -7,7 +7,7 @@ time the engine starts.
 from .base import AlertEvent, AlertRule, NotificationTransport
 from .engine import AlertEngine, build_alert_context
 from .registry import NOTIFICATION_TRANSPORTS, register_notification_transport
-from . import transports  # noqa: F401 — registers built-in transports
+from . import transports  # noqa: F401, registers built-in transports
 
 __all__ = [
     "AlertEvent",

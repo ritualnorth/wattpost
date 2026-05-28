@@ -13,7 +13,7 @@ What this does:
        * cloud_ca_chain.pem      (CA chain to verify cloud's TLS)
   3. Detect upcoming expiry and re-issue when <30 days remain.
 
-What this does NOT do (yet — Phase 6B-B):
+What this does NOT do (yet, Phase 6B-B):
 
   * Switch heartbeats / internal API calls to use the mTLS client.
     That requires a coordinated change: Caddy listener configured
@@ -24,7 +24,7 @@ What this does NOT do (yet — Phase 6B-B):
 We deliberately avoid taking a dep on `cryptography` (heavy native
 package). PyNaCl already gives us the raw ed25519 seed bytes, and
 the PKCS#8 v1 encoding for ed25519 is a fixed 16-byte ASN.1 prefix
-followed by the raw seed — small enough to construct by hand. The
+followed by the raw seed, small enough to construct by hand. The
 leaf cert (PEM) is returned by the cloud and stored as-is; we never
 need to parse it on the appliance.
 """
@@ -190,7 +190,7 @@ _PEM_RE = re.compile(
 
 def _looks_like_pem_chain(pem: str) -> bool:
     """Loose validation that the response body looks like one or
-    more PEM certs. We don't parse — that's the responsibility of
+    more PEM certs. We don't parse, that's the responsibility of
     the eventual TLS stack."""
     return bool(_PEM_RE.search(pem or ""))
 
@@ -199,7 +199,7 @@ async def ensure_cert(*, endpoint: str, bearer_token: str) -> bool:
     """If a fresh cert exists, return True without contacting cloud.
     Otherwise POST to /api/internal/identity/v2/mtls/issue, persist
     the response materials, and return True. Returns False on any
-    network / cloud-side failure (a Phase 1 keypair must exist —
+    network / cloud-side failure (a Phase 1 keypair must exist,
     callers should run this AFTER /upgrade succeeds)."""
     if not needs_renewal():
         return True
@@ -207,7 +207,7 @@ async def ensure_cert(*, endpoint: str, bearer_token: str) -> bool:
     try:
         kp = _keypair.load_or_create()
     except Exception:
-        log.exception("mtls: keypair load failed — cannot request cert")
+        log.exception("mtls: keypair load failed, cannot request cert")
         return False
 
     url = f"{endpoint.rstrip('/')}/api/internal/identity/v2/mtls/issue"
@@ -219,10 +219,10 @@ async def ensure_cert(*, endpoint: str, bearer_token: str) -> bool:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             r = await client.post(url, json={}, headers=headers)
     except Exception as e:
-        log.warning("mtls: /issue request failed: %s — will retry next boot", e)
+        log.warning("mtls: /issue request failed: %s, will retry next boot", e)
         return False
     if r.status_code == 404:
-        log.debug("mtls: cloud endpoint 404 — older deploy, will skip")
+        log.debug("mtls: cloud endpoint 404, older deploy, will skip")
         return False
     if r.status_code >= 400:
         log.warning("mtls: /issue HTTP %s: %s", r.status_code, r.text[:200])
@@ -243,7 +243,7 @@ async def ensure_cert(*, endpoint: str, bearer_token: str) -> bool:
         log.warning("mtls: /issue response missing required fields")
         return False
     if not _looks_like_pem_chain(cert_pem) or not _looks_like_pem_chain(ca_pem):
-        log.warning("mtls: /issue returned non-PEM body — refusing to persist")
+        log.warning("mtls: /issue returned non-PEM body, refusing to persist")
         return False
 
     # Re-derive PKCS#8 from the SAME ed25519 seed our keypair has.

@@ -12,7 +12,7 @@ def s16(b: bytes, off: int) -> int:
 
 
 def u32(b: bytes, off: int) -> int:
-    """Deye 32-bit registers: high-word first, big-endian — opposite
+    """Deye 32-bit registers: high-word first, big-endian, opposite
     of Luxpower/EG4's low-high pairing. (Kellerza calls this out
     explicitly; double-check on first probe paste because some
     older Deye firmwares reportedly ship low-first.)"""
@@ -33,7 +33,7 @@ MODE_LABELS = {
     3: "line",          # alarm (still running, just complaining)
     4: "fault",
     5: "selfcheck",     # activating
-    # 6+ : unknown — driver surfaces device_status_code for support
+    # 6+ : unknown, driver surfaces device_status_code for support
 }
 
 

@@ -11,7 +11,7 @@ upgrade response:
       "registered_at":        "2026-05-24T10:21:33+00:00"
     }
 
-These are all public values — nothing sealed; plain JSON. Lives next
+These are all public values, nothing sealed; plain JSON. Lives next
 to the sealed keypair under /var/lib/wattpost/keys/ so the on-disk
 identity surface is one directory.
 """
@@ -47,12 +47,12 @@ def load() -> OidcConfig | None:
     except FileNotFoundError:
         return None
     except OSError as e:
-        log.warning("oidc_config: read failed (%s) — treating as missing", e)
+        log.warning("oidc_config: read failed (%s), treating as missing", e)
         return None
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as e:
-        log.warning("oidc_config: %s corrupt JSON — ignoring (%s)",
+        log.warning("oidc_config: %s corrupt JSON, ignoring (%s)",
                     OIDC_CONFIG_PATH, e)
         return None
     try:
@@ -64,7 +64,7 @@ def load() -> OidcConfig | None:
             registered_at=data["registered_at"],
         )
     except KeyError as e:
-        log.warning("oidc_config: %s missing key %s — ignoring", OIDC_CONFIG_PATH, e)
+        log.warning("oidc_config: %s missing key %s, ignoring", OIDC_CONFIG_PATH, e)
         return None
 
 

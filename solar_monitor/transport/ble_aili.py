@@ -29,7 +29,7 @@ Frame layout (20 bytes, all big-endian unless flagged):
     byte  11     soc_pct         0-100
     byte  12     temperature_c   signed int8 (offset 0 actually,
                                  but some AiLi rebrands offset by 50
-                                 — we use raw signed first; future
+                                , we use raw signed first; future
                                  community report can disambiguate)
     bytes 13-14  time_to_go      minutes (uint16); 0xFFFF = unknown
     bytes 15-18  cumulative_mAh  uint32 (charge counter)
@@ -37,7 +37,7 @@ Frame layout (20 bytes, all big-endian unless flagged):
 
 Different AiLi rebrands sometimes swap bytes 12 and 13, and the
 checksum is sometimes XOR rather than sum. We accept either form
-on receive — first customer report can lock in which variant.
+on receive, first customer report can lock in which variant.
 
 Read-only. AiLi has no documented write commands the community
 has reverse-engineered cleanly.
@@ -70,7 +70,7 @@ STALE_AFTER_SECONDS = 60.0
 def _verify_frame(buf: bytes) -> bool:
     if len(buf) != FRAME_LEN or buf[:2] != HEADER:
         return False
-    # Sum-of-bytes-mod-256 OR XOR — both are seen in the wild.
+    # Sum-of-bytes-mod-256 OR XOR, both are seen in the wild.
     body = buf[:-1]
     if (sum(body) & 0xFF) == buf[-1]:
         return True
@@ -150,7 +150,7 @@ class BleAiliTransport(Transport):
     async def request(self, frame: bytes, expected_response_len: int,
                       timeout: float = 5.0) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on ble_aili — "
+            f"{self.id}: request() is unsupported on ble_aili, "
             "drivers must override poll() and use get_latest()"
         )
 

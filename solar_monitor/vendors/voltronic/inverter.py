@@ -3,17 +3,17 @@
 Read-only. Parses the four ASCII commands every Voltronic-derived
 firmware supports:
 
-  * QPI    — protocol version (sanity check on first poll)
-  * QID    — device serial number (one-shot, cached)
-  * QMOD   — current mode (Power on / Standby / Line / Battery / Fault / eco)
-  * QPIGS  — live status, ~21 space-separated fields
-  * QPIWS  — 32-bit warning bitmap (optional, surfaced as alarm_flags)
+  * QPI   , protocol version (sanity check on first poll)
+  * QID   , device serial number (one-shot, cached)
+  * QMOD  , current mode (Power on / Standby / Line / Battery / Fault / eco)
+  * QPIGS , live status, ~21 space-separated fields
+  * QPIWS , 32-bit warning bitmap (optional, surfaced as alarm_flags)
 
-This covers the union of fields the rebadges expose — Axpert,
+This covers the union of fields the rebadges expose, Axpert,
 MPP Solar PIP/LV-MK, EG4 6000XP/6500EX, Mecer, RCT, Infinisolar,
 Anenji, Datouboss, HZSolar, Effekta, LVTopSun, PowMr, Easun. Pure
 Sine Inverter Plus and the larger three-phase units use QPIGS2 /
-QPIGS3 for additional phases — out of scope for v1, we read the
+QPIGS3 for additional phases, out of scope for v1, we read the
 first phase only.
 
 Marked experimental because individual firmware variants diverge
@@ -63,7 +63,7 @@ def parse_qpigs(payload: bytes) -> dict[str, Any]:
 
     Schema follows the Voltronic Inverter Communication Protocol v3.6.
     Fields past column 16 vary by firmware so we treat them as best-
-    effort and never raise on a short response — partial state is
+    effort and never raise on a short response, partial state is
     better than no state.
     """
     text = payload.decode("ascii", errors="replace")
@@ -186,7 +186,7 @@ class VoltronicInverter(DeviceDriver):
         }
         if not hasattr(transport, "query"):
             result["_errors"] = [
-                "wrong transport type — Voltronic inverter requires usbhid_voltronic"
+                "wrong transport type, Voltronic inverter requires usbhid_voltronic"
             ]
             return result
 

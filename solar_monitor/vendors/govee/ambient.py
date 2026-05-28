@@ -1,4 +1,4 @@
-"""Govee thermo-hygrometer driver — passive BLE."""
+"""Govee thermo-hygrometer driver, passive BLE."""
 from __future__ import annotations
 
 import logging
@@ -27,7 +27,7 @@ class GoveeAmbient(DeviceDriver):
         }
         if not hasattr(transport, "get_latest"):
             result["_errors"] = [
-                "wrong transport type — Govee ambient requires "
+                "wrong transport type, Govee ambient requires "
                 "ble_govee_advertise"
             ]
             return result

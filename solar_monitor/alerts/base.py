@@ -1,4 +1,4 @@
-"""Alert primitives — rule schema, event payload, transport ABC.
+"""Alert primitives, rule schema, event payload, transport ABC.
 
 Same shapes as what the cloud tier will consume; only the *evaluator*
 differs between local and cloud.
@@ -22,7 +22,7 @@ class AlertRule(msgspec.Struct, kw_only=True):
     threshold: float
     # warn | alarm. Drives styling and ntfy priority.
     severity: str = "warn"
-    # Don't re-fire the same rule within this window — prevents alert
+    # Don't re-fire the same rule within this window, prevents alert
     # storms on flapping metrics.
     cooldown_seconds: int = 1800
     # Transport ids to dispatch this rule to (must match an entry in
@@ -60,7 +60,7 @@ def humanise_metric(dotted: str) -> str:
     Example: `bank.soc_pct` → "State of charge"."""
     if dotted in _METRIC_LABELS:
         return _METRIC_LABELS[dotted][0]
-    # Per-device metric (devices.<id>.<metric>) — pull the trailing
+    # Per-device metric (devices.<id>.<metric>), pull the trailing
     # piece and humanise the name a bit so it reads less code-like.
     tail = dotted.rsplit(".", 1)[-1]
     return tail.replace("_", " ").capitalize() or dotted
@@ -116,11 +116,11 @@ def render_alert_summary(event: "AlertEvent") -> str:
 
 
 class NotificationTransport(abc.ABC):
-    """One outbound channel — ntfy topic, Discord webhook, etc."""
+    """One outbound channel, ntfy topic, Discord webhook, etc."""
 
     id: str
 
-    async def start(self) -> None:  # noqa: D401 — keep simple lifecycle
+    async def start(self) -> None:  # noqa: D401, keep simple lifecycle
         return None
 
     async def stop(self) -> None:
@@ -129,5 +129,5 @@ class NotificationTransport(abc.ABC):
     @abc.abstractmethod
     async def send(self, event: AlertEvent) -> None:
         """Push one event to this channel. Must not raise on transient
-        failures — log + return so the engine can continue dispatching to
+        failures, log + return so the engine can continue dispatching to
         other channels."""

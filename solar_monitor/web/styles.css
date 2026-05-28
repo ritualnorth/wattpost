@@ -1,4 +1,4 @@
-/* solar-monitor — design tokens & layout
+/* solar-monitor, design tokens & layout
  * Dark by default (off-grid users live in dim places). Grid-organised,
  * generous spacing. Inspired by Cerbo GX overview + Sol-Ark flow + Solar-Assistant.
  */
@@ -17,7 +17,7 @@
   --text-2:    #9aa6b8;
   --text-3:    #6b7689;
 
-  /* Source/storage/load colors — match Cerbo GX vocabulary */
+  /* Source/storage/load colors, match Cerbo GX vocabulary */
   --pv:        #f0b429;   /* yellow = solar/PV */
   --pv-soft:   rgba(240,180,41,0.12);
   --batt:      #58a6ff;   /* blue = DC battery storage */
@@ -49,7 +49,7 @@
   --shadow: 0 2px 16px rgba(0,0,0,0.4);
   --shadow-soft: 0 1px 4px rgba(0,0,0,0.3);
 
-  /* Theme-variable surfaces — overridden in [data-theme="light"] below. */
+  /* Theme-variable surfaces, overridden in [data-theme="light"] below. */
   --header-bg:      rgba(13,17,23,0.85);
   --card-highlight: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%);
   --chart-grid:     rgba(106,118,137,0.08);
@@ -70,7 +70,7 @@
 
 /* ===== Light theme overrides =====
  * The inline script in <head> sets [data-theme="light|dark"] before paint.
- * Only properties that need to flip live here — everything else inherits
+ * Only properties that need to flip live here, everything else inherits
  * from :root.
  */
 [data-theme="light"] {
@@ -85,7 +85,7 @@
   --text-2:    #4d5868;
   --text-3:    #7a8595;
 
-  /* Source/storage/load colors — deepen slightly so they read on white */
+  /* Source/storage/load colors, deepen slightly so they read on white */
   --pv:        #b87800;
   --pv-soft:   rgba(184,120,0,0.10);
   --batt:      #0969da;
@@ -237,7 +237,7 @@ body {
 .demo-banner a:hover { text-decoration: none; }
 /* Demo mode: lock down every settings interaction up front so
  * visitors don't fill out a form just to get a 403 on save. The
- * read-only middleware is still the source of truth — this is the
+ * read-only middleware is still the source of truth, this is the
  * UX layer that signals "view only" before the click.
  *
  * Rules:
@@ -245,7 +245,7 @@ body {
  *    grey out, lose pointer-events, lose hover. Read-only stays
  *    readable, just clearly inert.
  *  - The Setup CTA card hides its button (the wizard mutates config).
- *  - Each .settings-block gets a "View only — demo mode" badge via
+ *  - Each .settings-block gets a "View only, demo mode" badge via
  *    a ::before pseudo-element, so visitors understand why.
  */
 body.is-demo .settings-block { position: relative; }
@@ -271,7 +271,7 @@ body.is-demo .settings-block .settings-toggle input {
   cursor: not-allowed;
 }
 /* Re-enable navigation-only controls the user might still click for
- * info — accordion toggles, theme picker (cosmetic), kiosk-mode
+ * info, accordion toggles, theme picker (cosmetic), kiosk-mode
  * toggle (purely a client preference, no server side). */
 body.is-demo .settings-block .theme-opt,
 body.is-demo .settings-block details > summary,
@@ -279,7 +279,7 @@ body.is-demo .settings-block [data-kiosk-toggle] {
   pointer-events: auto; opacity: 1; cursor: pointer;
 }
 /* Hide the bottom-of-page "Restart wattpost" / "Update now" CTAs
- * entirely on demo — no useful read-only view of them. */
+ * entirely on demo, no useful read-only view of them. */
 body.is-demo #settings-restart,
 body.is-demo #settings-update-apply { display: none !important; }
 
@@ -289,7 +289,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   top: 0;
   z-index: 10;
   display: flex;
-  /* Brand pushes right via margin-right:auto on .brand below — gives
+  /* Brand pushes right via margin-right:auto on .brand below, gives
      us a left-aligned brand with status + help-btn clustered on the
      right. Previously this was space-between, which left the Healthy
      pill floating in the middle once the help-btn was added (3
@@ -339,7 +339,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-/* "Sign in" affordance in the header — sits next to the status pill
+/* "Sign in" affordance in the header, sits next to the status pill
  * when there's no local session. Visual weight: pill-style like the
  * status, but uses the accent blue so it reads as a CTA. */
 .header-signin {
@@ -438,7 +438,7 @@ body.is-demo #settings-update-apply { display: none !important; }
 }
 .status-icon svg { width: 100%; height: 100%; }
 @media (max-width: 360px) {
-  /* Very narrow phones: drop the text — dot + icon say everything */
+  /* Very narrow phones: drop the text, dot + icon say everything */
   .status .text { display: none; }
   .status { padding: .35rem .55rem; }
 }
@@ -486,7 +486,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   border-bottom-color: var(--accent);
 }
 @media (max-width: 600px) {
-  /* Equal-width tabs across the full viewport on phones — no horizontal
+  /* Equal-width tabs across the full viewport on phones, no horizontal
    * scroll, no edge-flush tabs, no truncated labels.
    *
    * Icons are hidden at this breakpoint so the longest label
@@ -517,7 +517,7 @@ body.is-demo #settings-update-apply { display: none !important; }
  * Was a floating "?" FAB; lifted into the topbar so it stops competing
  * with primary dashboard tiles for screen real estate on mobile. Same
  * destination (#/docs), one-tap reachability preserved. Hidden on the
- * docs route + kiosk route — pointless to surface a shortcut to the
+ * docs route + kiosk route, pointless to surface a shortcut to the
  * page you're already on or a chrome-free wallmount.
  */
 .help-btn {
@@ -607,7 +607,7 @@ main {
   transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
   filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
 }
-/* Legacy band coloring — used by the per-pack mini donuts in the
+/* Legacy band coloring, used by the per-pack mini donuts in the
    bank-compare detail view (`.hero-donut-wrap` without a `.donut-state`
    wrapper, so the new state palette doesn't kick in). Two-class
    specificity beats the default `.donut-arc` rule so these win. */
@@ -627,7 +627,7 @@ main {
 .kiosk-donut.donut-state.discharging .donut-arc { stroke: url(#g-soc-k-discharging); }
 .kiosk-donut.donut-state.critical    .donut-arc { stroke: url(#g-soc-k-critical); }
 
-/* Leading-edge dot — small solid circle at the tip of the arc with a
+/* Leading-edge dot, small solid circle at the tip of the arc with a
    halo that pulses outward. Replaces the old rotating "ring runner"
    indicator. JS positions cx/cy on every snapshot paint. */
 .donut-head, .donut-head-glow {
@@ -637,7 +637,7 @@ main {
 .donut-head      { fill: #58a6ff; stroke: #ffffff; }
 .donut-head-glow {
   fill: rgba(88,166,255,0.55);
-  /* Animate via transform+opacity rather than the `r` attribute —
+  /* Animate via transform+opacity rather than the `r` attribute,
      iOS Safari historically didn't animate `r` via CSS, and even on
      versions that do it's silently dropped under "Reduce Motion"
      without firing the prefers-reduced-motion media query reliably
@@ -658,7 +658,7 @@ main {
 /* Decouple the leading-edge dot + halo colour from the arc colour
    when there's a non-trivial flow. The arc still reflects SoC
    severity; the head reflects flow direction. The visible case
-   this unlocks is "critical SoC, but charging" — red arc + green
+   this unlocks is "critical SoC, but charging", red arc + green
    pulsing head, telegraphing recovery without losing the "we're
    low" message. Applied only when |netW| > 5 W; the holding band
    keeps its neutral blue head. */
@@ -866,17 +866,17 @@ main {
 }
 .panel > * { position: relative; z-index: 1; }
 
-/* Flow panel — PV yellow on the left fading into battery blue on the right */
+/* Flow panel, PV yellow on the left fading into battery blue on the right */
 .panel:has(#flow) {
   --panel-tint:
     linear-gradient(95deg, rgba(240,180,41,0.07) 0%, rgba(240,180,41,0) 35%),
     radial-gradient(circle at 100% 100%, rgba(88,166,255,0.06), transparent 60%);
 }
-/* Today panel — warm energy-accounting tint */
+/* Today panel, warm energy-accounting tint */
 .today-panel {
   --panel-tint: linear-gradient(135deg, rgba(210,153,34,0.06), rgba(210,153,34,0) 70%);
 }
-/* Cell-balance panel — green by default, amber on drift, red on bad */
+/* Cell-balance panel, green by default, amber on drift, red on bad */
 #panel-cells { --panel-tint: linear-gradient(180deg, rgba(63,185,80,0.05), transparent 50%); }
 #panel-cells.drift-warn  { --panel-tint: linear-gradient(180deg, rgba(210,153,34,0.07), transparent 55%); }
 #panel-cells.drift-alarm { --panel-tint: linear-gradient(180deg, rgba(248,81,73,0.08), transparent 55%); }
@@ -900,7 +900,7 @@ main {
   color: var(--text-2);
 }
 
-/* Inline-SVG icon containers — make any SVG child fill its parent.
+/* Inline-SVG icon containers, make any SVG child fill its parent.
  * Without this, SVGs rendered without width/height attributes collapse
  * to 0×0 inside our span wrappers and the icon never shows. */
 .dev-card-icon svg,
@@ -958,7 +958,7 @@ main {
 @media (max-width: 720px) {
   /* Portrait phones: stack vertically. Connector becomes a vertical
    * column with a thicker line, chunky down-triangle, and the W label
-   * as a centered pill on the line — same pattern as Cerbo / Sol-Ark /
+   * as a centered pill on the line, same pattern as Cerbo / Sol-Ark /
    * Powerwall apps. */
   .flow {
     flex-direction: column;
@@ -974,7 +974,7 @@ main {
     min-height: 0;
     align-self: stretch;
     padding: 0;
-    /* abandon row-flex layout used elsewhere — children are absolutely
+    /* abandon row-flex layout used elsewhere, children are absolutely
      * positioned within this container */
     display: block;
   }
@@ -985,7 +985,7 @@ main {
     height: auto !important;
     display: block !important;
   }
-  /* Vertical line — thicker, rounded ends */
+  /* Vertical line, thicker, rounded ends */
   .flow-arrow::before {
     content: "";
     position: absolute !important;
@@ -1025,7 +1025,7 @@ main {
      We beat the landscape rule via the .flow-conn parent (specificity
      0,3,0 vs 0,2,0) rather than !important. CSS animations are *lower*
      priority than !important author rules, so flagging `top` important
-     would freeze the dot at top:0 — exactly the bug we're fixing. */
+     would freeze the dot at top:0, exactly the bug we're fixing. */
   .flow-conn .flow-arrow.active .dot {
     width: 9px; height: 9px;
     background: var(--to);
@@ -1067,7 +1067,7 @@ main {
 /* Kiosk view always renders the flow vertically, regardless of viewport.
  * The host's column can be wide on a landscape tablet, but stacking is
  * still the right read at a distance. Same rules as the portrait
- * @media block above — applied via parent selector instead of viewport
+ * @media block above, applied via parent selector instead of viewport
  * width. Properties that are also defined in the @media use the same
  * !important / specificity tricks (.flow-conn parent for the dot). */
 .kiosk-flow .flow {
@@ -1087,7 +1087,7 @@ main {
   padding: 0;
   display: block;
 }
-/* No chevron / arrowhead in kiosk — the tile order (Solar → Battery →
+/* No chevron / arrowhead in kiosk, the tile order (Solar → Battery →
    Load) already encodes direction, and at this scale any explicit arrow
    reads as a blob. Just a clean vertical line, slightly thicker, with
    the gradient colour when active. */
@@ -1106,7 +1106,7 @@ main {
   display: block !important;
 }
 /* Single canonical line rule: top→bottom symmetric, dead-centre
-   horizontally. Source order matters here — having two ::before rules
+   horizontally. Source order matters here, having two ::before rules
    meant the later one's bottom:16px (held over from when we had a
    chevron at the bottom of the connector) was making the line look
    off-centre vertically. */
@@ -1124,14 +1124,14 @@ main {
   transform: translateX(-50%) !important;
 }
 /* (chevron-style ::after / .active::after live earlier in this file
-   under the @media (max-width: 720px) override section — don't add a
+   under the @media (max-width: 720px) override section, don't add a
    filled-triangle duplicate here, it would win the cascade by virtue
    of being later in source order.) */
 .kiosk-flow .flow-arrow.active::before {
   background: linear-gradient(180deg, var(--from), var(--to));
 }
 /* The 9px haloed dot rendered as a chunky pin at the top of the
-   connector — its glow leaked into the tile above and dominated the
+   connector, its glow leaked into the tile above and dominated the
    whole connector. At kiosk distance the colour-graded line +
    chevron already convey direction; the dot is noise. Hide it. */
 .kiosk-flow .flow-conn .flow-arrow.active .dot {
@@ -1188,7 +1188,7 @@ main {
   background: transparent;
   border-left-color: var(--to);
 }
-/* Drop the chunky arrow-head from the flow strip — line + moving dot
+/* Drop the chunky arrow-head from the flow strip, line + moving dot
    already convey direction, and the filled triangle reads as visual
    noise at every scale we tried. */
 .flow-arrow::after { display: none !important; }
@@ -1196,7 +1196,7 @@ main {
    leave room for. The dot animation already uses calc(100% - 12px)
    for its travel range, so it stays within the line. Landscape uses
    right:0 (horizontal connector); portrait used bottom:16px to leave
-   room for the down-triangle — now reclaimed as bottom:2px. */
+   room for the down-triangle, now reclaimed as bottom:2px. */
 .flow-arrow::before {
   right: 0 !important;
   bottom: 2px !important;
@@ -1221,7 +1221,7 @@ main {
   90%  { opacity: 1; }
   to   { left: calc(100% - 12px); opacity: 0; }
 }
-/* Portrait connector's vertical-dot keyframes — defined at the top level
+/* Portrait connector's vertical-dot keyframes, defined at the top level
    (not inside the @media block) because Safari ≤17 is finicky about
    resolving keyframes references that are scoped to a conditional rule.
    The 9px reservation at the end was 22px when there was a down-
@@ -1240,7 +1240,7 @@ main {
   color: var(--text-2);
 }
 
-/* Silent device — Victron BLE driver reports advertisement_age_s > 60.
+/* Silent device, Victron BLE driver reports advertisement_age_s > 60.
  * The tile is still shown (the device is configured) but visually muted
  * so the user knows "we have nothing live here" rather than reading
  * the frozen wattage as real. See #171. */
@@ -1280,7 +1280,7 @@ main {
   color: var(--tile-color, var(--text-3));
   flex-shrink: 0;
 }
-/* Large watermark icon in the tile background — drives most of the
+/* Large watermark icon in the tile background, drives most of the
  * visual identity of each tile without crowding the numbers */
 .flow-tile-bg-icon {
   position: absolute;
@@ -1311,7 +1311,7 @@ main {
   z-index: 1;
 }
 .flow-tile-val .unit { font-size: .9rem; color: var(--text-2); margin-left: 2px; font-weight: 500; }
-/* Signed power values shift color with direction — same green/amber
+/* Signed power values shift color with direction, same green/amber
    cue the donut uses, so the eye picks up "gaining vs losing" without
    reading the sign. */
 .flow-tile-val.power-charging    { color: var(--green); }
@@ -1489,13 +1489,13 @@ main {
 .flow-svg-v2 {
   width: 100%;
   height: auto;
-  max-height: 320px;            /* up from 290 — bigger viewBox 440×290 */
+  max-height: 320px;            /* up from 290, bigger viewBox 440×290 */
   display: block;
   margin: -0.25rem auto 0;
 }
 .flow-svg-v2 .flow-conn-v2          { fill: none; stroke: var(--border); stroke-width: 1.4; transition: stroke 0.45s ease, stroke-width 0.3s ease; }
 .flow-svg-v2 .flow-conn-v2.active   { stroke: var(--text-3); stroke-width: 1.8; }
-/* Junction node — explicit centre marker. Pulses when in/out are
+/* Junction node, explicit centre marker. Pulses when in/out are
  * roughly balanced so users see "the system is humming along" at a
  * glance, even when no individual edge is dramatic. */
 .flow-svg-v2 .flow-junction         { fill: var(--text-3); opacity: 0.65; transition: opacity 0.4s ease, r 0.4s ease; }
@@ -1504,12 +1504,12 @@ main {
   0%, 100% { opacity: 0.55; }
   50%      { opacity: 1; }
 }
-/* Idle source — power=0 right now but configured. Dimmed enough to
+/* Idle source, power=0 right now but configured. Dimmed enough to
  * step out of the user's attention without disappearing (the system
  * shape still reads correctly: "yes the AC charger is wired up, it
  * just isn't pulling anything"). */
 .flow-svg-v2 .flow-node-group.idle  { opacity: 0.32; transition: opacity 0.5s ease; }
-/* Dominant source — soft halo pulse. Whichever node is contributing
+/* Dominant source, soft halo pulse. Whichever node is contributing
  * the most W (solar at midday, battery at night) draws the eye
  * without competing with the central junction's balance pulse. */
 .flow-svg-v2 .flow-node-group.dominant .flow-node-ring {
@@ -1526,28 +1526,28 @@ main {
 .flow-svg-v2 .flow-node-clickable:hover .flow-node-ring,
 .flow-svg-v2 .flow-node-clickable:focus-visible .flow-node-ring { stroke-width: 2.6; }
 .flow-svg-v2 .flow-node-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 50%; }
-/* Battery node — keep the ring transition for smooth direction
+/* Battery node, keep the ring transition for smooth direction
  * flips. The first cut at fill-tint (v0.1.90) was too busy on top
- * of the existing ring + SoC arc + new arrow chip — pink-on-pink-
+ * of the existing ring + SoC arc + new arrow chip, pink-on-pink-
  * on-pink. Dropped in v0.1.91; ring colour + arrow do the job
  * cleaner. Class still applied in case we want to bring it back
  * with a much lighter alpha later. */
 .flow-svg-v2 .flow-node-ring-batt          { transition: stroke 0.45s ease; }
-/* Direction chip + arrow — small badge just OUTSIDE the ring
+/* Direction chip + arrow, small badge just OUTSIDE the ring
  * (past the SoC arc) showing ↓ charging / ↑ discharging. Sized
  * to read as a badge not as a competing element. */
 .flow-svg-v2 .flow-node-dir-chip            { stroke: var(--surface); stroke-width: 1.2; }
 .flow-svg-v2 .flow-node-dir-chip.batt       { fill: var(--batt, #56d364); }
 .flow-svg-v2 .flow-node-dir-chip.discharge  { fill: #f06292; }
 .flow-svg-v2 .flow-node-dir-arrow           { fill: var(--surface); stroke: none; }
-/* Battery SoC arc — thin coloured ring just outside the main ring.
+/* Battery SoC arc, thin coloured ring just outside the main ring.
  * Stroke-dashoffset is set inline on the element. Same colour
  * language as the hero SoC donut. */
 .flow-svg-v2 .flow-batt-soc-ring    { fill: none; stroke-width: 2.6; stroke-linecap: round; opacity: 0.9; transition: stroke-dasharray 0.6s ease, stroke 0.4s ease; }
 .flow-svg-v2 .flow-batt-soc-ring.batt      { stroke: var(--batt,  #56d364); }
 .flow-svg-v2 .flow-batt-soc-ring.discharge { stroke: #f06292; }
 .flow-svg-v2 .flow-batt-soc-ring.silent    { stroke: var(--text-3); opacity: 0.4; }
-/* Mid-line W label — only rendered on 3+ active edges; uses a soft
+/* Mid-line W label, only rendered on 3+ active edges; uses a soft
  * pill background so it stays legible over the gradient stroke. */
 .flow-svg-v2 .flow-segment-w        { fill: var(--text-2); font-size: 10px; font-weight: 600; pointer-events: none; }
 .flow-svg-v2 .flow-segment-w-bg     { fill: var(--surface); fill-opacity: 0.85; stroke: var(--border); stroke-width: 0.6; }
@@ -1583,14 +1583,14 @@ main {
 .flow-svg-v2 .flow-particle-v2.ac   { fill: var(--grid,  #b1b9c2); filter: drop-shadow(0 0 3px var(--grid, #b1b9c2)); }
 .flow-svg-v2 .flow-particle-v2.dc   { fill: var(--dc,    #d29922); filter: drop-shadow(0 0 3px var(--dc,   #d29922)); }
 .flow-svg-v2 .flow-particle-v2.amber{ fill: var(--amber, #f0c849); filter: drop-shadow(0 0 3px var(--amber,#f0c849)); }
-/* "discharge" — pink; reserved for the energy *leaving the battery*
+/* "discharge", pink; reserved for the energy *leaving the battery*
    on its way to the load. Distinct enough from solar yellow + AC
    grey + DC-DC amber that off-grid users can tell at a glance
    whether the load is being fed by the bank vs by sources. Same
    colour the Energy chart uses for the "Out of battery" area. */
 .flow-svg-v2 .flow-particle-v2.discharge { fill: #f06292; filter: drop-shadow(0 0 3px #f06292); }
 .flow-svg-v2 .flow-particle-v2.neutral { fill: var(--text-3); }
-/* Respect reduced motion — replace SMIL flow with a subtle dash on
+/* Respect reduced motion, replace SMIL flow with a subtle dash on
    the line so it still implies direction without animation. */
 @media (prefers-reduced-motion: reduce) {
   .flow-svg-v2 .flow-particle-v2 { display: none; }
@@ -1672,7 +1672,7 @@ main {
   min-height: 1.35em;
 }
 .flow-caption:empty { display: none; }
-/* Idle state — battery tile centered, no source/load skeletons */
+/* Idle state, battery tile centered, no source/load skeletons */
 .flow.flow--idle {
   justify-content: center;
 }
@@ -1836,7 +1836,7 @@ main {
 .chart-export-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
 .chart-export-btn svg { width: 14px; height: 14px; }
 /* ===== History chart panel ===== */
-/* No special tint — chart and heatmap panels on the same route share the
+/* No special tint, chart and heatmap panels on the same route share the
  * default panel background so they read as siblings. */
 
 /* Inline header controls (replaces the stacked label+select layout) */
@@ -1853,7 +1853,7 @@ main {
 }
 .chart-controls > select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
 
-/* Custom date range picker — shown when the user clicks the Custom
+/* Custom date range picker, shown when the user clicks the Custom
  * range button. Native datetime-local inputs get iOS Safari's built-in
  * picker for free. */
 .custom-range {
@@ -1930,7 +1930,7 @@ main {
   .cs-cell { padding: .35rem .35rem; background: var(--surface-2); border-radius: var(--r-sm); }
 }
 
-/* Resolution subtitle — small grey line under the stat strip telling
+/* Resolution subtitle, small grey line under the stat strip telling
    the user what bucket the chart is in (raw / 1-min avg / 1-hour avg
    / 1-day avg) and how many points are visible. Used to live in the
    stat strip but it's debug context, not a stat. */
@@ -1943,7 +1943,7 @@ main {
 }
 
 /* Floating value-at-cursor tooltip on every uPlot chart. Anchored
-   absolutely inside u.over by valueTooltipPlugin() — left/top set
+   absolutely inside u.over by valueTooltipPlugin(), left/top set
    in JS each setCursor frame. */
 .chart-value-tip {
   position: absolute;
@@ -2005,7 +2005,7 @@ main {
 }
 /* Silent: device hasn't advertised in > 60s. Grey out the values so
  * the card is visually obvious as "we have no current data" without
- * hiding it entirely — keeps the customer's mental model of "what
+ * hiding it entirely, keeps the customer's mental model of "what
  * hardware is configured" stable. See #171. */
 .dev-card-silent { opacity: .55; }
 .dev-card-silent .dev-card-name { color: var(--text-2); }
@@ -2126,7 +2126,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   text-transform: lowercase;
 }
 
-/* "Right now" panel — current weather conditions from Open-Meteo.
+/* "Right now" panel, current weather conditions from Open-Meteo.
  * Sits between Today (energy state) and the daily outlook. The big
  * temperature reading + icon dominates so the panel reads at a glance;
  * supporting cells (cloud, wind, humidity, sunrise/sunset) sit below
@@ -2138,7 +2138,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   transition: --panel-tint .8s ease, border-color .8s ease;
 }
 
-/* #264 — "Where you are" location panel. Fixed-height map area; Leaflet
+/* #264, "Where you are" location panel. Fixed-height map area; Leaflet
  * controls + tile imagery handle their own colours. Border + tint match
  * the dashboard's panel family so it doesn't look pasted-in. */
 .location-panel {
@@ -2155,7 +2155,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 /* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
  * by renderWeather() based on WMO code + is_day. All intentionally
- * gentle (<=8% alpha) — the dashboard's information density is the
+ * gentle (<=8% alpha), the dashboard's information density is the
  * star; this is mood lighting, not a Weather Channel takeover. */
 .weather-panel.wx-bg-clear-day {
   border-color: rgba(245, 158, 11, 0.22);
@@ -2287,7 +2287,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   color: var(--text);
 }
 
-/* Today panel — two-column layout: hero numbers on the left, the
+/* Today panel, two-column layout: hero numbers on the left, the
  * forecast sparkline on the right. The hero's big kWh-so-far reading
  * sits above three compact sub-cells (charged Ah, peak, load). The
  * sparkline shows the day's predicted PV curve with the past portion
@@ -2311,7 +2311,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   display: flex; flex-direction: column; gap: .25rem;
 }
 .today-hero-k {
-  /* Caption above the big number — was unlabeled, leaving users
+  /* Caption above the big number, was unlabeled, leaving users
      guessing "what's 940?". meta-k already gives the uppercase
      micro-label aesthetic used in every other cell on the card. */
   display: block;
@@ -2340,7 +2340,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .today-spark svg { display: block; width: 100%; }
 
 /* One-line Tomorrow preview at the bottom of the Today tile. Reads
- * as a footnote — not another headline. */
+ * as a footnote, not another headline. */
 .today-tomorrow {
   margin-top: .65rem;
   padding-top: .5rem;
@@ -2352,7 +2352,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   width: 16px; height: 16px; flex: none; color: var(--amber);
 }
 
-/* Sleep mode — after sunset (no PV remaining today + tomorrow forecast
+/* Sleep mode, after sunset (no PV remaining today + tomorrow forecast
  * known) the panel flips: the hero shows tomorrow's expected kWh, and
  * today's tally demotes to the footer. Sub-stats stay live so the user
  * can still see the day's totals at a glance. */
@@ -2372,7 +2372,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 
 /* "Yesterday: predicted X kWh · actual Y kWh · Z% of forecast" line.
  * Lives at the bottom of the Today panel so the user can see how
- * well the previous day's forecast held up — drift here is the early
+ * well the previous day's forecast held up, drift here is the early
  * signal that Solcast's array model needs re-tuning (capacity, tilt,
  * azimuth, shading). */
 .forecast-accuracy {
@@ -2388,7 +2388,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 
 /* 5-day outlook strip: horizontal row of day-cards under the Today
  * tile. Today's card is highlighted with a slightly brighter border
- * so it reads as the "you are here" of the week — matching the Today
+ * so it reads as the "you are here" of the week, matching the Today
  * headline above. Cards scroll horizontally on narrow screens rather
  * than wrapping; a 5-card row that wraps to 2 rows looks worse than
  * one row the user can swipe. */
@@ -2452,7 +2452,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* Empty-state nudge for users without Solcast set up. Mid-weight —
+/* Empty-state nudge for users without Solcast set up. Mid-weight,
  * present enough to be discovered, polite enough to be ignored. */
 .tomorrow-empty {
   position: relative;
@@ -2557,7 +2557,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .eff-cell--unreliable .eff-cell-foot,
 .eff-cell--unreliable .meta-k { opacity: .5; }
 
-/* Battery health tile (#109) — cycle/lifetime stats + SoC residency */
+/* Battery health tile (#109), cycle/lifetime stats + SoC residency */
 #panel-battery-health { --panel-tint: linear-gradient(180deg, rgba(99,140,242,0.05), transparent 50%); }
 #panel-battery-health .h-icon { color: var(--blue, #6c8ef2); }
 .bhealth-stats {
@@ -2585,7 +2585,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-size: 1.25rem;
   font-weight: 600;
 }
-/* #294 — honest empty state when a BMS-only field has no data.
+/* #294, honest empty state when a BMS-only field has no data.
    Shrunk + dim'd so it reads as "not available" rather than
    "the number happens to be small". */
 .bhealth-v.bhealth-v-empty {
@@ -2599,7 +2599,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
-/* #295 — provenance caption under cycle/lifetime numbers.
+/* #295, provenance caption under cycle/lifetime numbers.
    "from BMS" / "from shunt" hint, small + grey so it reads as
    metadata not data. */
 .bhealth-src {
@@ -2676,7 +2676,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-style: italic;
 }
 
-/* Load heatmap — uses the default panel background like the chart panel
+/* Load heatmap, uses the default panel background like the chart panel
  * above it, so the two siblings on the History route match. */
 .heatmap-panel { /* no tint */ }
 .heatmap-rows {
@@ -2805,7 +2805,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .dev-detail-nav { display: flex; gap: .4rem; flex-shrink: 0; }
 @media (max-width: 540px) { .dev-detail-title { font-size: 1.05rem; } }
 
-/* dev-card is now an <a> — kill default link decoration */
+/* dev-card is now an <a>, kill default link decoration */
 a.dev-card { text-decoration: none; color: inherit; display: block; }
 a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); transition: all 0.15s; }
 
@@ -2955,7 +2955,7 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
   color: var(--text-2);
 }
 .settings-row > span:first-child {
-  /* Keep the label readable when the value is long — small viewports
+  /* Keep the label readable when the value is long, small viewports
    * were wrapping "Latest available" to two lines because the value
    * had a version + link + button competing for the same line. */
   flex-shrink: 0;
@@ -2981,7 +2981,7 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
   line-height: 1.45;
 }
 
-/* footer removed — version + identity already live in Settings → About */
+/* footer removed, version + identity already live in Settings → About */
 main { padding-bottom: 3rem; }
 
 /* ---------------- kiosk mode ---------------- */
@@ -3032,7 +3032,7 @@ body.kiosk-active .route.kiosk-route.active {
 }
 .kiosk-donut {
   position: relative;
-  /* Pick whichever axis is the constraint — a landscape phone is short
+  /* Pick whichever axis is the constraint, a landscape phone is short
      vertically, a portrait phone is narrow horizontally. Bumped the cap
      to 560px so the ring fills more of the left half on a landscape
      tablet without crowding the flow column. */
@@ -3091,7 +3091,7 @@ body.kiosk-active .route.kiosk-route.active {
   padding: 2vh 0;
 }
 /* The "53 W" / "0 W" pills in the connector are redundant at kiosk
-   scale — the Solar / Battery / Load tiles already show the wattage,
+   scale, the Solar / Battery / Load tiles already show the wattage,
    and one less label to read across the room is cleaner. Keep the
    animated dot so flow direction is still obvious. */
 .kiosk-flow .flow-arrow-label { display: none !important; }
@@ -3135,7 +3135,7 @@ body.kiosk-active .route.kiosk-route.active {
   background: var(--surface-2);
 }
 body:not(.kiosk-active) .kiosk-exit { display: none; }
-/* Honour `hidden` set by JS — needed because the `.kiosk-exit`
+/* Honour `hidden` set by JS, needed because the `.kiosk-exit`
    author rule above has equal specificity to the UA `[hidden]`
    declaration and wins by source order, silently leaving the
    broker-view + kiosk-share Exit button visible. Bit us when the
@@ -3228,7 +3228,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-radius: 6px; background: var(--surface-1); color: inherit;
 }
 /* <select> inside hist-input would otherwise size to the longest
-   option's text — when the placeholder is something verbose like
+   option's text, when the placeholder is something verbose like
    "No smart plug or AC charger output configured" (solar-pause panel
    with no plugs yet), the dropdown blows past the row's right edge
    on narrow viewports. Cap the width and let the browser ellipsis
@@ -3301,7 +3301,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 /* "Recently visible but missing" panel on the dongle-scan results.
  * Calls out devices we KNEW were broadcasting but aren't now,
  * because the #1 BLE debug surprise is "my Renogy BT-2 was here
- * a minute ago — where is it?". Amber tint = informational, not
+ * a minute ago, where is it?". Amber tint = informational, not
  * an error. */
 .wiz-missing {
   border: 1px solid rgba(210, 153, 34, 0.35);
@@ -3378,7 +3378,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
 .wiz-transport-id { font-weight: 600; }
 .wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
-/* Status pill on each transport row — one-line nowrap, ellipsis if
+/* Status pill on each transport row, one-line nowrap, ellipsis if
  * something larger ever lands. Previous copy "offline · will
  * reconnect on scan" was misleading (the daemon auto-retries every
  * poll regardless of user action) AND wrapped across two lines
@@ -3407,7 +3407,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-radius: var(--r);
 }
 .wiz-empty--quiet {
-  /* Mid-scan placeholder. Borderless, very low contrast — doesn't
+  /* Mid-scan placeholder. Borderless, very low contrast, doesn't
    * compete for attention while live results stream in below it. */
   background: transparent;
   border: 0;
@@ -3714,7 +3714,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
  * UA stylesheet, but ANY class rule with `display: grid|flex|etc`
  * wins the specificity fight and leaves the element visible.
  * Without this, the forecast form's provider-switched field groups
- * stay visible when their provider isn't selected — every Solcast
+ * stay visible when their provider isn't selected, every Solcast
  * user sees the Open-Meteo lat/lon/array fields uselessly. */
 .alerts-form-grid[hidden],
 .alerts-form .settings-foot[hidden] {
@@ -3944,7 +3944,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   max-width: 800px;
   line-height: 1.55;
   /* CRITICAL on mobile: grid items default to `min-width: auto`
-   * which equals the intrinsic content width — so any long
+   * which equals the intrinsic content width, so any long
    * unbreakable token (a URL, an inline code chip, a wide table)
    * silently pushes the column past the viewport, with text
    * running off the right edge. `min-width: 0` lets the grid
@@ -3955,7 +3955,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   overflow-wrap: anywhere;
   word-break: break-word;
 }
-/* Inline code in body text — wrap at character boundaries on
+/* Inline code in body text, wrap at character boundaries on
  * mobile so a long path / package id doesn't push the column wide. */
 .docs-content p code,
 .docs-content li code {
@@ -4014,7 +4014,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   max-width: 100%;
 }
 .docs-content td code {
-  /* Don't wrap inline-code chips that live inside table cells —
+  /* Don't wrap inline-code chips that live inside table cells,
    * "docker compose pull && up -d" reads better as one chunk that
    * the cell scrolls to than as wrapping fragments. */
   white-space: nowrap;
@@ -4131,7 +4131,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-color: rgba(210,153,34,0.4);
   color: var(--amber);
 }
-/* Victron-branded chip — uses their familiar accent blue. */
+/* Victron-branded chip, uses their familiar accent blue. */
 .wiz-vendor-hint--victron {
   background: rgba(0,114,206,0.12);
   border-color: rgba(0,114,206,0.45);
@@ -4148,7 +4148,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 .wiz-victron-key .settings-foot { margin-bottom: .55rem; }
 
-/* "Add another transport" — collapsible block in the wizard's
+/* "Add another transport", collapsible block in the wizard's
  * transport-list view. Lets a customer wire up BLE + USB side by
  * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
  * without faking-out the wizard by deleting and re-adding. */
@@ -4197,7 +4197,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 
 /* Source-disagreement hint (#121). Tucked under the donut-flow pill
  * inside the donut centre. Only shows when shunt + BMS SoC differ
- * by >5pp. Deliberately quiet — small, low-contrast — because it's
+ * by >5pp. Deliberately quiet, small, low-contrast, because it's
  * a "for your information" diagnostic, not an alarm. */
 .donut-disagreement {
   margin-top: .35rem;
@@ -4250,7 +4250,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   display: flex; align-items: center; gap: 1rem;
   padding: .5rem 0 .25rem;
 }
-/* The toggle is a chunky on/off switch with a sliding thumb — same
+/* The toggle is a chunky on/off switch with a sliding thumb, same
  * pattern as Settings → Kiosk view, just wider so it reads as the
  * primary control on the panel rather than a checkbox. */
 .output-toggle {
@@ -4351,7 +4351,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 
 /* Inline "add schedule" form. Renders into the same host slot as
- * the "+ Add schedule" button — replacing it on click and restoring
+ * the "+ Add schedule" button, replacing it on click and restoring
  * the button on cancel. */
 .schedule-add-host { margin-top: .25rem; }
 .schedule-form {
@@ -4402,7 +4402,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
    When the appliance dashboard renders inside the WattPost native
    shell (detected via navigator.userAgent contains "WattPostApp/"),
    the cloud already gives us a status bar + tab bar; ours would be
-   duplicate chrome. Hide it. Also hide the floating help-FAB —
+   duplicate chrome. Hide it. Also hide the floating help-FAB,
    docs route lives in the cloud's Account tab anyway. */
 html.in-wattpost-app .app-header { display: none !important; }
 html.in-wattpost-app .help-fab,
@@ -4415,13 +4415,13 @@ html.in-wattpost-app body > main,
 html.in-wattpost-app .container {
   padding-top: max(12px, env(safe-area-inset-top)) !important;
 }
-/* No bottom tab bar inside the broker tunnel — the appliance HTML
+/* No bottom tab bar inside the broker tunnel, the appliance HTML
    is served on its own origin (<slug>.wattpost.cloud) so the cloud's
    /app tab bar isn't reachable from here. Native back-gesture
    returns the user to Sites. */
 
 
-/* #292 — Battery detail page. Bank summary grid + per-pack mini-cards.
+/* #292, Battery detail page. Bank summary grid + per-pack mini-cards.
    Drilled into from the SoC donut on the dashboard. */
 .bank-sum-grid {
   display: grid;

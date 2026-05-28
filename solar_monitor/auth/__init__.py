@@ -1,4 +1,4 @@
-"""Identity v2 — appliance-side auth primitives.
+"""Identity v2, appliance-side auth primitives.
 
 This package owns the per-appliance ed25519 keypair (the trust
 root for the new identity layer described in

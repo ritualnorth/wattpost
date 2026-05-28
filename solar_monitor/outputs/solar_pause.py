@@ -2,7 +2,7 @@
 
 Pure decision function: given the current bank state, the charger's
 current on/off, the user's config, and the last state-change time,
-return one of three outcomes — force_on, force_off, or unchanged.
+return one of three outcomes, force_on, force_off, or unchanged.
 
 Hardware interaction lives in OutputsService.toggle(); this module
 never touches a transport, which makes it trivially unit-testable
@@ -12,7 +12,7 @@ The control law has four gates, evaluated in this order:
 
 1. Disabled or never-configured. Return unchanged.
 2. Hard floor. SoC below the hard floor forces the charger ON
-   regardless of PV. The floor beats every forecast — if the
+   regardless of PV. The floor beats every forecast, if the
    weather predictor is wrong, the bank survives.
 3. Recover. SoC below recover_soc (and currently paused) forces
    the charger back ON. This is the "wake up" condition during
@@ -26,7 +26,7 @@ flapping on a passing cloud.
 
 Manual override: if the user has just toggled the charger manually,
 `last_manual_toggle_at` is newer than `last_auto_change_at`, and we
-back off — the user knows something we don't.
+back off, the user knows something we don't.
 """
 from __future__ import annotations
 

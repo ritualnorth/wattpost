@@ -3,7 +3,7 @@
 JBD (Jiabaida) makes the BMS inside most cheap LFP packs in the
 hobby market. Battle Born, LiTime, Power Queen, many Eco-Worthy
 SKUs, anything sold rebranded on Amazon under "100Ah LiFePO4
-smart battery" — almost all of them are JBD inside. Overkill
+smart battery", almost all of them are JBD inside. Overkill
 Solar is the most prominent rebadge in the US market; the
 "Overkill Solar app" is the open-source-friendly client for the
 same protocol.
@@ -29,9 +29,9 @@ malformed frames.
 
 Two commands we care about:
 
-  * 0x03 — basic info: voltage, current, residual / nominal Ah,
+  * 0x03, basic info: voltage, current, residual / nominal Ah,
     cycle count, FET status, balance bits, protection bits, SoC.
-  * 0x04 — cell voltages: one uint16 (mV) per cell.
+  * 0x04, cell voltages: one uint16 (mV) per cell.
 
 The transport polls both per cycle by writing the request frame
 and accumulating notifications until a complete CRC-valid frame
@@ -121,7 +121,7 @@ def parse_frame(buf: bytes) -> tuple[int, bytes] | None:
     # write frames, but on response frames the convention from
     # Overkill's reference implementation is CMD+STATUS+DLEN+DATA.
     # The two forms produce the same number for read responses
-    # because STATUS is always 0 — so this matches both paths.
+    # because STATUS is always 0, so this matches both paths.
     if buf[4 + dlen:4 + dlen + 2] != expected:
         return None
     return cmd, payload
@@ -199,7 +199,7 @@ class BleJbdTransport(Transport):
     async def request(self, frame: bytes, expected_response_len: int,
                       timeout: float = 5.0) -> bytes:
         raise TransportError(
-            f"{self.id}: request() is unsupported on ble_jbd — "
+            f"{self.id}: request() is unsupported on ble_jbd, "
             "drivers must override poll() and use get_latest_frame()"
         )
 
@@ -256,7 +256,7 @@ class BleJbdTransport(Transport):
             candidate = bytes(self._buf[:end + 1])
             parsed = parse_frame(candidate)
             if parsed is None:
-                # Bad frame — advance past this 0xDD and keep
+                # Bad frame, advance past this 0xDD and keep
                 # scanning. Don't drop the whole buffer; a real
                 # frame might start within it.
                 del self._buf[:1]

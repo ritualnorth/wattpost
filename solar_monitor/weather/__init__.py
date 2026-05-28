@@ -1,6 +1,6 @@
 """Current weather conditions integration.
 
-Pluggable in the same shape as `forecast/` — one provider class, a
+Pluggable in the same shape as `forecast/`, one provider class, a
 `WeatherService` background poller, normalised `CurrentWeather`
 output. Open-Meteo is the first (and only) provider for now;
 no API key required.

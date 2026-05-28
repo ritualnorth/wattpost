@@ -1,10 +1,10 @@
-"""Output abstraction — the contract every per-vendor adapter implements.
+"""Output abstraction, the contract every per-vendor adapter implements.
 
 A vendor adapter (e.g. RoverLoadAdapter for Renogy Rover MPPTs) does
 three things:
   1. Decides whether a given device exposes any controllable outputs
      (model-string match, BMS feature flag, etc.).
-  2. Issues the actual write — FC06 for Modbus vendors, the JK BMS
+  2. Issues the actual write, FC06 for Modbus vendors, the JK BMS
      proprietary command for JK, an MQTT publish for smart-plug
      bridges, and so on.
   3. Reports the latest read-back state from the device's poll data so
@@ -23,7 +23,7 @@ from typing import Any, Protocol
 @dataclass(frozen=True)
 class ControllableOutput:
     """Static definition of an output. Mutable state (current value,
-    last command, safety_confirmed) lives in the SQLite table — this
+    last command, safety_confirmed) lives in the SQLite table, this
     record is what the adapter exposes at discovery time."""
     id: str                       # stable: "<device_label>.<kind>"
     device_label: str             # the parent device
@@ -47,7 +47,7 @@ class OutputAdapter(Protocol):
     """Per-vendor adapter. Implementations register themselves with
     `register_adapter` keyed on the device kind they handle. The
     service walks every known device and asks each registered adapter
-    to enumerate the outputs it cares about — Renogy adapter answers
+    to enumerate the outputs it cares about, Renogy adapter answers
     for `charge_controller`, JK BMS adapter for `bms`, etc."""
 
     vendor: str
@@ -55,14 +55,14 @@ class OutputAdapter(Protocol):
 
     def discover(self, device: dict[str, Any]) -> list[ControllableOutput]:
         """Inspect a device snapshot from the latest poll. Return zero
-        or more outputs to register. Pure / no I/O — runs every boot."""
+        or more outputs to register. Pure / no I/O, runs every boot."""
 
     async def write(
         self, output: ControllableOutput, on: bool, *, transport, slave_id: int,
     ) -> WriteResult:
         """Apply the new state to the physical device. May time out
         waiting for an ack (see Rover BT-2 quirk in #104 de-risk
-        notes) — adapters that know their device swallows acks should
+        notes), adapters that know their device swallows acks should
         return ok=True with confirmed_state from a follow-up read."""
 
     def read_state_from_snapshot(

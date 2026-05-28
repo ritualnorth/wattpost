@@ -4,7 +4,7 @@ Covers:
   * Deye SUN-5K/8K-SG04LP1
   * Sunsynk SG01LP1 3.6K / 5.5K / 8K / 16K
   * Sol-Ark 5K / 8K / 12K-1P
-  * Sol-Ark 12K-2P (US split-phase 120/240 V — still single-MPPT-pair on
+  * Sol-Ark 12K-2P (US split-phase 120/240 V, still single-MPPT-pair on
     the inverter side; treated as single-phase from the protocol view)
 
 Modbus RTU, holding registers (FC03), 9600 8N1, slave 1.
@@ -13,7 +13,7 @@ Register map (decimal, holding registers):
 
     Reg  Field                       Scale    Unit  Notes
     ---  --------------------------- -------- ----- ----------------
-     59  device_status               enum     —     mode enum
+     59  device_status               enum    ,     mode enum
      79  grid_frequency_hz           ×0.01    Hz
      90  dc_transformer_temperature  ×0.1     °C    main inverter temp
      91  radiator_temperature        ×0.1     °C
@@ -34,9 +34,9 @@ Register map (decimal, holding registers):
     191  battery_current             ×–0.01   A    sign-flipped; ours: +=charge
     193  ac_output_frequency         ×0.01    Hz
 
-References (all credited in NOTICE — facts not creative expression):
-  * kellerza/sunsynk MIT-then-Apache-2.0 — definitions/single_phase.py
-  * StephanJoubert/home_assistant_solarman Apache-2.0 — solarman
+References (all credited in NOTICE, facts not creative expression):
+  * kellerza/sunsynk MIT-then-Apache-2.0, definitions/single_phase.py
+  * StephanJoubert/home_assistant_solarman Apache-2.0, solarman
     integration register tables.
   * Deye Modbus PDF mirror (domotica.solar).
 
@@ -57,7 +57,7 @@ log = logging.getLogger(__name__)
 
 
 def _parse_status(bs: bytes) -> dict[str, Any]:
-    """Reg 59 — single-word read. Mode enum in low byte."""
+    """Reg 59, single-word read. Mode enum in low byte."""
     raw = u16(bs, 3)
     code = raw & 0xFF
     return {
@@ -70,7 +70,7 @@ def _parse_status(bs: bytes) -> dict[str, Any]:
 def _parse_temps_and_grid_hz(bs: bytes) -> dict[str, Any]:
     """Reg 79..91, 13 words. Pulls grid Hz (reg 79) + the two
     inverter temps (90, 91). Energy totals at 78/80/81/82 fall in
-    this block too — surface them as lifetime kWh counters so the
+    this block too, surface them as lifetime kWh counters so the
     Energy page can chart real history when a customer's been
     running for weeks."""
     out: dict[str, Any] = {}
@@ -184,7 +184,7 @@ def _parse_battery_and_pv_power(bs: bytes) -> dict[str, Any]:
     pv_total = max(0, pv1_w) + max(0, pv2_w)
     out["pv_power_w"] = pv_total
     # Reg 188-189: reserved. Two-word gap shifts the rest of the
-    # block by 4 bytes — easy to miscount, the original draft of
+    # block by 4 bytes, easy to miscount, the original draft of
     # this parser had battery_power reading the reserved word and
     # always returning 0.
     # Reg 190: battery_power ×-1 (positive = charge). Offset:

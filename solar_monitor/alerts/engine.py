@@ -68,7 +68,7 @@ def build_alert_context(snapshot: dict) -> dict:
         "worst_pack_drift_v":  bank_latest.get("worst_pack_drift_v"),
     }
 
-    # Aggregate-across-devices helpers — kept narrow on purpose; expand
+    # Aggregate-across-devices helpers, kept narrow on purpose; expand
     # only when a rule actually needs a new one.
     smart_battery_latest = [
         d.get("latest", {}) for d in devices_list
@@ -117,7 +117,7 @@ class AlertEngine:
         # capped to the most recent N. The cloud-heartbeat reads from
         # here and ships any with ts > last seen so the cloud inbox
         # (#206) gets every alert without per-heartbeat state on the
-        # appliance side — dedup is done by the cloud via a UNIQUE
+        # appliance side, dedup is done by the cloud via a UNIQUE
         # constraint on (appliance_id, rule_id, ts).
         self._event_history: list[AlertEvent] = []
         # Tracks the quiet-hours state across evaluate() calls so we
@@ -193,7 +193,7 @@ class AlertEngine:
 
     async def evaluate(self, snapshot: dict) -> list[AlertEvent]:
         """Run every rule against the supplied snapshot. Returns the list
-        of newly-fired events (post-cooldown). Never raises — a misbehaving
+        of newly-fired events (post-cooldown). Never raises, a misbehaving
         transport must not break the daemon.
 
         Quiet hours: `warn`-severity events fire into `_pending` instead
@@ -255,7 +255,7 @@ class AlertEngine:
         order they fired, then clear the buffer."""
         if not self._pending:
             return
-        log.info("quiet hours ended — flushing %d buffered alert(s)",
+        log.info("quiet hours ended, flushing %d buffered alert(s)",
                  len(self._pending))
         pending, self._pending = self._pending, []
         for event, transport_ids in pending:
@@ -319,7 +319,7 @@ class AlertEngine:
         self, event: AlertEvent, transport_ids: list[str],
     ) -> None:
         for tid in transport_ids:
-            # #259 — "cloud" is a magic transport id. The fan-out
+            # #259, "cloud" is a magic transport id. The fan-out
             # (web push, native push, email) happens in the cloud
             # when the heartbeat ingest sees the event has "cloud"
             # in its transports list. Nothing to do appliance-side.

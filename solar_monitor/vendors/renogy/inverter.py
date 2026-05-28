@@ -1,4 +1,4 @@
-"""Renogy pure-sine inverter driver — 1000W / 2000W / 3000W.
+"""Renogy pure-sine inverter driver, 1000W / 2000W / 3000W.
 
 Common in van + cabin builds for converting bank DC to mains AC.
 Some models are inverter-only; others are inverter/chargers that
@@ -9,7 +9,7 @@ charging side + load side.
 Reference register map from cyril/renogy-bt's `InverterClient.py`,
 validated against real Renogy gear in production at multiple
 installers. Modbus FC03 over the same BT-2 / USB-RS485 transports
-we already ship — no new transport needed.
+we already ship, no new transport needed.
 
 Registered under `(vendor=renogy, kind=inverter)`. The dashboard's
 device-detail page already renders generic devices via
@@ -24,7 +24,7 @@ from ._util import bytes_to_int
 
 # Charging-state enum specific to Renogy inverters (the inverter
 # charger side). Note these values DIFFER from the Rover's
-# CHARGING_STATE — Renogy reused the field name but assigned
+# CHARGING_STATE, Renogy reused the field name but assigned
 # different integers per device class.
 INVERTER_CHARGING_STATE = {
     0: "deactivated",
@@ -37,7 +37,7 @@ INVERTER_CHARGING_STATE = {
 
 
 def _parse_inverter_stats(bs: bytes) -> dict:
-    """Register 4000, 10 words — the live AC-side state.
+    """Register 4000, 10 words, the live AC-side state.
     Volts/amps at 0.1 scale; frequency at 0.01."""
     return {
         "ac_input_voltage_v":    bytes_to_int(bs, 3, 2, scale=0.1),
@@ -60,7 +60,7 @@ def _parse_inverter_model(bs: bytes) -> dict:
 
 
 def _parse_charging_info(bs: bytes) -> dict:
-    """Register 4327, 7 words — the integrated MPPT side. Models
+    """Register 4327, 7 words, the integrated MPPT side. Models
     that don't have built-in solar return zeros across this block;
     we surface every field anyway so downstream consumers can
     detect "this inverter has no solar wired up" rather than
@@ -79,9 +79,9 @@ def _parse_charging_info(bs: bytes) -> dict:
 
 
 def _parse_load_info(bs: bytes) -> dict:
-    """Register 4408, 6 words — what the inverter is currently
+    """Register 4408, 6 words, what the inverter is currently
     pushing to its AC output terminals. `load_percentage` is
-    relative to the inverter's nameplate W rating — useful for
+    relative to the inverter's nameplate W rating, useful for
     the user to spot "I'm running close to limit, time to turn
     something off."""
     return {
