@@ -29,6 +29,36 @@ from .storage import Store
 log = logging.getLogger(__name__)
 
 
+def _transport_is_open(t: Any) -> bool:
+    """Cross-class liveness probe shared between the snapshot pill
+    and the wizard's transport list. Knows the connection-state field
+    each transport class uses; see api/setup.py:list_setup_transports
+    for the canonical version of this logic.
+
+    The duplication is deliberate — keeping this small and inline
+    here avoids an import cycle between scheduler and api.setup.
+    """
+    if t is None:
+        return False
+    # bleak-backed transports (ble_modbus, ble_jkbms, ble_jbd, ble_daly,
+    # ble_aili, ble_junctek) expose _client.is_connected.
+    client = getattr(t, "_client", None)
+    if client is not None:
+        return bool(getattr(client, "is_connected", False))
+    # serial_modbus exposes _client elsewhere; passive BLE adverts and
+    # VE.Direct expose _latest_at + the underlying handle.
+    last_at = float(getattr(t, "_latest_at", 0.0) or 0.0)
+    if last_at:
+        return (time.time() - last_at) < 60.0
+    # USB-HID Voltronic and any other request/response transport that
+    # holds a non-_client device handle.
+    if getattr(t, "_dev", None) is not None:
+        return True
+    if getattr(t, "_ser", None) is not None:
+        return True
+    return False
+
+
 class PollScheduler:
     def __init__(
         self,
@@ -299,8 +329,7 @@ class PollScheduler:
         if transports:
             configured = len(transports)
             for t in transports.values():
-                client = getattr(t, "_client", None)
-                if client and getattr(client, "is_connected", False):
+                if _transport_is_open(t):
                     open_count += 1
         return {
             "type": "snapshot",

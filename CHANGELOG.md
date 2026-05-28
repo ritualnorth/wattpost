@@ -8,6 +8,45 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.116] · 2026-05-28
+
+### Added · Bank aggregate accepts inverter as SoC source (#361)
+
+The bank aggregator's source-priority is now shunt → BMS →
+inverter. A Voltronic-only / Deye-only install (no separate shunt
+or smart-battery) now populates the `bank` pseudo-device with
+soc_pct, voltage_v, current_a, and power_w from the inverter's
+canonical metrics, so the dashboard's SoC donut and Power Flow
+tile have real data to render instead of an empty state. Auto
+mode still prefers shunt then BMS when present — the inverter
+fallback only fires when the more authoritative sources are
+absent.
+
+### Added · Setup wizard supports usbhid_voltronic (#362)
+
+New `/api/setup/hid_scan` enumerates connected USB-HID devices
+and flags known Voltronic VID:PIDs (`0665:5161` Cypress chip,
+`0001:0000` EG4 variant). The wizard's Add-transport endpoint
+now accepts `type: usbhid_voltronic` with `vid` / `pid` /
+`serial_number`, dedupes on the triple, auto-creates the
+inverter device row, and hot-reloads the daemon — same shape
+as the BLE-advert + VE.Direct flows.
+
+Falls back gracefully when the `hid` Python package isn't
+installed (the default — it's an optional dep): the scan
+endpoint returns a clear "install hidapi" hint and a `200`
+with `hidapi_available: false` instead of a `500`.
+
+### Fixed · Setup transport status for request/response transports (#363)
+
+`/api/setup/transports` and the snapshot's `poll_run.transports`
+were reporting `open: false` for `ve_direct`, `usbhid_voltronic`,
+and any transport that doesn't expose `_client.is_connected`
+even when polls were succeeding. The probe now knows about
+`_ser` (VE.Direct), `_dev` (USB-HID), and `_latest_at`
+freshness for push-only transports. Shared via a single helper
+on the scheduler so the wizard and the dashboard pill agree.
+
 ## [0.1.115] · 2026-05-28
 
 ### Added · Voltronic-family inverter driver (#360, experimental)
