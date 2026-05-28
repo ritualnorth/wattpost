@@ -11,6 +11,9 @@ Versions follow [Semantic Versioning].
 ### Changed
 - Anonymous install-count beacon is now off by default, with a Settings -> Privacy toggle ("Anonymous install ping"). Was previously on by default with config-file-only opt-out (#217)
 
+### Fixed
+- Kiosk share view rendered a blank SoC donut over the cloud: the kiosk read allow-list was missing `/api/snapshot` (the donut's data source) and still listed the removed `/api/bank/current` (#225)
+
 ## [0.1.123] - 2026-05-28
 
 ### Changed

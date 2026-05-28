@@ -1315,8 +1315,8 @@ def build_app(
             # appliance-side share token to leak, rotate, or revoke.
             _path = scope.get("path", "/")
             _method = scope.get("method", "GET").upper()
-            _kiosk_paths = ("/kiosk", "/api/devices", "/api/poll_run",
-                            "/api/today", "/api/bank/current", "/api/weather",
+            _kiosk_paths = ("/kiosk", "/api/snapshot", "/api/devices",
+                            "/api/poll_run", "/api/today", "/api/weather",
                             "/web/", "/static/")
             # Cloud broker (#139). When the cloud proxies a logged-in
             # user's request through to this appliance, it stamps the
