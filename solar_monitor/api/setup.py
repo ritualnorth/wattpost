@@ -744,6 +744,72 @@ async def _maybe_push_discovery(
         log.debug("discovery push raised — swallowing", exc_info=True)
 
 
+@get("/api/setup/hid_scan")
+async def hid_scan() -> dict[str, Any]:
+    """Enumerate USB-HID devices and flag known hybrid-inverter VID:PIDs.
+
+    The wizard calls this from the "Add hybrid inverter" branch to
+    show installers which of their plugged-in HID devices match a
+    supported family. Falls back gracefully when the `hid` Python
+    package isn't installed (default on every install today —
+    optional dep) so the wizard can render a clear "install hidapi
+    on this host" hint instead of a 500.
+
+    Each entry carries:
+      vid + pid             integers, ready for AddTransportRequest
+      manufacturer + product strings from the device descriptor
+      serial_number          for multi-inverter installs
+      match                  "voltronic" | None — tells the wizard
+                             whether to default to usbhid_voltronic
+                             on Add.
+    """
+    try:
+        import hid  # type: ignore[import-not-found]
+    except ImportError:
+        return {
+            "devices": [],
+            "hidapi_available": False,
+            "hint": (
+                "Install the `hid` python package on the appliance to "
+                "enable USB-HID scanning. On the Pi: "
+                "`sudo apt-get install -y libhidapi-libusb0 && "
+                "pip install --break-system-packages hid` (matches the "
+                "library used by the Voltronic driver)."
+            ),
+        }
+
+    # Known VID:PIDs that map to the Voltronic family. Pulled from
+    # community reports + mpp-solar's device list. Add new entries
+    # here as customer reports come in.
+    VOLTRONIC_VID_PIDS = {
+        (0x0665, 0x5161),  # Cypress HID chip — Axpert / MPP / Mecer / Effekta
+        (0x0001, 0x0000),  # EG4 6500EX-48 variant
+    }
+
+    out: list[dict[str, Any]] = []
+    try:
+        for d in hid.enumerate():
+            vid = int(d.get("vendor_id") or 0)
+            pid = int(d.get("product_id") or 0)
+            rec: dict[str, Any] = {
+                "vid":           vid,
+                "pid":           pid,
+                "manufacturer":  d.get("manufacturer_string") or "",
+                "product":       d.get("product_string") or "",
+                "serial_number": d.get("serial_number") or "",
+                "match":         None,
+            }
+            if (vid, pid) in VOLTRONIC_VID_PIDS:
+                rec["match"] = "voltronic"
+            out.append(rec)
+    except Exception:
+        log.exception("hid_scan: enumerate failed")
+
+    log.info("hid_scan: %d HID device(s); %d voltronic match(es)",
+             len(out), sum(1 for r in out if r["match"]))
+    return {"devices": out, "hidapi_available": True}
+
+
 @get("/api/setup/usb_scan")
 async def usb_scan() -> dict[str, Any]:
     """Enumerate USB serial devices and classify what protocol each is
@@ -1109,12 +1175,21 @@ class AddTransportRequest(msgspec.Struct):
     #                                    provide `address` (MAC) + `encryption_key`
     #                                    (32-char hex from VictronConnect →
     #                                    Product info → Show device key).
+    # usbhid_voltronic (Axpert / MPP / EG4 hybrid inverter, USB-HID):
+    #                                    provide `vid` + `pid` (default 0665:5161,
+    #                                    the Cypress HID chip in every Voltronic
+    #                                    rebadge — EG4 6500EX uses 0001:0000),
+    #                                    + optional `serial_number` if multiple
+    #                                    inverters are wired to the same host.
     # Discriminated by `type` so a single endpoint handles every transport
     # kind the unified wizard surfaces (#120 / #118).
     address: str | None = None
     port: str | None = None
     baudrate: int = 9600
     encryption_key: str | None = None
+    vid: int | None = None
+    pid: int | None = None
+    serial_number: str | None = None
     # device_class: optional hint from the wizard's scan results (the
     # victron-ble Device class name, e.g. "AcCharger" / "SolarCharger" /
     # "BatteryMonitor"). Used by ble_victron_advertise to pick the
@@ -1317,6 +1392,45 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         }
         default_label = f"Mopeka {mac[-5:]}"
 
+    elif data.type == "usbhid_voltronic":
+        # Voltronic-family hybrid inverter (Axpert / MPP Solar / EG4
+        # rebadges) over USB-HID. Default VID:PID matches the Cypress
+        # HID chip every Voltronic firmware ships with; EG4 6500EX
+        # variants overlay 0001:0000 so the wizard accepts either.
+        # Treat 0 as a real value — EG4's PID literally is 0x0000.
+        vid = int(0x0665 if data.vid is None else data.vid)
+        pid = int(0x5161 if data.pid is None else data.pid)
+        if not (0 <= vid <= 0xFFFF and 0 <= pid <= 0xFFFF):
+            raise HTTPException(
+                status_code=400,
+                detail="vid + pid must be 16-bit USB IDs (0–65535)",
+            )
+        serial = (data.serial_number or "").strip() or None
+        # Dedupe per (vid, pid, serial_number). Two transports holding
+        # the same HID handle would race on every command.
+        for t in current_transports:
+            if (t.get("type") == "usbhid_voltronic"
+                    and int(t.get("vid", 0)) == vid
+                    and int(t.get("pid", 0)) == pid
+                    and (t.get("serial_number") or None) == serial):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"HID device {vid:04x}:{pid:04x}"
+                           + (f" serial {serial}" if serial else "")
+                           + f" is already configured as transport "
+                           f"{t.get('id')!r}",
+                )
+        new_id = f"voltronic_{vid:04x}_{pid:04x}"
+        block = {
+            "type": "usbhid_voltronic",
+            "vid":  vid,
+            "pid":  pid,
+        }
+        if serial:
+            block["serial_number"] = serial
+        default_label = "Hybrid inverter"
+        mac = ""  # unused for HID; satisfies the shared log.info below
+
     elif data.type == "serial_modbus":
         port = (data.port or "").strip()
         # Tolerant validation: accept any /dev/* path; pyserial will
@@ -1360,8 +1474,8 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
             detail=f"unsupported transport type {data.type!r} — wizard "
                    f"supports 'ble_modbus', 'serial_modbus', "
                    f"'ble_victron_advertise', 've_direct', "
-                   f"'ble_mopeka_advertise', 'ble_govee_advertise' and "
-                   f"'ble_ruuvi_advertise'",
+                   f"'ble_mopeka_advertise', 'ble_govee_advertise', "
+                   f"'ble_ruuvi_advertise' and 'usbhid_voltronic'",
         )
 
     # Bump id if collision (rare — different MAC, same tail).
@@ -1452,6 +1566,20 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
         log.info("setup wizard: auto-added ruuvi ambient device for transport %s",
                  new_id)
 
+    # USB-HID Voltronic transports: one HID handle = one hybrid inverter.
+    # Auto-create the device row so polling starts the moment Save is
+    # pressed; the wizard has no slave-ID scan step for HID.
+    if data.type == "usbhid_voltronic":
+        raw.setdefault("devices", []).append({
+            "vendor":    "voltronic",
+            "kind":      "inverter",
+            "transport": new_id,
+            "slave_id":  1,
+            "label":     label,
+        })
+        log.info("setup wizard: auto-added voltronic inverter device for transport %s",
+                 new_id)
+
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1500,24 +1628,23 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
         tid = tcfg.get("id")
         ttype = tcfg.get("type") or ""
         t = scheduler.get_transport(tid) if tid else None
-        # Class-aware open-state probe.
+        # Class-aware open-state probe. Passive BLE-advertise transports
+        # have an extra "registered with the scanner" precondition on
+        # top of the generic _latest_at freshness check; everything else
+        # delegates to the shared helper in scheduler.
+        from ..scheduler import _transport_is_open
         is_open = False
         if t is not None:
             if ttype in (
                 "ble_victron_advertise", "ble_mopeka_advertise",
                 "ble_govee_advertise", "ble_ruuvi_advertise",
             ):
-                # Passive: registered + recent advertisement = "open".
-                # Mopeka broadcasts every ~10s by default; the 60s
-                # freshness window is generous enough that we don't
-                # flap on a single missed advert.
                 registered = bool(getattr(t, "_registered", False))
                 last_at = float(getattr(t, "_latest_at", 0.0) or 0.0)
                 fresh = (time.time() - last_at) < 60 if last_at else False
                 is_open = registered and fresh
             else:
-                client = getattr(t, "_client", None)
-                is_open = bool(client and getattr(client, "is_connected", False))
+                is_open = _transport_is_open(t)
         # BLE transports expose `address` (MAC); serial transports
         # expose `port` (/dev/ttyUSB0). The wizard shows whichever is
         # present so a mixed-transport install reads cleanly.

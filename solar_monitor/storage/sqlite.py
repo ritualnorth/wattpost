@@ -816,9 +816,14 @@ class Store:
 
           * **System-level metrics** (V, A, SoC, remaining Ah, power,
             time-to-go) come from the policy in `self._bank_source`:
-              - "auto" (default): shunt if present, BMS pack-sum
-                otherwise.
-              - "shunt": force shunt even when BMS present.
+              - "auto" (default): shunt → BMS → inverter, in that
+                priority. The inverter falls back last because its
+                SoC is firmware-coulomb-counted (drifts over weeks)
+                while shunt/BMS coulomb counters are more reliable.
+                Still — for Persona-A hybrid-only installs with no
+                shunt and no smart battery, the inverter is the
+                only source of truth and we use it.
+              - "shunt": force shunt even when BMS or inverter present.
               - "bms":   force BMS pack-sum even when shunt present.
 
         When BOTH a shunt and BMS report SoC and they differ by more
@@ -828,13 +833,21 @@ class Store:
         investigate" hint. Renogy DC Home makes users pick manually;
         we pick + tell them when we're unsure.
 
-        Returns None when there's no shunt and no BMS to aggregate.
+        Returns None when there's no shunt, no BMS, and no inverter
+        to aggregate.
         """
         shunt = next((d for d in devices.values()
                       if d and d.get("_kind") == "shunt"), None)
         batts = [d for d in devices.values()
                  if d and d.get("_kind") == "smart_battery"]
-        if shunt is None and not batts:
+        # Inverter-as-source: any device of kind 'inverter' that
+        # reports both battery_voltage_v and soc_pct is a candidate.
+        # Voltronic / Axpert / MPP / EG4 family all populate these.
+        inverter = next((d for d in devices.values()
+                         if d and d.get("_kind") == "inverter"
+                         and d.get("battery_voltage_v") is not None
+                         and d.get("soc_pct") is not None), None)
+        if shunt is None and not batts and inverter is None:
             return None
 
         # --- Cell-level layer (always BMS-sourced when BMSes present) ---
@@ -921,19 +934,41 @@ class Store:
             if isinstance(ttg, (int, float)) and ttg > 0:
                 shunt_view["time_to_go_minutes"] = float(ttg)
 
-        # Pick the chosen source per policy.
+        # Inverter view: when neither shunt nor BMS is available, the
+        # hybrid inverter is the only device that knows SoC. Built
+        # from the same canonical metric names every inverter driver
+        # populates (Voltronic family today; Deye/SunSynk later).
+        inverter_view: dict[str, float] | None = None
+        if inverter is not None:
+            iv = inverter
+            v = float(iv.get("battery_voltage_v") or 0)
+            i = float(iv.get("battery_current_a") or 0)
+            soc = float(iv.get("soc_pct") or 0)
+            power_w = float(iv.get("battery_power_w") if iv.get("battery_power_w") is not None else v * i)
+            inverter_view = {
+                "voltage_v":    v,
+                "current_a":    i,
+                "power_w":      power_w,
+                "soc_pct":      soc,
+            }
+
+        # Pick the chosen source per policy. Auto-mode preference is
+        # shunt → BMS → inverter — first available wins.
         policy = getattr(self, "_bank_source", "auto")
         chosen: dict[str, float] | None
         chosen_label: str
         if policy == "shunt":
-            chosen = shunt_view or bms_view
-            chosen_label = "shunt" if shunt_view else "bms"
+            chosen = shunt_view or bms_view or inverter_view
+            chosen_label = ("shunt" if shunt_view else
+                            "bms" if bms_view else "inverter")
         elif policy == "bms":
-            chosen = bms_view or shunt_view
-            chosen_label = "bms" if bms_view else "shunt"
+            chosen = bms_view or shunt_view or inverter_view
+            chosen_label = ("bms" if bms_view else
+                            "shunt" if shunt_view else "inverter")
         else:  # auto
-            chosen = shunt_view if shunt_view else bms_view
-            chosen_label = "shunt" if shunt_view else "bms"
+            chosen = shunt_view or bms_view or inverter_view
+            chosen_label = ("shunt" if shunt_view else
+                            "bms" if bms_view else "inverter")
         if chosen is None:
             return None
 
