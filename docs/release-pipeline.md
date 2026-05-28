@@ -209,5 +209,4 @@ If the daemon was started before the helper was installed (legacy paired applian
 ## Related docs
 
 - [`docs/architecture.md`](architecture.md). Overall appliance design
-- [`docs/cloud-architecture.md`](cloud-architecture.md). Cloud + tunnel pattern
 - `packaging/README.md`. Install.sh / systemd unit specifics

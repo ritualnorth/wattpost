@@ -346,6 +346,5 @@ is the source of truth for config; cloud doesn't push state down.
 ## Related
 
 - [docs/architecture.md](architecture.md). Appliance internals
-- [docs/cloud-architecture.md](cloud-architecture.md). Cloud / appliance split
 - `cloud/wattpost_cloud/api/heartbeat.py`. Ingest, source of the data this API exposes
 - `cloud/wattpost_cloud/api/sites.py`. Dashboard's internal sites endpoint; the v1 API will share most of its logic
