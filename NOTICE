@@ -17,3 +17,18 @@ NOT included in this distribution.
 does not grant trademark rights.
 
 For commercial licensing enquiries: support@wattpost.io
+
+---
+
+Third-party references used during driver development:
+
+  * EG4 XP / kPV / FlexBOSS driver (vendors/eg4) — register map
+    cross-referenced against three public sources, no code copied
+    verbatim:
+      - joyfulhouse/eg4_web_monitor (MIT) — register addresses
+        and canonical Luxpower field names.
+      - celsworth/lxp-bridge (MIT) — Luxpower-LXP semantics.
+      - EG4 18kPV-12LV Modbus Communication Protocol PDF (EG4
+        Electronics, publicly mirrored). Register definitions
+        are facts, not creative expression, and so not subject
+        to copyright.

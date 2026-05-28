@@ -25,6 +25,7 @@ from . import mopeka  # noqa: F401
 from . import govee  # noqa: F401
 from . import ruuvi  # noqa: F401
 from . import voltronic  # noqa: F401
+from . import eg4  # noqa: F401
 
 __all__ = [
     "DeviceDriver",
