@@ -1694,6 +1694,10 @@ main {
   padding-left: .8rem;
 }
 .today-cell:first-child { border-left: none; padding-left: 0; }
+/* display:flex above outranks the UA [hidden] rule (equal specificity,
+   author wins), so .hidden=true wouldn't hide these — make [hidden]
+   authoritative for the today tile (battery-only hides Peak/Load). */
+.today-cell[hidden], .today-tomorrow[hidden] { display: none !important; }
 @media (max-width: 540px) {
   .today-cell { border-left: none; padding-left: 0; }
 }
@@ -4479,4 +4483,3 @@ html.in-wattpost-app .container {
 .pack-drift-warn { color: var(--amber, #f0c849); }
 .pack-drift-bad  { color: var(--red,   #ff7b72); }
 .pack-drift-na   { color: var(--text-3); opacity: .65; }
-

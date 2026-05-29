@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=140" />
+  <link rel="stylesheet" href="/web/styles.css?v=141" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -337,10 +337,10 @@
               <div class="today-hero-val"><span id="today-pv">·</span></div>
             </div>
             <div class="today-hero-cells">
-              <div class="today-cell"><span class="meta-k">Charged</span><span class="today-v" id="today-charged">·</span></div>
-              <div class="today-cell"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">·</span></div>
-              <div class="today-cell"><span class="meta-k">Load</span><span class="today-v" id="today-load">·</span></div>
-              <div class="today-cell"><span class="meta-k">Stored</span><span class="today-v" id="today-stored">·</span></div>
+              <div class="today-cell" id="today-cell-charged"><span class="meta-k" id="today-charged-k">Charged</span><span class="today-v" id="today-charged">·</span></div>
+              <div class="today-cell" id="today-cell-peak"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">·</span></div>
+              <div class="today-cell" id="today-cell-load"><span class="meta-k">Load</span><span class="today-v" id="today-load">·</span></div>
+              <div class="today-cell" id="today-cell-stored"><span class="meta-k" id="today-stored-k">Stored</span><span class="today-v" id="today-stored">·</span></div>
               <div class="today-cell"><span class="meta-k">SoC today</span><span class="today-v" id="today-soc-env">·</span></div>
             </div>
           </div>
@@ -1319,6 +1319,6 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=225"></script>
+  <script src="/web/app.js?v=226"></script>
 </body>
 </html>

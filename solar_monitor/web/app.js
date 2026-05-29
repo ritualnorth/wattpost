@@ -2653,6 +2653,15 @@ function renderToday() {
   const rover = devices.find(d => d.kind === "charge_controller");
   const l = rover?.latest || {};
 
+  // Battery-monitor framing: a shunt-only system (a battery + a shunt,
+  // no charging source) never "harvests" anything, so the PV-centric
+  // "Harvested today / Peak" tile reads as a dead 0 Wh. When there's no
+  // source device but there is a battery/shunt, reframe the tile around
+  // battery throughput (used / charged / net) instead.
+  const SOURCE_KINDS = new Set(["charge_controller", "ac_charger", "dcdc", "dcdc_xs", "dcdc_charger", "alternator"]);
+  const batteryOnly = !devices.some(d => SOURCE_KINDS.has(d.kind))
+    && devices.some(d => d.kind === "shunt" || d.kind === "smart_battery");
+
   // Headline kWh: prefer the server-side integrated total across ALL
   // sources (PV + AC charger + DC-DC) so a Victron-only install or
   // a multi-source install reads correctly. Fall back to the Renogy
@@ -2700,6 +2709,29 @@ function renderToday() {
     }
   }
 
+  // Battery-monitor reframe: lead with energy *used* today, drop the
+  // PV-only cells (Peak), and relabel "Stored" → "Net". Reset back to
+  // the PV framing otherwise, since the device set can change at runtime.
+  const heroK = document.getElementById("today-hero-k");
+  const peakCell = document.getElementById("today-cell-peak");
+  const loadCell = document.getElementById("today-cell-load");
+  const storedK = document.getElementById("today-stored-k");
+  if (batteryOnly) {
+    const dis = todayAggregate?.bank_discharged_today_wh;
+    const chg = todayAggregate?.bank_charged_today_wh;
+    if (heroK) heroK.textContent = "Used today";
+    $("#today-pv").textContent = (typeof dis === "number") ? fmt.wh(dis) : "—";
+    $("#today-charged").textContent = (typeof chg === "number") ? fmt.wh(chg) : "—";
+    if (peakCell) peakCell.hidden = true;
+    if (loadCell) loadCell.hidden = true;
+    if (storedK) storedK.textContent = "Net";
+  } else {
+    if (heroK) heroK.textContent = "Harvested today";
+    if (peakCell) peakCell.hidden = false;
+    if (loadCell) loadCell.hidden = false;
+    if (storedK) storedK.textContent = "Stored";
+  }
+
   // Today's SoC envelope, answers "did the bank get critically low
   // overnight?" at a glance. Sourced from /api/today_soc_minmax
   // (fresh endpoint, cheap MIN/MAX over today's bank.soc_pct
@@ -2729,6 +2761,17 @@ function renderToday() {
   const spark    = $("#today-spark");
 
   ensureForecast().then(f => {
+    if (batteryOnly) {
+      // No PV on this system — keep the battery framing, no solar
+      // forecast headline and no "hook up Solcast" nag.
+      if (headline) headline.textContent = "Today";
+      if (sub) sub.textContent = "";
+      if (foot) foot.hidden = true;
+      if (spark) spark.innerHTML = "";
+      panel?.classList.remove("today-panel--sleep");
+      renderTomorrowEmpty(false);
+      return;
+    }
     if (!f) {
       // No forecast configured. Show only live actuals and surface the
       // gentle "hook up Solcast" CTA card unless the user dismissed it.
