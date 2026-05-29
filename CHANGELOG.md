@@ -8,11 +8,17 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.124] - 2026-05-29
+
+### Added
+- Battery-monitor view for shunt-only systems: when there is no charging source (just a battery + a shunt), the Today tile now leads with energy used today and shows charged + net battery throughput, instead of a meaningless "Harvested today: 0 Wh" with empty PV cells
+
 ### Changed
 - Anonymous install-count beacon is now off by default, with a Settings -> Privacy toggle ("Anonymous install ping"). Was previously on by default with config-file-only opt-out (#217)
 
 ### Fixed
 - Kiosk share view rendered a blank SoC donut over the cloud: the kiosk read allow-list was missing `/api/snapshot` (the donut's data source) and still listed the removed `/api/bank/current` (#225)
+- Empty "Tomorrow" forecast footer could appear on setups with no solar forecast configured, because a `display` rule was overriding the element's hidden attribute
 
 ## [0.1.123] - 2026-05-28
 
