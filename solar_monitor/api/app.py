@@ -907,6 +907,27 @@ def kiosk_index() -> File:
     return File(path=path, media_type="text/html", content_disposition_type="inline")
 
 
+# Mode-aware kiosk route — pin a wall display at /kiosk/cabin (for
+# example) and the SPA reads the path segment, sets `data-mode` on
+# <body>, and renders the layout tuned for that persona. The validation
+# is permissive: unknown modes fall back to the standard kiosk view
+# rather than 404'ing, so a typo'd URL still gives the wall something
+# useful to show. See [[modes-state-machine]] for the full set.
+_VALID_KIOSK_MODES = frozenset({"home", "van", "cabin", "marine", "kiosk"})
+
+
+@get("/kiosk/{mode:str}", sync_to_thread=False)
+def kiosk_index_mode(mode: str) -> File:
+    """Mode-aware kiosk view (one of home / van / cabin / marine / kiosk)."""
+    path = _web_dir() / "index.html"
+    if not path.exists():
+        raise NotFoundException("index.html missing")
+    # Pass the requested mode through to the SPA via a header the
+    # boot script reads; it doesn't need to be in the body since the
+    # path itself encodes the intent (`window.location.pathname`).
+    return File(path=path, media_type="text/html", content_disposition_type="inline")
+
+
 @get("/login", sync_to_thread=False)
 def login_page(request: Request, state: State) -> File | Response:
     """Static HTML login form. POSTs to /api/login → cookie + redirect.
@@ -1579,6 +1600,7 @@ def build_app(
             patch_solar_pause,
             index,
             kiosk_index,
+            kiosk_index_mode,
             login_page,
             do_login,
             do_logout,

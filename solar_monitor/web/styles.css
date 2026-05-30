@@ -1064,6 +1064,35 @@ main {
   }
 }
 
+/* Mode-aware kiosk accents (Pillar 4b — see [[modes-state-machine]]).
+   Pin a wall display to /kiosk/<mode> (van/cabin/marine/home/kiosk)
+   and <body data-mode="..."> gets set at boot. A subtle accent stripe
+   at the top + a corner badge in kiosk mode are enough visual
+   differentiation for v1; richer per-mode layouts come later. */
+body[data-mode="van"]    { --mode-accent: #f5a623; --mode-label: "VAN"; }
+body[data-mode="cabin"]  { --mode-accent: #2c7d2c; --mode-label: "CABIN"; }
+body[data-mode="marine"] { --mode-accent: #1f6fc6; --mode-label: "MARINE"; }
+body[data-mode="home"]   { --mode-accent: #ff9a3c; --mode-label: "HOME"; }
+body[data-mode="kiosk"]  { --mode-accent: #6b7280; --mode-label: "KIOSK"; }
+body[data-mode]:not([data-mode=""])::before {
+  content: "";
+  position: fixed; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--mode-accent, transparent);
+  z-index: 9999;
+  pointer-events: none;
+}
+body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after {
+  content: var(--mode-label);
+  position: fixed; top: 12px; right: 14px;
+  font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  color: var(--mode-accent, #999);
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--mode-accent, #999);
+  background: rgba(255,255,255,0.04);
+  z-index: 9999; pointer-events: none;
+  font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
 /* Kiosk view always renders the flow vertically, regardless of viewport.
  * The host's column can be wide on a landscape tablet, but stacking is
  * still the right read at a distance. Same rules as the portrait

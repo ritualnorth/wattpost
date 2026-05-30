@@ -7506,7 +7506,18 @@ if (statusEl && legendEl) {
 // when local-auth is on), flip the SPA into kiosk mode by setting the
 // hash before initial setRoute runs. Bookmarkable, shareable, and the
 // auth middleware whitelists this exact path.
-if (window.location.pathname === "/kiosk") {
+//
+// /kiosk/<mode> variant — pin a wall display to a persona (van /
+// cabin / marine / home / kiosk) so the layout is tailored. The mode
+// lands on <body data-mode="..."> for CSS to react. Unknown modes
+// fall back to the standard kiosk view rather than 404'ing.
+const _KIOSK_MODES = ["home", "van", "cabin", "marine", "kiosk"];
+const _kioskPathMatch = window.location.pathname.match(/^\/kiosk(?:\/([a-z]+))?\/?$/);
+if (_kioskPathMatch) {
+  const _requestedMode = _kioskPathMatch[1] || "";
+  if (_requestedMode && _KIOSK_MODES.includes(_requestedMode)) {
+    document.body.dataset.mode = _requestedMode;
+  }
   window.location.hash = "#/kiosk";
 }
 // If this device is set to default-to-kiosk and the URL has no explicit
