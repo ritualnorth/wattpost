@@ -397,6 +397,46 @@ class MqttInCfg(msgspec.Struct, kw_only=True):
     stale_after_seconds: int = 600
 
 
+class HotspotCfg(msgspec.Struct, kw_only=True):
+    """Appliance-as-WiFi-AP (Pillar 3). Turns the Pi's WiFi radio into
+    an access point so a phone/laptop can reach the dashboard with no
+    existing network, the field-setup and off-grid story ("plug it in,
+    join WattPost-Setup, open the page").
+
+    Driven through NetworkManager (`nmcli`), the default network stack
+    on Pi OS Bookworm. We own a single named connection profile
+    (`connection_name`) in AP mode with NM's shared IPv4 (built-in
+    DHCP + NAT, 10.42.0.1/24 by default), so there's no hostapd /
+    dnsmasq to install or hand-configure.
+
+    Strictly opt-in and non-fatal, same contract as the tunnel:
+      - `enabled` only controls auto-bring-up on boot. Manual
+        on/off via /api/hotspot/{on,off} works regardless, as long
+        as the host has nmcli + the radio.
+      - If nmcli is missing or the interface doesn't exist we log
+        once and stay out of the way; the local UI and polling are
+        never affected.
+
+    Phase 3b (deferred): auto-handoff (fall back to AP when no known
+    WiFi is in range) and a captive portal. This struct deliberately
+    carries only what scaffold + manual control need.
+    """
+    enabled: bool = False          # auto-start the AP on boot
+    ssid: str = "WattPost-Setup"
+    # WPA2-PSK passphrase. Empty string => open network (no auth).
+    # NetworkManager/WPA require 8..63 chars when set; validated at
+    # activation time so a bad value surfaces as last_error, not a crash.
+    password: str = ""
+    # 2.4 GHz ("bg") by default for range + universal client support;
+    # "a" selects 5 GHz on radios/regions that allow AP there.
+    band: str = "bg"
+    channel: int = 6
+    interface: str = "wlan0"
+    # NM connection profile we create/own. Kept stable so repeated
+    # activations modify one profile instead of piling up duplicates.
+    connection_name: str = "wattpost-hotspot"
+
+
 class HistoryCfg(msgspec.Struct, kw_only=True):
     """Polling cadence + how long each retention tier keeps data.
 
@@ -449,6 +489,7 @@ class Config(msgspec.Struct, kw_only=True):
     solar_pause: SolarPauseCfg | None = None  # optional, auto-pause AC charger when PV covers (#163)
     smart_plugs: list[SmartPlugCfg] = []      # optional, LAN-attached smart plugs for solar-pause to drive
     mqtt_in: MqttInCfg | None = None     # optional, ingest from user's MQTT broker (#256)
+    hotspot: HotspotCfg | None = None    # optional, appliance-as-WiFi-AP (Pillar 3, off by default)
 
 
 # #258, default alert rules seeded on first boot. System-voltage-

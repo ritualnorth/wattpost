@@ -33,9 +33,15 @@ LABEL org.opencontainers.image.licenses="PolyForm-Noncommercial-1.0.0"
 #   - libffi8: argon2-cffi runtime.
 #   - ca-certificates: HTTPS to alert webhooks / Solcast / Open-Meteo.
 #   - curl: only needed to fetch cloudflared in the next layer.
+#   - network-manager: the `nmcli` client for the WiFi hotspot
+#     (appliance-as-AP). In host-network + /run/dbus-mount mode it
+#     drives the host's NetworkManager; the in-container NM daemon is
+#     never started. No-op when the hotspot feature is unconfigured.
+#   - iw: best-effort connected-client count for the hotspot status.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
         bluez bluez-tools libffi8 ca-certificates dbus curl \
+        network-manager iw \
  && rm -rf /var/lib/apt/lists/*
 
 # cloudflared — Cloudflare Tunnel client. Used by the paired-cloud

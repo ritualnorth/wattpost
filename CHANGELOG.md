@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Added
+- WiFi hotspot (appliance-as-AP, Pillar 3): the appliance can turn its WiFi radio into a NetworkManager access point so a phone/laptop reaches the dashboard with no other network — field setup and off-grid. Off by default; configure and toggle from Settings → WiFi hotspot, or via `POST /api/hotspot/{on,off}`. Reachable at `http://10.42.0.1` while up. Auto-handoff and captive portal are deferred to Phase 3b. See [docs/hotspot.md](docs/hotspot.md)
+
 ## [0.1.124] - 2026-05-29
 
 ### Added

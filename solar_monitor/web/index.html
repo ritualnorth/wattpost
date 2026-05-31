@@ -1103,6 +1103,43 @@
             </fieldset>
             <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
+          <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
+            <h3>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Turn this appliance's WiFi radio into an access point so a
+              phone or laptop can reach the dashboard with no other
+              network &mdash; field setup and off-grid. Needs
+              NetworkManager on the host (default on Pi&nbsp;OS Bookworm).
+              <strong>Off</strong> by default.
+            </p>
+            <div class="settings-row"><span>Status</span><span class="v" id="hotspot-status-v">&middot;</span></div>
+            <div class="hist-form" style="margin-top:.5rem">
+              <label class="hist-row">
+                <span>Network name (SSID)</span>
+                <span class="hist-input">
+                  <input id="hotspot-ssid" type="text" maxlength="32" placeholder="WattPost-Setup"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Password</span>
+                <span class="hist-input">
+                  <input id="hotspot-password" type="password" autocomplete="new-password" placeholder="blank = keep / open"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Start on boot</span>
+                <span class="hist-input">
+                  <input id="hotspot-enabled" type="checkbox"/>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="hotspot-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <button id="hotspot-on" class="btn-action" type="button">Turn on now</button>
+                <button id="hotspot-off" class="btn-action" type="button">Turn off</button>
+                <span id="hotspot-msg" class="settings-foot hist-status"></span>
+              </div>
+            </div>
+          </div>
           <div class="settings-block settings-block--backup" data-subroute="backup">
             <h3>Backup &amp; restore</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">

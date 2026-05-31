@@ -116,6 +116,22 @@ devices:
 #   label:             <set by cloud on pair>
 #   heartbeat_minutes: 5
 
+# WiFi hotspot (appliance-as-AP) — optional, off by default. Turns the
+# appliance's WiFi radio into a NetworkManager access point so a phone or
+# laptop can reach the dashboard with no other network (field setup /
+# off-grid). While up, the dashboard answers at http://10.42.0.1. Needs
+# NetworkManager on the host (default on Pi OS Bookworm). `enabled: true`
+# brings it up on boot; either way you can toggle it from
+# Settings -> WiFi hotspot. See docs/hotspot.md. (Auto-handoff + captive
+# portal are Phase 3b.)
+# hotspot:
+#   enabled: false
+#   ssid: WattPost-Setup
+#   password: "changeme123"   # 8..63 chars (WPA2), or "" for open
+#   band: bg                  # "bg" = 2.4 GHz, "a" = 5 GHz
+#   channel: 6
+#   interface: wlan0
+
 # Current weather (Open-Meteo, free, no API key). When set, the
 # daemon polls Open-Meteo for temperature, cloud cover, wind, and
 # sunrise/sunset, and the dashboard's "Right now" tile populates.

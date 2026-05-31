@@ -58,6 +58,9 @@ from .weather_admin import (
 from .weather_history import weather_history
 from .gps_admin import get_gps_status
 from .mqtt_in_admin import get_mqtt_in_status
+from .hotspot_admin import (
+    get_hotspot_status, update_hotspot_config, hotspot_on, hotspot_off,
+)
 from .location_admin import get_location_status, update_location_share
 from .energy import energy_today
 from .cloud_admin import (
@@ -1562,6 +1565,10 @@ def build_app(
             get_current_weather,
             get_gps_status,
             get_mqtt_in_status,
+            get_hotspot_status,
+            update_hotspot_config,
+            hotspot_on,
+            hotspot_off,
             get_location_status,
             update_location_share,
             get_weather_config,

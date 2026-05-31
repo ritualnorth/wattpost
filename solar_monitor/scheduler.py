@@ -19,6 +19,7 @@ from .cloud import CloudService
 from .gps import GpsService
 from .mqtt_in import MqttInService
 from .tunnel import TunnelService
+from .hotspot import HotspotService
 from .update import UpdateChecker
 from .config import Config
 from .export import EXPORTERS, Exporter
@@ -199,6 +200,20 @@ class PollScheduler:
             except Exception:
                 log.exception("mqtt_in service failed to initialise")
 
+        # Appliance-as-WiFi-AP (Pillar 3). Instantiated whenever a
+        # `hotspot:` block is present, regardless of `enabled`, so the
+        # /api/hotspot manual on/off controls work even when the AP
+        # doesn't auto-start on boot. The service auto-brings-up only
+        # when enabled=true (see HotspotService.start). nmcli-driven;
+        # missing NetworkManager is handled inside the service and
+        # never breaks the daemon.
+        self._hotspot: HotspotService | None = None
+        if config.hotspot is not None:
+            try:
+                self._hotspot = HotspotService(config.hotspot)
+            except Exception:
+                log.exception("hotspot service failed to initialise")
+
         # USB GPS (#125). Optional; off entirely when config.gps is
         # absent. On significant movement we mutate the weather +
         # forecast cfg in-memory and trigger one-shot re-fetches so
@@ -239,6 +254,12 @@ class PollScheduler:
         /api/mqtt_in/status endpoint. Returns None when the user
         hasn't configured a broker."""
         return self._mqtt_in
+
+    @property
+    def hotspot(self) -> HotspotService | None:
+        """Expose the WiFi-AP service for the /api/hotspot endpoints.
+        Returns None when no `hotspot:` block is configured."""
+        return self._hotspot
 
     async def _on_gps_move(self, lat: float, lon: float) -> None:
         """Called by GpsService when a fresh fix moves the daemon's
@@ -403,6 +424,8 @@ class PollScheduler:
             await self._mqtt_in.start()
         if self._tunnel is not None:
             await self._tunnel.start()
+        if self._hotspot is not None:
+            await self._hotspot.start()
         if self._updater is not None:
             await self._updater.start()
 
@@ -462,6 +485,8 @@ class PollScheduler:
             await self._mqtt_in.stop()
         if self._tunnel is not None:
             await self._tunnel.stop()
+        if self._hotspot is not None:
+            await self._hotspot.stop()
         if self._updater is not None:
             await self._updater.stop()
 

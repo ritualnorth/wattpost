@@ -4809,7 +4809,106 @@ function renderSettings() {
   refreshHistorySettings();  // #172, editable poll interval + retention
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
+  refreshHotspotPanel();     // Pillar 3, appliance-as-WiFi-AP
   wireResetToDefaults();     // #138, Danger zone
+}
+
+// Hotspot panel (Pillar 3). Reads /api/hotspot/status for live AP
+// state, pre-fills the form, and wires Save (PUT config) + the manual
+// on/off buttons. Password field stays blank on load so we never echo
+// the stored passphrase; a blank Save keeps the existing one.
+async function refreshHotspotPanel() {
+  const block = document.getElementById("settings-hotspot-block");
+  if (!block) return;
+  const statusEl = document.getElementById("hotspot-status-v");
+  const msgEl    = document.getElementById("hotspot-msg");
+  let s;
+  try { s = await api("/api/hotspot/status"); }
+  catch (e) {
+    if (statusEl) statusEl.textContent = "Couldn't load: " + (e.message || e);
+    return;
+  }
+
+  if (statusEl) {
+    if (!s.nmcli_available) {
+      statusEl.textContent = "Unavailable — NetworkManager (nmcli) not found on host";
+    } else if (!s.configured) {
+      statusEl.textContent = "Off · not configured";
+    } else if (s.active) {
+      const clients = (s.client_count == null) ? "" : ` · ${s.client_count} client${s.client_count === 1 ? "" : "s"}`;
+      statusEl.textContent = `On · "${s.ssid}" → http://${s.gateway}${clients}`;
+    } else {
+      statusEl.textContent = `Off · "${s.ssid}" ready`;
+    }
+  }
+
+  // Pre-fill form from current config (only when a block exists).
+  const ssidEl = document.getElementById("hotspot-ssid");
+  const enEl   = document.getElementById("hotspot-enabled");
+  if (s.configured) {
+    if (ssidEl && document.activeElement !== ssidEl) ssidEl.value = s.ssid || "";
+    if (enEl) enEl.checked = !!s.enabled;
+  }
+
+  const unavailable = !s.nmcli_available;
+  for (const id of ["hotspot-save", "hotspot-on", "hotspot-off"]) {
+    const b = document.getElementById(id);
+    if (b) b.disabled = unavailable;
+  }
+
+  const saveBtn = document.getElementById("hotspot-save");
+  if (saveBtn) saveBtn.onclick = saveHotspotSettings;
+  const onBtn = document.getElementById("hotspot-on");
+  if (onBtn) onBtn.onclick = () => hotspotPower(true);
+  const offBtn = document.getElementById("hotspot-off");
+  if (offBtn) offBtn.onclick = () => hotspotPower(false);
+  if (msgEl && !msgEl.dataset.sticky) msgEl.textContent = "";
+}
+
+async function saveHotspotSettings() {
+  const msgEl = document.getElementById("hotspot-msg");
+  const ssid  = (document.getElementById("hotspot-ssid")?.value || "").trim();
+  const pw    = document.getElementById("hotspot-password")?.value || "";
+  const enabled = !!document.getElementById("hotspot-enabled")?.checked;
+  const body = { ssid, enabled };
+  // Only send password when the user typed one — blank keeps current.
+  if (pw.length) body.password = pw;
+  if (msgEl) { msgEl.textContent = "Saving…"; msgEl.style.color = ""; msgEl.dataset.sticky = "1"; }
+  try {
+    const r = await fetch(_withKiosk("/api/hotspot/config"), {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const detail = await r.json().catch(() => ({}));
+      throw new Error(detail.detail || `HTTP ${r.status}`);
+    }
+    if (msgEl) { msgEl.style.color = ""; msgEl.textContent = "Saved."; }
+    const pwEl = document.getElementById("hotspot-password");
+    if (pwEl) pwEl.value = "";
+    // Config hot-reloads; give the new scheduler a beat, then refresh.
+    setTimeout(() => { delete msgEl?.dataset.sticky; refreshHotspotPanel(); }, 1500);
+  } catch (e) {
+    if (msgEl) { msgEl.style.color = "var(--red)"; msgEl.textContent = "Save failed: " + (e.message || e); delete msgEl.dataset.sticky; }
+  }
+}
+
+async function hotspotPower(on) {
+  const msgEl = document.getElementById("hotspot-msg");
+  if (msgEl) { msgEl.textContent = on ? "Turning on…" : "Turning off…"; msgEl.style.color = ""; msgEl.dataset.sticky = "1"; }
+  try {
+    const r = await fetch(_withKiosk(on ? "/api/hotspot/on" : "/api/hotspot/off"), { method: "POST" });
+    if (!r.ok) {
+      const detail = await r.json().catch(() => ({}));
+      throw new Error(detail.detail || `HTTP ${r.status}`);
+    }
+    if (msgEl) { msgEl.style.color = ""; msgEl.textContent = on ? "Hotspot on." : "Hotspot off."; }
+    delete msgEl?.dataset.sticky;
+    refreshHotspotPanel();
+  } catch (e) {
+    if (msgEl) { msgEl.style.color = "var(--red)"; msgEl.textContent = (on ? "Turn on failed: " : "Turn off failed: ") + (e.message || e); delete msgEl.dataset.sticky; }
+  }
 }
 
 async function refreshLocationPanel() {
