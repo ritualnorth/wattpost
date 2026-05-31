@@ -1412,6 +1412,29 @@ class CloudService:
                 # in scope for the earlier soc_pct / net_w extraction).
                 latest_for_extras = await store.get_latest()
 
+                # Instantaneous power split for the cloud hero's flow
+                # diagram: sum solar-in (pv_power_w) and load-out
+                # (load_power_w) across every device that reports them,
+                # the same way the local dashboard builds its flow strip.
+                # Net battery power already ships as net_w. Cheap, and
+                # free-form in extras so no cloud migration is needed.
+                try:
+                    pv_w = 0.0
+                    load_w = 0.0
+                    for _dev_metrics in latest_for_extras.values():
+                        if not isinstance(_dev_metrics, dict):
+                            continue
+                        _pv = _dev_metrics.get("pv_power_w")
+                        _ld = _dev_metrics.get("load_power_w")
+                        if isinstance(_pv, (int, float)):
+                            pv_w += float(_pv)
+                        if isinstance(_ld, (int, float)):
+                            load_w += float(_ld)
+                    extras["pv_w"] = round(pv_w)
+                    extras["load_w"] = round(load_w)
+                except Exception:
+                    log.debug("cloud heartbeat: pv/load aggregate failed", exc_info=True)
+
                 # Time to empty (discharging) or time to full (charging),
                 # in minutes. Uses the same rolling-hour load average as
                 # the runtime-forecast endpoint, so it's the same number
