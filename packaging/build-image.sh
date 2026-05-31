@@ -88,7 +88,6 @@ rsync -a \
       --exclude 'build/' \
       --exclude 'config.yaml' \
       --exclude 'solar-monitor.db*' \
-      --exclude '.claude/' \
       "${REPO_ROOT}/" "${SRC_STAGE_DIR}/"
 # Sanity: bail loudly if we didn't actually stage anything — the
 # chroot-side install.sh chokes on an empty source tree with a less
