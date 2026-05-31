@@ -85,7 +85,7 @@ def _ed25519_private_pem(seed_bytes: bytes) -> str:
     b64 = base64.b64encode(der).decode("ascii")
     # PEM wraps at 64 chars per line by convention.
     lines = "\n".join(b64[i:i+64] for i in range(0, len(b64), 64))
-    return f"-----BEGIN PRIVATE KEY-----\n{lines}\n-----END PRIVATE KEY-----\n"
+    return f"-----BEGIN PRIVATE KEY-----\n{lines}\n-----END PRIVATE KEY-----\n"  # gitleaks:allow — PEM wrapper over a runtime value, not a literal key
 
 
 # ---------------------------------------------------------------- #

@@ -100,8 +100,8 @@ devices:
 #
 #   - id: pushover_main
 #     type: pushover
-#     app_token: azGDORePK8gMaC0QOYAMyEEuzJnyUi    # https://pushover.net/apps/build (one-time setup)
-#     user_key:  uQiRzpo4DXghDmr9QzzfQu27cmVRsG    # top of your https://pushover.net dashboard
+#     app_token: <your-pushover-app-token>         # https://pushover.net/apps/build (one-time setup)
+#     user_key:  <your-pushover-user-key>          # top of your https://pushover.net dashboard
 #     # device: pixel-9                            # optional: only this device. Omit for all.
 
 # WattPost cloud (wattpost.io). Optional. Pair the appliance to your
