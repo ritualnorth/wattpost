@@ -172,6 +172,19 @@ fi
 chown -R "${APP_USER}:${APP_GROUP}" "${SLOTS_DIR}" "${STATE_DIR}"
 chown "${APP_USER}:${APP_GROUP}" "${CONFIG_DIR}"
 
+# Hotspot captive portal (Pillar 3b): NetworkManager reads dnsmasq
+# drop-ins for shared (AP) connections from here. Let the wattpost user
+# manage its catch-all drop-in so the captive portal can arm/disarm with
+# the AP, without giving the daemon broader root. Best-effort: skip
+# cleanly on hosts without NetworkManager (e.g. Docker installs), where
+# captive simply stays a no-op.
+NM_DNSMASQ_DIR=/etc/NetworkManager/dnsmasq-shared.d
+if [[ -d /etc/NetworkManager ]]; then
+    mkdir -p "${NM_DNSMASQ_DIR}"
+    chgrp "${APP_GROUP}" "${NM_DNSMASQ_DIR}" 2>/dev/null || true
+    chmod 0775 "${NM_DNSMASQ_DIR}" 2>/dev/null || true
+fi
+
 # ----- venv -----
 step "installing venv at ${APP_VENV}"
 if [[ ! -x "${APP_VENV}/bin/python" ]]; then

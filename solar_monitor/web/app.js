@@ -4846,10 +4846,12 @@ async function refreshHotspotPanel() {
   const ssidEl = document.getElementById("hotspot-ssid");
   const enEl   = document.getElementById("hotspot-enabled");
   const ahEl   = document.getElementById("hotspot-auto-handoff");
+  const cpEl   = document.getElementById("hotspot-captive");
   if (s.configured) {
     if (ssidEl && document.activeElement !== ssidEl) ssidEl.value = s.ssid || "";
     if (enEl) enEl.checked = !!s.enabled;
     if (ahEl) ahEl.checked = !!s.auto_handoff;
+    if (cpEl) cpEl.checked = !!s.captive_portal;
   }
 
   const unavailable = !s.nmcli_available;
@@ -4873,7 +4875,8 @@ async function saveHotspotSettings() {
   const pw    = document.getElementById("hotspot-password")?.value || "";
   const enabled = !!document.getElementById("hotspot-enabled")?.checked;
   const auto_handoff = !!document.getElementById("hotspot-auto-handoff")?.checked;
-  const body = { ssid, enabled, auto_handoff };
+  const captive_portal = !!document.getElementById("hotspot-captive")?.checked;
+  const body = { ssid, enabled, auto_handoff, captive_portal };
   // Only send password when the user typed one — blank keeps current.
   if (pw.length) body.password = pw;
   if (msgEl) { msgEl.textContent = "Saving…"; msgEl.style.color = ""; msgEl.dataset.sticky = "1"; }

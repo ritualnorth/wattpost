@@ -11,7 +11,8 @@ return 409 until a `hotspot:` block exists (PUT /config creates it and
 hot-reloads so the service materialises without a restart). Same
 save-config + background hot-reload pattern as weather_admin.
 
-Phase 3b (deferred): auto-handoff + captive portal.
+Auto-handoff (handoff.py) and the captive portal (captive_portal flag +
+api/captive.py) are wired in separately.
 """
 from __future__ import annotations
 
@@ -40,6 +41,7 @@ class HotspotConfigPayload(msgspec.Struct, kw_only=True):
     # default when first creating the block).
     enabled: bool | None = None
     auto_handoff: bool | None = None
+    captive_portal: bool | None = None
     ssid: str | None = None
     # Empty string => open network; non-empty must be 8..63 chars (WPA2).
     # `None` means "leave unchanged" so the panel never has to re-send
@@ -94,6 +96,7 @@ async def update_hotspot_config(
     interface = data.interface if data.interface is not None else cur.interface
     enabled = data.enabled if data.enabled is not None else cur.enabled
     auto_handoff = data.auto_handoff if data.auto_handoff is not None else cur.auto_handoff
+    captive_portal = data.captive_portal if data.captive_portal is not None else cur.captive_portal
     # password: None => keep existing; "" => explicitly open the network.
     password = data.password if data.password is not None else cur.password
 
@@ -110,7 +113,8 @@ async def update_hotspot_config(
         raise HTTPException(status_code=400, detail="channel out of range")
 
     new = HotspotCfg(
-        enabled=enabled, auto_handoff=auto_handoff, ssid=ssid, password=password,
+        enabled=enabled, auto_handoff=auto_handoff, captive_portal=captive_portal,
+        ssid=ssid, password=password,
         band=band, channel=channel, interface=interface,
         connection_name=cur.connection_name,
     )
@@ -120,6 +124,7 @@ async def update_hotspot_config(
         raw["hotspot"] = {
             "enabled":         new.enabled,
             "auto_handoff":    new.auto_handoff,
+            "captive_portal":  new.captive_portal,
             "ssid":            new.ssid,
             "password":        new.password,
             "band":            new.band,

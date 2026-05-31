@@ -5,10 +5,10 @@ point**, so a phone or laptop can reach the dashboard when there's no
 other network around. This is the field-setup and off-grid story: plug
 the box in, join the `WattPost-Setup` network, open the page.
 
-> **Status:** manual control **and auto-handoff** are shipped. A captive
-> portal that pops the dashboard automatically when a client joins is
-> still deferred. You can drive the hotspot by hand, or let it raise
-> itself whenever there's no other network (see *Auto-handoff* below).
+> **Status:** manual control, auto-handoff **and the captive portal** are
+> all shipped. Drive the hotspot by hand, let it raise itself whenever
+> there's no other network (*Auto-handoff*), and have a joining device
+> pop the dashboard automatically (*Captive portal*) — all below.
 
 ## What it does
 
@@ -59,6 +59,7 @@ up automatically every time the appliance starts.
 hotspot:
   enabled: true            # bring the AP up on boot (default false)
   auto_handoff: false      # auto-enable when offline (see below)
+  captive_portal: false    # auto-pop the dashboard on join (see below)
   ssid: WattPost-Setup
   password: "changeme123"  # 8..63 chars, or "" for an open network
   band: bg                 # "bg" = 2.4 GHz (default), "a" = 5 GHz
@@ -139,7 +140,32 @@ the uplink** (or add a second USB WiFi adapter) for seamless, blip-free
 handoff. `auto_handoff` is ignored when `enabled: true`, since the AP is
 already always on.
 
-## Roadmap (still deferred)
+## Captive portal
 
-- **Captive portal** — DNS redirect so joining the network pops the
-  dashboard automatically, like a hotel WiFi splash page.
+With **Captive portal** on (`captive_portal: true`, or the checkbox in
+Settings → WiFi hotspot), joining the hotspot **pops the dashboard
+automatically** on the phone or laptop — the "Sign in to network" sheet
+every OS shows for hotel/airport WiFi — so nobody has to know or type
+`http://10.42.0.1`.
+
+How it works: while a captive AP is up, the appliance adds a NetworkManager
+dnsmasq drop-in that resolves *every* hostname to itself. A joining
+device's OS fires its usual connectivity check (Apple hits
+`captive.apple.com`, Android `generate_204`, Windows `connecttest.txt`);
+those land on the appliance, which answers with a redirect to the
+dashboard instead of the "you're online" reply — and the OS opens its
+captive sheet.
+
+Notes:
+
+- **Needs DNS write access.** The appliance must be able to manage NM's
+  `dnsmasq-shared.d` drop-in. The packaged Pi image grants the `wattpost`
+  user exactly this (and nothing more). On a host where it can't write
+  there (e.g. a hand-rolled Docker setup), the portal simply doesn't arm
+  — the AP still works and clients reach the dashboard at the gateway IP
+  by hand. The hotspot is never affected either way.
+- The drop-in is present **only while a captive AP is up**; it's removed
+  the moment the AP comes down, so it never interferes with normal
+  networking.
+- Pairs naturally with **auto-handoff**: off-grid, the AP raises itself
+  and a joining phone is taken straight to the dashboard.

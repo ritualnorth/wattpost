@@ -417,9 +417,8 @@ class HotspotCfg(msgspec.Struct, kw_only=True):
         once and stay out of the way; the local UI and polling are
         never affected.
 
-    Phase 3b (deferred): auto-handoff (fall back to AP when no known
-    WiFi is in range) and a captive portal. This struct deliberately
-    carries only what scaffold + manual control need.
+    Phase 3b is wired in via the `auto_handoff` and `captive_portal`
+    fields below.
     """
     enabled: bool = False          # auto-start the AP on boot (always-on)
     # Auto-handoff (Pillar 3b): bring the AP up automatically whenever the
@@ -430,6 +429,13 @@ class HotspotCfg(msgspec.Struct, kw_only=True):
     # auto-handoff without the user touching this flag. Ignored when
     # `enabled` is true (the AP is always on then, nothing to hand off).
     auto_handoff: bool = False
+    # Captive portal: while the AP is up, hijack DNS (via a NetworkManager
+    # dnsmasq drop-in) so a joining device's OS connectivity check lands
+    # on the dashboard and the "Sign in to network" sheet pops
+    # automatically — no need to type http://10.42.0.1 by hand. Needs the
+    # daemon to be able to write NM's dnsmasq-shared.d dir (the packaged
+    # Pi image grants this); degrades to a no-op otherwise, AP unaffected.
+    captive_portal: bool = False
     ssid: str = "WattPost-Setup"
     # WPA2-PSK passphrase. Empty string => open network (no auth).
     # NetworkManager/WPA require 8..63 chars when set; validated at

@@ -85,6 +85,18 @@ ANONYMOUS_PATH_PREFIXES = (
     "/api/system/auth-status",
     # /api/heartbeat is bearer-token authed elsewhere; the middleware
     # leaves the auth header path alone.
+    #
+    # Captive-portal probe endpoints (Pillar 3b). A device joining the
+    # hotspot is pre-auth by definition; its OS hits these to detect the
+    # portal, so they MUST answer without a session. They only redirect
+    # to the dashboard when the captive portal is active. See api/captive.py.
+    "/generate_204",
+    "/gen_204",
+    "/hotspot-detect.html",
+    "/library/test/success.html",
+    "/connecttest.txt",
+    "/ncsi.txt",
+    "/canonical.html",
 )
 
 # In-memory session store. Token → {"issued_at": epoch, "origin": "local"|"sso"}.

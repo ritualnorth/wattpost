@@ -130,6 +130,9 @@ devices:
 #                             # other network, drop it when one returns.
 #                             # Local-first (no cloud needed); the off-grid
 #                             # path. Ignored when enabled: true.
+#   captive_portal: false     # when a device joins, auto-pop the dashboard
+#                             # (the "Sign in to network" sheet). Needs NM
+#                             # DNS access (built into the appliance image).
 #   ssid: WattPost-Setup
 #   password: "changeme123"   # 8..63 chars (WPA2), or "" for open
 #   band: bg                  # "bg" = 2.4 GHz, "a" = 5 GHz

@@ -18,14 +18,15 @@ Lifecycle / contract (same spirit as TunnelService):
   - Every nmcli failure is non-fatal: logged, surfaced via
     `status().last_error`, never raised into the scheduler.
 
-Out of scope here (Phase 3b): auto-handoff (fall back to AP when no
-known WiFi is in range) and a captive portal. This module only does
-manual + boot-if-enabled bring-up.
+This module owns manual + boot-if-enabled bring-up and the captive-portal
+DNS drop-in. The auto-handoff policy (when to raise/drop on its own)
+lives in handoff.py.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 
 from ..config import HotspotCfg
@@ -40,6 +41,16 @@ AP_GATEWAY = "10.42.0.1"
 
 _NMCLI_TIMEOUT = 20.0  # seconds; nmcli connection up can take a beat
 
+# NetworkManager reads *.conf here for the dnsmasq it runs on shared
+# (AP) connections. Dropping a catch-all `address=/#/<gw>` here makes
+# every DNS lookup from a joined client resolve to the appliance, which
+# is what turns a joining device's OS connectivity probe into a captive
+# portal hit. The packaged Pi image makes this dir writable by the
+# `wattpost` user; elsewhere the write simply fails and captive is a
+# no-op (the AP itself is unaffected).
+_DNSMASQ_SHARED_DIR = "/etc/NetworkManager/dnsmasq-shared.d"
+_CAPTIVE_DROPIN = "wattpost-captive.conf"
+
 
 class HotspotService:
     def __init__(self, cfg: HotspotCfg) -> None:
@@ -49,6 +60,14 @@ class HotspotService:
         # False after deactivate(). status() still queries nmcli for
         # ground truth; this is only for logging/diagnostics.
         self._desired_up = False
+        # True while the captive-portal DNS hijack is in force (AP up +
+        # captive_portal enabled + the drop-in actually written). The
+        # captive probe routes read this to decide whether to redirect.
+        self._captive_active = False
+
+    @property
+    def captive_active(self) -> bool:
+        return self._captive_active
 
     # ------------------------------------------------------------------
     # availability
@@ -107,12 +126,19 @@ class HotspotService:
 
         try:
             await self._ensure_profile()
+            # Write the captive drop-in BEFORE bringing the AP up, so
+            # NM's dnsmasq starts with the catch-all already in place
+            # (no live reload / blip needed). Best-effort.
+            if self.cfg.captive_portal:
+                self._write_captive_dropin()
             rc, _out, err = await self._nmcli(
                 "connection", "up", self.cfg.connection_name
             )
             if rc != 0:
                 self._last_error = err or f"nmcli up exited {rc}"
                 log.warning("hotspot: bring-up failed: %s", self._last_error)
+                self._remove_captive_dropin()  # don't leave a stray hijack
+                self._captive_active = False
                 return {"ok": False, "error": self._last_error}
         except Exception as e:  # non-fatal, surface and move on
             self._last_error = str(e)
@@ -122,9 +148,9 @@ class HotspotService:
         self._desired_up = True
         self._last_error = None
         log.info(
-            "hotspot: AP up — ssid=%s band=%s ch=%d iface=%s gw=%s",
+            "hotspot: AP up — ssid=%s band=%s ch=%d iface=%s gw=%s captive=%s",
             self.cfg.ssid, self.cfg.band, self.cfg.channel,
-            self.cfg.interface, AP_GATEWAY,
+            self.cfg.interface, AP_GATEWAY, self._captive_active,
         )
         return {"ok": True, "error": ""}
 
@@ -149,10 +175,53 @@ class HotspotService:
             log.warning("hotspot: deactivate failed: %s", e)
             return {"ok": False, "error": self._last_error}
 
+        # Pull the captive hijack once the AP is down so a later plain
+        # (non-captive) AP, or normal NM shared use, isn't affected.
+        self._remove_captive_dropin()
         self._desired_up = False
         self._last_error = None
         log.info("hotspot: AP '%s' down", self.cfg.ssid)
         return {"ok": True, "error": ""}
+
+    # ------------------------------------------------------------------
+    # captive portal — DNS hijack via NM's dnsmasq drop-in
+    # ------------------------------------------------------------------
+    def _write_captive_dropin(self) -> None:
+        """Drop a catch-all `address=/#/<gw>` so every client DNS lookup
+        resolves to the appliance. Best-effort: a write failure (no perm
+        on a non-packaged host) logs once and leaves captive inactive —
+        the AP still works, clients just have to browse to the gateway
+        IP by hand."""
+        content = (
+            "# WattPost captive portal — resolve all names to the AP so a\n"
+            "# joining device's OS connectivity check lands on the dashboard.\n"
+            "# Managed by the daemon; present only while a captive AP is up.\n"
+            f"address=/#/{AP_GATEWAY}\n"
+        )
+        try:
+            os.makedirs(_DNSMASQ_SHARED_DIR, exist_ok=True)
+            path = os.path.join(_DNSMASQ_SHARED_DIR, _CAPTIVE_DROPIN)
+            with open(path, "w") as f:
+                f.write(content)
+            self._captive_active = True
+            log.info("hotspot: captive portal armed (DNS → %s)", AP_GATEWAY)
+        except Exception as e:
+            self._captive_active = False
+            log.warning(
+                "hotspot: captive portal unavailable (can't write %s: %s). "
+                "AP is up; clients reach the dashboard at http://%s",
+                _DNSMASQ_SHARED_DIR, e, AP_GATEWAY,
+            )
+
+    def _remove_captive_dropin(self) -> None:
+        """Remove the catch-all drop-in. Idempotent; never raises."""
+        self._captive_active = False
+        try:
+            path = os.path.join(_DNSMASQ_SHARED_DIR, _CAPTIVE_DROPIN)
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception as e:
+            log.debug("hotspot: couldn't remove captive drop-in: %s", e)
 
     # ------------------------------------------------------------------
     # status
@@ -171,6 +240,8 @@ class HotspotService:
         return {
             "enabled":        self.cfg.enabled,
             "auto_handoff":   self.cfg.auto_handoff,
+            "captive_portal": self.cfg.captive_portal,
+            "captive_active": self._captive_active,
             "active":         active,
             "ssid":           self.cfg.ssid,
             "band":           self.cfg.band,

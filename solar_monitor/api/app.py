@@ -61,6 +61,9 @@ from .mqtt_in_admin import get_mqtt_in_status
 from .hotspot_admin import (
     get_hotspot_status, update_hotspot_config, hotspot_on, hotspot_off,
 )
+from .captive import (
+    android_204, apple_detect, win_connecttest, win_ncsi, ubuntu_canonical,
+)
 from .location_admin import get_location_status, update_location_share
 from .energy import energy_today
 from .cloud_admin import (
@@ -1569,6 +1572,11 @@ def build_app(
             update_hotspot_config,
             hotspot_on,
             hotspot_off,
+            android_204,
+            apple_detect,
+            win_connecttest,
+            win_ncsi,
+            ubuntu_canonical,
             get_location_status,
             update_location_share,
             get_weather_config,
