@@ -1413,25 +1413,36 @@ class CloudService:
                 latest_for_extras = await store.get_latest()
 
                 # Instantaneous power split for the cloud hero's flow
-                # diagram: sum solar-in (pv_power_w) and load-out
-                # (load_power_w) across every device that reports them,
-                # the same way the local dashboard builds its flow strip.
-                # Net battery power already ships as net_w. Cheap, and
-                # free-form in extras so no cloud migration is needed.
+                # diagram. Sources = solar (pv_power_w) + AC charger
+                # (output_1_power_w) + DC-DC (output_power_w), summed
+                # across devices (same kinds the energy totals use).
+                #
+                # Load is the ENERGY-BALANCE identity the local dashboard
+                # uses — load = max(0, sources − net_w) — NOT the charge
+                # controller's load terminal (load_power_w), which is
+                # usually 0 because household loads sit on a busbar the
+                # controller can't meter. (net_w >0 charging, <0
+                # discharging, so a discharging bank adds to the load.)
                 try:
                     pv_w = 0.0
-                    load_w = 0.0
-                    for _dev_metrics in latest_for_extras.values():
-                        if not isinstance(_dev_metrics, dict):
+                    sources_w = 0.0
+                    for _dm in latest_for_extras.values():
+                        if not isinstance(_dm, dict):
                             continue
-                        _pv = _dev_metrics.get("pv_power_w")
-                        _ld = _dev_metrics.get("load_power_w")
+                        _pv = _dm.get("pv_power_w")
+                        _ac = _dm.get("output_1_power_w")
+                        _dc = _dm.get("output_power_w")
                         if isinstance(_pv, (int, float)):
                             pv_w += float(_pv)
-                        if isinstance(_ld, (int, float)):
-                            load_w += float(_ld)
+                            sources_w += float(_pv)
+                        if isinstance(_ac, (int, float)):
+                            sources_w += float(_ac)
+                        if isinstance(_dc, (int, float)):
+                            sources_w += float(_dc)
                     extras["pv_w"] = round(pv_w)
-                    extras["load_w"] = round(load_w)
+                    extras["sources_w"] = round(sources_w)
+                    if isinstance(net_w, (int, float)):
+                        extras["load_w"] = round(max(0.0, sources_w - float(net_w)))
                 except Exception:
                     log.debug("cloud heartbeat: pv/load aggregate failed", exc_info=True)
 
