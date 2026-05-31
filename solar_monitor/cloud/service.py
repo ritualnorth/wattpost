@@ -402,11 +402,6 @@ class CloudService:
             # heartbeat post-update), persist it to config.yaml so the
             # /sso endpoint can verify cloud-signed redirect tokens.
             self._maybe_persist_sso_secret(body.get("sso_secret"))
-            # Cache the cloud-set operating mode (home/van/cabin/marine/
-            # kiosk). Persisted durably so mode-driven behaviour — e.g.
-            # Pillar 3 auto-hotspot when there's no LAN — can read it
-            # even while we're offline and can't re-fetch from the cloud.
-            self._cache_mode(body.get("mode"))
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         # Promote the pending alerts-uploaded cursor now that the
@@ -442,29 +437,6 @@ class CloudService:
             _ca.persist_cloud_cfg(self.cfg, config_path=cfg_path)
         except Exception:
             log.exception("cloud heartbeat: failed to persist sso_secret")
-
-    # Valid operating modes the cloud may push. Mirrors VALID_MODES in
-    # cloud/wattpost_cloud/api/sites.py. Anything else is ignored so a
-    # newer cloud value can't write a junk mode an older appliance
-    # wouldn't understand.
-    _VALID_MODES = ("home", "van", "cabin", "marine", "kiosk")
-
-    def _cache_mode(self, mode: str | None) -> None:
-        """Persist the cloud-set operating mode in the appliance's kv
-        table under `cloud.mode`. Durable (survives restart + offline),
-        which is the point: auto-hotspot needs the mode precisely when
-        there's no LAN to ask the cloud. Unknown/absent values are
-        ignored, leaving any previously-cached mode intact."""
-        if not mode or not isinstance(mode, str):
-            return
-        if mode not in self._VALID_MODES:
-            log.debug("cloud heartbeat: ignoring unknown mode %r", mode)
-            return
-        try:
-            store = self.scheduler.store
-            asyncio.create_task(store.kv_set("cloud.mode", mode))
-        except Exception as e:
-            log.debug("cloud heartbeat: failed to cache mode: %s", e)
 
     def _cache_branding(self, branding: dict[str, Any]) -> None:
         """Persist the {brand_name, brand_support_email, brand_logo_url}

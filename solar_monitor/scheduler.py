@@ -215,18 +215,13 @@ class PollScheduler:
                 log.exception("hotspot service failed to initialise")
 
         # Auto-handoff monitor (Pillar 3b). Watches connectivity and
-        # raises/drops the hotspot automatically. Local-first: driven by
-        # config.hotspot.auto_handoff with no cloud needed. The cloud
-        # mode (van/cabin/marine) is a convenience layer — only wired in
-        # when paired (config.cloud present), read from the kv cache the
-        # heartbeat populates. Monitor no-ops unless it should_run().
+        # raises/drops the hotspot automatically. Local-only: driven by
+        # config.hotspot.auto_handoff, no cloud involved. Monitor no-ops
+        # unless it should_run().
         self._hotspot_handoff: AutoHandoffMonitor | None = None
         if self._hotspot is not None:
             try:
-                _mode_getter = self._read_cloud_mode if config.cloud is not None else None
-                self._hotspot_handoff = AutoHandoffMonitor(
-                    self._hotspot, mode_getter=_mode_getter,
-                )
+                self._hotspot_handoff = AutoHandoffMonitor(self._hotspot)
             except Exception:
                 log.exception("hotspot auto-handoff failed to initialise")
 
@@ -276,16 +271,6 @@ class PollScheduler:
         """Expose the WiFi-AP service for the /api/hotspot endpoints.
         Returns None when no `hotspot:` block is configured."""
         return self._hotspot
-
-    async def _read_cloud_mode(self) -> str | None:
-        """Cloud-set operating mode the heartbeat caches in kv under
-        `cloud.mode` (home/van/cabin/marine/kiosk). Drives the auto-
-        handoff convenience layer. None when unset or unreadable."""
-        try:
-            row = await self.store.kv_get("cloud.mode")
-        except Exception:
-            return None
-        return row[0] if row else None
 
     async def _on_gps_move(self, lat: float, lon: float) -> None:
         """Called by GpsService when a fresh fix moves the daemon's

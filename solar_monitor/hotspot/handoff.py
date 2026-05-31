@@ -1,13 +1,10 @@
 """Auto-handoff (Pillar 3b): raise the hotspot when the appliance has no
 network, drop it when a real LAN returns.
 
-LOCAL-FIRST. The trigger is `hotspot.auto_handoff` in the appliance's own
+LOCAL-ONLY. The trigger is `hotspot.auto_handoff` in the appliance's own
 config — it works with no cloud subscription, which matters because the
 off-grid user who needs this most is the least likely to be paying for
-the cloud. The cloud operating mode (van/cabin/marine) is layered on top
-as a *convenience*: when present it implies auto-handoff without the user
-touching the local flag. Neither path gates the other; the effective
-decision is simply `local_flag OR mode_implies_it`.
+the cloud.
 
 Single-radio reality: most Pis have one WiFi radio, so while our AP holds
 it the appliance cannot also be a WiFi client — `lan_kind()` can't see a
@@ -24,15 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Awaitable, Callable
 
 from .service import HotspotService
 
 log = logging.getLogger(__name__)
-
-# Cloud operating modes that imply auto-handoff (mirrors the mobility
-# personas in the cloud's site mode picker). 'home'/'kiosk' do not.
-AUTO_MODES = frozenset({"van", "cabin", "marine"})
 
 POLL_SECONDS = 30        # how often tick() runs
 GRACE_CHECKS = 2         # consecutive offline ticks before raising the AP
@@ -40,13 +32,8 @@ RETRY_AFTER_POLLS = 10   # while AP up w/o ethernet, ticks before a probe-drop
 
 
 class AutoHandoffMonitor:
-    def __init__(
-        self,
-        service: HotspotService,
-        mode_getter: Callable[[], Awaitable[str | None]] | None = None,
-    ) -> None:
+    def __init__(self, service: HotspotService) -> None:
         self.service = service
-        self._mode_getter = mode_getter
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
         # Only the monitor's own AP raises are managed here; a manually
@@ -59,22 +46,21 @@ class AutoHandoffMonitor:
     # lifecycle
     # ------------------------------------------------------------------
     def should_run(self) -> bool:
-        """Run the loop only when auto-handoff could ever fire: the local
-        flag is set, or a cloud mode source exists (paired appliance).
-        Unpaired + flag-off → no loop, no periodic nmcli polling."""
+        """Run the loop only when auto-handoff could fire: the local flag
+        is set and we can drive an AP. Flag-off → no loop, no periodic
+        nmcli polling."""
         if not HotspotService.is_available(self.service.cfg):
             return False
         if self.service.cfg.enabled:
             return False  # AP is always-on; nothing to hand off
-        return self.service.cfg.auto_handoff or self._mode_getter is not None
+        return self.service.cfg.auto_handoff
 
     async def start(self) -> None:
         if not self.should_run():
             return
         self._stop.clear()
         self._task = asyncio.create_task(self._loop(), name="hotspot-handoff")
-        log.info("hotspot: auto-handoff monitor started (local_flag=%s, cloud_mode=%s)",
-                 self.service.cfg.auto_handoff, self._mode_getter is not None)
+        log.info("hotspot: auto-handoff monitor started")
 
     async def stop(self) -> None:
         self._stop.set()
@@ -108,11 +94,11 @@ class AutoHandoffMonitor:
         if not HotspotService.is_available(cfg):
             return "skip:unavailable"
 
-        eff = await self._effective_auto()
+        eff = cfg.auto_handoff
         ap_up = await self.service._is_active()
 
         if not eff:
-            # Not opted in (or a cloud mode flipped back to home/kiosk).
+            # Not opted in (the local flag was turned off).
             # Tidy up only an AP *we* raised; leave manual APs alone.
             if self._raised_by_monitor and ap_up:
                 await self.service.deactivate()
@@ -167,17 +153,6 @@ class AutoHandoffMonitor:
         # We have LAN — nothing to do.
         self._miss_streak = 0
         return "ok"
-
-    async def _effective_auto(self) -> bool:
-        if self.service.cfg.auto_handoff:
-            return True
-        if self._mode_getter is None:
-            return False
-        try:
-            mode = await self._mode_getter()
-        except Exception:
-            return False
-        return mode in AUTO_MODES
 
     def _reset(self) -> None:
         self._miss_streak = 0

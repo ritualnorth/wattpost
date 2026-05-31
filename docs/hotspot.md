@@ -115,12 +115,10 @@ again when a real LAN returns. This is the off-grid / vanlife path —
 park anywhere, and the dashboard is always reachable at
 `http://10.42.0.1` without you touching anything.
 
-**It's local-first and needs no cloud account.** The `auto_handoff` flag
-lives in the appliance's own config; it works on a fully offline,
-unpaired box. If you *do* use wattpost.cloud, setting the site's mode to
-**Van**, **Cabin**, or **Marine** turns auto-handoff on for you as a
-convenience — but the flag is always the source of truth, and the local
-toggle works regardless of subscription.
+**It needs no cloud account.** The `auto_handoff` flag lives in the
+appliance's own config and works on a fully offline, unpaired box —
+which is the whole point, since the off-grid user who needs this most is
+the least likely to be paying for the cloud.
 
 How it decides:
 

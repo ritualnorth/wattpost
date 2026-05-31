@@ -35,9 +35,9 @@ class FakeService:
         return {"ok": True, "error": ""}
 
 
-def mon(cfg, mode_getter=None):
+def mon(cfg):
     svc = FakeService(cfg)
-    m = AutoHandoffMonitor(svc, mode_getter=mode_getter)
+    m = AutoHandoffMonitor(svc)
     return m, svc
 
 
@@ -86,18 +86,16 @@ async def t_single_radio_probe_drop():
     print(f"PASS single-radio: probe-drop after RETRY_AFTER_POLLS={H.RETRY_AFTER_POLLS} holds")
 
 
-async def t_cloud_mode_convenience():
-    mode = {"v": "van"}
-    async def getter(): return mode["v"]
-    m, svc = mon(HotspotCfg(auto_handoff=False), mode_getter=getter)
+async def t_flag_off_cleans_up():
+    m, svc = mon(HotspotCfg(auto_handoff=True))
     svc.lan = None
     await m.tick(); r = await m.tick()
     assert r == "raise" and svc._active, r
-    # Cloud flips to home → no longer effective → our AP is cleaned up.
-    mode["v"] = "home"
+    # Operator turns auto-handoff off → the AP we raised is cleaned up.
+    svc.cfg.auto_handoff = False
     r = await m.tick()
     assert r == "off" and not svc._active, r
-    print("PASS cloud-mode: van implies handoff; home cleans up the raised AP")
+    print("PASS flag-off: turning auto_handoff off drops the monitor-raised AP")
 
 
 async def t_enabled_is_skipped():
@@ -128,7 +126,7 @@ async def t_lan_present_noop():
 
 async def main():
     for t in (t_not_opted_in, t_local_flag_raises_after_grace, t_eth_return_drops,
-              t_single_radio_probe_drop, t_cloud_mode_convenience, t_enabled_is_skipped,
+              t_single_radio_probe_drop, t_flag_off_cleans_up, t_enabled_is_skipped,
               t_manual_ap_untouched, t_lan_present_noop):
         await t()
     print("\nALL HANDOFF SCENARIOS PASS")
