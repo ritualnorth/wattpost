@@ -10,6 +10,8 @@ Strictly opt-in and non-fatal:
   - Needs `nmcli` (NetworkManager, default on Pi OS Bookworm).
     Missing → log once + skip, never breaks the local UI or polling.
 
-Phase 3b (deferred): auto-handoff + captive portal.
+Phase 3b: auto-handoff is implemented (see handoff.py); captive portal
+is still deferred.
 """
 from .service import HotspotService  # noqa: F401
+from .handoff import AutoHandoffMonitor  # noqa: F401

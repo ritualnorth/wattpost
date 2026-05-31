@@ -39,6 +39,7 @@ class HotspotConfigPayload(msgspec.Struct, kw_only=True):
     # absent fields fall back to the current value (or the struct
     # default when first creating the block).
     enabled: bool | None = None
+    auto_handoff: bool | None = None
     ssid: str | None = None
     # Empty string => open network; non-empty must be 8..63 chars (WPA2).
     # `None` means "leave unchanged" so the panel never has to re-send
@@ -92,6 +93,7 @@ async def update_hotspot_config(
     channel = data.channel if data.channel is not None else cur.channel
     interface = data.interface if data.interface is not None else cur.interface
     enabled = data.enabled if data.enabled is not None else cur.enabled
+    auto_handoff = data.auto_handoff if data.auto_handoff is not None else cur.auto_handoff
     # password: None => keep existing; "" => explicitly open the network.
     password = data.password if data.password is not None else cur.password
 
@@ -108,7 +110,7 @@ async def update_hotspot_config(
         raise HTTPException(status_code=400, detail="channel out of range")
 
     new = HotspotCfg(
-        enabled=enabled, ssid=ssid, password=password,
+        enabled=enabled, auto_handoff=auto_handoff, ssid=ssid, password=password,
         band=band, channel=channel, interface=interface,
         connection_name=cur.connection_name,
     )
@@ -117,6 +119,7 @@ async def update_hotspot_config(
     def _mutate(raw):
         raw["hotspot"] = {
             "enabled":         new.enabled,
+            "auto_handoff":    new.auto_handoff,
             "ssid":            new.ssid,
             "password":        new.password,
             "band":            new.band,
@@ -127,8 +130,8 @@ async def update_hotspot_config(
         return raw
 
     _save_config(config_path, _mutate)
-    log.info("hotspot configured (ssid=%s band=%s ch=%d enabled=%s)",
-             new.ssid, new.band, new.channel, new.enabled)
+    log.info("hotspot configured (ssid=%s band=%s ch=%d enabled=%s auto_handoff=%s)",
+             new.ssid, new.band, new.channel, new.enabled, new.auto_handoff)
     # Hot-reload rebuilds the scheduler's HotspotService from the new
     # block. If enabled=true it auto-brings-up on the reload's start().
     asyncio.create_task(_hot_reload_bg(state))

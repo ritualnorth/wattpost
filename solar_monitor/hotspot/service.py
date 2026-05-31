@@ -170,6 +170,7 @@ class HotspotService:
         clients = await self._client_count() if active else 0
         return {
             "enabled":        self.cfg.enabled,
+            "auto_handoff":   self.cfg.auto_handoff,
             "active":         active,
             "ssid":           self.cfg.ssid,
             "band":           self.cfg.band,
@@ -228,6 +229,53 @@ class HotspotService:
             return False
         names = {line.strip() for line in out.splitlines()}
         return self.cfg.connection_name in names
+
+    async def lan_kind(self) -> str | None:
+        """What kind of *non-AP* network is the appliance reachable on?
+
+          'eth'  — a connected ethernet device. Independent of the WiFi
+                   radio, so the AP can be dropped immediately when this
+                   appears.
+          'wifi' — the WiFi radio joined a real network as a client
+                   (i.e. a connected wifi device whose connection is NOT
+                   our hotspot profile).
+          None   — nothing: a candidate for AP fallback. Also None when
+                   nmcli is unavailable, so the caller treats "can't
+                   tell" as "don't act".
+
+        Uses `device` (not `connection`) status so the field layout is
+        stable: DEVICE/TYPE/STATE never contain ':', and CONNECTION is
+        the trailing field, so split(':', 3) is colon-safe even when a
+        connection name contains an escaped colon."""
+        if shutil.which("nmcli") is None:
+            return None
+        try:
+            rc, out, _err = await self._nmcli(
+                "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"
+            )
+        except Exception:
+            return None
+        if rc != 0:
+            return None
+        have_eth = have_wifi = False
+        for line in out.splitlines():
+            parts = line.split(":", 3)
+            if len(parts) < 4:
+                continue
+            _dev, dtype, state, conn = parts
+            if state != "connected":
+                continue
+            if dtype == "ethernet":
+                have_eth = True
+            elif dtype == "wifi" and conn != self.cfg.connection_name:
+                have_wifi = True
+        # Ethernet wins: it's the unambiguous "real LAN, drop the AP now"
+        # signal and doesn't contend with the AP radio.
+        if have_eth:
+            return "eth"
+        if have_wifi:
+            return "wifi"
+        return None
 
     async def _client_count(self) -> int | None:
         """Connected stations via `iw`. None if iw is absent."""

@@ -125,7 +125,11 @@ devices:
 # Settings -> WiFi hotspot. See docs/hotspot.md. (Auto-handoff + captive
 # portal are Phase 3b.)
 # hotspot:
-#   enabled: false
+#   enabled: false            # always-on: bring the AP up on boot
+#   auto_handoff: false       # auto-enable the AP whenever there's no
+#                             # other network, drop it when one returns.
+#                             # Local-first (no cloud needed); the off-grid
+#                             # path. Ignored when enabled: true.
 #   ssid: WattPost-Setup
 #   password: "changeme123"   # 8..63 chars (WPA2), or "" for open
 #   band: bg                  # "bg" = 2.4 GHz, "a" = 5 GHz

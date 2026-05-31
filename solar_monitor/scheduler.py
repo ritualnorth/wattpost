@@ -19,7 +19,7 @@ from .cloud import CloudService
 from .gps import GpsService
 from .mqtt_in import MqttInService
 from .tunnel import TunnelService
-from .hotspot import HotspotService
+from .hotspot import HotspotService, AutoHandoffMonitor
 from .update import UpdateChecker
 from .config import Config
 from .export import EXPORTERS, Exporter
@@ -214,6 +214,22 @@ class PollScheduler:
             except Exception:
                 log.exception("hotspot service failed to initialise")
 
+        # Auto-handoff monitor (Pillar 3b). Watches connectivity and
+        # raises/drops the hotspot automatically. Local-first: driven by
+        # config.hotspot.auto_handoff with no cloud needed. The cloud
+        # mode (van/cabin/marine) is a convenience layer — only wired in
+        # when paired (config.cloud present), read from the kv cache the
+        # heartbeat populates. Monitor no-ops unless it should_run().
+        self._hotspot_handoff: AutoHandoffMonitor | None = None
+        if self._hotspot is not None:
+            try:
+                _mode_getter = self._read_cloud_mode if config.cloud is not None else None
+                self._hotspot_handoff = AutoHandoffMonitor(
+                    self._hotspot, mode_getter=_mode_getter,
+                )
+            except Exception:
+                log.exception("hotspot auto-handoff failed to initialise")
+
         # USB GPS (#125). Optional; off entirely when config.gps is
         # absent. On significant movement we mutate the weather +
         # forecast cfg in-memory and trigger one-shot re-fetches so
@@ -260,6 +276,16 @@ class PollScheduler:
         """Expose the WiFi-AP service for the /api/hotspot endpoints.
         Returns None when no `hotspot:` block is configured."""
         return self._hotspot
+
+    async def _read_cloud_mode(self) -> str | None:
+        """Cloud-set operating mode the heartbeat caches in kv under
+        `cloud.mode` (home/van/cabin/marine/kiosk). Drives the auto-
+        handoff convenience layer. None when unset or unreadable."""
+        try:
+            row = await self.store.kv_get("cloud.mode")
+        except Exception:
+            return None
+        return row[0] if row else None
 
     async def _on_gps_move(self, lat: float, lon: float) -> None:
         """Called by GpsService when a fresh fix moves the daemon's
@@ -426,6 +452,8 @@ class PollScheduler:
             await self._tunnel.start()
         if self._hotspot is not None:
             await self._hotspot.start()
+        if self._hotspot_handoff is not None:
+            await self._hotspot_handoff.start()
         if self._updater is not None:
             await self._updater.start()
 
@@ -485,6 +513,8 @@ class PollScheduler:
             await self._mqtt_in.stop()
         if self._tunnel is not None:
             await self._tunnel.stop()
+        if self._hotspot_handoff is not None:
+            await self._hotspot_handoff.stop()
         if self._hotspot is not None:
             await self._hotspot.stop()
         if self._updater is not None:

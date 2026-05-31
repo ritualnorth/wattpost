@@ -9,7 +9,8 @@ Versions follow [Semantic Versioning].
 ## [Unreleased]
 
 ### Added
-- WiFi hotspot (appliance-as-AP, Pillar 3): the appliance can turn its WiFi radio into a NetworkManager access point so a phone/laptop reaches the dashboard with no other network — field setup and off-grid. Off by default; configure and toggle from Settings → WiFi hotspot, or via `POST /api/hotspot/{on,off}`. Reachable at `http://10.42.0.1` while up. Auto-handoff and captive portal are deferred to Phase 3b. See [docs/hotspot.md](docs/hotspot.md)
+- WiFi hotspot (appliance-as-AP, Pillar 3): the appliance can turn its WiFi radio into a NetworkManager access point so a phone/laptop reaches the dashboard with no other network — field setup and off-grid. Off by default; configure and toggle from Settings → WiFi hotspot, or via `POST /api/hotspot/{on,off}`. Reachable at `http://10.42.0.1` while up. See [docs/hotspot.md](docs/hotspot.md)
+- Hotspot auto-handoff (Pillar 3b): with "Auto-enable when offline" (`hotspot.auto_handoff`), the appliance raises the hotspot by itself whenever it has no other network and drops it when a real LAN returns. Local-first — works with no cloud subscription; the cloud operating mode (van/cabin/marine) turns it on as a convenience. Ethernet/dual-radio handoff is seamless; a single-radio Pi blips the AP briefly every few minutes while off-grid to re-test for known networks. Captive portal remains deferred.
 
 ## [0.1.124] - 2026-05-29
 

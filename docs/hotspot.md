@@ -5,10 +5,10 @@ point**, so a phone or laptop can reach the dashboard when there's no
 other network around. This is the field-setup and off-grid story: plug
 the box in, join the `WattPost-Setup` network, open the page.
 
-> **Status:** scaffold + manual control. Auto-handoff (automatically
-> falling back to the hotspot when no known WiFi is in range) and a
-> captive portal that pops the dashboard automatically are **Phase 3b**,
-> not yet shipped. Today you turn the hotspot on/off yourself.
+> **Status:** manual control **and auto-handoff** are shipped. A captive
+> portal that pops the dashboard automatically when a client joins is
+> still deferred. You can drive the hotspot by hand, or let it raise
+> itself whenever there's no other network (see *Auto-handoff* below).
 
 ## What it does
 
@@ -58,6 +58,7 @@ up automatically every time the appliance starts.
 ```yaml
 hotspot:
   enabled: true            # bring the AP up on boot (default false)
+  auto_handoff: false      # auto-enable when offline (see below)
   ssid: WattPost-Setup
   password: "changeme123"  # 8..63 chars, or "" for an open network
   band: bg                 # "bg" = 2.4 GHz (default), "a" = 5 GHz
@@ -104,9 +105,41 @@ the config first (the UI does this for you).
   and your phone didn't silently drop back to mobile data because the
   hotspot has no internet.
 
-## Roadmap (Phase 3b)
+## Auto-handoff
 
-- **Auto-handoff** — bring the AP up automatically when no known WiFi
-  is in range, and drop it again once a known network reappears.
+With **Auto-enable when offline** (`auto_handoff: true`, or the checkbox
+in Settings → WiFi hotspot), the appliance manages the AP for you: it
+brings the hotspot up whenever it has no other network, and drops it
+again when a real LAN returns. This is the off-grid / vanlife path —
+park anywhere, and the dashboard is always reachable at
+`http://10.42.0.1` without you touching anything.
+
+**It's local-first and needs no cloud account.** The `auto_handoff` flag
+lives in the appliance's own config; it works on a fully offline,
+unpaired box. If you *do* use wattpost.cloud, setting the site's mode to
+**Van**, **Cabin**, or **Marine** turns auto-handoff on for you as a
+convenience — but the flag is always the source of truth, and the local
+toggle works regardless of subscription.
+
+How it decides:
+
+- Every ~30s it checks for a non-AP network. A **wired** connection (or
+  a second WiFi adapter acting as a client) is detected immediately and
+  cleanly — the AP drops the moment real connectivity returns.
+- A short grace window debounces transient blips (e.g. a WiFi roam)
+  before the AP is raised, so it doesn't flap.
+
+**Single-radio caveat.** Most Pis have one WiFi radio, so while the AP
+is up that radio *can't also* be scanning for known networks. To recover,
+the appliance periodically (~every 5 min) drops the AP for a few seconds
+to let NetworkManager try to rejoin a known network; if none is in range
+the AP comes straight back. So on a one-radio box, expect a brief
+hotspot blip every few minutes while you're off-grid. Use **Ethernet for
+the uplink** (or add a second USB WiFi adapter) for seamless, blip-free
+handoff. `auto_handoff` is ignored when `enabled: true`, since the AP is
+already always on.
+
+## Roadmap (still deferred)
+
 - **Captive portal** — DNS redirect so joining the network pops the
   dashboard automatically, like a hotel WiFi splash page.

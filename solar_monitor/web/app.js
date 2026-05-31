@@ -4845,9 +4845,11 @@ async function refreshHotspotPanel() {
   // Pre-fill form from current config (only when a block exists).
   const ssidEl = document.getElementById("hotspot-ssid");
   const enEl   = document.getElementById("hotspot-enabled");
+  const ahEl   = document.getElementById("hotspot-auto-handoff");
   if (s.configured) {
     if (ssidEl && document.activeElement !== ssidEl) ssidEl.value = s.ssid || "";
     if (enEl) enEl.checked = !!s.enabled;
+    if (ahEl) ahEl.checked = !!s.auto_handoff;
   }
 
   const unavailable = !s.nmcli_available;
@@ -4870,7 +4872,8 @@ async function saveHotspotSettings() {
   const ssid  = (document.getElementById("hotspot-ssid")?.value || "").trim();
   const pw    = document.getElementById("hotspot-password")?.value || "";
   const enabled = !!document.getElementById("hotspot-enabled")?.checked;
-  const body = { ssid, enabled };
+  const auto_handoff = !!document.getElementById("hotspot-auto-handoff")?.checked;
+  const body = { ssid, enabled, auto_handoff };
   // Only send password when the user typed one — blank keeps current.
   if (pw.length) body.password = pw;
   if (msgEl) { msgEl.textContent = "Saving…"; msgEl.style.color = ""; msgEl.dataset.sticky = "1"; }

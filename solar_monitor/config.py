@@ -421,7 +421,15 @@ class HotspotCfg(msgspec.Struct, kw_only=True):
     WiFi is in range) and a captive portal. This struct deliberately
     carries only what scaffold + manual control need.
     """
-    enabled: bool = False          # auto-start the AP on boot
+    enabled: bool = False          # auto-start the AP on boot (always-on)
+    # Auto-handoff (Pillar 3b): bring the AP up automatically whenever the
+    # appliance has no other network, and drop it again when a real LAN
+    # returns. LOCAL source of truth — works with no cloud subscription;
+    # this is the off-grid/vanlife path. The cloud operating mode
+    # (van/cabin/marine) is layered on top as a convenience that implies
+    # auto-handoff without the user touching this flag. Ignored when
+    # `enabled` is true (the AP is always on then, nothing to hand off).
+    auto_handoff: bool = False
     ssid: str = "WattPost-Setup"
     # WPA2-PSK passphrase. Empty string => open network (no auth).
     # NetworkManager/WPA require 8..63 chars when set; validated at
