@@ -1,57 +1,48 @@
 # License
 
-WattPost is **source-available, not open source**. The appliance
-source ships with every SD image (`/opt/wattpost-src/`) and every
-Docker image (`/app/solar_monitor/`) so you can audit and modify
+WattPost is **open source**, licensed under **Apache License 2.0**. The
+appliance source ships with every SD image (`/opt/wattpost-src/`) and
+every Docker image (`/app/solar_monitor/`), so you can audit and modify
 exactly what runs on your hardware.
 
 ## Plain-English summary
 
 - ✅ Audit the code, read every line, run a debugger through it.
 - ✅ Modify your own copy. Add a vendor driver, change a UI string,
-  swap a colour, fork for a hobby project.
+  swap a colour, fork it for anything you like.
 - ✅ Run it on your own hardware (Raspberry Pi, mini PC, RV, boat, off-grid cabin).
+- ✅ Use it commercially — build a product on it, offer it as a hosted
+  service, white-label it. Apache 2.0 permits this.
 - ✅ Share patches back. Pull requests welcome.
-- ❌ Sell it (modified or not) as a product or hosted service.
-- ❌ Resell it under a different name.
+- ➡️ If you redistribute it (modified or not), keep the `LICENSE` and
+  `NOTICE` files and the existing copyright notices, and note any
+  significant changes you made. That's the main obligation.
 - ❌ Use the "WattPost" name or logo for anything other than referring
-  to this project.
+  to this project. Apache 2.0 grants copyright + patent rights, **not**
+  trademark rights — the name and logo are ours.
 
 ## The formal terms
 
-Licensed under [**PolyForm Noncommercial 1.0.0**](https://polyformproject.org/licenses/noncommercial/1.0.0).
-The full text is in [LICENSE](https://wattpost.io/) bundled with
-every distribution. PolyForm is a vetted source-available licence
-drafted by recognised legal experts. It's what we use because
-writing a custom licence is risky and reinventing the wheel.
+Licensed under [**Apache License 2.0**](https://www.apache.org/licenses/LICENSE-2.0).
+The full text is in [LICENSE](../LICENSE), with attributions in
+[NOTICE](../NOTICE), bundled with every distribution. Apache 2.0 is a
+widely-used, permissive, OSI-approved licence with an explicit patent
+grant.
 
 ## The cloud tier
 
 The code at `wattpost.cloud` (multi-site dashboard, heartbeat ingest,
 Cloudflare tunnel provisioning, REST API server, billing) is **not**
-distributed and **not** covered by the appliance licence. It's
-private to Ritual North.
+distributed and **not** covered by this licence. It's private to
+Ritual North. This licence covers the appliance in this repository only.
 
-## Commercial use
-
-If you want to use WattPost commercially. Embed it in a product,
-offer it as a managed service, white-label it for installer
-customers. Email [support@wattpost.io](mailto:support@wattpost.io)
-and we'll figure out a licence that works for both of us. We're
-not anti-business; we just want to be the ones running WattPost as
-a hosted product.
-
-## Why this approach
+## Why open source
 
 - **Trust:** You can verify there's no spyware / phone-home / cloud
   lock-in. The source on your Pi *is* what's running.
 - **Repairability:** A vendor going out of business shouldn't brick
-  your batteries. With source you can keep WattPost alive even if
+  your batteries. With the source, you can keep WattPost alive even if
   we disappear.
-- **Sustainability:** We want to keep building this. A pure-MIT
-  licence makes that hard. A competitor can copy our work and
-  undercut us on day one. PolyForm Noncommercial threads the needle:
-  open for users, closed for would-be SaaS hosts.
-
-If this annoys you, we get it. The alternative was "fully closed,
-encrypted binaries on the SD card" and we'd rather keep the trust.
+- **Longevity:** A permissive licence means the work can outlive us —
+  anyone can pick it up, fork it, ship it, or build on it without
+  asking permission.
