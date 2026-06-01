@@ -402,6 +402,12 @@ class CloudService:
             # heartbeat post-update), persist it to config.yaml so the
             # /sso endpoint can verify cloud-signed redirect tokens.
             self._maybe_persist_sso_secret(body.get("sso_secret"))
+            # #17 — backup-upload management lives in the cloud dashboard
+            # now. Honour the cloud-delivered toggle by mirroring it onto
+            # the live backup config, so the backup service uploads (or
+            # stops) with no local control. Absent field = older cloud;
+            # leave the local setting untouched.
+            self._apply_cloud_backups_flag(body.get("cloud_backups_enabled"))
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         # Promote the pending alerts-uploaded cursor now that the
@@ -413,6 +419,22 @@ class CloudService:
             self._alerts_uploaded_ts = pending
             self._alerts_pending_ts = None
         return True
+
+    def _apply_cloud_backups_flag(self, enabled) -> None:
+        """Mirror the cloud's per-appliance backup-upload toggle (#17)
+        onto the live backup config. In-memory only — the cloud is the
+        source of truth and re-asserts it on every heartbeat. No-op when
+        the field is absent (older cloud) or there's no backup config."""
+        if enabled is None or self._config is None:
+            return
+        bk = getattr(self._config, "backup", None)
+        if bk is None:
+            return
+        want = bool(enabled)
+        if bk.cloud_upload != want:
+            bk.cloud_upload = want
+            log.info("cloud backups %s by the cloud dashboard",
+                     "enabled" if want else "disabled")
 
     def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
         """Save the cloud-issued SSO HMAC key if we don't already have

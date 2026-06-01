@@ -5489,185 +5489,26 @@ function wireBackupRunNow() {
 }
 
 async function refreshCloudBackups() {
+  // #17 — cloud-backup management moved to the cloud dashboard. The
+  // appliance no longer hosts the upload toggle or the restore list:
+  // the upload toggle is delivered in the heartbeat and honoured
+  // silently, and browsing/downloading/restoring is done from the
+  // cloud. Render a pointer into the existing card so the local UI
+  // stays clean.
   const list = document.getElementById("backup-cloud-list");
   const summary = document.getElementById("backup-cloud-summary");
   const toggleBtn = document.getElementById("backup-cloud-toggle");
   const toggleMsg = document.getElementById("backup-cloud-toggle-msg");
-  if (!list || !toggleBtn) return;
-
-  // Read schedule first, tells us whether cloud_upload is on
-  // (and whether the local backup service is running at all).
-  let sched;
-  try { sched = await api("/api/system/backup/schedule"); }
-  catch { sched = null; }
-  const cloudOn = !!(sched && sched.cloud_upload_enabled);
-
-  // Always probe cloud-list, its response carries the cues we
-  // need (paired? Pro/Installer tier? cloud on a build that
-  // supports backups?) to decide what to show. Doing this before
-  // wiring the toggle means we can grey-out for Hobby etc.
-  let data, fetchError;
-  try {
-    const r = await fetch(_withKiosk("/api/system/backup/cloud-list"), { cache: "no-store" });
-    if (r.status === 503) {
-      data = { _not_paired: true };
-    } else if (r.ok) {
-      data = await r.json();
-    } else {
-      let detail = r.statusText;
-      try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
-      fetchError = detail;
-    }
-  } catch (e) {
-    fetchError = e.message;
+  if (toggleBtn) toggleBtn.style.display = "none";
+  if (toggleMsg) toggleMsg.textContent = "";
+  if (summary) summary.textContent = "Managed from your cloud dashboard.";
+  if (list) {
+    list.innerHTML =
+      '<p class="settings-empty">Enable uploads, browse, download and ' +
+      'restore cloud backups from your <a href="https://wattpost.cloud" ' +
+      'target="_blank" rel="noopener">cloud dashboard</a> &rarr; your site ' +
+      '&rarr; Cloud backups.</p>';
   }
-
-  // Decide toggle state up-front based on what we learned.
-  const notPaired = data && data._not_paired;
-  const tierRequired = data && data.tier_required;
-  const notYetAvailable = data && data.not_yet_available;
-  const canToggle = !notPaired && !tierRequired && !notYetAvailable && !fetchError;
-
-  toggleBtn.hidden = false;
-  toggleBtn.disabled = !canToggle && !cloudOn;  // allow disabling even when cloud no longer accepts
-  if (notPaired) {
-    toggleBtn.textContent = "Pair to wattpost.cloud first";
-  } else if (tierRequired) {
-    toggleBtn.textContent = "Upgrade to enable";
-  } else if (notYetAvailable) {
-    toggleBtn.textContent = "Cloud account not ready";
-  } else {
-    toggleBtn.textContent = cloudOn ? "Disable cloud upload" : "Enable cloud upload";
-  }
-  toggleBtn.onclick = async () => {
-    if (tierRequired) {
-      window.location.href = "https://wattpost.cloud/app/account";
-      return;
-    }
-    toggleBtn.disabled = true;
-    toggleMsg.textContent = cloudOn ? "Disabling…" : "Enabling…";
-    try {
-      const r = await fetch(_withKiosk("/api/system/backup/cloud-toggle"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: !cloudOn }),
-      });
-      if (!r.ok) {
-        let detail = r.statusText;
-        try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
-        throw new Error(`${r.status} ${detail}`);
-      }
-      toggleMsg.textContent = !cloudOn ? "Enabled." : "Disabled.";
-      refreshBackupSchedule();
-      refreshCloudBackups();
-    } catch (e) {
-      toggleMsg.textContent = "Failed: " + e.message;
-    } finally {
-      toggleBtn.disabled = false;
-    }
-  };
-
-  // Now render the list area based on the same data.
-  if (notPaired) {
-    list.innerHTML = `<div class="settings-empty">
-      Pair this appliance to wattpost.cloud first (Settings → Cloud)
-      to enable off-site backups.
-      <br><br>
-      <span class="dash-sub" style="display:block;font-size:.85rem;color:var(--text-2);margin-top:.4rem;">
-        Just restored from a cloud backup? Your previous credentials
-        were cleared for security, re-pair to reconnect.
-      </span>
-    </div>`;
-    return;
-  }
-  if (tierRequired) {
-    list.innerHTML = `<div class="settings-empty">
-      Cloud backups require <strong>Pro</strong> or
-      <strong>Installer</strong> tier on the paired account.
-      <a href="https://wattpost.cloud/app/account">Upgrade here</a>.
-    </div>`;
-    return;
-  }
-  if (notYetAvailable) {
-    list.innerHTML = `<div class="settings-empty">
-      Cloud account is on an older build that doesn't accept backup
-      uploads yet. The next cloud deploy will enable this. Your
-      local snapshots are unaffected.
-    </div>`;
-    return;
-  }
-  if (fetchError) {
-    list.innerHTML = `<div class="settings-empty" style="color:#f87171">${fetchError}</div>`;
-    return;
-  }
-  if (!cloudOn) {
-    list.innerHTML = `<div class="settings-empty">
-      Cloud upload is off. Click <strong>Enable cloud upload</strong>
-      to push each scheduled snapshot to wattpost.cloud.
-    </div>`;
-    return;
-  }
-  if (summary && data.backups && data.backups.length > 0) {
-    summary.innerHTML =
-      `Off-site copies stored on wattpost.cloud. ${data.backups.length} backup(s) on file.`;
-  }
-  if (!data.backups || !data.backups.length) {
-    list.innerHTML = `<div class="settings-empty">No cloud backups yet. The next scheduled snapshot will upload automatically.</div>`;
-    return;
-  }
-  list.innerHTML = `
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-    <table style="width:100%;border-collapse:collapse;font-size:.88rem">
-      <thead><tr style="text-align:left;opacity:.7">
-        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Name</th>
-        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Size</th>
-        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">Uploaded</th>
-        <th style="padding:.3rem .6rem .3rem 0;white-space:nowrap">From</th>
-        <th></th>
-      </tr></thead>
-      <tbody>
-        ${data.backups.map(b => {
-          const sizeMb = (b.size_bytes / (1024 * 1024)).toFixed(1);
-          const uploaded = b.uploaded_at ? fmt.ago(new Date(b.uploaded_at).getTime() / 1000) : "·";
-          return `<tr style="border-top:1px solid rgba(255,255,255,.06)">
-            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap"><code>${b.filename}</code></td>
-            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${sizeMb} MB</td>
-            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${uploaded}</td>
-            <td style="padding:.35rem .6rem .35rem 0;white-space:nowrap">${b.manifest_version || "·"}</td>
-            <td style="padding:.35rem 0;text-align:right;white-space:nowrap">
-              <button class="btn-action" style="padding:.15rem .5rem" type="button"
-                      data-cloud-restore="${b.id}" data-cloud-name="${b.filename}">Restore</button>
-            </td>
-          </tr>`;
-        }).join("")}
-      </tbody>
-    </table>
-    </div>`;
-  list.querySelectorAll("[data-cloud-restore]").forEach(b => {
-    b.addEventListener("click", async () => {
-      const id = b.dataset.cloudRestore;
-      const name = b.dataset.cloudName;
-      if (!window.confirm(
-        `Restore ${name} from wattpost.cloud?\n\n` +
-        "This will OVERWRITE the current database, config, and " +
-        "local-UI password, then restart the daemon."
-      )) return;
-      b.disabled = true; b.textContent = "Downloading…";
-      try {
-        const r = await fetch(_withKiosk(`/api/system/backup/cloud-restore/${id}`), { method: "POST" });
-        if (!r.ok) {
-          let detail = r.statusText;
-          try { const j = await r.json(); if (j && j.detail) detail = j.detail; } catch {}
-          throw new Error(`${r.status} ${detail}`);
-        }
-        b.textContent = "Daemon restarting…";
-        setTimeout(pollUntilHealthyThenReload, 1500);
-      } catch (e) {
-        window.alert("Cloud restore failed: " + e.message);
-        b.disabled = false; b.textContent = "Restore";
-      }
-    });
-  });
 }
 
 async function pollUntilHealthyThenReload() {
