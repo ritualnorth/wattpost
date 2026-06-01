@@ -26,6 +26,8 @@ def test_numeric_device_metrics_become_labelled_gauges():
                 "online": True,        # bool -> 1
                 "label": "battery_0",  # string -> skipped (not a metric)
                 "note": None,          # None  -> skipped
+                "_vendor": "renogy",   # metadata -> skipped (underscore)
+                "_slave_id": 96,       # numeric metadata -> skipped (underscore)
             },
         },
     }
@@ -36,6 +38,9 @@ def test_numeric_device_metrics_become_labelled_gauges():
     # Non-numeric values must not leak as metrics.
     assert "wattpost_label" not in out
     assert "wattpost_note" not in out
+    # Underscore-prefixed metadata must not leak, even when numeric.
+    assert "_vendor" not in out
+    assert "_slave_id" not in out
     # Each metric carries exactly one TYPE line.
     assert out.count("# TYPE wattpost_soc_pct gauge") == 1
     # Staleness derived from timestamp vs scrape time.

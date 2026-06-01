@@ -75,6 +75,10 @@ def render_openmetrics(
                 continue
             dev = _escape_label(label)
             for key, val in data.items():
+                # Skip internal/metadata fields (_vendor, _kind, _slave_id):
+                # they're plumbing, not telemetry, and shouldn't be metrics.
+                if isinstance(key, str) and key.startswith("_"):
+                    continue
                 if isinstance(val, bool):
                     num: float = 1.0 if val else 0.0
                 elif isinstance(val, (int, float)):
