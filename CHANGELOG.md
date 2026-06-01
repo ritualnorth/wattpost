@@ -8,10 +8,15 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.125] - 2026-06-01
+
 ### Added
 - WiFi hotspot (appliance-as-AP, Pillar 3): the appliance can turn its WiFi radio into a NetworkManager access point so a phone/laptop reaches the dashboard with no other network — field setup and off-grid. Off by default; configure and toggle from Settings → WiFi hotspot, or via `POST /api/hotspot/{on,off}`. Reachable at `http://10.42.0.1` while up. See [docs/hotspot.md](docs/hotspot.md)
 - Hotspot auto-handoff (Pillar 3b): with "Auto-enable when offline" (`hotspot.auto_handoff`), the appliance raises the hotspot by itself whenever it has no other network and drops it when a real LAN returns. Local-only — works with no cloud subscription. Ethernet/dual-radio handoff is seamless; a single-radio Pi blips the AP briefly every few minutes while off-grid to re-test for known networks.
 - Hotspot captive portal (`hotspot.captive_portal`): joining the hotspot pops the dashboard automatically on the device — the "Sign in to network" sheet — so no one has to type the address. While a captive AP is up the appliance hijacks DNS via a NetworkManager dnsmasq drop-in and answers the OS connectivity checks (Apple/Android/Windows) with a redirect to the dashboard. Needs NM DNS-dir write access (granted to the `wattpost` user by the packaged image); degrades to a no-op elsewhere with the AP unaffected.
+
+### Fixed
+- Settings → Integrations no longer fails the whole panel with "Could not load integrations: 429" over the cloud tunnel. The four per-integration config requests are folded into a single `/api/system/integrations` round-trip (no more 4-request burst tripping the edge limiter), with a 429 retry/backoff and a graceful partial render that keeps the last-loaded panel instead of blanking it (#18)
 
 ## [0.1.124] - 2026-05-29
 
