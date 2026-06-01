@@ -408,6 +408,16 @@ class CloudService:
             # stops) with no local control. Absent field = older cloud;
             # leave the local setting untouched.
             self._apply_cloud_backups_flag(body.get("cloud_backups_enabled"))
+            # #22 — cloud-controlled backup schedule. Apply interval +
+            # retention onto the live backup config and nudge the loop so
+            # the change takes effect now, not after the current sleep.
+            if self._apply_cloud_backup_schedule(
+                body.get("backup_interval_hours"),
+                body.get("backup_keep_count"),
+            ):
+                bk_svc = getattr(self.scheduler, "backup_service", None)
+                if bk_svc is not None and hasattr(bk_svc, "reschedule"):
+                    bk_svc.reschedule()
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         # Promote the pending alerts-uploaded cursor now that the
@@ -435,6 +445,33 @@ class CloudService:
             bk.cloud_upload = want
             log.info("cloud backups %s by the cloud dashboard",
                      "enabled" if want else "disabled")
+
+    def _apply_cloud_backup_schedule(self, interval_hours, keep_count) -> bool:
+        """Apply the cloud's backup schedule (#22) onto the live backup
+        config. None = the cloud hasn't overridden it, so leave the
+        local value alone. Returns True if anything changed (so the
+        caller can nudge the backup loop). In-memory only; the cloud
+        re-asserts on every heartbeat."""
+        if self._config is None:
+            return False
+        bk = getattr(self._config, "backup", None)
+        if bk is None:
+            return False
+        changed = False
+        if interval_hours is not None:
+            iv = int(interval_hours)
+            if iv >= 1 and bk.interval_hours != iv:
+                bk.interval_hours = iv
+                changed = True
+        if keep_count is not None:
+            kc = int(keep_count)
+            if kc >= 1 and bk.keep_count != kc:
+                bk.keep_count = kc
+                changed = True
+        if changed:
+            log.info("backup schedule updated by cloud: every %sh, keep %s",
+                     bk.interval_hours, bk.keep_count)
+        return changed
 
     def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
         """Save the cloud-issued SSO HMAC key if we don't already have

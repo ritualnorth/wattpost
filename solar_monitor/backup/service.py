@@ -65,6 +65,9 @@ class BackupService:
         self.backup_dir = _resolve_backup_dir(cfg, db_path)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+        # Set to wake the loop early so it recomputes the next-run time
+        # after a live schedule change (#22, cloud-controlled schedule).
+        self._wake = asyncio.Event()
         # Surfaced via /api/system/backup/schedule for the Settings UI.
         self.last_run_ts: int | None = None
         self.last_run_path: Path | None = None
@@ -95,6 +98,33 @@ class BackupService:
             except (asyncio.CancelledError, Exception):
                 pass
             self._task = None
+
+    def reschedule(self) -> None:
+        """Wake the loop so it recomputes next-run with the current
+        interval (#22). Called when the cloud changes the schedule, so
+        e.g. weekly -> daily takes effect now instead of waiting out the
+        current sleep."""
+        self._wake.set()
+
+    async def _interruptible_sleep(self, seconds: float) -> str:
+        """Sleep up to `seconds`, waking early on stop or reschedule.
+        Returns 'stop' | 'wake' | 'elapsed'."""
+        stop_t = asyncio.create_task(self._stop.wait())
+        wake_t = asyncio.create_task(self._wake.wait())
+        try:
+            await asyncio.wait(
+                {stop_t, wake_t}, timeout=max(0.0, seconds),
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+        finally:
+            stop_t.cancel()
+            wake_t.cancel()
+        if self._stop.is_set():
+            return "stop"
+        if self._wake.is_set():
+            self._wake.clear()
+            return "wake"
+        return "elapsed"
 
     def next_run_ts(self) -> int | None:
         """When the loop intends to fire next (UTC seconds). None if
@@ -175,11 +205,13 @@ class BackupService:
                 wait_s = 0  # never snapped here → run now
 
             if wait_s > 0:
-                try:
-                    await asyncio.wait_for(self._stop.wait(), timeout=wait_s)
+                outcome = await self._interruptible_sleep(wait_s)
+                if outcome == "stop":
                     return
-                except asyncio.TimeoutError:
-                    pass
+                if outcome == "wake":
+                    # Schedule changed under us — recompute wait_s with
+                    # the new interval rather than snapshotting now.
+                    continue
 
             try:
                 await self.snapshot_now()
