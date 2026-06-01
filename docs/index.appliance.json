@@ -21,6 +21,9 @@
     { "slug": "remote-access",   "title": "Remote access (wattpost.cloud)", "section": "Integrations" },
     { "slug": "hotspot",         "title": "WiFi hotspot (appliance-as-AP)", "section": "Integrations" },
 
+    { "slug": "api",             "title": "REST API",                 "section": "API" },
+    { "slug": "api-keys",        "title": "API keys",                 "section": "API" },
+
     { "slug": "local-password",  "title": "Local web password",       "section": "Security" },
     { "slug": "security",        "title": "About the \"Not Secure\" warning", "section": "Security" },
 
