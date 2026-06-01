@@ -44,11 +44,19 @@ ENV PYTHONUNBUFFERED=1 \
 # real Open-Meteo (free, no key) seeded with a London coordinate
 # (visitors get an actual-looking forecast for "somewhere"). Coords
 # can be tweaked if we ever theme the demo around a different site.
+#
+# The Prometheus exporter is enabled so demo.wattpost.io/metrics serves
+# the synthetic readings — this is what the public Grafana demo
+# (grafana.wattpost.io) scrapes, and it doubles as a live showcase of
+# the Prometheus/Grafana export feature (#14, #15).
 RUN mkdir -p /var/lib/wattpost && \
     printf '%s\n' \
       'transports: []' \
       'devices: []' \
-      'exporters: []' \
+      'exporters:' \
+      '  - id: prometheus' \
+      '    type: prometheus' \
+      '    metric_prefix: wattpost' \
       'notification_transports: []' \
       'alerts: []' \
       'forecast:' \
