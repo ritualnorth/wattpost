@@ -15,6 +15,13 @@ try:
 except ImportError:
     pass
 
+# Prometheus exporter (#14). Pure-stdlib, so import shouldn't fail, but
+# guard it the same way as mqtt for consistency.
+try:
+    from . import prometheus  # noqa: F401
+except ImportError:
+    pass
+
 __all__ = [
     "Exporter",
     "ExporterError",

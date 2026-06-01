@@ -54,7 +54,32 @@ LWT fires.
 
 ## Grafana
 
-Two reasonable paths:
+The simplest path is the built-in **Prometheus exporter**. Enable it
+in `config.yaml` alongside (or instead of) MQTT:
+
+```yaml
+exporters:
+  - id: prom
+    type: prometheus
+    metric_prefix: wattpost   # optional, default
+```
+
+WattPost then serves the latest readings at **`GET /metrics`** on the
+dashboard port, in Prometheus text format — read-only, no credentials.
+Each numeric per-device reading is a gauge labelled by device, e.g.:
+
+```
+wattpost_soc_pct{device="battery_0"} 25.2
+wattpost_voltage{device="battery_0"} 13.1
+wattpost_pv_power_w{device="rover_mppt"} 248
+```
+
+Point Prometheus (or Grafana Agent) at
+`http://<appliance>:<port>/metrics`, then add Prometheus as a Grafana
+data source. This runs happily next to the MQTT exporter — MQTT for
+Home Assistant, Prometheus for Grafana.
+
+Other paths if you'd rather not run Prometheus:
 
 1. **Telegraf** → MQTT input plugin subscribes to `solar/+/+`,
    writes to InfluxDB, Grafana queries InfluxDB. Best for long-term

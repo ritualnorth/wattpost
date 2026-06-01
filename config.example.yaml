@@ -68,6 +68,17 @@ devices:
 #     ha_discovery_prefix: homeassistant
 #     ha_node_id: solar_monitor   # unique-id namespace; change if running
 #                                  # multiple WattPost units on one broker
+#
+#   # Prometheus exporter (#14). Serves the latest readings at GET /metrics
+#   # for Grafana via the standard pull model — no credentials, read-only.
+#   # Point Prometheus (or Grafana Agent) at
+#   # http://<appliance>:<dashboard-port>/metrics, then add Prometheus as a
+#   # Grafana data source. Run it ALONGSIDE the MQTT exporter above — MQTT
+#   # for Home Assistant, Prometheus for Grafana. Each numeric per-device
+#   # reading becomes a gauge, e.g. wattpost_soc_pct{device="battery_0"}.
+#   - id: prom
+#     type: prometheus
+#     metric_prefix: wattpost     # optional; gauge-name prefix (default)
 
 # Notification transports — outbound channels the alert engine can fan
 # events to. Each entry needs a unique `id` you reference from alert

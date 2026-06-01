@@ -66,6 +66,10 @@ SESSION_TTL_SECONDS     = 60 * 60 * 24 * 30   # 30 days
 ANONYMOUS_PATH_PREFIXES = (
     "/kiosk",
     "/web/",
+    # Prometheus scrape endpoint (#14). Scrapers don't carry a session;
+    # it's read-only LAN telemetry (same data as /kiosk + /api/snapshot)
+    # and 404s when no prometheus exporter is configured.
+    "/metrics",
     "/login",
     "/manifest.webmanifest",
     "/service-worker.js",

@@ -850,6 +850,28 @@ async def snapshot(state: State) -> dict[str, Any]:
     return await scheduler.build_snapshot()
 
 
+@get("/metrics")
+async def prometheus_metrics(state: State) -> Response:
+    """Prometheus scrape endpoint (#14). Served only when a
+    `prometheus` exporter is configured (404 otherwise); renders the
+    latest poll result as Prometheus text exposition format for Grafana.
+    Anonymous by design — scrapers carry no session, and this is the
+    same read-only telemetry the LAN dashboard shows."""
+    from ..export.prometheus import PrometheusExporter
+    scheduler: PollScheduler = state["scheduler"]
+    exp = next(
+        (e for e in getattr(scheduler, "_exporters", []) or []
+         if isinstance(e, PrometheusExporter)),
+        None,
+    )
+    if exp is None:
+        raise NotFoundException("prometheus exporter not enabled")
+    return Response(
+        content=exp.render(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 @get("/api/devices/{label:str}/history.csv")
 async def device_history_csv(
     label: str,
@@ -1551,6 +1573,7 @@ def build_app(
             load_heatmap,
             stream,
             snapshot,
+            prometheus_metrics,
             list_alerts,
             test_alert,
             restart_daemon,
