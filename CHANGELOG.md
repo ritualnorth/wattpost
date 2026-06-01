@@ -8,6 +8,11 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.126] - 2026-06-01
+
+### Added
+- Prometheus / Grafana export: a new export target that serves your live readings at a read-only `/metrics` endpoint in Prometheus text format. Point Prometheus (or Grafana Agent) at it and add Prometheus as a Grafana data source. No credentials, local-LAN, and it runs alongside the MQTT exporter, so you can feed Home Assistant over MQTT and Grafana over Prometheus at the same time. Enable it from Settings → Integrations (or `{type: prometheus}` in config.yaml). Each numeric per-device reading becomes a gauge, e.g. `wattpost_soc_pct{device="battery_0"}`. See [docs/integrations.md](docs/integrations.md) (#14)
+
 ## [0.1.125] - 2026-06-01
 
 ### Added
