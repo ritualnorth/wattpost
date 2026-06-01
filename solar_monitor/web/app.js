@@ -5933,10 +5933,11 @@ async function refreshIntegrationsPanel() {
       return;
     }
   }
-  integrationsState.forecast = data.forecast;
-  integrationsState.weather  = data.weather;
-  integrationsState.cloud    = data.cloud;
-  integrationsState.mqtt     = data.mqtt;
+  integrationsState.forecast   = data.forecast;
+  integrationsState.weather    = data.weather;
+  integrationsState.cloud      = data.cloud;
+  integrationsState.mqtt       = data.mqtt;
+  integrationsState.prometheus = data.prometheus;
   renderIntegrationsPanel();
 }
 
@@ -5966,11 +5967,17 @@ function renderIntegrationsPanel() {
     wireMqttForm();
     return;
   }
+  if (integrationsState.editing === "prometheus") {
+    host.innerHTML = renderPrometheusForm(integrationsState.prometheus || {});
+    wirePrometheusForm();
+    return;
+  }
 
   const forecastConfigured = fc.configured;
   const weatherConfigured  = wc.configured;
   const cloudConfigured    = (integrationsState.cloud || {}).configured;
   const mqttEnabled        = (integrationsState.mqtt || {}).enabled;
+  const promEnabled        = (integrationsState.prometheus || {}).enabled;
   host.innerHTML = `
     <div class="integration-row" data-integration="solcast">
       <div class="integration-row-main">
@@ -6070,6 +6077,27 @@ function renderIntegrationsPanel() {
           ${mqttEnabled ? "Edit" : "Configure"}
         </button>
       </div>
+    </div>
+    <div class="integration-row" data-integration="prometheus">
+      <div class="integration-row-main">
+        <div class="integration-row-head">
+          <span class="integration-row-name">Prometheus / Grafana</span>
+          <span class="alerts-row-tag alerts-row-tag--${promEnabled ? "ok" : "warn"}">
+            ${promEnabled ? "enabled" : "not set up"}
+          </span>
+        </div>
+        <div class="integration-row-sub">
+          ${promEnabled
+            ? `Serving metrics at <code>${location.origin}/metrics</code> · prefix <code>${(integrationsState.prometheus.metric_prefix) || "wattpost"}</code>`
+            : `Expose a read-only <code>/metrics</code> endpoint for Grafana (via Prometheus). No credentials, local-LAN.`
+          }
+        </div>
+      </div>
+      <div class="integration-row-actions">
+        <button class="alerts-add-btn" data-edit-prometheus>
+          ${promEnabled ? "Edit" : "Configure"}
+        </button>
+      </div>
     </div>`;
   $("[data-edit-forecast]")?.addEventListener("click", () => {
     integrationsState.editing = "forecast";
@@ -6085,6 +6113,10 @@ function renderIntegrationsPanel() {
   });
   $("[data-edit-mqtt]")?.addEventListener("click", () => {
     integrationsState.editing = "mqtt";
+    renderIntegrationsPanel();
+  });
+  $("[data-edit-prometheus]")?.addEventListener("click", () => {
+    integrationsState.editing = "prometheus";
     renderIntegrationsPanel();
   });
 }
@@ -6222,6 +6254,83 @@ async function disableMqtt() {
   if (!confirm("Disable the MQTT exporter? The broker still runs; we just stop publishing to it.")) return;
   try {
     const r = await fetch("/api/exporters/mqtt/config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: false }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { alert(e.message); }
+}
+
+function renderPrometheusForm(pc) {
+  const enabled = !!pc.enabled;
+  const prefix = pc.metric_prefix || "wattpost";
+  const url = `${location.origin}/metrics`;
+  return `
+    <form class="alerts-form" data-form="prometheus">
+      <div class="alerts-form-grid">
+        <label class="alerts-field-wide">Metric name prefix
+          <input type="text" name="metric_prefix" value="${prefix}" placeholder="wattpost"/>
+        </label>
+      </div>
+      <p class="settings-foot">
+        Serves a read-only Prometheus endpoint at <code>${url}</code>.
+        Point Prometheus (or Grafana Agent) at it, then add Prometheus as a
+        Grafana data source. Each numeric per-device reading becomes a gauge,
+        e.g. <code>${prefix}_soc_pct{device="battery_0"}</code>. No credentials —
+        same read-only telemetry as the dashboard. Runs alongside MQTT.
+        Changes apply on next daemon restart.
+      </p>
+      <div class="alerts-form-actions">
+        <button type="submit" class="btn-action btn-action--primary">${enabled ? "Save" : "Enable"}</button>
+        ${enabled
+          ? `<button type="button" class="btn-action alerts-icon-btn--danger" data-disable-prometheus>Disable</button>`
+          : ""}
+        <button type="button" class="btn-action" data-cancel-prometheus>Cancel</button>
+        <span class="alerts-form-status"></span>
+      </div>
+    </form>`;
+}
+
+function wirePrometheusForm() {
+  const form = document.querySelector("form[data-form='prometheus']");
+  if (!form) return;
+  form.addEventListener("submit", (e) => { e.preventDefault(); savePrometheusConfig(form); });
+  form.querySelector("[data-cancel-prometheus]")?.addEventListener("click", () => {
+    integrationsState.editing = null;
+    renderIntegrationsPanel();
+  });
+  form.querySelector("[data-disable-prometheus]")?.addEventListener("click", () => disablePrometheus());
+}
+
+async function savePrometheusConfig(form) {
+  const status = form.querySelector(".alerts-form-status");
+  status.textContent = "Saving…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/exporters/prometheus/config", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        enabled: true,
+        metric_prefix: form.elements["metric_prefix"].value.trim() || "wattpost",
+      }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    }
+    integrationsState.editing = null;
+    await refreshIntegrationsPanel();
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function disablePrometheus() {
+  if (!confirm("Disable the Prometheus exporter? The /metrics endpoint will stop responding.")) return;
+  try {
+    const r = await fetch("/api/exporters/prometheus/config", {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ enabled: false }),
     });

@@ -72,6 +72,7 @@ from .cloud_admin import (
 )
 from .exporters_admin import (
     get_mqtt_config, update_mqtt_config, test_mqtt, mqtt_config_view,
+    get_prometheus_config, update_prometheus_config, prometheus_config_view,
 )
 from .outputs import (
     list_outputs,
@@ -169,10 +170,11 @@ async def get_integrations(state: State) -> dict[str, Any]:
     for the form save/clear flows."""
     config: Config = state["config"]
     return {
-        "forecast": forecast_config_view(config),
-        "weather":  weather_config_view(config),
-        "cloud":    cloud_config_view(config),
-        "mqtt":     mqtt_config_view(config),
+        "forecast":   forecast_config_view(config),
+        "weather":    weather_config_view(config),
+        "cloud":      cloud_config_view(config),
+        "mqtt":       mqtt_config_view(config),
+        "prometheus": prometheus_config_view(config),
     }
 
 
@@ -1635,6 +1637,8 @@ def build_app(
             get_mqtt_config,
             update_mqtt_config,
             test_mqtt,
+            get_prometheus_config,
+            update_prometheus_config,
             ble_status,
             ble_scan,
             ble_diagnose,

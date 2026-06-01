@@ -181,6 +181,87 @@ async def update_mqtt_config(
     return {"ok": True, "enabled": True, "restart_required": True}
 
 
+# ---------- Prometheus exporter (#14) ----------
+
+class PrometheusExporterPayload(msgspec.Struct, kw_only=True):
+    enabled: bool = True
+    metric_prefix: str = "wattpost"
+
+
+def _first_prometheus(exporters: list[dict]) -> dict | None:
+    for e in exporters:
+        if e.get("type") == "prometheus":
+            return e
+    return None
+
+
+def prometheus_config_view(config: Config) -> dict[str, Any]:
+    """Whether the Prometheus exporter is enabled + its prefix. Pure
+    config→dict, reused by /api/system/integrations (#18)."""
+    p = _first_prometheus(config.exporters)
+    if p is None:
+        return {"enabled": False, "metric_prefix": "wattpost", "path": "/metrics"}
+    return {
+        "enabled":       True,
+        "metric_prefix": p.get("metric_prefix", "wattpost"),
+        "path":          "/metrics",
+    }
+
+
+@get("/api/exporters/prometheus/config")
+async def get_prometheus_config(state: State) -> dict[str, Any]:
+    return prometheus_config_view(state["config"])
+
+
+@put("/api/exporters/prometheus/config")
+async def update_prometheus_config(
+    data: PrometheusExporterPayload, state: State,
+) -> dict[str, Any]:
+    config: Config = state["config"]
+    config_path: str = state.get("config_path", "config.yaml")
+
+    if not data.enabled:
+        config.exporters = [e for e in config.exporters
+                            if e.get("type") != "prometheus"]
+        def _mutate(raw):
+            raw["exporters"] = [
+                e for e in (raw.get("exporters") or [])
+                if e.get("type") != "prometheus"
+            ]
+            return raw
+        _save_config(config_path, _mutate)
+        log.info("Prometheus exporter removed")
+        return {"ok": True, "enabled": False, "restart_required": True}
+
+    prefix = (data.metric_prefix or "wattpost").strip() or "wattpost"
+    existing = _first_prometheus(config.exporters) or {}
+    new_entry: dict[str, Any] = {
+        "id":            existing.get("id", "prometheus"),
+        "type":          "prometheus",
+        "metric_prefix": prefix,
+    }
+
+    def _upsert(lst: list[dict]) -> list[dict]:
+        out: list[dict] = []
+        replaced = False
+        for e in lst:
+            if not replaced and e.get("type") == "prometheus":
+                out.append(new_entry); replaced = True
+            else:
+                out.append(e)
+        if not replaced:
+            out.append(new_entry)
+        return out
+
+    config.exporters = _upsert(config.exporters)
+    def _mutate(raw):
+        raw["exporters"] = _upsert(raw.get("exporters") or [])
+        return raw
+    _save_config(config_path, _mutate)
+    log.info("Prometheus exporter configured (prefix=%s)", prefix)
+    return {"ok": True, "enabled": True, "restart_required": True}
+
+
 @post("/api/exporters/mqtt/test")
 async def test_mqtt(
     data: MqttExporterPayload, state: State,
