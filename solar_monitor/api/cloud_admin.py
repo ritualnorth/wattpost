@@ -58,9 +58,9 @@ def _save_config(config_path: str, mutator) -> None:
 
 # ---------- routes ----------
 
-@get("/api/cloud/config")
-async def get_cloud_config(state: State) -> dict[str, Any]:
-    config: Config = state["config"]
+def cloud_config_view(config: Config) -> dict[str, Any]:
+    """Pure config→dict view, reused by /api/system/integrations (#18).
+    Token stays masked."""
     c = config.cloud
     if c is None or not c.bearer_token:
         return {
@@ -86,6 +86,11 @@ async def get_cloud_config(state: State) -> dict[str, Any]:
         "tunnel_enabled":    bool(c.tunnel_token),
         "tunnel_hostname":   c.tunnel_hostname or None,
     }
+
+
+@get("/api/cloud/config")
+async def get_cloud_config(state: State) -> dict[str, Any]:
+    return cloud_config_view(state["config"])
 
 
 @put("/api/cloud/config")

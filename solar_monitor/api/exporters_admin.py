@@ -60,11 +60,10 @@ def _first_mqtt(exporters: list[dict]) -> dict | None:
     return None
 
 
-@get("/api/exporters/mqtt/config")
-async def get_mqtt_config(state: State) -> dict[str, Any]:
+def mqtt_config_view(config: Config) -> dict[str, Any]:
     """Masked view of the MQTT exporter config. `enabled` flag tracks
-    whether the exporter exists at all."""
-    config: Config = state["config"]
+    whether the exporter exists at all. Pure config→dict so the
+    aggregate /api/system/integrations endpoint can reuse it (#18)."""
     mqtt = _first_mqtt(config.exporters)
     if mqtt is None:
         return {
@@ -89,6 +88,11 @@ async def get_mqtt_config(state: State) -> dict[str, Any]:
         "ha_discovery_prefix": mqtt.get("ha_discovery_prefix", "homeassistant"),
         "ha_node_id":          mqtt.get("ha_node_id", "solar_monitor"),
     }
+
+
+@get("/api/exporters/mqtt/config")
+async def get_mqtt_config(state: State) -> dict[str, Any]:
+    return mqtt_config_view(state["config"])
 
 
 @put("/api/exporters/mqtt/config")

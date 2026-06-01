@@ -49,11 +49,11 @@ from .alerts_admin import (
 )
 from .forecast_admin import (
     get_pv_forecast, get_forecast_config, update_forecast_config,
-    test_forecast_fetch, get_forecast_accuracy,
+    test_forecast_fetch, get_forecast_accuracy, forecast_config_view,
 )
 from .weather_admin import (
     get_current_weather, get_weather_config, update_weather_config,
-    test_weather_fetch,
+    test_weather_fetch, weather_config_view,
 )
 from .weather_history import weather_history
 from .gps_admin import get_gps_status
@@ -68,10 +68,10 @@ from .location_admin import get_location_status, update_location_share
 from .energy import energy_today
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
-    unpair_appliance, trigger_heartbeat,
+    unpair_appliance, trigger_heartbeat, cloud_config_view,
 )
 from .exporters_admin import (
-    get_mqtt_config, update_mqtt_config, test_mqtt,
+    get_mqtt_config, update_mqtt_config, test_mqtt, mqtt_config_view,
 )
 from .outputs import (
     list_outputs,
@@ -153,6 +153,26 @@ async def today_soc_envelope(state: State) -> dict[str, Any]:
         "now_ts":   now,
         "min_pct":  round(lo, 1) if lo is not None else None,
         "max_pct":  round(hi, 1) if hi is not None else None,
+    }
+
+
+@get("/api/system/integrations")
+async def get_integrations(state: State) -> dict[str, Any]:
+    """One-shot view of all four Settings → Integrations configs
+    (#18). The panel used to fire four parallel requests
+    (/api/{forecast,weather,cloud,exporters/mqtt}/config); over the
+    cloud tunnel that burst could trip the edge 429 limiter and, with
+    Promise.all, fail the whole panel. Folding them into a single
+    broker round-trip removes the burst. Each sub-view is the same
+    pure config→dict the individual endpoints still serve, so the
+    shapes are identical and the per-integration GET/PUT routes stay
+    for the form save/clear flows."""
+    config: Config = state["config"]
+    return {
+        "forecast": forecast_config_view(config),
+        "weather":  weather_config_view(config),
+        "cloud":    cloud_config_view(config),
+        "mqtt":     mqtt_config_view(config),
     }
 
 
@@ -1560,6 +1580,7 @@ def build_app(
             update_transport,
             delete_transport,
             update_quiet_hours,
+            get_integrations,
             get_pv_forecast,
             get_forecast_config,
             update_forecast_config,

@@ -5907,21 +5907,36 @@ let integrationsState = { forecast: null, weather: null, cloud: null, mqtt: null
 async function refreshIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
-  try {
-    const [fc, wc, cc, mc] = await Promise.all([
-      api("/api/forecast/config"),
-      api("/api/weather/config"),
-      api("/api/cloud/config"),
-      api("/api/exporters/mqtt/config"),
-    ]);
-    integrationsState.forecast = fc;
-    integrationsState.weather  = wc;
-    integrationsState.cloud    = cc;
-    integrationsState.mqtt     = mc;
-  } catch (e) {
-    host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
-    return;
+  // One broker round-trip (#18). This used to fire four parallel
+  // requests (forecast/weather/cloud/mqtt config); over the cloud
+  // tunnel that burst could trip the edge 429 limiter and, because it
+  // was a Promise.all, fail the entire panel. /api/system/integrations
+  // folds all four into a single response. Retry once on 429 with a
+  // short backoff, and on a hard failure keep whatever we already had
+  // on screen instead of blanking the panel.
+  let data = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      data = await api("/api/system/integrations");
+      break;
+    } catch (e) {
+      const rateLimited = (e.message || "").startsWith("429");
+      if (rateLimited && attempt === 0) {
+        await new Promise(r => setTimeout(r, 1200));
+        continue;
+      }
+      const haveCached = integrationsState.forecast || integrationsState.weather
+        || integrationsState.cloud || integrationsState.mqtt;
+      if (!haveCached) {
+        host.innerHTML = `<div class="settings-empty">Could not load integrations: ${e.message}</div>`;
+      }
+      return;
+    }
   }
+  integrationsState.forecast = data.forecast;
+  integrationsState.weather  = data.weather;
+  integrationsState.cloud    = data.cloud;
+  integrationsState.mqtt     = data.mqtt;
   renderIntegrationsPanel();
 }
 

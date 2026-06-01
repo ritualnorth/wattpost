@@ -67,9 +67,8 @@ async def get_current_weather(state: State) -> dict[str, Any]:
     return payload
 
 
-@get("/api/weather/config")
-async def get_weather_config(state: State) -> dict[str, Any]:
-    config: Config = state["config"]
+def weather_config_view(config: Config) -> dict[str, Any]:
+    """Pure config→dict view, reused by /api/system/integrations (#18)."""
     w = config.weather
     if w is None:
         return {"configured": False, "provider": "openmeteo",
@@ -81,6 +80,11 @@ async def get_weather_config(state: State) -> dict[str, Any]:
         "lon":          w.lon,
         "poll_minutes": w.poll_minutes,
     }
+
+
+@get("/api/weather/config")
+async def get_weather_config(state: State) -> dict[str, Any]:
+    return weather_config_view(state["config"])
 
 
 @put("/api/weather/config")

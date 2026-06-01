@@ -138,14 +138,15 @@ async def get_pv_forecast(state: State) -> dict[str, Any]:
     return payload
 
 
-@get("/api/forecast/config")
-async def get_forecast_config(state: State) -> dict[str, Any]:
+def forecast_config_view(config: Config) -> dict[str, Any]:
     """Masked view of the config for the Settings UI. Never returns
     the raw api_key, the field comes back as `****` when set, "" when
     unset, and the UI handles "leave blank to keep existing" the same
     way the alert transport editor does. Open-Meteo fields ride along
-    so the form can show the array geometry without a second fetch."""
-    config: Config = state["config"]
+    so the form can show the array geometry without a second fetch.
+
+    Pure function of `config` so the aggregate /api/system/integrations
+    endpoint (#18) can reuse it without a second round-trip."""
     fc = config.forecast
     if fc is None:
         return {
@@ -174,6 +175,11 @@ async def get_forecast_config(state: State) -> dict[str, Any]:
         "system_efficiency": fc.system_efficiency,
         "poll_hours":        fc.poll_hours,
     }
+
+
+@get("/api/forecast/config")
+async def get_forecast_config(state: State) -> dict[str, Any]:
+    return forecast_config_view(state["config"])
 
 
 @put("/api/forecast/config")
