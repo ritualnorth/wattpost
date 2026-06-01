@@ -95,5 +95,10 @@ async def main():
     print("\nALL CAPTIVE TESTS PASS")
 
 
+def test_captive_responders():
+    """pytest entry point — runs every scenario (each asserts inline)."""
+    asyncio.run(main())
+
+
 if __name__ == "__main__":
     asyncio.run(main())

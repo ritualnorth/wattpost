@@ -131,4 +131,11 @@ async def main():
         await t()
     print("\nALL HANDOFF SCENARIOS PASS")
 
-asyncio.run(main())
+
+def test_auto_handoff_scenarios():
+    """pytest entry point — runs every scenario (each asserts inline)."""
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

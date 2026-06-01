@@ -27,14 +27,17 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install package
-        run: pip install .
+      - name: Install package (with test extras)
+        run: pip install .[test]
 
       - name: Import smoke test
         run: python -c "import solar_monitor, solar_monitor.cli"
 
       - name: Byte-compile all sources
         run: python -m compileall -q solar_monitor scripts
+
+      - name: Unit + scenario tests (pytest)
+        run: pytest
 
       - name: Driver verification scripts
         run: |
