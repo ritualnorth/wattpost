@@ -4803,7 +4803,6 @@ function renderSettings() {
   wireBackupRestore();
   refreshBackupSchedule();
   wireBackupRunNow();
-  refreshCloudBackups();
   refreshDiscoveryToggle();
   refreshLocalTelemetryToggle();  // #217, anonymous install ping (off by default)
   refreshHistorySettings();  // #172, editable poll interval + retention
@@ -5486,29 +5485,6 @@ function wireBackupRunNow() {
       btn.disabled = false;
     }
   });
-}
-
-async function refreshCloudBackups() {
-  // #17 — cloud-backup management moved to the cloud dashboard. The
-  // appliance no longer hosts the upload toggle or the restore list:
-  // the upload toggle is delivered in the heartbeat and honoured
-  // silently, and browsing/downloading/restoring is done from the
-  // cloud. Render a pointer into the existing card so the local UI
-  // stays clean.
-  const list = document.getElementById("backup-cloud-list");
-  const summary = document.getElementById("backup-cloud-summary");
-  const toggleBtn = document.getElementById("backup-cloud-toggle");
-  const toggleMsg = document.getElementById("backup-cloud-toggle-msg");
-  if (toggleBtn) toggleBtn.style.display = "none";
-  if (toggleMsg) toggleMsg.textContent = "";
-  if (summary) summary.textContent = "Managed from your cloud dashboard.";
-  if (list) {
-    list.innerHTML =
-      '<p class="settings-empty">Enable uploads, browse, download and ' +
-      'restore cloud backups from your <a href="https://wattpost.cloud" ' +
-      'target="_blank" rel="noopener">cloud dashboard</a> &rarr; your site ' +
-      '&rarr; Cloud backups.</p>';
-  }
 }
 
 async function pollUntilHealthyThenReload() {
