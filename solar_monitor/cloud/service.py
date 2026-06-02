@@ -418,6 +418,15 @@ class CloudService:
                 bk_svc = getattr(self.scheduler, "backup_service", None)
                 if bk_svc is not None and hasattr(bk_svc, "reschedule"):
                     bk_svc.reschedule()
+            # #11 — cloud-controlled update channel. Cloud wins when set:
+            # it re-asserts on every heartbeat. Absent = the owner hasn't
+            # chosen one on the dashboard, so the appliance's own local
+            # selector stands. On a change, kick an immediate manifest
+            # re-check so the dashboard reflects the new channel's latest.
+            if self._apply_cloud_update_channel(body.get("update_channel")):
+                updater = getattr(self.scheduler, "_updater", None)
+                if updater is not None:
+                    asyncio.create_task(updater.check_once())
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         # Promote the pending alerts-uploaded cursor now that the
@@ -472,6 +481,28 @@ class CloudService:
             log.info("backup schedule updated by cloud: every %sh, keep %s",
                      bk.interval_hours, bk.keep_count)
         return changed
+
+    def _apply_cloud_update_channel(self, channel) -> bool:
+        """Mirror the cloud's per-appliance update-channel choice (#11)
+        onto the live update checker. Cloud wins when set: it re-asserts
+        on every heartbeat. None = the cloud hasn't overridden it (older
+        cloud, or the owner hasn't picked one), so leave the appliance's
+        local selector alone. Returns True if the channel changed (so the
+        caller can kick a re-check). In-memory only; the cloud is the
+        source of truth for paired appliances, exactly like the backup
+        toggle/schedule above."""
+        if channel is None:
+            return False
+        updater = getattr(self.scheduler, "_updater", None)
+        if updater is None:
+            return False
+        from ..update.checker import normalize_channel
+        want = normalize_channel(channel)
+        if updater.channel == want:
+            return False
+        updater.set_channel(want)
+        log.info("update channel set to %s by the cloud dashboard", want)
+        return True
 
     def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
         """Save the cloud-issued SSO HMAC key if we don't already have

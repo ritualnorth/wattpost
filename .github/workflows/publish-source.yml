@@ -106,64 +106,82 @@ jobs:
           envs: NEW_VERSION
           script: |
             set -euo pipefail
-            # No-downgrade guard (incident 2026-05-28). A re-pushed old tag
-            # must not roll the release channel backwards. Skip the whole
-            # source publish if the manifest already advertises a newer
-            # version than this release.
-            MANIFEST=/srv/wattpost-releases/img/manifest.json
+            # Channel routing (#11). A semver pre-release (a hyphen in
+            # NEW_VERSION, e.g. 0.2.0-rc1) publishes source to the BETA
+            # channel only; a final version publishes to STABLE and is
+            # mirrored into beta (a final release is the newest beta too).
+            case "$NEW_VERSION" in
+              *-*) CHANNEL=beta ;;
+              *)   CHANNEL=stable ;;
+            esac
+            if [ "$CHANNEL" = beta ]; then
+              SRC_LINK=beta.tar.gz;   MANIFEST=/srv/wattpost-releases/img/manifest-beta.json
+            else
+              SRC_LINK=latest.tar.gz; MANIFEST=/srv/wattpost-releases/img/manifest.json
+            fi
+            echo "source publish: $NEW_VERSION -> channel=$CHANNEL (src=$SRC_LINK)"
+
+            # No-downgrade guard against THIS channel's manifest
+            # (incident 2026-05-28). A re-pushed old tag must not roll
+            # the channel backwards.
             if [ -f "$MANIFEST" ]; then
               CUR=$(python3 -c "import json;print(json.load(open('$MANIFEST')).get('version',''))" 2>/dev/null || echo "")
               if [ -n "$CUR" ] && [ "$CUR" != "$NEW_VERSION" ] \
                  && [ "$(printf '%s\n%s\n' "$CUR" "$NEW_VERSION" | sort -V | tail -1)" = "$CUR" ]; then
-                echo "no-downgrade: channel at $CUR, this release is $NEW_VERSION -- skipping source publish"
+                echo "no-downgrade: $CHANNEL channel at $CUR, this release is $NEW_VERSION -- skipping source publish"
                 exit 0
               fi
             fi
             cd /srv/wattpost-releases/source
             newest=$(ls -1t wattpost-source-*.tar.gz 2>/dev/null | head -1)
-            if [ -n "$newest" ]; then
-              ln -sfn "$newest" latest.tar.gz
-              ln -sfn "$newest.sha256" latest.tar.gz.sha256
-              echo "latest.tar.gz → $newest"
-            else
+            if [ -z "$newest" ]; then
               echo "no source tarballs found" >&2
               exit 1
             fi
-            # Keep only the 10 most recent tarballs — older ones are
-            # historical only; appliances pulling "latest" don't care.
-            ls -1t wattpost-source-*.tar.gz 2>/dev/null | tail -n +11 \
-                | xargs -r rm -f
-            ls -1t wattpost-source-*.tar.gz.sha256 2>/dev/null | tail -n +11 \
-                | xargs -r rm -f
 
-            # Bump the version + source SHA + released_at on the
-            # img/manifest.json so paired appliances see "Update
-            # available" within the next manifest-poll cycle. Image
-            # fields (image_url, image_filename, sha256, size_bytes)
-            # are left untouched — they're owned by pi-gen's
-            # build-image.yml, not source-only releases.
-            MANIFEST=/srv/wattpost-releases/img/manifest.json
-            if [ -f "${MANIFEST}" ]; then
-              SOURCE_SHA=$(awk '{print $1}' "${newest}.sha256")
-              NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-              python3 - "$MANIFEST" "$NEW_VERSION" "$SOURCE_SHA" "$NOW" <<'PY'
+            # Manifest patcher written once to a temp file, then called
+            # per channel. Kept OUT of any shell function so this heredoc
+            # terminator sits at the YAML-dedented column 0 (a quoted
+            # heredoc won't close on an indented terminator). Image fields
+            # are left untouched — they're owned by build-image.yml.
+            cat > /tmp/wp_patch_manifest.py <<'PY'
             import json, sys, pathlib
             path, version, src_sha, now = sys.argv[1:]
             p = pathlib.Path(path)
             m = json.loads(p.read_text())
-            m["version"]     = version
-            m["released_at"] = now
+            m["version"]       = version
+            m["released_at"]   = now
             m["source_sha256"] = src_sha
-            # Relative URL — the appliance dashboard resolves it
-            # against its own origin so it works on Pi (LAN IP),
-            # Docker (LAN IP), or via cloudflared tunnel without
-            # the manifest needing to know the host. Same content
-            # is also at wattpost.io/docs/release-notes for users
-            # who land on the marketing site.
-            m["release_url"] = "/docs/release-notes"
+            # Relative URL — the appliance dashboard resolves it against
+            # its own origin so it works on Pi/Docker LAN IPs or via the
+            # cloudflared tunnel without the manifest knowing the host.
+            m["release_url"]   = "/docs/release-notes"
             p.write_text(json.dumps(m, indent=2) + "\n")
-            print(f"manifest: version={version} released_at={now}")
+            print(f"manifest {path}: version={version} released_at={now}")
             PY
-            else
-              echo "manifest.json missing — skipping manifest bump"
+
+            publish_source_channel() {
+              local src_link="$1" manifest="$2"
+              ln -sfn "$newest" "$src_link"
+              ln -sfn "$newest.sha256" "$src_link.sha256"
+              echo "$src_link -> $newest"
+              if [ -f "$manifest" ]; then
+                local source_sha; source_sha=$(awk '{print $1}' "${newest}.sha256")
+                local now; now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                python3 /tmp/wp_patch_manifest.py "$manifest" "$NEW_VERSION" "$source_sha" "$now"
+              else
+                echo "manifest $manifest missing — skipping manifest bump"
+              fi
+            }
+            publish_source_channel "$SRC_LINK" "$MANIFEST"
+            # A final release is the newest beta too — mirror the source.
+            if [ "$CHANNEL" = stable ]; then
+              publish_source_channel "beta.tar.gz" "/srv/wattpost-releases/img/manifest-beta.json"
             fi
+
+            # Keep only the 10 most recent tarballs — older ones are
+            # historical only; appliances pulling latest/beta don't care.
+            ls -1t wattpost-source-*.tar.gz 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f
+            ls -1t wattpost-source-*.tar.gz.sha256 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f

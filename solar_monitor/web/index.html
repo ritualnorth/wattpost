@@ -1029,6 +1029,21 @@
           <div class="settings-block" data-subroute="about">
             <h3>About</h3>
             <div class="settings-row"><span>Version</span><span class="v" id="settings-version">·</span></div>
+            <div class="settings-row" id="settings-channel-row">
+              <span>Update channel</span>
+              <span class="v">
+                <select id="settings-channel-select" style="font-size:.85em">
+                  <option value="stable">Stable</option>
+                  <option value="beta">Beta</option>
+                  <option value="edge">Edge</option>
+                </select>
+                <span id="settings-channel-saving" class="settings-foot" style="font-size:.8em;margin-left:.4rem"></span>
+              </span>
+            </div>
+            <div class="settings-row" id="settings-channel-note-row" hidden>
+              <span></span>
+              <span class="v settings-foot" id="settings-channel-note" style="font-size:.82em;line-height:1.4;text-align:left"></span>
+            </div>
             <div class="settings-row" id="settings-update-row" hidden>
               <span>Latest available</span>
               <span class="v">

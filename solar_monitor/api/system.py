@@ -399,6 +399,75 @@ async def update_check_now(state: State) -> dict[str, Any]:
     return updater.state.as_dict()
 
 
+class UpdateChannelPatch(msgspec.Struct):
+    channel: str
+
+
+@post("/api/system/update/channel")
+async def set_update_channel(
+    data: UpdateChannelPatch, state: State,
+) -> dict[str, Any]:
+    """Switch the release channel this appliance follows (#11).
+
+    Persists `update.channel` to config.yaml and applies it live to the
+    running update checker, then fires an immediate manifest re-check so
+    the dashboard reflects the new channel's latest version without
+    waiting for the daily poll. Stable / beta / edge only.
+    """
+    import yaml as _yaml, shutil as _shutil
+    from pathlib import Path as _Path
+
+    from ..config import UpdateCfg
+    from ..update.checker import VALID_CHANNELS
+
+    channel = (data.channel or "").strip().lower()
+    if channel not in VALID_CHANNELS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"channel must be one of {', '.join(VALID_CHANNELS)}",
+        )
+
+    scheduler = state["scheduler"]
+    config = state.get("config") if hasattr(state, "get") else state["config"]
+    config_path: str = state.get("config_path", "config.yaml")
+
+    # Apply live to the running checker FIRST so a later YAML write
+    # failure still leaves the user on the channel they picked (mirrors
+    # patch_history_settings' apply-before-persist ordering).
+    updater = getattr(scheduler, "_updater", None)
+    if updater is not None:
+        updater.set_channel(channel)
+    # Mirror onto the in-memory Config so a hot-reload doesn't revert it.
+    if config is not None:
+        config.update = UpdateCfg(channel=channel)
+
+    # Persist under `update:`, preserving any sibling keys.
+    path = _Path(config_path)
+    raw = _yaml.safe_load(path.read_text()) or {}
+    upd = raw.get("update") or {}
+    if not isinstance(upd, dict):
+        upd = {}
+    upd["channel"] = channel
+    raw["update"] = upd
+    backup = path.with_suffix(path.suffix + ".bak")
+    _shutil.copy2(path, backup)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+    log.info("update channel set to %s", channel)
+
+    deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
+    # Immediate re-check so the UI doesn't wait 24h to learn the new
+    # channel's latest. Best-effort; the daily loop catches up on failure.
+    if updater is not None:
+        try:
+            await updater.check_once()
+        except Exception:
+            log.info("post-channel-switch re-check failed (non-fatal)")
+        return {**updater.state.as_dict(), "deployment": deployment}
+    return {"channel": channel, "deployment": deployment}
+
+
 @get("/api/branding")
 async def appliance_branding(state: State) -> dict[str, Any]:
     """White-label branding for this appliance, cached from the cloud

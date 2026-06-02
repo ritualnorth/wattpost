@@ -227,50 +227,78 @@ jobs:
           # build automatically. No commit-to-cloud step.
           VERSION=$(grep -E '^__version__' solar_monitor/__init__.py \
                     | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          # No-downgrade guard. A tag force-push (e.g. a history rewrite)
-          # re-fires this workflow for EVERY old tag; with cancel-in-progress
-          # a stale build can win the race and overwrite the release channel
-          # with an ancient version (incident 2026-05-28: a re-run of v0.0.35
-          # clobbered the manifest to 0.0.35). Refuse to publish if the
-          # channel already advertises a newer version than this build.
+          # Channel routing (#11). A semver pre-release (a hyphen in the
+          # version, e.g. 0.2.0-rc1) publishes to BETA only; a final
+          # version publishes to STABLE and is then mirrored into beta
+          # (a final release is the newest beta too). RC builds therefore
+          # never touch the stable manifest/image.
+          case "$VERSION" in
+            *-*) CHANNEL=beta ;;
+            *)   CHANNEL=stable ;;
+          esac
+          if [ "$CHANNEL" = beta ]; then
+            MANIFEST_NAME=manifest-beta.json; IMG_LINK=beta.img.xz;   SRC_LINK=beta.tar.gz
+          else
+            MANIFEST_NAME=manifest.json;      IMG_LINK=latest.img.xz; SRC_LINK=latest.tar.gz
+          fi
+          echo "publishing $VERSION -> channel=$CHANNEL (manifest=$MANIFEST_NAME img=$IMG_LINK)"
+
+          # No-downgrade guard, per channel. A tag force-push re-fires
+          # this workflow for old tags; refuse to roll THIS channel's
+          # manifest backwards (incident 2026-05-28: a re-run of v0.0.35
+          # clobbered the manifest to 0.0.35).
           CUR_RAW=$(ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" \
-            "grep -oE '\"version\"[^,]*' /srv/wattpost-releases/img/manifest.json 2>/dev/null | head -1" || echo "")
+            "grep -oE '\"version\"[^,]*' /srv/wattpost-releases/img/${MANIFEST_NAME} 2>/dev/null | head -1" || echo "")
           CUR=$(printf '%s' "$CUR_RAW" | sed -E 's/.*"([0-9][^"]*)".*/\1/')
           if [ -n "$CUR" ] && [ "$CUR" != "$VERSION" ] \
              && [ "$(printf '%s\n%s\n' "$CUR" "$VERSION" | sort -V | tail -1)" = "$CUR" ]; then
-            echo "no-downgrade: channel at $CUR, this build is $VERSION -- skipping publish"
+            echo "no-downgrade: $CHANNEL channel at $CUR, this build is $VERSION -- skipping publish"
             exit 0
           fi
           SHA=$(awk '{print $1}' "$CHECKSUM")
           SIZE=$(stat -c %s "$IMG")
           FNAME=$(basename "$IMG")
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          cat > /tmp/manifest.json <<JSON
+          # Emit + scp a channel manifest, then repoint that channel's
+          # image symlink. image_url / source_url use the channel's
+          # stable symlink names so an appliance on this channel always
+          # pulls channel-appropriate artefacts.
+          publish_channel() {
+            local ch="$1" out="$2" img_link="$3" src_link="$4"
+            cat > /tmp/${out} <<JSON
           {
             "version":      "${VERSION}",
             "released_at":  "${NOW}",
+            "channel":      "${ch}",
             "image_filename": "${FNAME}",
-            "image_url":    "https://releases.wattpost.io/img/latest.img.xz",
+            "image_url":    "https://releases.wattpost.io/img/${img_link}",
             "sha256":       "${SHA}",
-            "sha256_url":   "https://releases.wattpost.io/img/latest.img.xz.sha256",
+            "sha256_url":   "https://releases.wattpost.io/img/${img_link}.sha256",
             "size_bytes":   ${SIZE},
             "release_url":  "/docs/release-notes",
-            "source_url":   "https://releases.wattpost.io/source/latest.tar.gz",
-            "source_sha256_url": "https://releases.wattpost.io/source/latest.tar.gz.sha256"
+            "source_url":   "https://releases.wattpost.io/source/${src_link}",
+            "source_sha256_url": "https://releases.wattpost.io/source/${src_link}.sha256"
           }
           JSON
-          retry scp "${SSH_COMMON[@]}" /tmp/manifest.json \
-              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/manifest.json"
+            retry scp "${SSH_COMMON[@]}" /tmp/${out} \
+                "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/${out}"
+            retry ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" "
+              set -euo pipefail
+              cd /srv/wattpost-releases/img
+              ln -sfn '${FNAME}' '${img_link}'
+              ln -sfn '${FNAME}.sha256' '${img_link}.sha256'
+              echo '${img_link} -> ${FNAME}'
+            "
+          }
+          publish_channel "${CHANNEL}" "${MANIFEST_NAME}" "${IMG_LINK}" "${SRC_LINK}"
           # Also publish CHANGELOG.md at the releases root — the
           # appliance update checker fetches it so the dashboard can
           # preview release notes before the user installs.
           retry scp "${SSH_COMMON[@]}" CHANGELOG.md \
               "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/CHANGELOG.md"
-          # Repoint latest.img.xz → newest dated file, by mtime.
-          retry ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" "
-            set -euo pipefail
-            cd /srv/wattpost-releases/img
-            ln -sfn '${FNAME}' latest.img.xz
-            ln -sfn '${FNAME}.sha256' latest.img.xz.sha256
-            echo 'latest.img.xz -> ${FNAME}'
-          "
+          # A final release is the newest beta too — mirror it so beta
+          # testers never fall BEHIND stable. Pre-releases already wrote
+          # beta directly above, so only mirror when we just did stable.
+          if [ "$CHANNEL" = stable ]; then
+            publish_channel "beta" "manifest-beta.json" "beta.img.xz" "beta.tar.gz"
+          fi

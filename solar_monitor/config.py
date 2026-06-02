@@ -291,6 +291,28 @@ class LocalTelemetryCfg(msgspec.Struct, kw_only=True):
     enabled: bool = False
 
 
+class UpdateCfg(msgspec.Struct, kw_only=True):
+    """Release-channel selection (#11).
+
+    Picks which release stream the daily update-check follows (and, on
+    a Pi install, what an in-place apply pulls):
+
+      * stable — tagged releases that have soaked. Docker `:latest`,
+        Pi `manifest.json`. The default; what customers run.
+      * beta   — release candidates the moment they're cut, before the
+        soak. Docker `:beta`, Pi `manifest-beta.json`. Pre-release;
+        may be unstable. For opt-in testers.
+      * edge   — every commit to main. Docker `:edge`. Bleeding; expect
+        breakage. Docker-only — there is no per-commit Pi image, so on
+        a Pi install edge behaves like beta for the apply path.
+
+    The channel rides the daily manifest poll as a `?channel=` query
+    param; the cloud serves the matching stream. Toggle from
+    Settings -> About. See docs/release-pipeline.md.
+    """
+    channel: str = "stable"
+
+
 class DiscoveryCfg(msgspec.Struct, kw_only=True):
     """Anonymous hardware-discovery telemetry (#129).
 
@@ -499,6 +521,7 @@ class Config(msgspec.Struct, kw_only=True):
     backup: BackupCfg | None = None      # optional, local rotating snapshots (#146 phase 2)
     discovery: DiscoveryCfg | None = None  # optional, anonymous discovery telemetry (#129)
     local_telemetry: LocalTelemetryCfg | None = None  # optional, anonymous install beacon (#217); OFF by default
+    update: UpdateCfg | None = None      # optional, release-channel selection (#11); defaults to stable when absent
     history: HistoryCfg | None = None    # optional, poll cadence + retention (#172)
     solar_pause: SolarPauseCfg | None = None  # optional, auto-pause AC charger when PV covers (#163)
     smart_plugs: list[SmartPlugCfg] = []      # optional, LAN-attached smart plugs for solar-pause to drive

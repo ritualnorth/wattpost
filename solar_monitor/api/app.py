@@ -87,7 +87,7 @@ from .outputs import (
 )
 from .system import (
     auth_status, broker_auth_log, diagnostics_bundle, system_info,
-    update_state, update_check_now, update_apply, update_log,
+    update_state, update_check_now, set_update_channel, update_apply, update_log,
     slot_state, slot_rollback,
     release_changelog, appliance_branding, rotate_web_password,
     get_history_settings, patch_history_settings,
@@ -1589,6 +1589,7 @@ def build_app(
             reset_to_defaults,
             update_state,
             update_check_now,
+            set_update_channel,
             rotate_web_password,
             update_apply,
             update_log,
