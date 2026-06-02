@@ -157,9 +157,15 @@ class PollScheduler:
                 config.local_telemetry is not None
                 and config.local_telemetry.enabled
             )
+            _channel = (
+                config.update.channel
+                if config.update is not None
+                else None
+            )
             self._updater = UpdateChecker(
                 install_id=_install_id,
                 telemetry_enabled=_tele_on,
+                channel=_channel,
             )
         except Exception:
             log.exception("update checker failed to initialise")

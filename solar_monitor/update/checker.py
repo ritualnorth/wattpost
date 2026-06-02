@@ -30,6 +30,20 @@ DEFAULT_BEACON_URL     = "https://wattpost.cloud/api/local_installs/beacon"
 DEFAULT_CHANGELOG_URL  = "https://releases.wattpost.io/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 
+# Release channels the appliance can follow (#11). Ordered loosest-last
+# for display; "stable" is the default and the only one a fresh install
+# tracks until the user opts in via Settings -> About.
+VALID_CHANNELS = ("stable", "beta", "edge")
+DEFAULT_CHANNEL = "stable"
+
+
+def normalize_channel(channel: str | None) -> str:
+    """Coerce an arbitrary string to a known channel, falling back to
+    stable. Keeps a typo or a stale config value from pointing the
+    poller at a nonsense manifest."""
+    c = (channel or "").strip().lower()
+    return c if c in VALID_CHANNELS else DEFAULT_CHANNEL
+
 
 @dataclass
 class UpdateState:
@@ -40,6 +54,10 @@ class UpdateState:
     release_url:        str | None = None
     last_checked_at:    int | None = None     # unix seconds
     last_error:         str | None = None     # last fetch failure if any
+    # Release channel this poll is following (#11). Surfaced to the API
+    # + Settings so the UI can render the selector and the "you're on
+    # the beta channel" note. Defaults to stable.
+    channel:            str       = DEFAULT_CHANNEL
     # Cached upstream CHANGELOG.md text, refreshed each successful
     # manifest poll. Lets the dashboard show "what's in 0.0.3" while
     # the appliance is still on 0.0.2 (bundled docs only know the
@@ -66,6 +84,7 @@ class UpdateState:
             "last_checked_at":    self.last_checked_at,
             "last_error":         self.last_error,
             "has_update":         self.has_update,
+            "channel":            self.channel,
         }
 
 
@@ -89,15 +108,34 @@ class UpdateChecker:
         beacon_url: str | None = None,
         install_id: str | None = None,
         telemetry_enabled: bool = True,
+        channel: str | None = None,
     ) -> None:
         self.manifest_url      = manifest_url  or DEFAULT_MANIFEST_URL
         self.changelog_url     = changelog_url or DEFAULT_CHANGELOG_URL
         self.beacon_url        = beacon_url    or DEFAULT_BEACON_URL
         self.install_id        = install_id
         self.telemetry_enabled = telemetry_enabled
-        self.state = UpdateState()
+        self.channel           = normalize_channel(channel)
+        self.state = UpdateState(channel=self.channel)
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
+
+    def _channel_url(self, base: str) -> str:
+        """Append the channel as a query param so the cloud serves the
+        matching release stream. Always explicit (even for stable) so
+        Cloudflare keys its cache per channel."""
+        sep = "&" if "?" in base else "?"
+        return f"{base}{sep}channel={self.channel}"
+
+    def set_channel(self, channel: str) -> str:
+        """Switch the channel the poller follows. Clears the cached
+        "latest" so has_update recomputes against the new stream on the
+        next check_once(). Returns the normalized channel actually set."""
+        self.channel = normalize_channel(channel)
+        self.state.channel        = self.channel
+        self.state.latest_version = None
+        self.state.release_url    = None
+        return self.channel
 
     async def start(self) -> None:
         self._stop.clear()
@@ -124,7 +162,7 @@ class UpdateChecker:
                 timeout=15.0, follow_redirects=True,
                 headers={"User-Agent": USER_AGENT},
             ) as client:
-                r = await client.get(self.manifest_url)
+                r = await client.get(self._channel_url(self.manifest_url))
                 r.raise_for_status()
                 body = r.json()
                 self.state.latest_version     = body.get("version")

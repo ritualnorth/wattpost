@@ -5556,6 +5556,7 @@ async function refreshUpdateState() {
   set("#settings-version", "v" + (u.current_version || "?"));
 
   const isDocker = u.deployment === "docker";
+  renderUpdateChannel(u.channel || "stable", isDocker);
 
   // "Latest available" row is ALWAYS visible, gives users a positive
   // confirmation either way (the previous behaviour silently hid the
@@ -5620,6 +5621,71 @@ async function refreshUpdateState() {
     set("#settings-update-checked", "never");
   }
 }
+
+// Release-channel selector (#11). Reflects the channel the appliance is
+// following and renders the pre-release warning. Stable shows no note;
+// beta/edge warn. Edge has no per-commit Pi image, so on a Pi install we
+// add a caveat that the apply path falls back to beta-equivalent.
+function renderUpdateChannel(channel, isDocker) {
+  const sel = document.getElementById("settings-channel-select");
+  if (sel && sel.value !== channel) sel.value = channel;
+  const noteRow = document.getElementById("settings-channel-note-row");
+  const note = document.getElementById("settings-channel-note");
+  if (!noteRow || !note) return;
+  let text = "";
+  if (channel === "beta") {
+    text = "Beta — release candidates the moment they're cut, before "
+         + "they've soaked. May be unstable. Great for helping test; "
+         + "switch back to Stable any time.";
+  } else if (channel === "edge") {
+    text = "Edge — every commit to main, unfiltered. Expect breakage.";
+    if (!isDocker) {
+      text += " Edge images are Docker-only; on this Pi the update "
+            + "check tracks edge but an in-place apply uses the latest "
+            + "beta build.";
+    }
+  }
+  if (text) {
+    note.textContent = text;
+    noteRow.hidden = false;
+  } else {
+    note.textContent = "";
+    noteRow.hidden = true;
+  }
+}
+
+document.getElementById("settings-channel-select")?.addEventListener("change", async (e) => {
+  const sel = e.currentTarget;
+  const channel = sel.value;
+  const saving = document.getElementById("settings-channel-saving");
+  sel.disabled = true;
+  if (saving) saving.textContent = "saving…";
+  try {
+    const r = await fetch("/api/system/update/channel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ channel }),
+    });
+    if (!r.ok) {
+      let detail = `HTTP ${r.status}`;
+      try { const j = await r.json(); detail = j.detail || detail; } catch {}
+      if (saving) saving.textContent = "failed: " + detail;
+      // Re-sync the selector to the actual server state.
+      await refreshUpdateState();
+      return;
+    }
+    if (saving) saving.textContent = "saved";
+    // The POST already fired a fresh manifest check server-side; pull
+    // the new state so "Latest available" reflects the new channel.
+    await refreshUpdateState();
+    setTimeout(() => { if (saving) saving.textContent = ""; }, 2500);
+  } catch (err) {
+    if (saving) saving.textContent = "failed: " + (err.message || err);
+    await refreshUpdateState();
+  } finally {
+    sel.disabled = false;
+  }
+});
 
 // Alert banner expand/collapse, toggles the detail panel + the chevron
 // rotation via the `expanded` class on the host. We deliberately use

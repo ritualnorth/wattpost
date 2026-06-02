@@ -100,6 +100,43 @@ The pi-gen workflow takes the longest, so the rule of thumb is:
 tag → take a 90 min break → check it landed. The CI emails on
 failure.
 
+## Release channels (#11)
+
+Appliances pick a channel in **Settings → About**. Each channel is a
+separate stream of the three artefacts above:
+
+| Channel | Who    | Docker tag | Pi manifest          | Pi image       | Trigger                         |
+| ------- | ------ | ---------- | -------------------- | -------------- | ------------------------------- |
+| stable  | customers | `:latest` | `manifest.json`      | `latest.img.xz`| **final** tag `vX.Y.Z`          |
+| beta    | testers   | `:beta`   | `manifest-beta.json` | `beta.img.xz`  | **pre-release** tag `vX.Y.Z-rcN`|
+| edge    | dev       | `:edge`   | — (Docker-only)      | —              | every push to `main`            |
+
+The appliance's daily poll hits `…/api/releases/latest?channel=<ch>`;
+the cloud serves the matching `manifest*.json` (and transparently
+degrades a not-yet-published beta/edge channel to stable, so no
+appliance ever sees the 0.0.1 fallback).
+
+**Beta sits between edge and stable.** edge is every commit; beta is a
+tagged release candidate that hasn't soaked; stable is a final release.
+A **final** tag publishes stable AND mirrors into beta (a final release
+is the newest beta too), so beta testers never fall *behind* stable.
+
+**Edge is Docker-only** — we don't pi-gen every commit. On a Pi the
+edge channel still version-checks but an in-place apply uses the latest
+beta build; the Settings selector says as much.
+
+**To cut a beta / release candidate**:
+
+1. Bump `__version__` to a semver pre-release, e.g. `0.2.0-rc1` (the
+   hyphen is what routes the build to the beta channel everywhere —
+   Docker `latest=auto` skips `:latest`, and both Pi workflows detect
+   the `*-*` version and write `manifest-beta.json` / `beta.*` instead
+   of touching stable).
+2. Tag `v0.2.0-rc1` and push. Only `:beta` + `manifest-beta.json`
+   move; `:latest` / `manifest.json` are untouched.
+3. When the RC has soaked, cut the final `v0.2.0` (drop the `-rcN`).
+   That publishes stable and re-mirrors beta.
+
 ### Recovering when pi-gen's publish step fails
 
 Pi-gen successfully BUILDS the image then SCPs it to
