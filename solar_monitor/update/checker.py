@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 CHECK_INTERVAL_SECONDS = 24 * 3600   # 1 day
 DEFAULT_MANIFEST_URL   = "https://wattpost.cloud/api/releases/latest"
 DEFAULT_BEACON_URL     = "https://wattpost.cloud/api/local_installs/beacon"
-DEFAULT_CHANGELOG_URL  = "https://releases.wattpost.io/CHANGELOG.md"
+DEFAULT_CHANGELOG_URL  = "https://raw.githubusercontent.com/ritualnorth/wattpost/main/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 
 # Release channels the appliance can follow (#11). Ordered loosest-last

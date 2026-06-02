@@ -65,6 +65,12 @@ jobs:
               --exclude='*.egg-info' \
               ./solar_monitor ./packaging ./pyproject.toml ./README.md
           ( cd "${OUT_DIR}" && sha256sum "${NAME}" > "${NAME}.sha256" )
+          # Stable-named copies so GitHub's permanent
+          # releases/latest/download/wattpost-source.tar.gz URL resolves
+          # to the newest release — the appliance update helper and the
+          # cloud read these. The version lives in the release tag.
+          cp "${OUT_DIR}/${NAME}" "${OUT_DIR}/wattpost-source.tar.gz"
+          ( cd "${OUT_DIR}" && sha256sum wattpost-source.tar.gz > wattpost-source.tar.gz.sha256 )
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "out_dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
@@ -80,8 +86,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ steps.tarball.outputs.out_dir }}/${{ steps.tarball.outputs.name }}
-            ${{ steps.tarball.outputs.out_dir }}/${{ steps.tarball.outputs.name }}.sha256
+            ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz
+            ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz.sha256
           fail_on_unmatched_files: true
 
       - name: Upload to releases.wattpost.io

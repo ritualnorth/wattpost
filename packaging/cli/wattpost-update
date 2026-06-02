@@ -37,14 +37,15 @@
 set -euo pipefail
 
 LOG=/var/log/wattpost-update.log
-# Cache-buster query string defeats stale Cloudflare cache on
-# /source/latest.* (#224). Without it the tarball + sha256 can be
-# out of sync for the few minutes after a publish — sha256 was
-# updated, tarball still serves the previous version. Proper fix
-# is Cache-Control: no-cache on Caddy; this is the belt.
+# Source ships as a GitHub Release asset; releases/latest/download/<name>
+# is a permanent URL that 302-redirects to the newest release's asset.
+# Cache-buster query string is belt-and-braces against any CDN serving
+# a stale tarball/sha pair in the brief window after a publish (#224).
+# Override with WATTPOST_SOURCE_URL for a mirror or testing.
 CB="?cb=$(date +%s)-$$"
-SRC_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}${CB}"
-SHA_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}.sha256${CB}"
+SRC_BASE="${WATTPOST_SOURCE_URL:-https://github.com/ritualnorth/wattpost/releases/latest/download/wattpost-source.tar.gz}"
+SRC_URL="${SRC_BASE}${CB}"
+SHA_URL="${SRC_BASE}.sha256${CB}"
 APP_ROOT=/opt/wattpost
 SLOTS_DIR=/opt/wattpost-slots
 TMP_TAR="$(mktemp --suffix=.tar.gz)"
