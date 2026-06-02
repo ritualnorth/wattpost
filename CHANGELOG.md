@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.128] - 2026-06-02
+
 ### Added
 - Update-channel selector (Settings → About): choose **Stable**, **Beta**, or **Edge** release streams. Stable is tagged releases that have soaked; Beta is release candidates the moment they're cut; Edge is every commit to main (Docker-only). The daily update check follows the chosen channel, with a pre-release warning shown for Beta/Edge. Backed by per-channel release manifests on the cloud and a `:beta` Docker tag / `manifest-beta.json` Pi image in the release pipeline (#11)
 
