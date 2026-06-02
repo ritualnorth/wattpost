@@ -8,6 +8,14 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.127] - 2026-06-02
+
+### Changed
+- Cloud-managed backups: backup control moves off the appliance into the cloud dashboard. The appliance now honours the cloud's per-appliance "upload backups" toggle and backup schedule (interval + retention), delivered in the heartbeat and applied to the live backup config without a restart. The appliance's local "Cloud backups" tile is now a pointer to the cloud dashboard, where enable/browse/download/restore live. Local file backup/restore is unchanged (#17, #22)
+
+### Fixed
+- Prometheus `/metrics` no longer emits internal metadata fields (`_vendor`, `_kind`, `_slave_id`) as gauges — only real telemetry
+
 ## [0.1.126] - 2026-06-01
 
 ### Added
