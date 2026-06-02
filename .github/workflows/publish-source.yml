@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write   # attach the source tarball to the GitHub Release
 
 jobs:
   build-and-publish:
@@ -69,6 +69,20 @@ jobs:
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "out_dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
           ls -lah "${OUT_DIR}"
+
+      # Post-public: attach the source tarball + sha256 to the GitHub
+      # Release (the .img.xz is already attached by build-image.yml), so
+      # GitHub Releases is the canonical home the cloud reads from. The
+      # scp-to-VPS below stays as a fallback until the GitHub path is
+      # proven on a real tag; then it + the VPS release host get dropped.
+      - name: Attach source to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.tarball.outputs.out_dir }}/${{ steps.tarball.outputs.name }}
+            ${{ steps.tarball.outputs.out_dir }}/${{ steps.tarball.outputs.name }}.sha256
+          fail_on_unmatched_files: true
 
       - name: Upload to releases.wattpost.io
         uses: appleboy/scp-action@v0.1.7
