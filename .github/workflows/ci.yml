@@ -1,0 +1,47 @@
+name: CI
+
+# Lightweight checks for every push to main and every pull request.
+# Runs on GitHub-hosted runners (free for public repos).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Install, import, driver checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install package (with test extras)
+        run: pip install .[test]
+
+      - name: Import smoke test
+        run: python -c "import solar_monitor, solar_monitor.cli"
+
+      - name: Byte-compile all sources
+        run: python -m compileall -q solar_monitor scripts
+
+      - name: Unit + scenario tests (pytest)
+        run: pytest
+
+      - name: Driver verification scripts
+        run: |
+          for f in scripts/verify_*.py; do
+            echo "::group::$f"
+            python "$f" || exit 1
+            echo "::endgroup::"
+          done

@@ -1,0 +1,11 @@
+python3
+python3-venv
+python3-pip
+bluez
+bluez-tools
+network-manager
+iw
+ca-certificates
+curl
+gnupg
+lsb-release

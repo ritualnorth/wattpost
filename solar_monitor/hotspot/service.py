@@ -1,0 +1,394 @@
+"""Appliance-as-WiFi-AP via NetworkManager (Pillar 3, scaffold + manual).
+
+Owns a single named `nmcli` connection profile in AP mode with NM's
+shared IPv4 (built-in DHCP + NAT at 10.42.0.1/24). Bringing the AP up
+is `nmcli connection up <name>`; tearing it down is `... down`. We
+create/modify the profile from `HotspotCfg` on every activation so the
+live SSID/band/channel/password always reflect config.
+
+Lifecycle / contract (same spirit as TunnelService):
+  - `start()` auto-brings-up the AP only when `cfg.enabled` AND
+    nmcli is available. Otherwise it does nothing, the profile and
+    manual /api/hotspot controls still work.
+  - `stop()` deliberately leaves the AP UP. The AP lives in
+    NetworkManager, not as a child of this process, so a daemon
+    restart (or crash) must not knock a field user off the only
+    network they can reach the box on. Turning it off is an explicit
+    act (`deactivate()` / POST /api/hotspot/off).
+  - Every nmcli failure is non-fatal: logged, surfaced via
+    `status().last_error`, never raised into the scheduler.
+
+This module owns manual + boot-if-enabled bring-up and the captive-portal
+DNS drop-in. The auto-handoff policy (when to raise/drop on its own)
+lives in handoff.py.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import shutil
+
+from ..config import HotspotCfg
+
+log = logging.getLogger(__name__)
+
+# NM's shared-mode gateway. `ipv4.method shared` always hands the AP
+# host 10.42.0.1/24 and runs a DHCP server for clients, so this is the
+# address the dashboard answers on while the AP is up. Reported in
+# status() so the UI can tell the user where to point their browser.
+AP_GATEWAY = "10.42.0.1"
+
+_NMCLI_TIMEOUT = 20.0  # seconds; nmcli connection up can take a beat
+
+# NetworkManager reads *.conf here for the dnsmasq it runs on shared
+# (AP) connections. Dropping a catch-all `address=/#/<gw>` here makes
+# every DNS lookup from a joined client resolve to the appliance, which
+# is what turns a joining device's OS connectivity probe into a captive
+# portal hit. The packaged Pi image makes this dir writable by the
+# `wattpost` user; elsewhere the write simply fails and captive is a
+# no-op (the AP itself is unaffected).
+_DNSMASQ_SHARED_DIR = "/etc/NetworkManager/dnsmasq-shared.d"
+_CAPTIVE_DROPIN = "wattpost-captive.conf"
+
+
+class HotspotService:
+    def __init__(self, cfg: HotspotCfg) -> None:
+        self.cfg = cfg
+        self._last_error: str | None = None
+        # What we last *intended*: True after a successful activate(),
+        # False after deactivate(). status() still queries nmcli for
+        # ground truth; this is only for logging/diagnostics.
+        self._desired_up = False
+        # True while the captive-portal DNS hijack is in force (AP up +
+        # captive_portal enabled + the drop-in actually written). The
+        # captive probe routes read this to decide whether to redirect.
+        self._captive_active = False
+
+    @property
+    def captive_active(self) -> bool:
+        return self._captive_active
+
+    # ------------------------------------------------------------------
+    # availability
+    # ------------------------------------------------------------------
+    @staticmethod
+    def is_available(cfg: HotspotCfg) -> bool:
+        """Can we drive an AP on this host at all? We require nmcli on
+        PATH. The interface is checked at activation time (a missing
+        radio surfaces as last_error rather than silently disabling
+        manual control). Logs once when nmcli is absent."""
+        if shutil.which("nmcli") is None:
+            log.warning(
+                "hotspot: nmcli not found on PATH, appliance-as-WiFi-AP "
+                "unavailable. Install NetworkManager (default on Pi OS "
+                "Bookworm) to use the '%s' hotspot.",
+                cfg.ssid,
+            )
+            return False
+        return True
+
+    # ------------------------------------------------------------------
+    # scheduler lifecycle
+    # ------------------------------------------------------------------
+    async def start(self) -> None:
+        """Boot hook. Only auto-brings-up the AP when the user opted in
+        with `enabled: true`; manual control is always available."""
+        if not self.is_available(self.cfg):
+            return
+        if not self.cfg.enabled:
+            log.info("hotspot: configured, manual-only (enabled=false)")
+            return
+        log.info("hotspot: enabled, bringing up AP '%s'", self.cfg.ssid)
+        await self.activate()
+
+    async def stop(self) -> None:
+        """Daemon shutdown. Intentionally a no-op for the AP itself, we
+        leave NetworkManager holding the connection so a restart doesn't
+        drop a user who reached us over the hotspot."""
+        return
+
+    # ------------------------------------------------------------------
+    # manual control
+    # ------------------------------------------------------------------
+    async def activate(self) -> dict[str, str | bool]:
+        """Create/refresh the AP profile from cfg, then bring it up.
+        Returns {ok, error}. Never raises."""
+        if not self.is_available(self.cfg):
+            self._last_error = "nmcli not available"
+            return {"ok": False, "error": self._last_error}
+
+        pw = self.cfg.password or ""
+        if pw and not (8 <= len(pw) <= 63):
+            self._last_error = "password must be 8..63 chars (WPA2) or empty (open)"
+            log.warning("hotspot: %s", self._last_error)
+            return {"ok": False, "error": self._last_error}
+
+        try:
+            await self._ensure_profile()
+            # Write the captive drop-in BEFORE bringing the AP up, so
+            # NM's dnsmasq starts with the catch-all already in place
+            # (no live reload / blip needed). Best-effort.
+            if self.cfg.captive_portal:
+                self._write_captive_dropin()
+            rc, _out, err = await self._nmcli(
+                "connection", "up", self.cfg.connection_name
+            )
+            if rc != 0:
+                self._last_error = err or f"nmcli up exited {rc}"
+                log.warning("hotspot: bring-up failed: %s", self._last_error)
+                self._remove_captive_dropin()  # don't leave a stray hijack
+                self._captive_active = False
+                return {"ok": False, "error": self._last_error}
+        except Exception as e:  # non-fatal, surface and move on
+            self._last_error = str(e)
+            log.warning("hotspot: activate failed: %s", e)
+            return {"ok": False, "error": self._last_error}
+
+        self._desired_up = True
+        self._last_error = None
+        log.info(
+            "hotspot: AP up — ssid=%s band=%s ch=%d iface=%s gw=%s captive=%s",
+            self.cfg.ssid, self.cfg.band, self.cfg.channel,
+            self.cfg.interface, AP_GATEWAY, self._captive_active,
+        )
+        return {"ok": True, "error": ""}
+
+    async def deactivate(self) -> dict[str, str | bool]:
+        """Bring the AP down. Idempotent: 'not active' is treated as
+        success. Never raises."""
+        if shutil.which("nmcli") is None:
+            self._last_error = "nmcli not available"
+            return {"ok": False, "error": self._last_error}
+        try:
+            rc, _out, err = await self._nmcli(
+                "connection", "down", self.cfg.connection_name
+            )
+            # rc!=0 with 'not an active connection' just means it was
+            # already down, which is the state the caller wanted.
+            if rc != 0 and "not an active connection" not in (err or "").lower():
+                self._last_error = err or f"nmcli down exited {rc}"
+                log.warning("hotspot: bring-down failed: %s", self._last_error)
+                return {"ok": False, "error": self._last_error}
+        except Exception as e:
+            self._last_error = str(e)
+            log.warning("hotspot: deactivate failed: %s", e)
+            return {"ok": False, "error": self._last_error}
+
+        # Pull the captive hijack once the AP is down so a later plain
+        # (non-captive) AP, or normal NM shared use, isn't affected.
+        self._remove_captive_dropin()
+        self._desired_up = False
+        self._last_error = None
+        log.info("hotspot: AP '%s' down", self.cfg.ssid)
+        return {"ok": True, "error": ""}
+
+    # ------------------------------------------------------------------
+    # captive portal — DNS hijack via NM's dnsmasq drop-in
+    # ------------------------------------------------------------------
+    def _write_captive_dropin(self) -> None:
+        """Drop a catch-all `address=/#/<gw>` so every client DNS lookup
+        resolves to the appliance. Best-effort: a write failure (no perm
+        on a non-packaged host) logs once and leaves captive inactive —
+        the AP still works, clients just have to browse to the gateway
+        IP by hand."""
+        content = (
+            "# WattPost captive portal — resolve all names to the AP so a\n"
+            "# joining device's OS connectivity check lands on the dashboard.\n"
+            "# Managed by the daemon; present only while a captive AP is up.\n"
+            f"address=/#/{AP_GATEWAY}\n"
+        )
+        try:
+            os.makedirs(_DNSMASQ_SHARED_DIR, exist_ok=True)
+            path = os.path.join(_DNSMASQ_SHARED_DIR, _CAPTIVE_DROPIN)
+            with open(path, "w") as f:
+                f.write(content)
+            self._captive_active = True
+            log.info("hotspot: captive portal armed (DNS → %s)", AP_GATEWAY)
+        except Exception as e:
+            self._captive_active = False
+            log.warning(
+                "hotspot: captive portal unavailable (can't write %s: %s). "
+                "AP is up; clients reach the dashboard at http://%s",
+                _DNSMASQ_SHARED_DIR, e, AP_GATEWAY,
+            )
+
+    def _remove_captive_dropin(self) -> None:
+        """Remove the catch-all drop-in. Idempotent; never raises."""
+        self._captive_active = False
+        try:
+            path = os.path.join(_DNSMASQ_SHARED_DIR, _CAPTIVE_DROPIN)
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception as e:
+            log.debug("hotspot: couldn't remove captive drop-in: %s", e)
+
+    # ------------------------------------------------------------------
+    # status
+    # ------------------------------------------------------------------
+    async def status(self) -> dict:
+        """Settings-panel view. Queries nmcli for ground-truth active
+        state so it stays honest even if the AP was toggled outside us.
+        Client count is best-effort (needs `iw`); None when unknown.
+
+        Never raises: on a host without NetworkManager we report
+        inactive + nmcli_available=false rather than blowing up the
+        status endpoint."""
+        nmcli_ok = shutil.which("nmcli") is not None
+        active = await self._is_active() if nmcli_ok else False
+        clients = await self._client_count() if active else 0
+        return {
+            "enabled":        self.cfg.enabled,
+            "auto_handoff":   self.cfg.auto_handoff,
+            "captive_portal": self.cfg.captive_portal,
+            "captive_active": self._captive_active,
+            "active":         active,
+            "ssid":           self.cfg.ssid,
+            "band":           self.cfg.band,
+            "channel":        self.cfg.channel,
+            "interface":      self.cfg.interface,
+            "gateway":        AP_GATEWAY,
+            "secured":        bool(self.cfg.password),
+            "client_count":   clients,
+            "last_error":     self._last_error,
+            "nmcli_available": nmcli_ok,
+        }
+
+    # ------------------------------------------------------------------
+    # internals
+    # ------------------------------------------------------------------
+    async def _ensure_profile(self) -> None:
+        """Make the named connection match cfg. We delete any existing
+        profile of the same name and re-add, so stale band/channel/psk
+        from a previous config can't linger. Cheaper than diffing each
+        nmcli property."""
+        name = self.cfg.connection_name
+        # Drop a prior profile (ignore 'unknown connection').
+        await self._nmcli("connection", "delete", name)
+
+        rc, _out, err = await self._nmcli(
+            "connection", "add",
+            "type", "wifi",
+            "ifname", self.cfg.interface,
+            "con-name", name,
+            "autoconnect", "no",
+            "ssid", self.cfg.ssid,
+        )
+        if rc != 0:
+            raise RuntimeError(f"nmcli add: {err or rc}")
+
+        mods = [
+            "802-11-wireless.mode", "ap",
+            "802-11-wireless.band", self.cfg.band,
+            "802-11-wireless.channel", str(self.cfg.channel),
+            "ipv4.method", "shared",
+        ]
+        if self.cfg.password:
+            mods += [
+                "wifi-sec.key-mgmt", "wpa-psk",
+                "wifi-sec.psk", self.cfg.password,
+            ]
+        rc, _out, err = await self._nmcli("connection", "modify", name, *mods)
+        if rc != 0:
+            raise RuntimeError(f"nmcli modify: {err or rc}")
+
+    async def _is_active(self) -> bool:
+        rc, out, _err = await self._nmcli(
+            "-t", "-f", "NAME", "connection", "show", "--active"
+        )
+        if rc != 0:
+            return False
+        names = {line.strip() for line in out.splitlines()}
+        return self.cfg.connection_name in names
+
+    async def lan_kind(self) -> str | None:
+        """What kind of *non-AP* network is the appliance reachable on?
+
+          'eth'  — a connected ethernet device. Independent of the WiFi
+                   radio, so the AP can be dropped immediately when this
+                   appears.
+          'wifi' — the WiFi radio joined a real network as a client
+                   (i.e. a connected wifi device whose connection is NOT
+                   our hotspot profile).
+          None   — nothing: a candidate for AP fallback. Also None when
+                   nmcli is unavailable, so the caller treats "can't
+                   tell" as "don't act".
+
+        Uses `device` (not `connection`) status so the field layout is
+        stable: DEVICE/TYPE/STATE never contain ':', and CONNECTION is
+        the trailing field, so split(':', 3) is colon-safe even when a
+        connection name contains an escaped colon."""
+        if shutil.which("nmcli") is None:
+            return None
+        try:
+            rc, out, _err = await self._nmcli(
+                "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"
+            )
+        except Exception:
+            return None
+        if rc != 0:
+            return None
+        have_eth = have_wifi = False
+        for line in out.splitlines():
+            parts = line.split(":", 3)
+            if len(parts) < 4:
+                continue
+            _dev, dtype, state, conn = parts
+            if state != "connected":
+                continue
+            if dtype == "ethernet":
+                have_eth = True
+            elif dtype == "wifi" and conn != self.cfg.connection_name:
+                have_wifi = True
+        # Ethernet wins: it's the unambiguous "real LAN, drop the AP now"
+        # signal and doesn't contend with the AP radio.
+        if have_eth:
+            return "eth"
+        if have_wifi:
+            return "wifi"
+        return None
+
+    async def _client_count(self) -> int | None:
+        """Connected stations via `iw`. None if iw is absent."""
+        if shutil.which("iw") is None:
+            return None
+        try:
+            rc, out, _err = await self._run(
+                "iw", "dev", self.cfg.interface, "station", "dump"
+            )
+            if rc != 0:
+                return None
+            return sum(1 for ln in out.splitlines() if ln.startswith("Station"))
+        except Exception:
+            return None
+
+    async def _nmcli(self, *args: str) -> tuple[int, str, str]:
+        return await self._run("nmcli", *args)
+
+    @staticmethod
+    async def _run(*cmd: str) -> tuple[int, str, str]:
+        """Run a command, capture (rc, stdout, stderr). Times out so a
+        wedged nmcli can't hang the event loop. A missing binary becomes
+        a clean RuntimeError instead of a raw FileNotFoundError so every
+        caller degrades the same way."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except (FileNotFoundError, PermissionError) as e:
+            raise RuntimeError(f"{cmd[0]} unavailable: {e}")
+        try:
+            out_b, err_b = await asyncio.wait_for(
+                proc.communicate(), timeout=_NMCLI_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise RuntimeError(f"{cmd[0]} timed out after {_NMCLI_TIMEOUT:.0f}s")
+        return (
+            proc.returncode if proc.returncode is not None else -1,
+            out_b.decode(errors="replace"),
+            err_b.decode(errors="replace").strip(),
+        )

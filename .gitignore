@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenv
+.venv/
+venv/
+env/
+
+# SQLite databases — runtime state, never commit
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# User config — contains BT MAC addresses + (later) license keys
+config.yaml
+config.local.yaml
+config.yaml.bak
+config.yaml.tmp
+*.local.yaml
+
+# Build artefacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Frontend build (when we move to SvelteKit)
+node_modules/
+solar_monitor/web/build/
+solar_monitor/web/.svelte-kit/
+
+# Pi-gen output
+*.img
+*.img.xz
+pi-gen-work/
+
+# Ed25519 signing keys — must NEVER end up in the repo
+secrets/
+*.key
+*.pem
+license-signing-key*
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/sm-daemon.log
+
+# Local notes / scratch
+NOTES.local.md
+scratch/
+
+# Cloud per-environment secrets — never commit. The template is
+# `cloud/.env.example`; copy → `cloud/.env` per machine. The
+# wildcard catches one-off envs like `cloud/.env.stripe-setup` used
+# by the provisioning script.
+cloud/.env
+cloud/.env.*
+!cloud/.env.example
+.env
+
+# Editor / tool local state
+.vscode/
+.idea/

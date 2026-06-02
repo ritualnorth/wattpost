@@ -1,0 +1,54 @@
+[project]
+name = "solar-monitor"
+version = "0.0.1"
+description = "Local-first multi-vendor solar/battery telemetry appliance"
+requires-python = ">=3.11"
+dependencies = [
+    "bleak>=0.22",
+    "pyserial>=3.5",
+    "pyyaml>=6.0",
+    "msgspec>=0.19",
+    "litestar[standard]>=2.13",
+    "aiosqlite>=0.20",
+    "uvicorn>=0.30",
+    "aiomqtt>=2.0",        # MQTT exporter + (future) MQTT-publish alert transport
+    "httpx>=0.27",         # ntfy / Discord / generic-webhook alert transports
+    "aiosmtplib>=4.0",     # SMTP alert transport
+    "argon2-cffi>=23.1",   # local web UI password hash
+    "pynacl>=1.5",         # Identity v2 — ed25519 keypair + SecretBox sealed storage (#303)
+    "victron-ble>=0.9",    # Victron SmartShunt + SmartSolar BLE Instant Readout decoder (latest published is 0.9.3)
+]
+
+[project.optional-dependencies]
+# Test harness (#20). Install with `pip install .[test]`. Kept out of
+# the runtime deps so the appliance image stays lean.
+test = [
+    "pytest>=8",
+]
+
+[project.scripts]
+solar-monitor = "solar_monitor.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["solar_monitor*"]
+
+[tool.setuptools.package-data]
+solar_monitor = [
+    "web/*.html",
+    "web/*.css",
+    "web/*.js",
+    "web/*.webmanifest",
+    "web/*.svg",
+    "web/*.png",
+    "web/docs/*.md",
+    "web/docs/*.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Quiet, fail-fast-ish defaults; scenario tests assert inline.
+addopts = "-q"

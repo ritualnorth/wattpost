@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0d12" id="meta-theme-color" />
+  <title>WattPost</title>
+  <!-- Suppress PWA hints when this HTML is served via the cloud
+       broker (<slug>.wattpost.cloud). Push notifications register
+       against the page's origin; if a user "Add to Home Screen"s
+       from a broker URL they'd get a per-appliance PWA scoped to
+       that single broker subdomain, alerts wouldn't reach it
+       (cloud sends push from wattpost.cloud origin), and the
+       multi-site picker wouldn't exist. The canonical install
+       target is wattpost.cloud/app. LAN access (192.168.x.x etc.)
+       still installs the appliance PWA, that's still valid for
+       offline-first / no-cloud customers. -->
+  <script>
+    (function () {
+      try {
+        if (location.hostname.endsWith('.wattpost.cloud')) {
+          // Tag for the SW block below + any other code that wants
+          // to know it's running in broker context.
+          window._wp_no_pwa = true;
+          var sel = 'link[rel="manifest"], link[rel="apple-touch-icon"], '
+                  + 'meta[name="apple-mobile-web-app-capable"], '
+                  + 'meta[name="apple-mobile-web-app-status-bar-style"], '
+                  + 'meta[name="apple-mobile-web-app-title"]';
+          var nodes = document.querySelectorAll(sel);
+          for (var i = 0; i < nodes.length; i++) nodes[i].remove();
+        }
+      } catch (_) { /* ignore, non-fatal */ }
+    })();
+  </script>
+  <!-- PWA: install-to-home-screen + offline shell. Stripped above
+       when accessed via the cloud broker. -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/web/icon-192.png" />
+  <link rel="icon" type="image/svg+xml" href="/web/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="WattPost" />
+  <script>
+    // Skip SW registration when the HTML was served via the cloud
+    // broker, the cloud's own SW (at wattpost.cloud/wp-sw.js)
+    // owns push delivery for paired users. Registering a second SW
+    // on the broker subdomain would just compete for the alerts
+    // inbox notification flow.
+    if (!window._wp_no_pwa && 'serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        // updateViaCache: 'none' tells the browser to bypass the
+        // HTTP cache when fetching sw.js itself. Without it, iOS
+        // Safari can hold the old SW for hours after a deploy,
+        // serving the old app.js even though the container's been
+        // updated. This makes SW updates propagate within ~1
+        // page load instead of "whenever Safari feels like it".
+        navigator.serviceWorker.register('/sw.js', {
+          updateViaCache: 'none',
+        }).catch(() => {});
+      });
+    }
+  </script>
+  <!-- Resolve theme before stylesheets paint so there's no flash of the
+       wrong palette. The preference is "system" | "dark" | "light";
+       in "system" mode we honour prefers-color-scheme. -->
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem("wp-theme") || "system";
+        var resolved = pref === "system"
+          ? (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+          : pref;
+        document.documentElement.setAttribute("data-theme", resolved);
+      } catch (_) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="/web/uPlot.min.css" />
+  <link rel="stylesheet" href="/web/styles.css?v=142" />
+  <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
+       pin as the cloud Fleet map. Defer-loaded so it doesn't block
+       paint of the hero. -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""
+          defer></script>
+  <script>
+    // Detect the WattPost mobile shell (sets a UA marker via
+    // capacitor.config.ts.{ios,android}.appendUserAgent). When set,
+    // tag <body> so CSS can strip the appliance's own header, the
+    // mobile app's native tab bar + cloud-served wrapper already
+    // provide chrome; rendering ours again is "website in a frame"
+    // double chrome. Done inline before paint so there's no flash. #}
+    (function () {
+      if (/WattPostApp\//.test(navigator.userAgent)) {
+        document.documentElement.classList.add("in-wattpost-app");
+      }
+    })();
+  </script>
+</head>
+<body>
+  <!-- Conditional alert banner (always visible across all routes) -->
+  <!-- Single collapsible alert banner, replaces the old stacked rows
+       that were eating ~25% of the mobile fold. Banner shows a one-line
+       summary; tap to expand the per-category detail. Same-category
+       alerts (e.g. cell drift on two batteries at the same value) are
+       collapsed server-side via renderAlerts() before they reach the
+       DOM. -->
+  <div id="alerts" class="alerts" hidden>
+    <button type="button" class="alerts-summary" id="alerts-summary"
+            aria-expanded="false" aria-controls="alerts-detail">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           aria-hidden="true">
+        <path d="M12 2L2 21h20L12 2z"/>
+        <path d="M12 9v6M12 18h.01"/>
+      </svg>
+      <span class="alerts-summary-count" id="alerts-summary-count">·</span>
+      <span class="alerts-summary-cats" id="alerts-summary-cats"></span>
+      <span class="alerts-summary-chev" aria-hidden="true">›</span>
+    </button>
+    <div class="alerts-detail" id="alerts-detail" hidden></div>
+  </div>
+
+  <!-- Full-screen overlay while the daemon is restarting -->
+  <div id="restart-overlay" class="restart-overlay" hidden>
+    <div class="restart-overlay-card">
+      <div class="restart-spinner"></div>
+      <div class="restart-overlay-title">Restarting daemon…</div>
+      <div class="restart-overlay-sub" id="restart-overlay-sub">Reconnecting</div>
+    </div>
+  </div>
+
+  <div id="demo-banner" class="demo-banner" hidden>
+    <strong>DEMO</strong> · This is a public demo running on synthetic data.
+    Buttons that change state are disabled. <a href="https://wattpost.cloud/download">Get the real thing →</a>
+  </div>
+
+  <header class="app-header">
+    <div class="brand" id="app-brand">
+      <!-- White-label users on Installer tier replace the SVG with
+           their own logo URL + the title with brand_name. Default
+           WattPost mark stays as-is for everyone else. JS swaps via
+           /api/branding on page load. -->
+      <svg class="logo" id="app-brand-logo-default" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+           aria-label="WattPost">
+        <rect x="2" y="3" width="20" height="12" rx="1"/>
+        <line x1="7" y1="15" x2="7" y2="22"/>
+        <line x1="17" y1="15" x2="17" y2="22"/>
+        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
+              fill="currentColor" stroke="none"/>
+      </svg>
+      <img class="logo" id="app-brand-logo-custom" alt="" hidden />
+      <span class="title" id="app-brand-title">WattPost</span>
+    </div>
+    <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
+      <span class="dot"></span>
+      <span class="status-icon"></span>
+      <span class="text">connecting…</span>
+    </button>
+    <!-- Help icon-button, small, sits in the topbar instead of a
+         floating FAB. Same destination (#/docs), less screen real-estate
+         eaten on mobile, no overlay clash with the dashboard tiles. -->
+    <a class="help-btn" id="help-btn" href="#/docs"
+       aria-label="Open documentation" title="Help & documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
+        <line x1="12" y1="17" x2="12" y2="17.01"/>
+      </svg>
+    </a>
+    <!-- Sign-in / sign-out lived here briefly but moved inside Settings
+         (the only place you actually need them), clicking Settings on
+         an unauthed session bounces to /login automatically, so the
+         header button was redundant noise. Sign-out now lives inside
+         Settings → System. -->
+
+
+    <!-- Status legend popover, opens when the pill is tapped. -->
+    <div id="status-legend" class="status-legend" hidden>
+      <div class="status-legend-head">
+        <span>System status</span>
+        <button class="status-legend-close" type="button" aria-label="Close">×</button>
+      </div>
+      <ul class="status-legend-list">
+        <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet. Visit Settings → Setup and click "Find my dongle".</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Your Bluetooth connection is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes. Usually a brief BLE wobble; clears on the next cycle.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes. Check Bluetooth power / range to the dongle.</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Visit Settings → System → Restart daemon.</li>
+      </ul>
+      <a class="status-legend-link" href="#/settings">Open Settings → Diagnostics for live logs</a>
+    </div>
+  </header>
+
+  <nav class="app-nav" aria-label="Primary">
+    <a class="nav-tab" data-tab="dashboard" href="#/">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a class="nav-tab" data-tab="history" href="#/history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/></svg>
+      <span>History</span>
+    </a>
+    <a class="nav-tab" data-tab="devices" href="#/devices">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="6" rx="1.5"/><rect x="4" y="13" width="16" height="6" rx="1.5"/><circle cx="8" cy="8" r="0.6" fill="currentColor"/><circle cx="8" cy="16" r="0.6" fill="currentColor"/></svg>
+      <span>Devices</span>
+    </a>
+    <a class="nav-tab" data-tab="settings" href="#/settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </a>
+  </nav>
+
+  <!-- Floating help button was previously here; lifted into the topbar
+       as a small icon-button (above) so it doesn't eat screen real
+       estate or compete with primary tiles on mobile. -->
+
+  <main>
+    <!-- =====================================================
+         ROUTE: Dashboard (default)
+         ===================================================== -->
+    <section class="route" data-route="dashboard">
+      <!-- HERO -->
+      <section class="hero-v2">
+        <div class="hero-donut-wrap donut-state" id="donut-wrap" data-radius="86">
+          <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+            <defs>
+              <linearGradient id="g-soc-charging" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#2ea043"/><stop offset="100%" stop-color="#56d364"/>
+              </linearGradient>
+              <linearGradient id="g-soc-holding" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1f6feb"/><stop offset="100%" stop-color="#58a6ff"/>
+              </linearGradient>
+              <linearGradient id="g-soc-discharging" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#d29922"/><stop offset="100%" stop-color="#f0c849"/>
+              </linearGradient>
+              <linearGradient id="g-soc-critical" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#da3633"/><stop offset="100%" stop-color="#ff7b72"/>
+              </linearGradient>
+            </defs>
+            <circle class="donut-track" cx="100" cy="100" r="86" fill="none" stroke-width="14" />
+            <circle id="donut-arc" class="donut-arc" cx="100" cy="100" r="86" fill="none" stroke-width="14"
+                    pathLength="100" stroke-dasharray="0 100" stroke-linecap="round"
+                    transform="rotate(-90 100 100)" />
+            <circle id="donut-head-glow" class="donut-head-glow" cx="100" cy="14" r="9" />
+            <circle id="donut-head" class="donut-head" cx="100" cy="14" r="5" stroke-width="1.5" />
+          </svg>
+          <div class="donut-center">
+            <div class="donut-pct"><span id="bank-soc">·</span><span class="donut-pct-unit">%</span></div>
+            <div class="donut-label">State of charge</div>
+            <div class="donut-flow" id="donut-flow"><span class="donut-flow-arrow"></span><span class="donut-flow-text">·</span></div>
+            <!-- #121: surfaced when shunt + BMS SoC disagree by >5pp.
+                 Empty / hidden in the common case. -->
+            <div class="donut-disagreement" id="donut-disagreement" hidden></div>
+            <!-- #293: one-liner battery health badge. Aggregated from
+                 the worst of cycles / silent-cells / cell-spread /
+                 charger-state, surfaces a single status without the
+                 user needing to open the Battery health panel. -->
+            <div class="donut-health" id="donut-health" hidden></div>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="hero-stat hero-stat--big" id="bank-power-tile">
+            <div class="meta-k">Net power</div>
+            <div class="hero-stat-val"><span id="bank-power">·</span><span class="hero-stat-unit">W</span></div>
+            <div class="hero-stat-sub" id="bank-power-sub">·</div>
+          </div>
+          <div class="hero-stat hero-stat--big" id="bank-time-tile">
+            <div class="meta-k">Remaining</div>
+            <div class="hero-stat-val"><span id="bank-time">·</span></div>
+            <div class="hero-stat-sub" id="bank-time-sub">·</div>
+            <div class="hero-stat-forecast" id="bank-time-forecast" hidden>·</div>
+          </div>
+          <div class="hero-stat">
+            <div class="meta-k">Voltage</div>
+            <div class="hero-stat-val"><span id="bank-voltage">·</span><span class="hero-stat-unit">V</span></div>
+          </div>
+          <div class="hero-stat">
+            <div class="meta-k">Capacity</div>
+            <div class="hero-stat-val"><span id="bank-capacity">·</span><span class="hero-stat-unit">Ah</span></div>
+          </div>
+          <div class="hero-stat">
+            <div class="meta-k">Remaining</div>
+            <div class="hero-stat-val"><span id="bank-remaining">·</span><span class="hero-stat-unit">Ah</span></div>
+          </div>
+          <div class="hero-stat">
+            <div class="meta-k">Bank</div>
+            <div class="hero-stat-val"><span id="bank-meta">·</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- POWER FLOW -->
+      <section class="panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h6m6 0h6"/><path d="M9 8l-4 4 4 4"/><path d="M15 8l4 4-4 4"/>
+            </svg>
+            Power flow
+          </h2>
+          <div class="panel-sub" id="flow-sub">·</div>
+        </div>
+        <div id="flow" class="flow"></div>
+        <div id="flow-cap" class="flow-caption"></div>
+      </section>
+
+      <!-- TODAY -- headline panel: PV-so-far, remaining-forecast curve,
+           sub-stats, and a one-line Tomorrow preview. After sunset (no
+           PV remaining today + tomorrow forecast available) the panel
+           flips: Tomorrow becomes the headline and today demotes to a
+           "final" footer line. -->
+      <section class="panel today-panel" id="today-panel">
+        <div class="panel-header today-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+            <span id="today-headline">Today</span>
+          </h2>
+          <div class="panel-sub" id="today-sub"></div>
+        </div>
+        <div class="today-grid">
+          <div class="today-hero">
+            <div class="today-hero-block">
+              <span class="meta-k today-hero-k" id="today-hero-k">Harvested today</span>
+              <div class="today-hero-val"><span id="today-pv">·</span></div>
+            </div>
+            <div class="today-hero-cells">
+              <div class="today-cell" id="today-cell-charged"><span class="meta-k" id="today-charged-k">Charged</span><span class="today-v" id="today-charged">·</span></div>
+              <div class="today-cell" id="today-cell-peak"><span class="meta-k">Peak</span><span class="today-v" id="today-peak">·</span></div>
+              <div class="today-cell" id="today-cell-load"><span class="meta-k">Load</span><span class="today-v" id="today-load">·</span></div>
+              <div class="today-cell" id="today-cell-stored"><span class="meta-k" id="today-stored-k">Stored</span><span class="today-v" id="today-stored">·</span></div>
+              <div class="today-cell"><span class="meta-k">SoC today</span><span class="today-v" id="today-soc-env">·</span></div>
+            </div>
+          </div>
+          <div class="today-spark" id="today-spark" aria-hidden="true"></div>
+        </div>
+        <div class="today-tomorrow" id="today-tomorrow" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
+          </svg>
+          <span id="today-tomorrow-text">·</span>
+        </div>
+        <div class="forecast-accuracy" id="forecast-accuracy" hidden>
+          <span class="meta-k">Yesterday</span>
+          <span class="forecast-accuracy-line" id="forecast-accuracy-line">·</span>
+        </div>
+      </section>
+
+      <!-- RIGHT NOW (Open-Meteo current conditions, hidden until configured) -->
+      <section class="panel weather-panel" id="weather-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+            </svg>
+            Right now
+          </h2>
+          <div class="panel-sub" id="weather-sub">·</div>
+        </div>
+        <div class="weather-strip" id="weather-strip">
+          <div class="weather-hero">
+            <div class="weather-icon" id="weather-icon"></div>
+            <div class="weather-temp">
+              <span class="weather-temp-v" id="weather-temp">·</span>
+              <span class="weather-temp-unit">°C</span>
+            </div>
+            <div class="weather-cond" id="weather-cond">·</div>
+          </div>
+          <div class="weather-meta">
+            <div class="weather-cell"><span class="meta-k">Cloud</span><span class="weather-v" id="weather-cloud">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Wind</span><span class="weather-v" id="weather-wind">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Humidity</span><span class="weather-v" id="weather-humidity">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunrise</span><span class="weather-v" id="weather-sunrise">·</span></div>
+            <div class="weather-cell"><span class="meta-k">Sunset</span><span class="weather-v" id="weather-sunset">·</span></div>
+          </div>
+          <div class="weather-hourly" id="weather-hourly" hidden></div>
+        </div>
+      </section>
+
+      <!-- LOCATION (#264), shown when the appliance has any current
+           location (GPS fix OR static forecast lat/lon). Always rendered
+           locally; cloud transmission is gated separately by the
+           Settings → Location toggle. -->
+      <section class="panel location-panel" id="location-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s-7-7-7-13a7 7 0 1 1 14 0c0 6-7 13-7 13z"/>
+              <circle cx="12" cy="9" r="3"/>
+            </svg>
+            <span>Where you are</span>
+          </h2>
+          <div class="panel-sub" id="location-sub">·</div>
+        </div>
+        <div id="location-map" class="location-map"></div>
+        <p class="map-attrib" style="margin:.4rem 0 0;font-size:.68rem;color:var(--text-3);text-align:right">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">CARTO</a></p>
+      </section>
+
+      <!-- DAILY OUTLOOK (PV forecast, hidden until first fetch lands) -->
+      <section class="panel week-panel" id="week-panel" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="17" rx="2"/>
+              <path d="M3 9h18M8 2v4M16 2v4"/>
+            </svg>
+            <span id="week-title">Daily outlook</span>
+          </h2>
+          <div class="panel-sub" id="week-sub">·</div>
+        </div>
+        <div class="week-strip" id="week-strip"></div>
+      </section>
+
+      <!-- TOMORROW EMPTY STATE (shown when no forecast is configured) -->
+      <section class="panel tomorrow-empty" id="tomorrow-empty" hidden>
+        <button class="tomorrow-empty-close" id="tomorrow-empty-dismiss" title="Dismiss" aria-label="Dismiss">&times;</button>
+        <div class="tomorrow-empty-body">
+          <svg class="tomorrow-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 18a4 4 0 0 0 0-8 6 6 0 0 0-11.7 1.8A3.5 3.5 0 0 0 6.5 18z"/>
+            <path d="M12 22v-3M8 21l1-2M16 21l-1-2"/>
+          </svg>
+          <div class="tomorrow-empty-text">
+            <h3>See tomorrow's expected PV here</h3>
+            <p>
+              Hook up a free <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">Solcast</a>
+              hobbyist key in <a href="#/settings">Settings → Integrations</a> and this tile fills with
+              tomorrow's kWh estimate, peak time, and a dashed forecast overlay on the History chart.
+              Nothing leaves your network without it.
+            </p>
+            <a class="tomorrow-empty-cta" href="#/docs/forecast">How it works →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- TANK + AMBIENT SENSORS (#257), hidden by default, surfaces
+           when at least one tank (Mopeka) or ambient (Govee/Ruuvi)
+           device is paired. Renders below the weather/location stack
+           so it sits with environmental data, not battery telemetry. -->
+      <section class="panel" id="panel-sensors" hidden>
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v9"/><circle cx="12" cy="17" r="4"/>
+            </svg>
+            Sensors
+          </h2>
+          <div class="panel-sub" id="sensors-summary">·</div>
+        </div>
+        <div class="sensors-grid" id="sensors-grid"></div>
+      </section>
+
+      <!-- BATTERY HEALTH -->
+      <section class="panel" id="panel-battery-health">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="14" height="10" rx="1.5"/><path d="M17 10v4"/><path d="M7 12h6"/>
+            </svg>
+            Battery health
+          </h2>
+          <div class="panel-sub" id="bhealth-window">last 30 days</div>
+        </div>
+        <div class="bhealth-stats">
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Cycles (BMS)</span>
+            <span class="bhealth-v" id="bhealth-cycles">·</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Lifetime energy</span>
+            <span class="bhealth-v" id="bhealth-lifetime">·</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Window cycles</span>
+            <span class="bhealth-v" id="bhealth-window-cycles">·</span>
+          </div>
+          <div class="bhealth-stat">
+            <span class="bhealth-k">Days online</span>
+            <span class="bhealth-v" id="bhealth-days">·</span>
+          </div>
+        </div>
+        <div class="bhealth-residency">
+          <div class="bhealth-residency-head">
+            <span class="meta-k">Where the battery lives. SoC residency</span>
+            <span class="bhealth-residency-stat" id="bhealth-residency-stat">·</span>
+          </div>
+          <div class="bhealth-bars" id="bhealth-bars"></div>
+          <div class="bhealth-bars-axis">
+            <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CELL BALANCE -->
+      <section class="panel" id="panel-cells">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="14" height="10" rx="1.5"/><path d="M17 10v4"/><path d="M6 9v6M10 9v6M14 9v6"/>
+            </svg>
+            Cell balance
+          </h2>
+          <div class="panel-sub" id="cells-summary">·</div>
+        </div>
+        <div class="cells-grid" id="cells-grid"></div>
+        <div class="cell-drift-trend">
+          <div class="cell-drift-trend-head">
+            <span class="meta-k">Drift trend · last 24h (max across packs)</span>
+            <span class="cell-drift-trend-stat" id="cell-drift-stat">·</span>
+          </div>
+          <div id="cell-drift-spark"></div>
+        </div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: History
+         ===================================================== -->
+    <section class="route" data-route="history">
+
+      <!-- ENERGY TODAY, Powerwall-style overview chart. Multi-series
+           area + SoC line, four kWh totals, self-powered breakdown.
+           Backed by /api/energy/today which returns aligned series in
+           a single request. -->
+      <section class="panel energy-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/>
+            </svg>
+            <span id="energy-title">Energy today</span>
+          </h2>
+          <div class="panel-sub" id="energy-sub">·</div>
+        </div>
+
+        <div class="energy-ranges" id="energy-ranges" role="tablist" aria-label="Energy chart range">
+          <button class="erange is-active" data-range="today" role="tab">Today</button>
+          <button class="erange"           data-range="24h"   role="tab">24h</button>
+          <button class="erange"           data-range="7d"    role="tab">7 days</button>
+          <button class="erange"           data-range="30d"   role="tab">30 days</button>
+        </div>
+
+        <div id="energy-chart" class="energy-chart-host"></div>
+
+        <div class="energy-legend" id="energy-legend">
+          <span class="chip"><span class="swatch" style="background:#f0c849"></span>Solar</span>
+          <span class="chip"><span class="swatch" style="background:#7c5cff"></span>Load</span>
+          <span class="chip"><span class="swatch" style="background:#56d364"></span>Into battery</span>
+          <span class="chip"><span class="swatch" style="background:#f06292"></span>Out of battery</span>
+          <span class="chip"><span class="swatch line" style="background:#ff5e57"></span>SoC</span>
+          <span class="chip" id="energy-legend-weather" hidden><span class="swatch" style="background:rgba(180,190,210,.55)"></span>Cloud cover</span>
+        </div>
+
+        <div class="energy-stats">
+          <div class="estat pv">
+            <div class="estat-k">Solar today</div>
+            <div class="estat-v"><span id="es-solar">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat load">
+            <div class="estat-k">Load today</div>
+            <div class="estat-v"><span id="es-load">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat in">
+            <div class="estat-k">Into battery</div>
+            <div class="estat-v"><span id="es-batin">·</span><span class="unit">kWh</span></div>
+          </div>
+          <div class="estat out">
+            <div class="estat-k">Out of battery</div>
+            <div class="estat-v"><span id="es-batout">·</span><span class="unit">kWh</span></div>
+          </div>
+        </div>
+
+        <div class="energy-self">
+          <div class="energy-self-k">Self-powered breakdown</div>
+          <div class="energy-self-bars" id="energy-self-bars"></div>
+          <div class="energy-self-legend" id="energy-self-legend"></div>
+        </div>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 17l5-6 4 3 4-7 5 6"/><path d="M3 21h18"/>
+            </svg>
+            Detailed metrics
+          </h2>
+          <div class="chart-controls">
+            <select id="sel-device" aria-label="Device"></select>
+            <select id="sel-metric" aria-label="Metric"></select>
+            <label class="chart-compare" title="Overlay every battery pack on the same chart">
+              <input type="checkbox" id="chart-compare-packs"/> Compare packs
+            </label>
+            <div class="range-btns">
+              <button data-range="1h">1h</button>
+              <button data-range="6h">6h</button>
+              <button data-range="24h" class="active">24h</button>
+              <button data-range="7d">7d</button>
+              <button data-range="30d">30d</button>
+              <button data-range="custom" id="btn-custom">Custom</button>
+            </div>
+            <button id="chart-export-csv" class="chart-export-btn" title="Download the chart data as CSV">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+              <span>CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="custom-range" class="custom-range" hidden>
+          <label>From <input type="datetime-local" id="custom-from"/></label>
+          <label>To <input type="datetime-local" id="custom-to"/></label>
+        </div>
+
+        <div class="chart-statstrip" id="chart-stats">
+          <div class="cs-cell cs-cell--now"><span class="cs-k">Now</span><span class="cs-v" id="cs-now">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Min</span><span class="cs-v" id="cs-min">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Avg</span><span class="cs-v" id="cs-avg">·</span></div>
+          <div class="cs-cell"><span class="cs-k">Max</span><span class="cs-v" id="cs-max">·</span></div>
+        </div>
+        <div class="chart-resbar"><span id="cs-res">·</span></div>
+
+        <div id="chart" class="chart-host"></div>
+      </section>
+
+      <section class="panel heatmap-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/>
+              <line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>
+            Load profile
+          </h2>
+          <div class="panel-sub" id="heatmap-sub">last 30 days · hour × day</div>
+        </div>
+        <div id="heatmap" class="heatmap"></div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: Devices
+         ===================================================== -->
+    <section class="route" data-route="devices">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="4" y="5" width="16" height="6" rx="1.5"/><rect x="4" y="13" width="16" height="6" rx="1.5"/><circle cx="8" cy="8" r="0.6" fill="currentColor"/><circle cx="8" cy="16" r="0.6" fill="currentColor"/>
+            </svg>
+            Devices
+          </h2>
+          <div class="panel-actions">
+            <a class="btn-action" href="#/setup">+ Add device</a>
+          </div>
+        </div>
+        <div class="panel-sub" id="devices-meta" style="margin-bottom:.75rem">·</div>
+        <div id="device-cards" class="device-cards"></div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: Per-device detail (#/device/<label>)
+         Content rendered dynamically by renderDeviceDetail().
+         ===================================================== -->
+    <section class="route" data-route="device" id="device-route"></section>
+
+    <!-- =====================================================
+         ROUTE: Setup (placeholder for wizard)
+         ===================================================== -->
+    <section class="route" data-route="setup">
+      <section class="panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 12h2a3 3 0 0 1 6 0M14 12h6"/><circle cx="9" cy="12" r="2.5"/><path d="M9 5v3M9 16v3"/>
+            </svg>
+            Setup
+          </h2>
+          <span class="panel-sub">Scan a Bluetooth dongle for new devices and add them automatically.</span>
+        </div>
+
+        <!-- Restart banner, visible after a successful add until the daemon restarts. -->
+        <div id="wiz-restart" class="wiz-restart" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+          <div>
+            <strong>Restart required.</strong>
+            <span id="wiz-restart-detail">Added devices won't start polling until the daemon restarts.</span>
+          </div>
+        </div>
+
+        <div class="wizard">
+          <!-- BLE adapter status, diagnostic at the top so users
+               can tell if their dongle / docker passthrough is even
+               reaching the daemon before fiddling with anything else. -->
+          <div id="wiz-ble-status" class="wiz-ble-status">
+            <span class="wiz-ble-dot"></span>
+            <span class="wiz-ble-label">Checking Bluetooth…</span>
+          </div>
+          <!-- Deeper diagnostics on demand. Runs bleak and bluetoothctl
+               side by side and reports the divergence; catches the
+               Realtek+BlueZ 5.72 silent-scan case where bluetoothctl
+               returns 0 devices while bleak finds plenty (#158). -->
+          <div class="wiz-ble-diag-row">
+            <button id="wiz-ble-diagnose-btn" type="button"
+                    class="btn btn-ghost btn-sm">Run BLE diagnostics</button>
+            <div id="wiz-ble-diag-out" class="wiz-ble-diag-out" hidden></div>
+          </div>
+
+          <!-- Step 1, Bluetooth connection (internally "transport"
+              , kept that word in IDs/CSS/APIs but the UX shows
+               plain English). -->
+          <div class="wiz-step">
+            <div class="wiz-step-head"><span class="wiz-num">1</span><span>Your Bluetooth connection</span></div>
+            <p class="wiz-help">The dongle or adapter your solar gear is plugged into. Pick one to scan it for devices.</p>
+            <div id="wiz-transports" class="wiz-transports"><div class="wiz-empty">Loading…</div></div>
+          </div>
+
+          <!-- Step 2, scan -->
+          <div class="wiz-step" id="wiz-step-scan" hidden>
+            <div class="wiz-step-head"><span class="wiz-num">2</span><span>Find your devices</span></div>
+            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running. Scanning just shares the link.</p>
+            <div class="wiz-controls">
+              <button id="wiz-scan-btn" class="btn-action btn-action--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>Scan</span>
+              </button>
+              <span id="wiz-scan-status" class="wiz-status"></span>
+            </div>
+            <div id="wiz-scan-results" class="wiz-results"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: Settings (placeholder)
+         ===================================================== -->
+    <section class="route" data-route="settings">
+      <section class="panel placeholder-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+            </svg>
+            Settings
+          </h2>
+        </div>
+
+        <!-- Sub-page back link, only visible when a sub-route is
+             active (CSS hides .settings-sub-back when
+             body[data-route-sub="menu"]). -->
+        <a href="#/settings" class="settings-sub-back">← Settings</a>
+
+        <!-- Menu landing, only visible when no sub-route is selected.
+             Each row deep-links to a sub-page where the matching
+             settings-blocks render. CSS in body[data-route-sub="menu"]
+             shows this and hides the .settings-grid blocks. -->
+        <nav class="settings-menu" aria-label="Settings sections">
+          <a class="settings-menu-row" href="#/settings/devices">
+            <span class="settings-menu-icon">🔌</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Devices</span>
+              <span class="settings-menu-sub">Scan over Bluetooth · pair Renogy, Victron, JK BMS</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/alerts">
+            <span class="settings-menu-icon">🔔</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Alerts</span>
+              <span class="settings-menu-sub">Threshold rules · transports · solar-aware charger pause</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/backup">
+            <span class="settings-menu-icon">💾</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Backup &amp; restore</span>
+              <span class="settings-menu-sub">Manual + automatic snapshots</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/privacy">
+            <span class="settings-menu-icon">🔐</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Privacy &amp; sharing</span>
+              <span class="settings-menu-sub">Location · web password · discovery telemetry</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/integrations">
+            <span class="settings-menu-icon">🔌</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Integrations</span>
+              <span class="settings-menu-sub">MQTT-out · MQTT-in · Home Assistant + Grafana hooks</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/advanced">
+            <span class="settings-menu-icon">⚙️</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">Advanced</span>
+              <span class="settings-menu-sub">History tiers · poll interval · diagnostics · theme</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+          <a class="settings-menu-row" href="#/settings/about">
+            <span class="settings-menu-icon">ℹ️</span>
+            <span class="settings-menu-body">
+              <span class="settings-menu-title">About</span>
+              <span class="settings-menu-sub">Version · update · session · reset to defaults</span>
+            </span>
+            <span class="settings-menu-chev">›</span>
+          </a>
+        </nav>
+
+        <div class="settings-grid">
+          <!-- Session + system actions promoted to the top of the
+               grid (#147). Sign Out specifically, easy to miss when
+               buried under five blocks of config; finishing at "Sign
+               out" up here means you don't accidentally walk away
+               from an authed session on a shared tablet. -->
+          <div class="settings-block" data-subroute="about">
+            <h3>Session &amp; system</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Restart the daemon to apply pending changes (new transports,
+              devices, exporters). The UI reconnects automatically. Takes
+              ~5 seconds.
+            </p>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+              <button id="restart-daemon-btn" class="btn-action btn-action--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                <span>Restart daemon</span>
+              </button>
+              <button id="signout-btn" class="btn-action" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                <span id="signout-btn-label">Sign out</span>
+              </button>
+            </div>
+            <p id="signout-broker-note" class="settings-block-note" hidden style="margin:.5rem 0 0;color:var(--text-2);font-size:.85rem;line-height:1.45">
+              You're signed in via wattpost.cloud. The button above takes you to cloud sign-out, ending that session ends broker access to this appliance.
+            </p>
+          </div>
+          <div class="settings-block settings-block--cta" data-subroute="devices">
+            <h3>Devices &amp; setup</h3>
+            <p class="settings-cta-blurb">Scan over Bluetooth and pair Renogy gear. No config files.</p>
+            <a class="btn-action btn-action--primary" href="#/setup">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h2a3 3 0 0 1 6 0M14 12h6"/><circle cx="9" cy="12" r="2.5"/><path d="M9 5v3M9 16v3"/></svg>
+              <span>Run device setup</span>
+            </a>
+          </div>
+          <div class="settings-block" data-subroute="advanced">
+            <h3>Appearance</h3>
+            <div class="theme-picker" role="radiogroup" aria-label="Theme">
+              <button class="theme-opt" data-theme-pref="system" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                <span>System</span>
+              </button>
+              <button class="theme-opt" data-theme-pref="dark" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                <span>Dark</span>
+              </button>
+              <button class="theme-opt" data-theme-pref="light" role="radio" aria-checked="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                <span>Light</span>
+              </button>
+            </div>
+            <label class="settings-toggle" id="kiosk-default-row">
+              <input type="checkbox" id="kiosk-default-toggle" />
+              <span class="settings-toggle-label">
+                <span>Kiosk view on this device</span>
+                <span class="settings-toggle-sub">Opens straight to the SoC + power flow card. Visit <code>/#/kiosk</code> any time, or go to Settings to switch back. Local access only; cloud kiosk uses share links.</span>
+              </span>
+            </label>
+          </div>
+          <div class="settings-block settings-block--alerts" data-subroute="alerts">
+            <h3>Alerts</h3>
+            <div id="settings-alerts" class="alerts-list">
+              <div class="settings-empty">Loading…</div>
+            </div>
+            <p class="settings-foot">Edits apply on the next daemon restart for transports; rule changes hot-reload immediately.</p>
+          </div>
+          <div class="settings-block" id="settings-history-block" data-subroute="advanced">
+            <h3>History &amp; polling</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              How often the daemon polls each device and how long each
+              retention tier keeps data. Changes apply live; the next
+              poll cycle uses the new interval and the next maintenance
+              pass (~10 min) applies the new retention windows.
+            </p>
+            <div class="hist-form">
+              <label class="hist-row">
+                <span>Poll interval</span>
+                <span class="hist-input">
+                  <input id="hist-poll" type="number" min="5" max="3600" step="1"/>
+                  <span class="hist-unit">seconds</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Raw samples</span>
+                <span class="hist-input">
+                  <input id="hist-raw" type="number" min="1" max="90" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>1-min aggregates</span>
+                <span class="hist-input">
+                  <input id="hist-min" type="number" min="1" max="365" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>1-hour aggregates</span>
+                <span class="hist-input">
+                  <input id="hist-hour" type="number" min="7" max="3650" step="1"/>
+                  <span class="hist-unit">days</span>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="hist-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <button id="hist-reset" class="btn-action" type="button">Reset to defaults</button>
+                <span id="hist-status" class="settings-foot hist-status"></span>
+              </div>
+            </div>
+            <div class="settings-row" style="margin-top:.65rem"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
+            <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
+          </div>
+          <div class="settings-block" id="settings-solar-pause-block" data-subroute="alerts">
+            <h3>Solar-aware charger pause <span class="settings-foot" style="font-weight:normal">· Pro</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Pause your AC charger when solar is covering the load.
+              The daemon re-enables it before the bank drops too low.
+              Cooldown + a hard SoC floor protect against weather
+              forecast errors. Off by default. Manual toggles always
+              win; the rule won't override an output you just turned
+              on or off yourself. The recommended control point is a
+              <strong>Shelly Plug S Gen2</strong> or Tasmota plug on
+              the mains lead going into your AC charger. Add one
+              under <code>smart_plugs:</code> in config.yaml; the
+              dropdown picks it up automatically.
+            </p>
+            <div class="sp-form">
+              <label class="hist-row">
+                <span>Enabled</span>
+                <span class="hist-input">
+                  <input id="sp-enabled" type="checkbox"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Output to control</span>
+                <span class="hist-input">
+                  <select id="sp-output"></select>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Pause above SoC</span>
+                <span class="hist-input">
+                  <input id="sp-target" type="number" min="50" max="100" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Resume below SoC</span>
+                <span class="hist-input">
+                  <input id="sp-recover" type="number" min="20" max="90" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Hard floor (force on)</span>
+                <span class="hist-input">
+                  <input id="sp-floor" type="number" min="5" max="60" step="1"/>
+                  <span class="hist-unit">%</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>PV surplus threshold</span>
+                <span class="hist-input">
+                  <input id="sp-pv" type="number" min="0" max="2000" step="10"/>
+                  <span class="hist-unit">W</span>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Cooldown between changes</span>
+                <span class="hist-input">
+                  <input id="sp-cooldown" type="number" min="5" max="240" step="1"/>
+                  <span class="hist-unit">min</span>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="sp-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <span id="sp-status" class="settings-foot hist-status"></span>
+              </div>
+              <div class="settings-row" style="margin-top:.5rem"><span>Live decision</span><span class="v" id="sp-decision">·</span></div>
+              <div class="settings-row"><span>Reason</span><span class="v" id="sp-reason">·</span></div>
+            </div>
+          </div>
+          <div class="settings-block" data-subroute="advanced">
+            <h3>Retention</h3>
+            <div class="settings-row"><span>Raw samples</span><span class="v">7 days</span></div>
+            <div class="settings-row"><span>1-min rollup</span><span class="v">30 days</span></div>
+            <div class="settings-row"><span>1-hour rollup</span><span class="v">1 year</span></div>
+            <div class="settings-row"><span>1-day rollup</span><span class="v">forever</span></div>
+          </div>
+          <div class="settings-block" data-subroute="integrations">
+            <h3>Integrations</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Third-party data sources. Each one needs your own free credentials ·
+              we don't proxy or store anything for you.
+            </p>
+            <div id="settings-integrations" class="integrations-block">
+              <div class="settings-empty">Loading…</div>
+            </div>
+          </div>
+          <div class="settings-block" data-subroute="about">
+            <h3>About</h3>
+            <div class="settings-row"><span>Version</span><span class="v" id="settings-version">·</span></div>
+            <div class="settings-row" id="settings-channel-row">
+              <span>Update channel</span>
+              <span class="v">
+                <select id="settings-channel-select" style="font-size:.85em">
+                  <option value="stable">Stable</option>
+                  <option value="beta">Beta</option>
+                  <option value="edge">Edge</option>
+                </select>
+                <span id="settings-channel-saving" class="settings-foot" style="font-size:.8em;margin-left:.4rem"></span>
+              </span>
+            </div>
+            <div class="settings-row" id="settings-channel-note-row" hidden>
+              <span></span>
+              <span class="v settings-foot" id="settings-channel-note" style="font-size:.82em;line-height:1.4;text-align:left"></span>
+            </div>
+            <div class="settings-row" id="settings-update-row" hidden>
+              <span>Latest available</span>
+              <span class="v">
+                <span id="settings-update-latest">·</span>
+                <a id="settings-update-link" href="#" hidden>Release notes →</a>
+                <button id="settings-update-apply" class="alerts-add-btn" type="button" hidden style="margin-left:.5rem">Update now</button>
+              </span>
+            </div>
+            <div class="settings-row" id="settings-update-docker-row" hidden>
+              <span>Updates</span>
+              <span class="v settings-foot" style="font-size:.85em;line-height:1.4">
+                Docker install. Apply updates with <code>docker compose pull &amp;&amp; docker compose up -d</code> on the host.
+              </span>
+            </div>
+            <div class="settings-row" id="settings-update-progress-row" hidden>
+              <span>Update progress</span>
+              <span class="v">
+                <pre id="settings-update-progress" style="margin:0;padding:.4rem .55rem;background:var(--surface-2);border-radius:6px;font-size:.75rem;max-height:160px;overflow:auto;text-align:left;white-space:pre-wrap;word-break:break-all">waiting…</pre>
+              </span>
+            </div>
+            <div class="settings-row"><span>Daemon</span><span class="v" id="settings-daemon">·</span></div>
+            <div class="settings-row"><span>Uptime</span><span class="v" id="settings-uptime">·</span></div>
+            <div class="settings-row"><span>Python</span><span class="v" id="settings-python">·</span></div>
+            <div class="settings-row"><span>Disk (root)</span><span class="v" id="settings-disk">·</span></div>
+            <div class="settings-row"><span>Update check</span>
+              <span class="v">
+                <span id="settings-update-checked">·</span>
+                <button id="settings-update-now" class="alerts-add-btn" type="button">Check now</button>
+              </span>
+            </div>
+          </div>
+          <!-- Session & system block moved to top of the grid above. -->
+
+          <div class="settings-block" data-subroute="privacy">
+            <h3>Web password</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              The local password protects writes from the LAN. Rotate it
+              if you've forgotten yours, or if you suspect it's been
+              shared. The new password is shown to you once. Save it
+              right then.
+            </p>
+            <button id="rotate-pw-btn" class="btn-action">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Rotate web password</span>
+            </button>
+            <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
+          </div>
+          <div class="settings-block" data-subroute="privacy">
+            <h3>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Where this appliance shows up on the cloud fleet map &mdash; or whether it shows up at all.
+              <strong>Off</strong> by default. Your dashboard always knows where you are; this toggle only controls what gets shared to wattpost.cloud.
+            </p>
+            <div id="settings-location-current" class="settings-row">
+              <span>Current</span>
+              <span class="v" id="settings-location-current-v">·</span>
+            </div>
+            <fieldset class="settings-share-fieldset" style="border:0;padding:0;margin:.5rem 0 0">
+              <legend class="settings-foot" style="padding:0;margin-bottom:.35rem">Share with cloud</legend>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="off" style="margin-top:.3rem"/>
+                <span><strong>Off</strong><br/><span class="settings-foot">Cloud receives no location data at all. Default for new installs.</span></span>
+              </label>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="approx" style="margin-top:.3rem"/>
+                <span><strong>Approximate</strong><br/><span class="settings-foot">Snapped to ~10&nbsp;km grid before transmission &mdash; "near Keswick", not your exact pitch.</span></span>
+              </label>
+              <label class="settings-share-opt" style="display:flex;gap:.5rem;align-items:flex-start;padding:.45rem 0;cursor:pointer">
+                <input type="radio" name="settings-location-share" value="precise" style="margin-top:.3rem"/>
+                <span><strong>Precise</strong><br/><span class="settings-foot">Real lat/lon. Required for geofences and the moving-van trail.</span></span>
+              </label>
+            </fieldset>
+            <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
+          </div>
+          <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
+            <h3>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Turn this appliance's WiFi radio into an access point so a
+              phone or laptop can reach the dashboard with no other
+              network &mdash; field setup and off-grid. Needs
+              NetworkManager on the host (default on Pi&nbsp;OS Bookworm).
+              <strong>Off</strong> by default.
+            </p>
+            <div class="settings-row"><span>Status</span><span class="v" id="hotspot-status-v">&middot;</span></div>
+            <div class="hist-form" style="margin-top:.5rem">
+              <label class="hist-row">
+                <span>Network name (SSID)</span>
+                <span class="hist-input">
+                  <input id="hotspot-ssid" type="text" maxlength="32" placeholder="WattPost-Setup"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Password</span>
+                <span class="hist-input">
+                  <input id="hotspot-password" type="password" autocomplete="new-password" placeholder="blank = keep / open"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Start on boot</span>
+                <span class="hist-input">
+                  <input id="hotspot-enabled" type="checkbox"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Auto-enable when offline<br/><span class="settings-foot" style="font-weight:normal">Bring the hotspot up by itself whenever there's no other network, and drop it when one returns. Works with no cloud account.</span></span>
+                <span class="hist-input">
+                  <input id="hotspot-auto-handoff" type="checkbox"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Captive portal<br/><span class="settings-foot" style="font-weight:normal">When someone joins the hotspot, automatically pop the dashboard on their phone — no need to type the address. Needs NetworkManager DNS access (built into the appliance image).</span></span>
+                <span class="hist-input">
+                  <input id="hotspot-captive" type="checkbox"/>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="hotspot-save" class="btn-action btn-action--primary" type="button">Save</button>
+                <button id="hotspot-on" class="btn-action" type="button">Turn on now</button>
+                <button id="hotspot-off" class="btn-action" type="button">Turn off</button>
+                <span id="hotspot-msg" class="settings-foot hist-status"></span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-block settings-block--backup" data-subroute="backup">
+            <h3>Backup &amp; restore</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Download a single archive containing the full SQLite
+              database (all history, devices, alerts) plus
+              <code>config.yaml</code> and your local-UI password
+              hash. Restore on a fresh install to come back exactly
+              where you were &mdash; useful before swapping the SD card,
+              moving to new hardware, or running a risky firmware update.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap">
+              <a id="backup-download" class="btn-action" href="/api/system/backup"
+                 title="Download a tar.gz of the daemon's mutable state.">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Download backup</span>
+              </a>
+              <label class="btn-action" for="backup-restore-file"
+                     style="cursor:pointer"
+                     title="Pick a previously-downloaded .tar.gz to restore. The daemon will restart immediately after.">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Restore from file&hellip;</span>
+              </label>
+              <input id="backup-restore-file" type="file" accept=".tar.gz,.tgz,application/gzip"
+                     style="display:none"/>
+              <span class="settings-foot" id="backup-msg"></span>
+            </div>
+            <p class="settings-foot" style="margin-top:.6rem">
+              <strong>Restore is destructive.</strong> It overwrites
+              the current database and config, then restarts the
+              daemon. The previous <code>config.yaml</code> is kept
+              as <code>config.yaml.restored.bak</code> in case you
+              need to back out.
+            </p>
+            <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:1rem 0">
+            <h4 style="margin:0 0 .35rem 0">Automatic backups</h4>
+            <p class="settings-foot" id="backup-sched-summary" style="margin-top:0;margin-bottom:.5rem">
+              Loading&hellip;
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap">
+              <button id="backup-run-now" class="btn-action" type="button"
+                      title="Take a snapshot right now (rolls into the keep-N rotation just like a scheduled one).">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+                <span>Run backup now</span>
+              </button>
+              <span class="settings-foot" id="backup-run-msg"></span>
+            </div>
+            <div id="backup-snap-list" class="settings-foot" style="margin-top:.6rem">
+              <div class="settings-empty">No snapshots yet.</div>
+            </div>
+          </div>
+          <div class="settings-block" data-subroute="privacy">
+            <h3>Discovery telemetry</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Anonymous: when you scan for BLE / Modbus devices, the
+              appliance sends a fingerprint of anything our drivers
+              don't recognise to wattpost.cloud, so we know which
+              hardware to support next. <strong>Off by default.</strong>
+              No full MAC, no IP, no account info. Just OUI, advertised
+              name, and a few bytes of manufacturer data.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+              <button id="discovery-toggle" class="btn-action" type="button" hidden></button>
+              <span class="settings-foot" id="discovery-toggle-msg"></span>
+            </div>
+          </div>
+          <div class="settings-block" data-subroute="privacy">
+            <h3>Anonymous install ping</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              On the daily update check, the appliance can include an
+              anonymous install ID + version so we can count how many
+              installs exist and which release they run.
+              <strong>Off by default.</strong> No account, no location,
+              no device data. The update check runs either way; this only
+              controls whether the anonymous ID rides along.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem">
+              <button id="localtele-toggle" class="btn-action" type="button" hidden></button>
+              <span class="settings-foot" id="localtele-toggle-msg"></span>
+            </div>
+          </div>
+          <div class="settings-block settings-block--diagnostics" data-subroute="advanced">
+            <h3>Diagnostics</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Live log tail from the daemon. Newest at the bottom.
+              Send these lines if you open a support ticket.
+            </p>
+            <div class="diag-controls">
+              <button id="diag-refresh" type="button" class="alerts-add-btn">Refresh</button>
+              <label class="alerts-checkbox">
+                <input type="checkbox" id="diag-autoscroll" checked /> Follow tail
+              </label>
+              <a id="diag-download" class="alerts-add-btn" href="/api/system/diagnostics"
+                 download
+                 title="Download a single JSON bundle (version, redacted config, recent logs, scheduler state) suitable for attaching to a support ticket.">
+                Download bundle
+              </a>
+              <span class="settings-foot" id="diag-meta">·</span>
+            </div>
+            <pre id="diag-log" class="diag-log">Loading…</pre>
+          </div>
+          <div class="settings-block settings-block--danger" id="settings-reset-block" data-subroute="about">
+            <h3>Reset to defaults</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
+              Wipes all configured transports, devices, exporters, alerts
+              and smart-scene rules so this appliance behaves like a
+              freshly installed one. Your SQLite history, web password
+              and (by default) cloud pairing are kept. A timestamped
+              <code>config.yaml.bak</code> is written first so you can
+              restore from disk if you change your mind.
+            </p>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem">
+              <label class="alerts-checkbox">
+                <input type="checkbox" id="reset-keep-cloud" checked />
+                Stay paired with the cloud
+              </label>
+            </div>
+            <div class="kiosk-actions" style="gap:.5rem;flex-wrap:wrap;align-items:center">
+              <label for="reset-confirm-input" class="settings-foot" style="margin:0">
+                Type <strong>RESET</strong> to enable the button:
+              </label>
+              <input id="reset-confirm-input" type="text" autocomplete="off"
+                     spellcheck="false" placeholder="RESET"
+                     style="max-width:8rem" />
+              <button id="reset-go" type="button" class="alerts-add-btn"
+                      disabled
+                      title="Wipes configuration and returns to first-boot state.">
+                Wipe configuration
+              </button>
+              <span class="settings-foot" id="reset-msg"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: Docs (markdown topics)
+         ===================================================== -->
+    <section class="route docs-route" data-route="docs">
+      <section class="panel docs-panel">
+        <div class="panel-header">
+          <h2>
+            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Documentation
+          </h2>
+        </div>
+        <div class="docs-layout">
+          <nav id="docs-nav" class="docs-nav" aria-label="Documentation topics">
+            <div class="settings-empty">Loading topics…</div>
+          </nav>
+          <article id="docs-content" class="docs-content">
+            <p class="docs-placeholder">Pick a topic on the left.</p>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <!-- =====================================================
+         ROUTE: Kiosk, chrome-free SoC + flow for wall-mounted tablets
+         ===================================================== -->
+    <section class="route kiosk-route" data-route="kiosk">
+      <div class="kiosk-stage">
+        <div class="kiosk-donut donut-state" id="kiosk-donut-wrap" data-radius="88">
+          <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
+            <defs>
+              <linearGradient id="g-soc-k-charging" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#2ea043"/><stop offset="100%" stop-color="#56d364"/>
+              </linearGradient>
+              <linearGradient id="g-soc-k-holding" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#1f6feb"/><stop offset="100%" stop-color="#58a6ff"/>
+              </linearGradient>
+              <linearGradient id="g-soc-k-discharging" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#d29922"/><stop offset="100%" stop-color="#f0c849"/>
+              </linearGradient>
+              <linearGradient id="g-soc-k-critical" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#da3633"/><stop offset="100%" stop-color="#ff7b72"/>
+              </linearGradient>
+            </defs>
+            <circle class="donut-track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
+            <circle class="donut-arc"   cx="100" cy="100" r="88" fill="none" stroke-width="14"
+                    stroke-linecap="round" pathLength="100"
+                    stroke-dasharray="0 100" transform="rotate(-90 100 100)"/>
+            <circle class="donut-head-glow" cx="100" cy="12" r="9"/>
+            <circle class="donut-head" cx="100" cy="12" r="5" stroke-width="1.5"/>
+          </svg>
+          <div class="donut-center">
+            <div class="donut-pct"><span id="kiosk-soc">·</span><span class="donut-pct-unit">%</span></div>
+            <div class="donut-label">state of charge</div>
+            <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">·</span></div>
+          </div>
+        </div>
+        <div class="kiosk-flow" id="kiosk-flow"></div>
+      </div>
+      <button class="kiosk-exit" id="kiosk-exit" aria-label="Exit kiosk view" title="Exit kiosk view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+        </svg>
+      </button>
+    </section>
+  </main>
+
+  <script src="/web/uPlot.iife.min.js"></script>
+  <script src="/web/app.js?v=227"></script>
+</body>
+</html>

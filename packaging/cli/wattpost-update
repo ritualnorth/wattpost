@@ -1,0 +1,280 @@
+#!/bin/bash
+# WattPost atomic-swap upgrade helper (#36).
+#
+# Triggered by:
+#   1. POST /api/system/update/apply on the running daemon (which
+#      sudo-execs this script in the background so the daemon can
+#      restart without killing the update mid-flight).
+#   2. Manually: `sudo /usr/local/bin/wattpost-update`
+#
+# Atomic-swap algorithm:
+#
+#   1. Identify the *inactive* slot (the one /opt/wattpost is NOT
+#      pointing at). Wipe it.
+#   2. Download the latest source tarball, verify SHA256.
+#   3. Extract source + build a fresh venv inside the inactive slot.
+#   4. Health probe: start the daemon from the inactive venv on a
+#      sandbox port (:18000), with `--db :memory:` so we don't touch
+#      the real SQLite database. Hit /api/health + /api/snapshot.
+#      If either fails, ABORT — leave the active slot untouched.
+#   5. Atomic-flip the /opt/wattpost symlink to the inactive slot
+#      via mv -T (single rename(2) syscall — no window where
+#      /opt/wattpost doesn't exist).
+#   6. systemctl restart wattpost so the daemon picks up the new
+#      venv.
+#   7. Post-swap probe: hit the live /api/health for 15s. If the
+#      newly-running daemon doesn't respond, AUTO-ROLL-BACK by
+#      flipping the symlink to the old slot + restart.
+#
+# All output goes to /var/log/wattpost-update.log so the daemon (and
+# the user via wattpost-config) can tail it.
+#
+# Crash-safe: power loss between step 5 (symlink flip) and step 6
+# (restart) leaves the system bootable — systemd will just start the
+# already-flipped slot on next boot. Power loss earlier leaves the
+# active slot intact (only the inactive slot was being modified).
+
+set -euo pipefail
+
+LOG=/var/log/wattpost-update.log
+# Cache-buster query string defeats stale Cloudflare cache on
+# /source/latest.* (#224). Without it the tarball + sha256 can be
+# out of sync for the few minutes after a publish — sha256 was
+# updated, tarball still serves the previous version. Proper fix
+# is Cache-Control: no-cache on Caddy; this is the belt.
+CB="?cb=$(date +%s)-$$"
+SRC_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}${CB}"
+SHA_URL="${WATTPOST_SOURCE_URL:-https://releases.wattpost.io/source/latest.tar.gz}.sha256${CB}"
+APP_ROOT=/opt/wattpost
+SLOTS_DIR=/opt/wattpost-slots
+TMP_TAR="$(mktemp --suffix=.tar.gz)"
+TMP_SHA="$(mktemp --suffix=.sha256)"
+LOCK=/run/wattpost-update.lock
+PROBE_PORT=18000
+PROBE_LOG=/var/log/wattpost-update-probe.log
+APP_USER=wattpost
+APP_GROUP=wattpost
+
+# Run only one update at a time. flock returns 1 on contention; we
+# fail fast rather than queueing because the user pressing Update Now
+# twice should see "already updating" rather than two parallel
+# tarballs racing.
+exec 200>"${LOCK}"
+flock -n 200 || {
+    echo "$(date -Is) ERROR another update is already running" | tee -a "${LOG}" >&2
+    exit 11
+}
+
+cleanup() {
+    rm -f "${TMP_TAR}" "${TMP_SHA}" || true
+    # If a health-probe daemon is still alive, kill it.
+    if [ -n "${PROBE_PID:-}" ]; then
+        kill -TERM "${PROBE_PID}" 2>/dev/null || true
+        wait "${PROBE_PID}" 2>/dev/null || true
+    fi
+    # Per-probe scratch dir (created in the health probe section).
+    if [ -n "${PROBE_CWD:-}" ] && [ -d "${PROBE_CWD}" ]; then
+        rm -rf "${PROBE_CWD}" || true
+    fi
+}
+trap cleanup EXIT
+
+log() { echo "$(date -Is) $*" | tee -a "${LOG}"; }
+fail() { log "ABORT: $*"; exit "${2:-1}"; }
+
+# ----- resolve active + inactive slot -----
+[ -L "${APP_ROOT}" ] || fail "${APP_ROOT} is not a symlink — run install.sh once to initialise the slot layout"
+ACTIVE_TARGET=$(readlink -f "${APP_ROOT}")
+ACTIVE_NAME=$(basename "${ACTIVE_TARGET}")
+case "${ACTIVE_NAME}" in
+    a) INACTIVE_NAME=b ;;
+    b) INACTIVE_NAME=a ;;
+    *) fail "unrecognised active slot '${ACTIVE_NAME}' (expected a|b)" ;;
+esac
+INACTIVE_TARGET="${SLOTS_DIR}/${INACTIVE_NAME}"
+
+log "==> WattPost atomic-swap update starting"
+log "    source: ${SRC_URL}"
+log "    active=${ACTIVE_NAME} → installing into inactive=${INACTIVE_NAME}"
+
+# ----- pre-update snapshot (#269) -----
+# Slot atomic-swap already protects against a bad binary, but DB
+# schema migrations are forward-only — a slot rollback brings old
+# code back with new schema = bad. A local snapshot before any work
+# starts gives the user a one-shot restore path even if the slot
+# machinery itself goes wrong. Best-effort: if snapshot fails we log
+# loudly but proceed; blocking updates on a snapshot wedge is worse
+# than letting an update proceed with no extra safety net.
+log "    taking pre-update snapshot..."
+SNAP_PATH=""
+if sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
+        snapshot --config /etc/wattpost/config.yaml 2>&1 | tee -a "${LOG}" \
+        | tail -1 > /tmp/wattpost-update-snap.$$; then
+    SNAP_PATH=$(cat /tmp/wattpost-update-snap.$$)
+    log "    pre-update snapshot ok: ${SNAP_PATH}"
+else
+    log "    WARN pre-update snapshot failed — proceeding without local rollback safety net"
+fi
+rm -f /tmp/wattpost-update-snap.$$
+
+# ----- prepare inactive slot -----
+rm -rf "${INACTIVE_TARGET}"
+mkdir -p "${INACTIVE_TARGET}/src" "${INACTIVE_TARGET}/venv"
+
+# ----- download + verify -----
+log "    downloading tarball..."
+curl -fsSL --connect-timeout 10 --max-time 300 -o "${TMP_TAR}" "${SRC_URL}"
+log "    downloading sha256..."
+curl -fsSL --connect-timeout 10 --max-time 30  -o "${TMP_SHA}" "${SHA_URL}"
+expected_hash=$(awk '{print $1}' "${TMP_SHA}")
+echo "${expected_hash}  ${TMP_TAR}" | sha256sum -c - --quiet
+log "    sha256 verified"
+
+# ----- extract source -----
+tar -xzf "${TMP_TAR}" -C "${INACTIVE_TARGET}/src" --strip-components=0
+# The tarball's top-level may or may not be a wrapping dir; handle
+# both shapes by detecting and unwrapping if there's a single subdir.
+if [ ! -f "${INACTIVE_TARGET}/src/pyproject.toml" ]; then
+    inner=$(find "${INACTIVE_TARGET}/src" -mindepth 1 -maxdepth 1 -type d | head -1)
+    if [ -n "${inner}" ] && [ -f "${inner}/pyproject.toml" ]; then
+        mv "${inner}"/* "${INACTIVE_TARGET}/src/"
+        mv "${inner}"/.[!.]* "${INACTIVE_TARGET}/src/" 2>/dev/null || true
+        rmdir "${inner}"
+    fi
+fi
+log "    extracted to ${INACTIVE_TARGET}/src"
+
+# ----- build venv in inactive slot -----
+log "    building venv..."
+python3 -m venv "${INACTIVE_TARGET}/venv"
+"${INACTIVE_TARGET}/venv/bin/pip" install --quiet --upgrade pip wheel
+# --prefer-binary helps on slow runners (qemu/pi-gen); --force-reinstall
+# --no-deps is required because pyproject.toml hardcodes version 0.0.1
+# (#216 fix). See [[pyproject-pinned-version]] memory for context.
+"${INACTIVE_TARGET}/venv/bin/pip" install --prefer-binary --upgrade \
+    "${INACTIVE_TARGET}/src" 2>&1 | tail -5 | sed 's/^/      /' | tee -a "${LOG}"
+"${INACTIVE_TARGET}/venv/bin/pip" install --prefer-binary --force-reinstall \
+    --no-deps --quiet "${INACTIVE_TARGET}/src"
+
+NEW_VERSION=$(grep -E '^__version__' "${INACTIVE_TARGET}/src/solar_monitor/__init__.py" \
+              | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+echo "${NEW_VERSION}" > "${INACTIVE_TARGET}/version"
+log "    inactive slot ready: v${NEW_VERSION}"
+
+# Ownership — daemon user needs to read the slot.
+chown -R "${APP_USER}:${APP_GROUP}" "${INACTIVE_TARGET}"
+
+# ----- health probe -----
+log "    health probe on 127.0.0.1:${PROBE_PORT} (--db :memory:, demo mode)..."
+# Demo mode = synthetic poller, no real BLE contention with the
+# running daemon. :memory: DB = no migration / write side-effects.
+# WATTPOST_PORT=$PROBE_PORT prevents any port.env override.
+#
+# CWD must be writable by the wattpost user — several daemon
+# subsystems (backups dir, etc.) default to relative paths and
+# would fail mkdir(parents=True) against the inherited "/" CWD.
+# Use a per-probe scratch dir under /tmp; gets nuked after the
+# probe terminates.
+PROBE_CWD=$(mktemp -d /tmp/wattpost-probe.XXXXXX)
+chown "${APP_USER}:${APP_GROUP}" "${PROBE_CWD}"
+cd "${PROBE_CWD}"
+sudo -u "${APP_USER}" \
+    WATTPOST_DEMO=1 \
+    WATTPOST_PORT="${PROBE_PORT}" \
+    nohup "${INACTIVE_TARGET}/venv/bin/solar-monitor" \
+        --log-level WARNING serve \
+        --config /etc/wattpost/config.yaml \
+        --db :memory: \
+        --port "${PROBE_PORT}" \
+        --host 127.0.0.1 \
+        --interval 999999 \
+    > "${PROBE_LOG}" 2>&1 &
+PROBE_PID=$!
+cd - >/dev/null
+
+# Wait up to 12s for the probe daemon to come up.
+PROBE_UP=false
+for i in $(seq 1 12); do
+    sleep 1
+    if curl -fsS -m 1 "http://127.0.0.1:${PROBE_PORT}/api/health" >/dev/null 2>&1; then
+        PROBE_UP=true
+        break
+    fi
+done
+if [ "${PROBE_UP}" != true ]; then
+    log "    probe daemon never reached /api/health"
+    tail -20 "${PROBE_LOG}" 2>/dev/null | sed 's/^/      /' | tee -a "${LOG}" || true
+    fail "probe daemon failed to start — inactive slot at ${INACTIVE_TARGET} left for inspection"
+fi
+
+# Hit every endpoint that's known-load-bearing. The /api/snapshot
+# check would have caught the v0.1.29 demo-mode 500 bug immediately.
+PROBE_OK=true
+for ep in /api/health /api/snapshot /api/devices /api/system/info; do
+    code=$(curl -fsS -m 3 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PROBE_PORT}${ep}" || echo "000")
+    if [ "${code}" != "200" ]; then
+        log "    PROBE FAIL: ${ep} → ${code}"
+        PROBE_OK=false
+    else
+        log "    probe ok: ${ep}"
+    fi
+done
+
+# Tear down probe daemon.
+kill -TERM "${PROBE_PID}" 2>/dev/null || true
+wait "${PROBE_PID}" 2>/dev/null || true
+unset PROBE_PID
+
+if [ "${PROBE_OK}" != true ]; then
+    log "    probe log tail:"
+    tail -20 "${PROBE_LOG}" 2>/dev/null | sed 's/^/      /' | tee -a "${LOG}" || true
+    fail "health probe failed — inactive slot at ${INACTIVE_TARGET} left for inspection"
+fi
+log "    health probe passed"
+
+# ----- atomic swap -----
+# mv -T on a symlink rename is atomic via Linux rename(2). No window
+# where /opt/wattpost doesn't exist; either old or new is live.
+PREV_TARGET="${ACTIVE_TARGET}"
+ln -sfn "${INACTIVE_TARGET}" "${APP_ROOT}.new"
+mv -Tf "${APP_ROOT}.new" "${APP_ROOT}"
+log "    swapped: ${APP_ROOT} → ${INACTIVE_TARGET}"
+
+# Record the previous slot for Slice 3's rollback CLI.
+ln -sfn "${PREV_TARGET}" "${SLOTS_DIR}/previous"
+
+# ----- restart daemon -----
+log "    restarting wattpost.service..."
+systemctl restart wattpost.service
+
+# ----- post-swap health check (auto-rollback gate) -----
+# Read the configured port so we hit the right URL. install.sh writes
+# /etc/wattpost/port.env; default to 80 if absent.
+WP_PORT=80
+if [ -r /etc/wattpost/port.env ]; then
+    # shellcheck source=/dev/null
+    . /etc/wattpost/port.env
+    WP_PORT="${WATTPOST_PORT:-80}"
+fi
+
+POST_OK=false
+for i in $(seq 1 20); do
+    sleep 1
+    if curl -fsS -m 1 "http://127.0.0.1:${WP_PORT}/api/health" >/dev/null 2>&1; then
+        POST_OK=true
+        break
+    fi
+done
+
+if [ "${POST_OK}" = true ]; then
+    log "==> update complete: now running v${NEW_VERSION}"
+    exit 0
+fi
+
+# Post-swap probe failed — auto-rollback.
+log "    POST-SWAP HEALTH FAIL: /api/health on :${WP_PORT} didn't respond within 20s"
+log "    rolling back to ${PREV_TARGET}"
+ln -sfn "${PREV_TARGET}" "${APP_ROOT}.new"
+mv -Tf "${APP_ROOT}.new" "${APP_ROOT}"
+systemctl restart wattpost.service
+fail "auto-rolled back to previous slot ${PREV_TARGET}" 2

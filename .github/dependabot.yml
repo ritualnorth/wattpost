@@ -1,0 +1,33 @@
+version: 2
+updates:
+  # Python appliance dependencies (pyproject.toml)
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+
+  # Mobile app (Capacitor / npm)
+  - package-ecosystem: npm
+    directory: "/mobile-app"
+    schedule:
+      interval: weekly
+    groups:
+      mobile-app:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "mobile-app"]
+
+  # GitHub Actions workflow pins
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    labels: ["dependencies", "ci"]

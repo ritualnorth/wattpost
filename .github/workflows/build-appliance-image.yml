@@ -1,0 +1,105 @@
+name: Build appliance image
+
+# Multi-arch (amd64 + arm64) Docker image for the WattPost appliance.
+# Published to GHCR on every push to main that touches the appliance
+# source. Users on a Linux host can `docker compose pull` to take
+# updates — the in-container equivalent of the Pi's "Update now" button.
+#
+# Arm64 is the Pi 4 / Pi 5 case; amd64 covers homelab boxes, mini PCs,
+# recycled laptops. Buildx with both targets in one workflow.
+
+on:
+  # Two channels:
+  #   - main push: builds + tags `:edge` and `:sha-<short>` for
+  #     dev / beta testers tracking bleeding-edge.
+  #   - tag push (vX.Y.Z): builds + tags `:vX.Y.Z`, `:X.Y`, `:latest`
+  #     for customers who want batched, version-numbered releases.
+  # See docs/release-pipeline.md for the full release ritual.
+  push:
+    branches: [main]
+    tags:    ['v*']
+    paths-ignore: []
+  workflow_dispatch:
+
+# Concurrency strategy:
+#  - **Tag pushes**: group by the tag ref so a rapid retag of the
+#    SAME tag (`git tag -d` + push) cancels the previous build for
+#    that tag. Different tags still get distinct groups.
+#  - **Main pushes**: group by COMMIT SHA, not by branch. Each commit
+#    on main must publish its own `:edge` Docker tag — if we group
+#    by the `refs/heads/main` ref, back-to-back commits on main
+#    cancel each other (bit us before — fix #262: `:edge` never
+#    updated after slice 1B because slice 1A's main build got
+#    cancelled). Per-SHA groups never collide.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write    # GHCR push via GITHUB_TOKEN
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/wattpost-appliance
+
+jobs:
+  build-and-push:
+    name: Build + push appliance image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Three channels (#11):
+          #   - main push            → :edge + :sha-<short>
+          #   - pre-release tag      → :vX.Y.Z-rcN + :beta   (NOT :latest)
+          #   - final tag (vX.Y.Z)   → :vX.Y.Z, :X.Y, :beta, :latest
+          # `latest=auto` (flavor below) is what makes :latest skip
+          # pre-releases — docker/metadata-action only applies latest to
+          # the highest NON-prerelease semver. It also suppresses the
+          # {{major}}.{{minor}} tag for pre-releases, so an RC never
+          # clobbers the :X.Y stable pointer. :beta is fired on ANY v*
+          # tag (a final release IS the newest beta too). See "Behaviors"
+          # in https://github.com/docker/metadata-action.
+          tags: |
+            type=edge,branch=main
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          flavor: |
+            latest=auto
+
+      - name: Build + push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.appliance
+          # arm64 covers Pi 4 / 5 + Apple Silicon Linux VMs; amd64
+          # covers everything else.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,90 @@
+[Unit]
+Description=WattPost solar-monitor daemon
+Documentation=https://github.com/ritualnorth/wattpost
+# Bluetooth must be up before we try to discover the BT-2 dongle.
+# network-online.target lets the cloud sync + ntfy / Discord / SMTP
+# transports reach the outside world on first poll.
+After=bluetooth.service network-online.target
+Wants=bluetooth.service network-online.target
+# Auto-rollback watchdog: fires when the StartLimit below is hit.
+OnFailure=wattpost-rollback.service
+
+[Service]
+Type=simple
+User=wattpost
+Group=wattpost
+# bluetooth group gives access to BlueZ DBus without root.
+SupplementaryGroups=bluetooth
+
+WorkingDirectory=/opt/wattpost
+Environment=PYTHONUNBUFFERED=1
+# Single source of truth for runtime paths so the install script and
+# pi-gen stage only have to set them in one place.
+Environment=WATTPOST_CONFIG=/etc/wattpost/config.yaml
+Environment=WATTPOST_DB=/var/lib/wattpost/solar-monitor.db
+Environment=WATTPOST_PORT=80
+
+# Allow binding privileged ports without running as root. The unit
+# stays User=wattpost; the kernel grants this single capability so the
+# default :80 dashboard works without giving the daemon any other root
+# powers. Docker / manual installs override WATTPOST_PORT to something
+# unprivileged via /etc/wattpost/port.env (installed by install.sh).
+EnvironmentFile=-/etc/wattpost/port.env
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
+ExecStart=/opt/wattpost/venv/bin/solar-monitor --log-level INFO serve \
+    --config ${WATTPOST_CONFIG} \
+    --db ${WATTPOST_DB} \
+    --interval 60 \
+    --port ${WATTPOST_PORT} \
+    --host 0.0.0.0
+
+# /api/system/restart uses os.execv to re-exec the daemon. Restart=
+# on-failure means systemd also brings us back if the process crashes
+# for any reason that *doesn't* end in an execv.
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+
+# Auto-rollback watchdog (#36 Slice 3). If the daemon fails to
+# start 3 times within 60s, systemd gives up on the unit AND fires
+# the OnFailure unit below — which rolls /opt/wattpost back to the
+# previous slot and starts the daemon there. Pairs with the
+# inactive-slot health probe in wattpost-update: the probe catches
+# import errors / API breakage, this watchdog catches "boots fine
+# in sandbox but crashes against real DB / real BLE / real config".
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+# Hardening — minimum capabilities, read-only filesystem except for
+# the state + log paths we explicitly need.
+#
+# NoNewPrivileges is intentionally NOT set. The daemon needs to invoke
+# `sudo` for the in-place update helpers that the sudoers entry pins:
+#   1. `sudo /usr/local/bin/wattpost-update`   — Update-now button
+#   2. `sudo /usr/local/bin/wattpost-rollback` — Rollback button
+# NoNewPrivileges=true would block both because sudo is setuid root.
+# The risk is limited: the sudoers rule only allows those exact
+# commands (no args), and the rest of the hardening (ProtectSystem,
+# ProtectHome, RestrictNamespaces, etc) still applies to the daemon
+# itself.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/var/lib/wattpost /etc/wattpost
+# config.yaml gets rewritten in place by the setup wizard + alerts
+# editor, so /etc/wattpost has to be writable too.
+
+# journald captures stdout/stderr; the in-memory ring buffer also keeps
+# the last 500 lines for Settings → Diagnostics.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

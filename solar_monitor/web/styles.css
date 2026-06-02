@@ -1,0 +1,4514 @@
+/* solar-monitor, design tokens & layout
+ * Dark by default (off-grid users live in dim places). Grid-organised,
+ * generous spacing. Inspired by Cerbo GX overview + Sol-Ark flow + Solar-Assistant.
+ */
+
+:root {
+  /* Surfaces */
+  --bg:        #0a0d12;
+  --surface:   #131820;
+  --surface-2: #1b212c;
+  --surface-3: #232a37;
+  --border:    #2a3343;
+  --border-2:  #3a4458;
+
+  /* Text */
+  --text:      #e6edf3;
+  --text-2:    #9aa6b8;
+  --text-3:    #6b7689;
+
+  /* Source/storage/load colors, match Cerbo GX vocabulary */
+  --pv:        #f0b429;   /* yellow = solar/PV */
+  --pv-soft:   rgba(240,180,41,0.12);
+  --batt:      #58a6ff;   /* blue = DC battery storage */
+  --batt-soft: rgba(88,166,255,0.12);
+  --ac:        #3fb950;   /* green = AC loads */
+  --ac-soft:   rgba(63,185,80,0.12);
+  --dc:        #2cc9b1;   /* teal = DC loads */
+  --dc-soft:   rgba(44,201,177,0.12);
+  --grid:      #f85149;   /* red = grid/genset AC input */
+  --grid-soft: rgba(248,81,73,0.12);
+  --neutral:   #6b7689;
+  --neutral-soft: rgba(107,118,137,0.12);
+
+  /* Accents */
+  --accent:    #58a6ff;
+  --green:     #3fb950;
+  --green-soft:#1d4d2a;
+  --amber:     #d29922;
+  --amber-soft:#4a3717;
+  --red:       #f85149;
+  --red-soft:  #4a1f1f;
+  --sky:       #79c0ff;
+  --violet:    #a371f7;
+
+  /* Radii / shadow */
+  --r-sm: 4px;
+  --r:    8px;
+  --r-lg: 14px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  --shadow-soft: 0 1px 4px rgba(0,0,0,0.3);
+
+  /* Theme-variable surfaces, overridden in [data-theme="light"] below. */
+  --header-bg:      rgba(13,17,23,0.85);
+  --card-highlight: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%);
+  --chart-grid:     rgba(106,118,137,0.08);
+  --chart-grid-strong: rgba(106,118,137,0.15);
+  --chart-band-fill:rgba(88,166,255,0.12);
+  --chart-accent-fill: rgba(88,166,255,0.16);
+  --chart-amber-fill: rgba(210,153,34,0.15);
+  --body-bg-glow-1: rgba(88,166,255,0.06);
+  --body-bg-glow-2: rgba(63,185,80,0.04);
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(63,185,80,0.85);
+  --donut-pulse-discharging-glow: rgba(210,153,34,0.85);
+
+  /* Type */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ===== Light theme overrides =====
+ * The inline script in <head> sets [data-theme="light|dark"] before paint.
+ * Only properties that need to flip live here, everything else inherits
+ * from :root.
+ */
+[data-theme="light"] {
+  --bg:        #f4f6fa;
+  --surface:   #ffffff;
+  --surface-2: #eef1f6;
+  --surface-3: #e1e6ee;
+  --border:    #d6dbe4;
+  --border-2:  #c2c9d5;
+
+  --text:      #11161f;
+  --text-2:    #4d5868;
+  --text-3:    #7a8595;
+
+  /* Source/storage/load colors, deepen slightly so they read on white */
+  --pv:        #b87800;
+  --pv-soft:   rgba(184,120,0,0.10);
+  --batt:      #0969da;
+  --batt-soft: rgba(9,105,218,0.10);
+  --ac:        #1a7f37;
+  --ac-soft:   rgba(26,127,55,0.10);
+  --dc:        #2a8576;
+  --dc-soft:   rgba(42,133,118,0.10);
+  --grid:      #cf222e;
+  --grid-soft: rgba(207,34,46,0.10);
+  --neutral:   #7a8595;
+  --neutral-soft: rgba(122,133,149,0.10);
+
+  --accent:    #0969da;
+  --green:     #1a7f37;
+  --green-soft:#d4edd9;
+  --amber:     #9a6700;
+  --amber-soft:#fbeec0;
+  --red:       #cf222e;
+  --red-soft:  #fbd5d6;
+  --sky:       #2a6fc4;
+  --violet:    #6f42c1;
+
+  --shadow:        0 2px 16px rgba(15,23,42,0.10);
+  --shadow-soft:   0 1px 4px rgba(15,23,42,0.06);
+
+  --header-bg:        rgba(255,255,255,0.85);
+  --card-highlight:   linear-gradient(135deg, rgba(15,23,42,0.025), rgba(15,23,42,0) 60%);
+  --chart-grid:       rgba(60,72,95,0.10);
+  --chart-grid-strong:rgba(60,72,95,0.20);
+  --chart-band-fill:  rgba(9,105,218,0.08);
+  --chart-accent-fill:rgba(9,105,218,0.12);
+  --chart-amber-fill: rgba(154,103,0,0.12);
+  --body-bg-glow-1:   rgba(9,105,218,0.05);
+  --body-bg-glow-2:   rgba(26,127,55,0.04);
+  /* In light mode pure white would just look like a gap in the ring, so
+     we use a saturated mid-tone of the action color that's clearly
+     lighter than the ring stroke. */
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
+  --donut-pulse-discharging-glow: rgba(154,103,0,0.7);
+}
+[data-theme="light"] .donut-state.charging .donut-pulse    { stroke: #5dd373; }
+[data-theme="light"] .donut-state.discharging .donut-pulse { stroke: #f1b73a; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html {
+  /* Disable iOS Safari + Android Chrome's auto text-inflation.
+   * Mobile browsers will otherwise scale up text in long-prose
+   * containers (most visible on /docs body content), bypassing the
+   * font-size rules we set and making body text 2x the nav text on
+   * the same page. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 70% -100px, var(--body-bg-glow-1), transparent 60%),
+    radial-gradient(800px 400px at 0% 100%, var(--body-bg-glow-2), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------- alert banner (single, collapsible) ----------------
+   Replaces the stacked alert-row design that ate ~25% of the mobile
+   fold. One summary row by default; tap to expand per-category detail.
+   Same-category alerts (e.g. cell drift on two batteries at the same
+   value) are merged in renderAlerts() so a 3-row stack becomes a
+   2-line banner. Colour palette flips between warn and crit based on
+   the highest-severity child via the .alerts.crit modifier. */
+.alerts {
+  margin: .75rem 1rem 0;
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.35);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.alerts.crit {
+  background: rgba(218,54,51,0.12);
+  border-color: rgba(218,54,51,0.40);
+}
+.alerts[hidden] { display: none; }
+.alerts-summary {
+  width: 100%;
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .75rem;
+  background: transparent; color: inherit;
+  border: 0; cursor: pointer; text-align: left;
+  font: inherit;
+}
+.alerts-summary .icon { width: 16px; height: 16px; flex-shrink: 0; color: #f0c849; }
+.alerts.crit .alerts-summary .icon { color: #ff7b72; }
+.alerts-summary-count { font-size: .82rem; font-weight: 500; color: var(--text); }
+.alerts-summary-cats {
+  flex: 1; min-width: 0; text-align: right;
+  font-size: .78rem; color: var(--text-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.alerts-summary-chev {
+  color: var(--text-3); font-size: .85rem;
+  transition: transform 180ms ease;
+}
+.alerts[aria-expanded="true"] .alerts-summary-chev,
+.alerts.expanded .alerts-summary-chev { transform: rotate(90deg); }
+
+.alerts-detail {
+  border-top: 1px solid rgba(210,153,34,0.30);
+}
+.alerts.crit .alerts-detail { border-top-color: rgba(218,54,51,0.35); }
+.alerts-detail[hidden] { display: none; }
+.alerts-detail-row {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .5rem .75rem;
+  font-size: .82rem;
+}
+.alerts-detail-row + .alerts-detail-row {
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.alerts-detail-row .sev {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #f0c849; flex-shrink: 0;
+}
+.alerts-detail-row .sev.alarm { background: #ff7b72; }
+.alerts-detail-row .lbl { flex: 1; color: var(--text); min-width: 0; }
+.alerts-detail-row .val {
+  color: var(--text-3); font-variant-numeric: tabular-nums; font-size: .78rem;
+}
+
+/* ---------------- demo banner ---------------- */
+.demo-banner {
+  background: linear-gradient(90deg, #d29922, #f0b429);
+  color: #1a1a0a;
+  padding: .55rem 1rem;
+  text-align: center;
+  font-size: .9rem;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0,0,0,0.15);
+  position: relative;
+  z-index: 20;
+}
+.demo-banner strong { font-weight: 800; letter-spacing: .05em; margin-right: .35rem; }
+.demo-banner a { color: #1a1a0a; font-weight: 700; text-decoration: underline; }
+.demo-banner a:hover { text-decoration: none; }
+/* Demo mode: lock down every settings interaction up front so
+ * visitors don't fill out a form just to get a 403 on save. The
+ * read-only middleware is still the source of truth, this is the
+ * UX layer that signals "view only" before the click.
+ *
+ * Rules:
+ *  - All buttons / inputs / selects / textareas inside .settings-block
+ *    grey out, lose pointer-events, lose hover. Read-only stays
+ *    readable, just clearly inert.
+ *  - The Setup CTA card hides its button (the wizard mutates config).
+ *  - Each .settings-block gets a "View only, demo mode" badge via
+ *    a ::before pseudo-element, so visitors understand why.
+ */
+body.is-demo .settings-block { position: relative; }
+body.is-demo .settings-block::before {
+  content: "View only · demo mode";
+  position: absolute; top: .75rem; right: 1rem;
+  font-size: .68rem; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--amber, #d29922);
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.30);
+  padding: .15rem .5rem; border-radius: 999px;
+  pointer-events: none;
+}
+body.is-demo .settings-block input,
+body.is-demo .settings-block select,
+body.is-demo .settings-block textarea,
+body.is-demo .settings-block button,
+body.is-demo .settings-block .alerts-add-btn,
+body.is-demo .settings-block .settings-toggle input {
+  pointer-events: none;
+  opacity: .55;
+  cursor: not-allowed;
+}
+/* Re-enable navigation-only controls the user might still click for
+ * info, accordion toggles, theme picker (cosmetic), kiosk-mode
+ * toggle (purely a client preference, no server side). */
+body.is-demo .settings-block .theme-opt,
+body.is-demo .settings-block details > summary,
+body.is-demo .settings-block [data-kiosk-toggle] {
+  pointer-events: auto; opacity: 1; cursor: pointer;
+}
+/* Hide the bottom-of-page "Restart wattpost" / "Update now" CTAs
+ * entirely on demo, no useful read-only view of them. */
+body.is-demo #settings-restart,
+body.is-demo #settings-update-apply { display: none !important; }
+
+/* ---------------- header ---------------- */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  /* Brand pushes right via margin-right:auto on .brand below, gives
+     us a left-aligned brand with status + help-btn clustered on the
+     right. Previously this was space-between, which left the Healthy
+     pill floating in the middle once the help-btn was added (3
+     children with space-between = one in each third of the header). */
+  gap: .5rem;
+  align-items: center;
+  /* Top + side padding scale with the device safe area so the
+     OS status bar / display cutout don't draw on top of brand /
+     health pill / help-btn when this page renders inside the
+     Capacitor WebView. env() returns 0 in desktop browsers. */
+  padding:
+    max(0.9rem, env(safe-area-inset-top))
+    max(1.5rem, env(safe-area-inset-right))
+    0.9rem
+    max(1.5rem, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+  background: var(--header-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.brand { display: flex; align-items: center; gap: .5rem; min-width: 0; margin-right: auto; }
+.brand .logo { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
+.brand .title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 420px) {
+  .brand .title { font-size: .9rem; }
+}
+@media (max-width: 360px) {
+  /* Very narrow: hide the wordmark, just show the logo icon */
+  .brand .title { display: none; }
+}
+
+.status {
+  display: inline-flex; align-items: center; gap: .55rem;
+  font: inherit;
+  font-size: .82rem; color: var(--text-2);
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+/* "Sign in" affordance in the header, sits next to the status pill
+ * when there's no local session. Visual weight: pill-style like the
+ * status, but uses the accent blue so it reads as a CTA. */
+.header-signin {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .82rem;
+  color: var(--blue, #6c8ef2);
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--blue, #6c8ef2);
+  text-decoration: none;
+  transition: background 0.15s;
+  margin-left: .5rem;
+}
+.header-signin:hover { background: var(--surface-2); }
+.header-signin svg { width: 14px; height: 14px; }
+@media (max-width: 360px) {
+  .header-signin span { display: none; }
+  .header-signin { padding: .35rem .55rem; }
+}
+/* Kiosk share URL panel (Settings → Kiosk share URL) */
+.kiosk-url-row {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: .55rem;
+}
+.kiosk-url-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: .82rem;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .4rem .55rem;
+  min-width: 0;  /* let the flex item shrink below content width */
+}
+.kiosk-url-input:focus { outline: 2px solid var(--accent, #58a6ff); outline-offset: -2px; }
+.kiosk-actions { display: flex; align-items: center; gap: .75rem; }
+
+/* Rotate-password result panel (Settings → System) */
+.rotate-pw-result {
+  margin-top: .75rem;
+  padding: .8rem;
+  background: var(--bg-2);
+  border: 1px solid var(--amber, #d29922);
+  border-radius: 8px;
+}
+.rotate-pw-label {
+  font-size: .78rem;
+  color: var(--text-3);
+  margin-bottom: .4rem;
+}
+.rotate-pw-code {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 1rem;
+  padding: .35rem .55rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  user-select: all;
+  margin-right: .4rem;
+}
+.rotate-pw-copy {
+  font-size: .78rem;
+  padding: .35rem .65rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rotate-pw-copy:hover { background: var(--surface-2); }
+.rotate-pw-foot {
+  margin-top: .55rem;
+  font-size: .74rem;
+  color: var(--text-3);
+}
+.rotate-pw-foot code {
+  font-family: var(--mono);
+  font-size: .7rem;
+  padding: 0 .25rem;
+  background: var(--surface);
+  border-radius: 3px;
+}
+.status:hover { background: var(--surface-2); }
+.status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+}
+.status-icon {
+  display: inline-flex; align-items: center;
+  width: 14px; height: 14px;
+  color: inherit;
+}
+.status-icon svg { width: 100%; height: 100%; }
+@media (max-width: 360px) {
+  /* Very narrow phones: drop the text, dot + icon say everything */
+  .status .text { display: none; }
+  .status { padding: .35rem .55rem; }
+}
+.status.ok   { color: var(--green); }
+.status.ok   .dot { background: var(--green); box-shadow: 0 0 0 3px rgba(63,185,80,0.15); }
+.status.warn { color: var(--amber); }
+.status.warn .dot { background: var(--amber); box-shadow: 0 0 0 3px rgba(210,153,34,0.15); }
+.status.err  { color: var(--red); }
+.status.err  .dot { background: var(--red); }
+
+/* ---------------- nav (tabs) ---------------- */
+.app-nav {
+  position: sticky;
+  top: 56px;  /* below the header */
+  z-index: 9;
+  display: flex;
+  gap: 0;
+  padding: 0 1.5rem;
+  background: var(--header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.app-nav::-webkit-scrollbar { display: none; }
+.nav-tab {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .85rem 1rem .75rem;
+  color: var(--text-3);
+  text-decoration: none;
+  font-size: .88rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 0.18s, border-color 0.18s;
+}
+.nav-tab svg {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+}
+.nav-tab:hover { color: var(--text-2); }
+.nav-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+@media (max-width: 600px) {
+  /* Equal-width tabs across the full viewport on phones, no horizontal
+   * scroll, no edge-flush tabs, no truncated labels.
+   *
+   * Icons are hidden at this breakpoint so the longest label
+   * ("Dashboard") fits its 25% share without ellipsis. The active tab
+   * remains obvious via its blue underline + text colour.
+   */
+  .app-nav {
+    padding: 0 .5rem;
+    gap: 0;
+  }
+  .nav-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    gap: 0;
+    padding: .85rem .35rem .7rem;
+    font-size: .85rem;
+    min-width: 0;
+  }
+  .nav-tab svg { display: none; }
+  .nav-tab span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ---------------- help icon-button (topbar) ----------------
+ * Was a floating "?" FAB; lifted into the topbar so it stops competing
+ * with primary dashboard tiles for screen real estate on mobile. Same
+ * destination (#/docs), one-tap reachability preserved. Hidden on the
+ * docs route + kiosk route, pointless to surface a shortcut to the
+ * page you're already on or a chrome-free wallmount.
+ */
+.help-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: background .15s, color .15s;
+  flex-shrink: 0;
+}
+.help-btn:hover { background: var(--surface-3); color: var(--text); }
+.help-btn:active { background: var(--surface-3); }
+.help-btn svg { width: 16px; height: 16px; }
+body[data-route="docs"] .help-btn,
+body[data-route="kiosk"] .help-btn,
+body.kiosk-active .help-btn { display: none; }
+
+/* ---------------- routes ---------------- */
+.route { display: none; }
+.route.active {
+  display: flex; flex-direction: column; gap: 1.25rem;
+}
+
+/* ---------------- main ---------------- */
+main {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: block;  /* routes handle their own flex stacking */
+}
+
+/* ---------------- hero v2: donut + stats ---------------- */
+.hero-v2 {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(63,185,80,0.12), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.08), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+}
+/* Hero hue follows SoC state for subtle emotional cue */
+.hero-v2.soc-low {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(248,81,73,0.16), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(248,81,73,0.06), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+}
+.hero-v2.soc-mid {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(210,153,34,0.14), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(210,153,34,0.05), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+}
+@media (max-width: 740px) {
+  .hero-v2 { grid-template-columns: 1fr; }
+}
+.hero-donut-wrap {
+  position: relative;
+  width: 220px; height: 220px;
+  justify-self: center;
+}
+.hero-donut {
+  width: 100%; height: 100%;
+  display: block;
+}
+.donut-track {
+  stroke: var(--surface-3);
+}
+.donut-arc {
+  /* Gradient + halo are picked per state via .donut-state.<state>
+     selectors below. JS sets the wrapper's state class on every snapshot
+     paint. Pre-state default = holding (calm blue). */
+  stroke: url(#g-soc-holding);
+  transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
+}
+/* Legacy band coloring, used by the per-pack mini donuts in the
+   bank-compare detail view (`.hero-donut-wrap` without a `.donut-state`
+   wrapper, so the new state palette doesn't kick in). Two-class
+   specificity beats the default `.donut-arc` rule so these win. */
+.donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px rgba(248,81,73,0.45)); }
+.donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(210,153,34,0.4)); }
+.donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
+
+/* State palette: charging green, holding blue, discharging amber,
+   critical red. The gradient IDs are duplicated in the kiosk donut
+   under a `-k-` prefix so the two SVGs don't share defs. */
+.donut-state.charging    .donut-arc { stroke: url(#g-soc-charging);    filter: drop-shadow(0 0 10px rgba(86,211,100,0.50)); }
+.donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  rgba(88,166,255,0.35)); }
+.donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(240,200,73,0.50)); }
+.donut-state.critical    .donut-arc { stroke: url(#g-soc-critical);    filter: drop-shadow(0 0 12px rgba(255,123,114,0.65)); }
+.kiosk-donut.donut-state.charging    .donut-arc { stroke: url(#g-soc-k-charging); }
+.kiosk-donut.donut-state.holding     .donut-arc { stroke: url(#g-soc-k-holding); }
+.kiosk-donut.donut-state.discharging .donut-arc { stroke: url(#g-soc-k-discharging); }
+.kiosk-donut.donut-state.critical    .donut-arc { stroke: url(#g-soc-k-critical); }
+
+/* Leading-edge dot, small solid circle at the tip of the arc with a
+   halo that pulses outward. Replaces the old rotating "ring runner"
+   indicator. JS positions cx/cy on every snapshot paint. */
+.donut-head, .donut-head-glow {
+  transition: cx 0.8s ease, cy 0.8s ease, fill 0.4s ease, stroke 0.4s ease;
+  pointer-events: none;
+}
+.donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-head-glow {
+  fill: rgba(88,166,255,0.55);
+  /* Animate via transform+opacity rather than the `r` attribute,
+     iOS Safari historically didn't animate `r` via CSS, and even on
+     versions that do it's silently dropped under "Reduce Motion"
+     without firing the prefers-reduced-motion media query reliably
+     on every install. transform-box: fill-box ensures the scale
+     happens about the circle's own centre, not the SVG viewport. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: donut-head-pulse 1800ms ease-out infinite;
+}
+.donut-state.charging    .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.55); }
+.donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.50); }
+.donut-state.discharging .donut-head      { fill: #f0c849; stroke: #ffffff; }
+.donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.55); }
+.donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
+.donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.65); animation-duration: 900ms; }
+/* Decouple the leading-edge dot + halo colour from the arc colour
+   when there's a non-trivial flow. The arc still reflects SoC
+   severity; the head reflects flow direction. The visible case
+   this unlocks is "critical SoC, but charging", red arc + green
+   pulsing head, telegraphing recovery without losing the "we're
+   low" message. Applied only when |netW| > 5 W; the holding band
+   keeps its neutral blue head. */
+.donut-state.donut-head-flow-up   .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.donut-head-flow-up   .donut-head-glow { fill: rgba(86,211,100,0.55); }
+.donut-state.donut-head-flow-down .donut-head      { fill: #f0c849; stroke: #ffffff; }
+.donut-state.donut-head-flow-down .donut-head-glow { fill: rgba(240,200,73,0.55); }
+@keyframes donut-head-pulse {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  60%  { transform: scale(2.2); opacity: 0;   }
+  100% { transform: scale(1);   opacity: 0;   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .donut-head-glow { animation: none; opacity: 0.35; }
+}
+
+/* Net W indicator under "State of charge" */
+.donut-health {
+  display: inline-block;
+  margin-top: .35rem;
+  padding: .1rem .55rem;
+  border-radius: 999px;
+  font-size: .7rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.donut-health.good  { color: var(--green); border-color: rgba(63,185,80,0.45);  background: rgba(63,185,80,0.08); }
+.donut-health.warn  { color: var(--amber); border-color: rgba(210,153,34,0.45); background: rgba(210,153,34,0.08); }
+.donut-health.alarm { color: var(--red);   border-color: rgba(248,81,73,0.55);  background: rgba(248,81,73,0.10); }
+
+.donut-flow {
+  display: inline-flex; align-items: center; gap: .3rem;
+  margin-top: .55rem;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+.donut-flow-arrow {
+  display: inline-flex;
+  width: 10px; height: 10px;
+}
+.donut-state.charging .donut-flow {
+  color: var(--green);
+  border-color: rgba(63,185,80,0.45);
+  background: rgba(63,185,80,0.08);
+}
+.donut-state.charging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid currentColor;
+}
+.donut-state.discharging .donut-flow {
+  color: var(--amber);
+  border-color: rgba(210,153,34,0.45);
+  background: rgba(210,153,34,0.08);
+}
+.donut-state.discharging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid currentColor;
+}
+.donut-state.idle .donut-flow-arrow::before {
+  content: "•";
+  color: var(--text-3);
+  font-size: 1.3rem;
+  line-height: .5;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.donut-pct {
+  font-family: var(--mono);
+  font-size: 3.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.donut-pct-unit {
+  font-size: 1.2rem;
+  color: var(--text-2);
+  margin-left: 2px;
+}
+.donut-label {
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: .35rem;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  gap: .75rem;
+  align-content: start;
+}
+@media (max-width: 540px) {
+  .hero-stats { grid-template-columns: 1fr 1fr; }
+}
+.hero-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+}
+.hero-stat--big {
+  grid-column: span 1;
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+}
+@media (max-width: 540px) {
+  .hero-stat--big { grid-column: span 2; }
+}
+.hero-stat-val {
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: .15rem;
+  display: flex; align-items: baseline; gap: .25rem;
+  /* Long device/model strings must not break the grid cell */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-stat-val > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* When the value is a non-numeric string (e.g. bank meta), don't blow up
+   the font; let it shrink and fit on one line. */
+.hero-stat-val.is-text { font-size: .95rem; font-weight: 500; }
+.hero-stat--big .hero-stat-val { font-size: 1.7rem; }
+.hero-stat-unit {
+  font-size: .95rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.hero-stat-sub {
+  font-size: .76rem;
+  color: var(--text-3);
+  margin-top: .2rem;
+}
+.hero-stat-forecast {
+  font-size: .72rem;
+  color: var(--blue, #6c8ef2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
+/* Net power color cues */
+#bank-power-tile.charging .hero-stat-val { color: var(--green); }
+#bank-power-tile.discharging .hero-stat-val { color: var(--amber); }
+#bank-power-tile.idle .hero-stat-val { color: var(--text-2); }
+
+.meta-k {
+  font-size: .68rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  display: block;
+}
+
+/* ---------------- panel ---------------- */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.1rem 1.25rem 1.3rem;
+  position: relative;
+  overflow: hidden;
+}
+/* Per-panel subtle hue tints. ::before sits above the surface but below
+   content; pointer-events disabled so it never blocks clicks. */
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--panel-tint, transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+.panel > * { position: relative; z-index: 1; }
+
+/* Flow panel, PV yellow on the left fading into battery blue on the right */
+.panel:has(#flow) {
+  --panel-tint:
+    linear-gradient(95deg, rgba(240,180,41,0.07) 0%, rgba(240,180,41,0) 35%),
+    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.06), transparent 60%);
+}
+/* Today panel, warm energy-accounting tint */
+.today-panel {
+  --panel-tint: linear-gradient(135deg, rgba(210,153,34,0.06), rgba(210,153,34,0) 70%);
+}
+/* Cell-balance panel, green by default, amber on drift, red on bad */
+#panel-cells { --panel-tint: linear-gradient(180deg, rgba(63,185,80,0.05), transparent 50%); }
+#panel-cells.drift-warn  { --panel-tint: linear-gradient(180deg, rgba(210,153,34,0.07), transparent 55%); }
+#panel-cells.drift-alarm { --panel-tint: linear-gradient(180deg, rgba(248,81,73,0.08), transparent 55%); }
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.panel-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+.h-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+
+/* Inline-SVG icon containers, make any SVG child fill its parent.
+ * Without this, SVGs rendered without width/height attributes collapse
+ * to 0×0 inside our span wrappers and the icon never shows. */
+.dev-card-icon svg,
+.flow-tile-icon svg,
+.flow-tile-bg-icon svg,
+.status-icon svg,
+.donut-flow-arrow svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Per-panel header icon tint */
+.panel:has(#flow) .h-icon { color: var(--pv); }
+.today-panel .h-icon       { color: var(--amber); }
+#panel-cells .h-icon       { color: var(--green); }
+#panel-cells.drift-warn  .h-icon { color: var(--amber); }
+#panel-cells.drift-alarm .h-icon { color: var(--red); }
+.panel-sub {
+  font-size: .82rem;
+  color: var(--text-3);
+  font-family: var(--mono);
+}
+
+/* ---------------- power flow strip ---------------- */
+.flow {
+  /* v2: SVG (perimeter nodes + animated particles) stacked above the
+   * battery card. Was flex-row in v1 (sources / connector / battery
+   * tile / connector / loads); the v2 redesign replaces all of that
+   * with a single SVG + a slim card. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.flow-col {
+  display: flex; flex-direction: column;
+  gap: .5rem;
+  min-width: 160px;
+  flex: 1;
+  /* Centre tiles vertically within the column so a single-tile
+   * column (Battery, Load) lines up against the middle of a multi-
+   * tile column (Sources stack: AC Charger + Solar) instead of
+   * top-aligning to the first source tile. */
+  justify-content: center;
+}
+.flow-conn {
+  flex: 0 0 auto;
+  min-width: 90px;
+  align-self: center;
+  display: flex; flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  padding: 0 .25rem;
+}
+@media (max-width: 720px) {
+  /* Portrait phones: stack vertically. Connector becomes a vertical
+   * column with a thicker line, chunky down-triangle, and the W label
+   * as a centered pill on the line, same pattern as Cerbo / Sol-Ark /
+   * Powerwall apps. */
+  .flow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .flow-col { width: 100%; }
+
+  .flow-conn {
+    position: relative;
+    width: 100%;
+    height: 72px;
+    min-height: 0;
+    align-self: stretch;
+    padding: 0;
+    /* abandon row-flex layout used elsewhere, children are absolutely
+     * positioned within this container */
+    display: block;
+  }
+  .flow-arrow {
+    position: absolute !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    display: block !important;
+  }
+  /* Vertical line, thicker, rounded ends */
+  .flow-arrow::before {
+    content: "";
+    position: absolute !important;
+    top: 2px !important;
+    bottom: 16px !important;
+    left: 50% !important;
+    right: auto !important;
+    width: 3px !important;
+    height: auto !important;
+    background: var(--border-2);
+    border-radius: 3px;
+    transform: translateX(-50%) !important;
+  }
+  /* Chunky down-triangle at the bottom of the line */
+  .flow-arrow::after {
+    content: "";
+    position: absolute !important;
+    top: auto !important;
+    bottom: 0 !important;
+    left: 50% !important;
+    right: auto !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-style: solid !important;
+    border-width: 14px 9px 0 9px !important;
+    border-color: var(--border-2) transparent transparent transparent !important;
+    transform: translateX(-50%) !important;
+    background: transparent !important;
+  }
+  .flow-arrow.active::before {
+    background: linear-gradient(180deg, var(--from), var(--to));
+  }
+  .flow-arrow.active::after {
+    border-top-color: var(--to) !important;
+  }
+  /* Animated dot drops top → bottom along the line.
+     We beat the landscape rule via the .flow-conn parent (specificity
+     0,3,0 vs 0,2,0) rather than !important. CSS animations are *lower*
+     priority than !important author rules, so flagging `top` important
+     would freeze the dot at top:0, exactly the bug we're fixing. */
+  .flow-conn .flow-arrow.active .dot {
+    width: 9px; height: 9px;
+    background: var(--to);
+    box-shadow: 0 0 12px var(--to);
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    animation: flow-dot-v 1.8s linear infinite;
+  }
+  .flow-conn .flow-arrow.reverse .dot {
+    animation-direction: reverse;
+  }
+  /* (keyframes flow-dot-v live at top-of-file to dodge a Safari quirk) */
+  /* W label centered on the *line*, not the whole connector. The connector
+     is 72px tall but the bottom 14px is the down-triangle, so a flat
+     top:50% sits 7px below the line midpoint. calc() corrects for it. */
+  .flow-arrow-label {
+    position: absolute;
+    top: calc(50% - 7px); left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--surface);
+    padding: 3px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--border-2);
+    font-family: var(--mono);
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--text-2);
+    z-index: 2;
+    white-space: nowrap;
+  }
+  .flow-arrow.active + .flow-arrow-label,
+  .flow-conn:has(.flow-arrow.active) .flow-arrow-label {
+    color: var(--text);
+    border-color: var(--accent);
+  }
+}
+
+/* Mode-aware kiosk accents (Pillar 4b — see [[modes-state-machine]]).
+   Pin a wall display to /kiosk/<mode> (van/cabin/marine/home/kiosk)
+   and <body data-mode="..."> gets set at boot. A subtle accent stripe
+   at the top + a corner badge in kiosk mode are enough visual
+   differentiation for v1; richer per-mode layouts come later. */
+body[data-mode="van"]    { --mode-accent: #f5a623; --mode-label: "VAN"; }
+body[data-mode="cabin"]  { --mode-accent: #2c7d2c; --mode-label: "CABIN"; }
+body[data-mode="marine"] { --mode-accent: #1f6fc6; --mode-label: "MARINE"; }
+body[data-mode="home"]   { --mode-accent: #ff9a3c; --mode-label: "HOME"; }
+body[data-mode="kiosk"]  { --mode-accent: #6b7280; --mode-label: "KIOSK"; }
+body[data-mode]:not([data-mode=""])::before {
+  content: "";
+  position: fixed; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--mode-accent, transparent);
+  z-index: 9999;
+  pointer-events: none;
+}
+body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after {
+  content: var(--mode-label);
+  position: fixed; top: 12px; right: 14px;
+  font-size: 10px; font-weight: 700; letter-spacing: .14em;
+  color: var(--mode-accent, #999);
+  padding: 3px 8px; border-radius: 999px;
+  border: 1px solid var(--mode-accent, #999);
+  background: rgba(255,255,255,0.04);
+  z-index: 9999; pointer-events: none;
+  font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
+/* Kiosk view always renders the flow vertically, regardless of viewport.
+ * The host's column can be wide on a landscape tablet, but stacking is
+ * still the right read at a distance. Same rules as the portrait
+ * @media block above, applied via parent selector instead of viewport
+ * width. Properties that are also defined in the @media use the same
+ * !important / specificity tricks (.flow-conn parent for the dot). */
+.kiosk-flow .flow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.kiosk-flow .flow-col { width: 100%; }
+.kiosk-flow .flow-conn {
+  position: relative;
+  width: 100%;
+  /* Taller than the previous attempt so the line actually reads as a
+     connection rather than a stub. */
+  height: clamp(28px, 4.5vh, 40px);
+  min-height: 0;
+  align-self: stretch;
+  padding: 0;
+  display: block;
+}
+/* No chevron / arrowhead in kiosk, the tile order (Solar → Battery →
+   Load) already encodes direction, and at this scale any explicit arrow
+   reads as a blob. Just a clean vertical line, slightly thicker, with
+   the gradient colour when active. */
+.kiosk-flow .flow-arrow::after {
+  /* Hide the triangle inherited from the portrait @media rule. */
+  display: none !important;
+}
+.kiosk-flow .flow-arrow.active::after {
+  display: none !important;
+}
+.kiosk-flow .flow-arrow {
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: block !important;
+}
+/* Single canonical line rule: top→bottom symmetric, dead-centre
+   horizontally. Source order matters here, having two ::before rules
+   meant the later one's bottom:16px (held over from when we had a
+   chevron at the bottom of the connector) was making the line look
+   off-centre vertically. */
+.kiosk-flow .flow-arrow::before {
+  content: "";
+  position: absolute !important;
+  top: 2px !important;
+  bottom: 2px !important;
+  left: 50% !important;
+  right: auto !important;
+  width: 3px !important;
+  height: auto !important;
+  background: var(--border-2);
+  border-radius: 3px;
+  transform: translateX(-50%) !important;
+}
+/* (chevron-style ::after / .active::after live earlier in this file
+   under the @media (max-width: 720px) override section, don't add a
+   filled-triangle duplicate here, it would win the cascade by virtue
+   of being later in source order.) */
+.kiosk-flow .flow-arrow.active::before {
+  background: linear-gradient(180deg, var(--from), var(--to));
+}
+/* The 9px haloed dot rendered as a chunky pin at the top of the
+   connector, its glow leaked into the tile above and dominated the
+   whole connector. At kiosk distance the colour-graded line +
+   chevron already convey direction; the dot is noise. Hide it. */
+.kiosk-flow .flow-conn .flow-arrow.active .dot {
+  display: none;
+}
+.kiosk-flow .flow-arrow-label {
+  position: absolute;
+  top: calc(50% - 7px); left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--surface);
+  padding: 3px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-2);
+  font-family: var(--mono);
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+  font-weight: 600;
+  color: var(--text-2);
+  z-index: 2;
+  white-space: nowrap;
+}
+.kiosk-flow .flow-arrow.active + .flow-arrow-label,
+.kiosk-flow .flow-conn:has(.flow-arrow.active) .flow-arrow-label {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.flow-arrow {
+  width: 100%;
+  height: 18px;
+  position: relative;
+  display: flex; align-items: center;
+}
+.flow-arrow::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 8px;
+  top: 50%; height: 2px;
+  background: var(--border-2);
+  transform: translateY(-50%);
+}
+.flow-arrow::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 50%;
+  border: 6px solid transparent;
+  border-left-color: var(--border-2);
+  transform: translateY(-50%);
+}
+.flow-arrow.active::before,
+.flow-arrow.active::after {
+  background: linear-gradient(90deg, var(--from), var(--to));
+}
+.flow-arrow.active::after {
+  background: transparent;
+  border-left-color: var(--to);
+}
+/* Drop the chunky arrow-head from the flow strip, line + moving dot
+   already convey direction, and the filled triangle reads as visual
+   noise at every scale we tried. */
+.flow-arrow::after { display: none !important; }
+/* And let the line run edge-to-edge now that there's no triangle to
+   leave room for. The dot animation already uses calc(100% - 12px)
+   for its travel range, so it stays within the line. Landscape uses
+   right:0 (horizontal connector); portrait used bottom:16px to leave
+   room for the down-triangle, now reclaimed as bottom:2px. */
+.flow-arrow::before {
+  right: 0 !important;
+  bottom: 2px !important;
+}
+/* Animated moving dot */
+.flow-arrow.active .dot {
+  position: absolute;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--to);
+  top: 50%;
+  transform: translateY(-50%);
+  animation: flow-dot 1.8s linear infinite;
+  box-shadow: 0 0 8px var(--to);
+}
+.flow-arrow.reverse .dot {
+  animation-direction: reverse;
+}
+@keyframes flow-dot {
+  from { left: 0%; opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  to   { left: calc(100% - 12px); opacity: 0; }
+}
+/* Portrait connector's vertical-dot keyframes, defined at the top level
+   (not inside the @media block) because Safari ≤17 is finicky about
+   resolving keyframes references that are scoped to a conditional rule.
+   The 9px reservation at the end was 22px when there was a down-
+   triangle to leave room for; now that the triangle is gone the dot
+   should travel until its bottom touches the line's bottom. */
+@keyframes flow-dot-v {
+  from { top: 0;                 opacity: 0; }
+  8%   {                         opacity: 1; }
+  92%  {                         opacity: 1; }
+  to   { top: calc(100% - 9px);  opacity: 0; }
+}
+.flow-arrow-label {
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+/* Silent device, Victron BLE driver reports advertisement_age_s > 60.
+ * The tile is still shown (the device is configured) but visually muted
+ * so the user knows "we have nothing live here" rather than reading
+ * the frozen wattage as real. See #171. */
+.flow-tile.is-silent {
+  opacity: .5;
+  filter: grayscale(.6);
+}
+.flow-tile.is-silent .flow-tile-val { color: var(--text-3); }
+
+.flow-tile {
+  border-radius: var(--r);
+  padding: .9rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  position: relative;
+  overflow: hidden;
+  min-height: 92px;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.flow-tile::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: var(--tile-tint, transparent);
+  pointer-events: none;
+}
+.flow-tile-head {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: var(--text-2);
+  position: relative;
+  z-index: 1;
+}
+.flow-tile-icon {
+  width: 16px; height: 16px;
+  color: var(--tile-color, var(--text-3));
+  flex-shrink: 0;
+}
+/* Large watermark icon in the tile background, drives most of the
+ * visual identity of each tile without crowding the numbers */
+.flow-tile-bg-icon {
+  position: absolute;
+  right: -8px; bottom: -16px;
+  width: 78px; height: 78px;
+  color: var(--tile-color, var(--text-3));
+  opacity: 0.12;
+  pointer-events: none;
+}
+.flow-tile.pv .flow-tile-bg-icon       { opacity: 0.18; }
+.flow-tile.batt .flow-tile-bg-icon     { opacity: 0.14; }
+/* Subtle pulse on active source tiles when power > 0 */
+.flow-tile.is-active .flow-tile-bg-icon {
+  animation: tile-glow 2.4s ease-in-out infinite;
+}
+@keyframes tile-glow {
+  0%, 100% { opacity: 0.10; transform: scale(1); }
+  50%      { opacity: 0.22; transform: scale(1.04); }
+}
+.flow-tile-val {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-top: .2rem;
+  position: relative;
+  z-index: 1;
+}
+.flow-tile-val .unit { font-size: .9rem; color: var(--text-2); margin-left: 2px; font-weight: 500; }
+/* Signed power values shift color with direction, same green/amber
+   cue the donut uses, so the eye picks up "gaining vs losing" without
+   reading the sign. */
+.flow-tile-val.power-charging    { color: var(--green); }
+.flow-tile-val.power-discharging { color: var(--amber); }
+.flow-tile-val.power-charging .unit,
+.flow-tile-val.power-discharging .unit { color: inherit; opacity: 0.75; }
+.flow-tile-sub {
+  font-size: .72rem;
+  color: var(--text-3);
+  font-family: var(--mono);
+  margin-top: .25rem;
+  position: relative;
+  z-index: 1;
+}
+.flow-tile.pv      { --tile-tint: var(--pv-soft); --tile-color: var(--pv); border-color: rgba(240,180,41,0.25); }
+.flow-tile.batt    { --tile-tint: var(--batt-soft); --tile-color: var(--batt); border-color: rgba(88,166,255,0.25); }
+.flow-tile.ac      { --tile-tint: var(--ac-soft); --tile-color: var(--ac); border-color: rgba(63,185,80,0.25); }
+.flow-tile.dc      { --tile-tint: var(--dc-soft); --tile-color: var(--dc); border-color: rgba(44,201,177,0.25); }
+.flow-tile.grid    { --tile-tint: var(--grid-soft); --tile-color: var(--grid); border-color: rgba(248,81,73,0.25); }
+.flow-tile.neutral { --tile-tint: var(--neutral-soft); --tile-color: var(--text-3); }
+/* Inferred (energy-balance) tiles use a dashed border + an asterisk hint
+   so users know it's calculated, not directly measured. */
+.flow-tile.inferred {
+  border-style: dashed;
+}
+.flow-tile.inferred .flow-tile-sub::before {
+  content: "∗ ";
+  color: var(--text-3);
+}
+
+.flow-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .85rem;
+}
+
+/* Power-flow donut centerpiece (replaces the rectangular battery tile).
+   Same SoC palette + gradient defs as the Hero donut so the colour
+   semantics match across the dashboard. Gradient defs live inside the
+   Hero SVG up the DOM; SVG url() references resolve document-wide. */
+.flow-donut-wrap {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: .25rem auto;
+  flex: 0 0 auto;
+  align-self: center;
+}
+@media (min-width: 720px) {
+  .flow-donut-wrap { width: 200px; height: 200px; }
+}
+.flow-donut {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.flow-donut .donut-track { stroke: var(--surface-3); }
+.flow-donut .donut-arc {
+  stroke: url(#g-soc-holding);
+  transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
+}
+.flow-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 .9rem;
+  pointer-events: none;
+}
+.flow-donut-pct {
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+.flow-donut-pct-unit {
+  font-size: .9rem;
+  margin-left: .15rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.flow-donut-state {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-2);
+  margin-top: .35rem;
+}
+.flow-donut-flow {
+  font-size: .85rem;
+  margin-top: .45rem;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+.flow-donut-arrow { font-weight: 700; }
+.donut-state.charging    .flow-donut-arrow { color: var(--green); }
+.donut-state.discharging .flow-donut-arrow { color: var(--amber); }
+.donut-state.critical    .flow-donut-arrow { color: var(--red); }
+
+/* ───── Energy-today overview (top of /history) ───── */
+.energy-panel { padding: 1.1rem 1rem; }
+.energy-chart-host { width: 100%; min-height: 280px; }
+.energy-legend {
+  display: flex; flex-wrap: wrap; gap: .25rem .85rem;
+  font-size: .68rem; color: var(--text-2);
+  margin: .55rem .25rem 0; justify-content: center;
+}
+.energy-legend .chip { display: inline-flex; align-items: center; gap: .3rem; }
+.energy-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.energy-legend .swatch.line { width: 14px; height: 2px; border-radius: 0; }
+.energy-ranges {
+  display: flex; gap: .3rem; flex-wrap: wrap;
+  margin: 0 0 .75rem; padding: .25rem; border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  width: max-content;
+}
+.energy-ranges .erange {
+  appearance: none; border: 0; cursor: pointer;
+  background: transparent; color: var(--text-2);
+  font-size: .78rem; font-weight: 500;
+  padding: .35rem .75rem; border-radius: 6px;
+  transition: background .12s ease, color .12s ease;
+}
+.energy-ranges .erange:hover { color: var(--text-1); background: rgba(255,255,255,.05); }
+.energy-ranges .erange.is-active {
+  background: var(--accent, #3a7bd5); color: #fff;
+}
+
+.energy-stats {
+  display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
+  margin-top: 1rem;
+}
+.estat {
+  padding: .75rem .85rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.estat-k { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: .25rem; }
+.estat-v { font-size: 1.3rem; font-weight: 700; }
+.estat-v .unit { font-size: .8rem; font-weight: 500; color: var(--text-2); margin-left: .15rem; }
+.estat.pv  .estat-v { color: var(--pv,    #f0c849); }
+.estat.load .estat-v { color: var(--load, #7c5cff); }
+.estat.in  .estat-v { color: var(--batt,  #56d364); }
+.estat.out .estat-v { color: var(--amber, #f0c849); }
+
+.energy-self {
+  margin-top: .75rem;
+  padding: .8rem .9rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.energy-self-k { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: .55rem; }
+.energy-self-bars { display: flex; gap: .35rem; height: 8px; border-radius: 999px; overflow: hidden; margin-bottom: .55rem; }
+.energy-self-bars span { display: block; height: 100%; }
+.energy-self-legend { display: grid; gap: .25rem; font-size: .72rem; }
+.energy-self-legend .self-row { display: flex; align-items: center; gap: .4rem; color: var(--text-2); }
+.energy-self-legend .self-row .dot { width: 8px; height: 8px; border-radius: 50%; }
+.energy-self-legend .self-row .pct { margin-left: auto; color: var(--text); font-weight: 600; }
+
+/* ───── v2 SVG flow diagram (Powerwall-style) ─────
+   Replaces the old flow-col / flow-conn layout. Sources/loads arc
+   around a notional bus point; particles travel along bezier paths.
+   Battery lives in `.bat-card` below the SVG (not inside it) when
+   the bank flow is small; only joins the diagram when it carries
+   ≥10 W. */
+.flow-svg-v2 {
+  width: 100%;
+  height: auto;
+  max-height: 320px;            /* up from 290, bigger viewBox 440×290 */
+  display: block;
+  margin: -0.25rem auto 0;
+}
+.flow-svg-v2 .flow-conn-v2          { fill: none; stroke: var(--border); stroke-width: 1.4; transition: stroke 0.45s ease, stroke-width 0.3s ease; }
+.flow-svg-v2 .flow-conn-v2.active   { stroke: var(--text-3); stroke-width: 1.8; }
+/* Junction node, explicit centre marker. Pulses when in/out are
+ * roughly balanced so users see "the system is humming along" at a
+ * glance, even when no individual edge is dramatic. */
+.flow-svg-v2 .flow-junction         { fill: var(--text-3); opacity: 0.65; transition: opacity 0.4s ease, r 0.4s ease; }
+.flow-svg-v2 .flow-junction.balanced { animation: flow-junction-pulse 2.4s ease-in-out infinite; }
+@keyframes flow-junction-pulse {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+/* Idle source, power=0 right now but configured. Dimmed enough to
+ * step out of the user's attention without disappearing (the system
+ * shape still reads correctly: "yes the AC charger is wired up, it
+ * just isn't pulling anything"). */
+.flow-svg-v2 .flow-node-group.idle  { opacity: 0.32; transition: opacity 0.5s ease; }
+/* Dominant source, soft halo pulse. Whichever node is contributing
+ * the most W (solar at midday, battery at night) draws the eye
+ * without competing with the central junction's balance pulse. */
+.flow-svg-v2 .flow-node-group.dominant .flow-node-ring {
+  animation: flow-node-dominant 2.6s ease-in-out infinite;
+}
+@keyframes flow-node-dominant {
+  0%, 100% { stroke-width: 1.8; }
+  50%      { stroke-width: 3.2; }
+}
+/* Tap-target affordance. Cursor + slight hover ring growth so
+ * users know nodes are clickable; mobile gets touch-action so the
+ * scroll-vs-tap heuristic plays nicely. */
+.flow-svg-v2 .flow-node-clickable   { cursor: pointer; touch-action: manipulation; }
+.flow-svg-v2 .flow-node-clickable:hover .flow-node-ring,
+.flow-svg-v2 .flow-node-clickable:focus-visible .flow-node-ring { stroke-width: 2.6; }
+.flow-svg-v2 .flow-node-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 50%; }
+/* Battery node, keep the ring transition for smooth direction
+ * flips. The first cut at fill-tint (v0.1.90) was too busy on top
+ * of the existing ring + SoC arc + new arrow chip, pink-on-pink-
+ * on-pink. Dropped in v0.1.91; ring colour + arrow do the job
+ * cleaner. Class still applied in case we want to bring it back
+ * with a much lighter alpha later. */
+.flow-svg-v2 .flow-node-ring-batt          { transition: stroke 0.45s ease; }
+/* Direction chip + arrow, small badge just OUTSIDE the ring
+ * (past the SoC arc) showing ↓ charging / ↑ discharging. Sized
+ * to read as a badge not as a competing element. */
+.flow-svg-v2 .flow-node-dir-chip            { stroke: var(--surface); stroke-width: 1.2; }
+.flow-svg-v2 .flow-node-dir-chip.batt       { fill: var(--batt, #56d364); }
+.flow-svg-v2 .flow-node-dir-chip.discharge  { fill: #f06292; }
+.flow-svg-v2 .flow-node-dir-arrow           { fill: var(--surface); stroke: none; }
+/* Battery SoC arc, thin coloured ring just outside the main ring.
+ * Stroke-dashoffset is set inline on the element. Same colour
+ * language as the hero SoC donut. */
+.flow-svg-v2 .flow-batt-soc-ring    { fill: none; stroke-width: 2.6; stroke-linecap: round; opacity: 0.9; transition: stroke-dasharray 0.6s ease, stroke 0.4s ease; }
+.flow-svg-v2 .flow-batt-soc-ring.batt      { stroke: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-batt-soc-ring.discharge { stroke: #f06292; }
+.flow-svg-v2 .flow-batt-soc-ring.silent    { stroke: var(--text-3); opacity: 0.4; }
+/* Mid-line W label, only rendered on 3+ active edges; uses a soft
+ * pill background so it stays legible over the gradient stroke. */
+.flow-svg-v2 .flow-segment-w        { fill: var(--text-2); font-size: 10px; font-weight: 600; pointer-events: none; }
+.flow-svg-v2 .flow-segment-w-bg     { fill: var(--surface); fill-opacity: 0.85; stroke: var(--border); stroke-width: 0.6; }
+.flow-svg-v2 .flow-node-ring        { fill: var(--surface); stroke-width: 1.6; }
+.flow-svg-v2 .flow-node-ring.pv     { stroke: var(--pv,    #f0c849); }
+.flow-svg-v2 .flow-node-ring.batt   { stroke: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-node-ring.load   { stroke: var(--load,  #58a6ff); }
+.flow-svg-v2 .flow-node-ring.grid,
+.flow-svg-v2 .flow-node-ring.ac     { stroke: var(--grid,  #b1b9c2); }
+.flow-svg-v2 .flow-node-ring.dc     { stroke: var(--dc,    #d29922); }
+.flow-svg-v2 .flow-node-ring.amber  { stroke: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-ring.discharge { stroke: #f06292; }
+.flow-svg-v2 .flow-node-ring.red    { stroke: var(--red,   #ff7b72); }
+.flow-svg-v2 .flow-node-ring.silent { stroke: var(--text-3); opacity: .5; }
+.flow-svg-v2 .flow-node-ring.neutral{ stroke: var(--text-3); }
+.flow-svg-v2 .flow-node-icon        { color: var(--text-3); fill: none; stroke: currentColor; }
+.flow-svg-v2 .flow-node-icon.pv     { color: var(--pv,    #f0c849); }
+.flow-svg-v2 .flow-node-icon.batt   { color: var(--batt,  #56d364); }
+.flow-svg-v2 .flow-node-icon.load   { color: var(--load,  #58a6ff); }
+.flow-svg-v2 .flow-node-icon.grid,
+.flow-svg-v2 .flow-node-icon.ac     { color: var(--grid,  #b1b9c2); }
+.flow-svg-v2 .flow-node-icon.dc     { color: var(--dc,    #d29922); }
+.flow-svg-v2 .flow-node-icon.amber  { color: var(--amber, #f0c849); }
+.flow-svg-v2 .flow-node-icon.discharge { color: #f06292; }
+.flow-svg-v2 .flow-node-icon.red    { color: var(--red,   #ff7b72); }
+.flow-svg-v2 .flow-node-icon.silent { color: var(--text-3); opacity: .55; }
+.flow-svg-v2 .flow-node-w           { fill: var(--text); font-size: 13px; font-weight: 600; }
+.flow-svg-v2 .flow-node-w.silent    { fill: var(--text-3); font-weight: 400; }
+.flow-svg-v2 .flow-particle-v2.pv   { fill: var(--pv,    #f0c849); filter: drop-shadow(0 0 3px var(--pv,   #f0c849)); }
+.flow-svg-v2 .flow-particle-v2.batt { fill: var(--batt,  #56d364); filter: drop-shadow(0 0 3px var(--batt, #56d364)); }
+.flow-svg-v2 .flow-particle-v2.load { fill: var(--load,  #58a6ff); filter: drop-shadow(0 0 3px var(--load, #58a6ff)); }
+.flow-svg-v2 .flow-particle-v2.grid,
+.flow-svg-v2 .flow-particle-v2.ac   { fill: var(--grid,  #b1b9c2); filter: drop-shadow(0 0 3px var(--grid, #b1b9c2)); }
+.flow-svg-v2 .flow-particle-v2.dc   { fill: var(--dc,    #d29922); filter: drop-shadow(0 0 3px var(--dc,   #d29922)); }
+.flow-svg-v2 .flow-particle-v2.amber{ fill: var(--amber, #f0c849); filter: drop-shadow(0 0 3px var(--amber,#f0c849)); }
+/* "discharge", pink; reserved for the energy *leaving the battery*
+   on its way to the load. Distinct enough from solar yellow + AC
+   grey + DC-DC amber that off-grid users can tell at a glance
+   whether the load is being fed by the bank vs by sources. Same
+   colour the Energy chart uses for the "Out of battery" area. */
+.flow-svg-v2 .flow-particle-v2.discharge { fill: #f06292; filter: drop-shadow(0 0 3px #f06292); }
+.flow-svg-v2 .flow-particle-v2.neutral { fill: var(--text-3); }
+/* Respect reduced motion, replace SMIL flow with a subtle dash on
+   the line so it still implies direction without animation. */
+@media (prefers-reduced-motion: reduce) {
+  .flow-svg-v2 .flow-particle-v2 { display: none; }
+  .flow-svg-v2 .flow-conn-v2.active { stroke-dasharray: 4 4; }
+}
+
+/* Battery card under the SVG. Icon (left), SoC + state label, signed
+   power on the right, thin fill bar spanning the bottom. */
+.bat-card {
+  margin: .75rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0 .85rem;
+  align-items: center;
+  padding: .8rem .95rem;
+  background: var(--surface-2, rgba(255,255,255,0.04));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.bat-icon-wrap {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface);
+  border: 1.6px solid var(--batt, #56d364);
+  color: var(--batt, #56d364);
+  display: flex; align-items: center; justify-content: center;
+  grid-row: 1 / span 2;
+}
+.bat-icon-wrap svg { width: 22px; height: 22px; }
+.bat-icon-wrap.amber { border-color: var(--amber, #f0c849); color: var(--amber, #f0c849); }
+.bat-icon-wrap.discharge { border-color: #f06292; color: #f06292; }
+.bat-icon-wrap.red   { border-color: var(--red,   #ff7b72); color: var(--red,   #ff7b72); }
+.bat-icon-wrap.blue  { border-color: var(--load,  #58a6ff); color: var(--load,  #58a6ff); }
+.bat-icon-wrap.green { border-color: var(--batt,  #56d364); color: var(--batt,  #56d364); }
+.bat-headline {
+  display: flex; align-items: baseline; gap: .55rem;
+  min-width: 0;
+}
+.bat-soc      { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--text); }
+.bat-soc-unit { font-size: .9rem; color: var(--text-2); font-weight: 500; margin-left: .1rem; }
+.bat-state    { font-size: .7rem; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+.bat-power {
+  grid-column: 3; grid-row: 1 / span 2;
+  text-align: right;
+  font-size: 1.05rem; font-weight: 600;
+  color: var(--text);
+}
+.bat-power.charging    { color: var(--batt,  #56d364); }
+.bat-power.discharging { color: var(--amber, #f0c849); }
+.bat-power-sub { font-size: .7rem; color: var(--text-3); font-weight: 400; margin-top: .15rem; }
+.bat-fill {
+  grid-column: 2 / span 2;
+  height: 4px; border-radius: 999px; background: var(--surface, #131820);
+  overflow: hidden; margin-top: .55rem;
+}
+.bat-fill-inner {
+  height: 100%; background: var(--batt, #56d364);
+  transition: width .8s ease, background .4s ease;
+}
+.bat-fill-inner.amber { background: var(--amber, #f0c849); }
+.bat-fill-inner.discharge { background: #f06292; }
+.bat-fill-inner.red   { background: var(--red,   #ff7b72); }
+.bat-fill-inner.blue  { background: var(--load,  #58a6ff); }
+.bat-fill-inner.green { background: var(--batt,  #56d364); }
+
+/* On narrow screens compact slightly. */
+@media (max-width: 480px) {
+  .flow-svg-v2 { max-height: 240px; }
+  .bat-card    { padding: .7rem .8rem; }
+  .bat-soc     { font-size: 1.4rem; }
+  .bat-power   { font-size: .95rem; }
+}
+
+.flow-caption {
+  padding: .55rem .75rem 0;
+  text-align: center;
+  color: var(--text-2);
+  font-size: .85rem;
+  line-height: 1.35;
+  min-height: 1.35em;
+}
+.flow-caption:empty { display: none; }
+/* Idle state, battery tile centered, no source/load skeletons */
+.flow.flow--idle {
+  justify-content: center;
+}
+.flow-col--solo {
+  flex: 0 1 400px;
+  max-width: 100%;
+}
+
+/* ---------------- today strip ---------------- */
+.today-panel { padding: .9rem 1.25rem; }
+.today-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+.today-cell {
+  display: flex; flex-direction: column;
+  border-left: 2px solid var(--border-2);
+  padding-left: .8rem;
+}
+.today-cell:first-child { border-left: none; padding-left: 0; }
+/* display:flex above outranks the UA [hidden] rule (equal specificity,
+   author wins), so .hidden=true wouldn't hide these — make [hidden]
+   authoritative for the today tile (battery-only hides Peak/Load). */
+.today-cell[hidden], .today-tomorrow[hidden] { display: none !important; }
+@media (max-width: 540px) {
+  .today-cell { border-left: none; padding-left: 0; }
+}
+.today-v {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-top: .2rem;
+}
+
+/* ---------------- tank + ambient sensors (#257) ---------------- */
+.sensors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: .75rem;
+}
+.sensor-card {
+  background: var(--surface-2);
+  border-radius: var(--r);
+  padding: .85rem 1rem;
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.sensor-card-head {
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+}
+.sensor-card-kind {
+  font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-2);
+}
+.sensor-card-name {
+  font-weight: 600; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sensor-card-metric {
+  display: flex; align-items: baseline; gap: .35rem;
+}
+.sensor-card-metric strong { font-size: 1.4rem; font-weight: 700; }
+.sensor-card-metric span    { font-size: .85rem; color: var(--text-2); }
+.sensor-card-row {
+  display: flex; gap: 1rem; font-size: .8rem; color: var(--text-2);
+}
+.sensor-card-row > div { flex: 1; }
+.sensor-card-stale {
+  font-size: .72rem; color: #d29922; margin-top: .2rem;
+}
+
+/* ---------------- cell grid ---------------- */
+.cells-grid { display: flex; flex-direction: column; gap: .5rem; }
+.cell-row {
+  display: grid;
+  grid-template-columns: minmax(0, 110px) 1fr auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .55rem .65rem;
+  background: var(--surface-2);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+.cell-row-label {
+  font-size: .82rem; color: var(--text-2); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cell-row-cells { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
+.cell-chip {
+  display: flex; flex-direction: column;
+  padding: .35rem .5rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .85rem;
+  min-width: 0;
+}
+.cell-chip.is-min { border-color: rgba(121,192,255,0.4); background: rgba(121,192,255,0.06); }
+.cell-chip.is-max { border-color: rgba(210,153,34,0.4); background: rgba(210,153,34,0.06); }
+.cell-chip.is-high { border-color: rgba(248,81,73,0.5); background: rgba(248,81,73,0.07); }
+.cell-chip-v { font-variant-numeric: tabular-nums; }
+.cell-chip-k { font-size: .65rem; color: var(--text-3); }
+.cell-row-temp { font-family: var(--mono); font-size: .82rem; color: var(--text-2); text-align: right; white-space: nowrap; }
+@media (max-width: 720px) {
+  .cell-row { grid-template-columns: 1fr; gap: .5rem; }
+  .cell-row-temp { text-align: left; }
+}
+
+/* ---------------- pills (used in cell summary) ---------------- */
+.pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  font-size: .78rem; font-weight: 500;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-2);
+}
+.pill .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.green { color: var(--green); background: var(--green-soft); border-color: rgba(63,185,80,0.3); }
+.pill.amber { color: var(--amber); background: var(--amber-soft); border-color: rgba(210,153,34,0.3); }
+.pill.red   { color: var(--red);   background: var(--red-soft);   border-color: rgba(248,81,73,0.3); }
+
+/* ---------------- history chart ---------------- */
+.chart-controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.chart-controls label {
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: center; gap: .4rem;
+}
+.chart-controls select {
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem; border-radius: var(--r-sm);
+  font-size: .85rem; font-family: inherit;
+}
+.range-btns { display: flex; gap: .25rem; }
+.range-btns button {
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.range-btns button:hover { color: var(--text); border-color: var(--border-2); }
+.range-btns button.active {
+  color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
+}
+.chart-compare { user-select: none; cursor: pointer; }
+.chart-compare input { margin: 0; cursor: pointer; }
+.chart-compare.is-disabled { opacity: .4; cursor: not-allowed; }
+.chart-compare.is-disabled input { cursor: not-allowed; }
+.chart-export-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer;
+  margin-left: auto; /* push to right end of chart-controls */
+}
+.chart-export-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
+.chart-export-btn svg { width: 14px; height: 14px; }
+/* ===== History chart panel ===== */
+/* No special tint, chart and heatmap panels on the same route share the
+ * default panel background so they read as siblings. */
+
+/* Inline header controls (replaces the stacked label+select layout) */
+.chart-controls > select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .42rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: inherit;
+  min-width: 0;
+  max-width: 180px;
+}
+.chart-controls > select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* Custom date range picker, shown when the user clicks the Custom
+ * range button. Native datetime-local inputs get iOS Safari's built-in
+ * picker for free. */
+.custom-range {
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+/* `display: flex` above overrides the HTML `hidden` attribute,
+ * so we have to opt back into hiding when the attribute is set. */
+.custom-range[hidden] {
+  display: none;
+}
+.custom-range label {
+  display: flex; flex-direction: column; gap: .2rem;
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+}
+.custom-range input[type="datetime-local"] {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: var(--mono);
+  color-scheme: dark;  /* dark-mode native picker on Chromium */
+  min-width: 170px;
+}
+
+/* ----- Stat strip ----- */
+.chart-statstrip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .5rem;
+  margin: 0 0 1rem;
+  padding: .6rem .5rem;
+  background: linear-gradient(180deg, var(--surface-2), transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.cs-cell {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding: 0 .5rem;
+}
+.cs-cell + .cs-cell { border-left: 1px solid var(--border-2); }
+.cs-cell .cs-k {
+  font-size: .65rem; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+  margin-bottom: .15rem;
+}
+.cs-cell .cs-v {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cs-cell--now .cs-v { color: var(--accent); font-size: 1.15rem; }
+@media (max-width: 720px) {
+  .chart-statstrip { grid-template-columns: repeat(2, 1fr); gap: .35rem; }
+  .cs-cell + .cs-cell { border-left: none; }
+  .cs-cell { padding: .35rem .35rem; background: var(--surface-2); border-radius: var(--r-sm); }
+}
+
+/* Resolution subtitle, small grey line under the stat strip telling
+   the user what bucket the chart is in (raw / 1-min avg / 1-hour avg
+   / 1-day avg) and how many points are visible. Used to live in the
+   stat strip but it's debug context, not a stat. */
+.chart-resbar {
+  font-size: .72rem;
+  color: var(--text-3);
+  margin: .25rem 0 .5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Floating value-at-cursor tooltip on every uPlot chart. Anchored
+   absolutely inside u.over by valueTooltipPlugin(), left/top set
+   in JS each setCursor frame. */
+.chart-value-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .45rem .65rem;
+  font-size: .76rem;
+  line-height: 1.45;
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 5;
+  max-width: 240px;
+  white-space: nowrap;
+}
+.chart-value-tip strong {
+  display: block; margin-bottom: .3rem;
+  font-size: .72rem; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.chart-value-tip div { color: var(--text-2); }
+.chart-value-tip em {
+  font-style: normal; font-weight: 700; color: var(--text);
+}
+.chart-value-tip-sw {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  margin-right: .35rem; vertical-align: middle;
+}
+
+/* ----- The chart itself ----- */
+.chart-host {
+  min-height: 380px;
+  padding-bottom: .5rem;
+}
+/* Style uPlot's own legend + crosshair to feel like part of the design */
+.u-legend {
+  margin-top: .5rem !important;
+  font-family: var(--font) !important;
+  font-size: .82rem !important;
+  color: var(--text-2) !important;
+}
+.u-legend .u-label, .u-legend .u-value { color: var(--text) !important; }
+.u-cursor-x, .u-cursor-y { background: var(--accent) !important; opacity: 0.5 !important; }
+.u-cursor-pt { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent) !important; }
+.uplot { font-family: var(--font) !important; }
+
+/* ---------------- device cards ---------------- */
+.device-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: .85rem;
+}
+.dev-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .9rem 1rem 1rem;
+}
+/* Silent: device hasn't advertised in > 60s. Grey out the values so
+ * the card is visually obvious as "we have no current data" without
+ * hiding it entirely, keeps the customer's mental model of "what
+ * hardware is configured" stable. See #171. */
+.dev-card-silent { opacity: .55; }
+.dev-card-silent .dev-card-name { color: var(--text-2); }
+.dev-card-silent-badge {
+  margin-top: .55rem;
+  font-size: .72rem;
+  color: var(--text-3);
+  font-weight: 500;
+  padding: .25rem .5rem;
+  background: rgba(255, 138, 122, .08);
+  border: 1px solid rgba(255, 138, 122, .25);
+  color: #d9886f;
+  border-radius: 6px;
+  display: inline-block;
+  opacity: 1;
+}
+.dev-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: .25rem;
+}
+.dev-card-head-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-icon {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.dev-card.kind-charge_controller .dev-card-icon { color: var(--pv); }
+.dev-card.kind-smart_battery     .dev-card-icon { color: var(--batt); }
+.dev-card.kind-inverter          .dev-card-icon { color: var(--ac); }
+.dev-card.kind-dcdc_charger      .dev-card-icon { color: var(--grid); }
+.dev-card.kind-shunt             .dev-card-icon { color: var(--batt); }
+.dev-card-name { font-weight: 600; font-size: .92rem; }
+.dev-card-head-right {
+  display: flex; align-items: center; gap: .5rem;
+  color: var(--text-3);
+}
+.dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
+.dev-card-del {
+  /* Tiny trash icon button on each device row's head. The card
+   * itself is an <a> so clicks navigate to /#/device/<label>; this
+   * button stops propagation in JS to keep destructive clicks
+   * separate from the "open detail" tap. */
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.dev-card-del svg { width: 14px; height: 14px; }
+.dev-card-del:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: rgba(248,81,73,0.10);
+}
+.dev-card-chevron {
+  width: 16px; height: 16px;
+  color: var(--text-3);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+a.dev-card:hover .dev-card-chevron {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+
+/* Footer "View detail" hint */
+.dev-card-foot {
+  margin-top: .75rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .75rem;
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.dev-card-foot svg {
+  width: 13px; height: 13px;
+  transition: transform 0.15s ease;
+}
+a.dev-card:hover .dev-card-foot {
+  color: var(--accent);
+}
+a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
+.dev-card-sub { font-size: .76rem; color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
+.dev-card-row { display: flex; justify-content: space-between; padding: .2rem 0; font-size: .85rem; }
+.dev-card-row .k { color: var(--text-3); }
+.dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* Lifetime stats strip on smart-battery cards */
+.dev-card-lifetime {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+  margin: .25rem 0 .65rem;
+  padding: .5rem .55rem;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.lt-cell { display: flex; flex-direction: column; min-width: 0; }
+.lt-cell .lt-v {
+  font-family: var(--mono);
+  font-size: .92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.lt-cell--unreliable .lt-v,
+.lt-cell--unreliable .meta-k { color: var(--text-3, var(--text-2)); opacity: .55; }
+.lt-eff-win {
+  font-size: .7rem;
+  font-family: var(--mono);
+  color: var(--text-2);
+  text-transform: lowercase;
+}
+
+/* "Right now" panel, current weather conditions from Open-Meteo.
+ * Sits between Today (energy state) and the daily outlook. The big
+ * temperature reading + icon dominates so the panel reads at a glance;
+ * supporting cells (cloud, wind, humidity, sunrise/sunset) sit below
+ * in a row. Soft blue tint matches the border so the tile reads as
+ * part of the dashboard's tinted-panel family, not a flat one-off. */
+.weather-panel {
+  border-color: rgba(88, 166, 255, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
+  transition: --panel-tint .8s ease, border-color .8s ease;
+}
+
+/* #264, "Where you are" location panel. Fixed-height map area; Leaflet
+ * controls + tile imagery handle their own colours. Border + tint match
+ * the dashboard's panel family so it doesn't look pasted-in. */
+.location-panel {
+  border-color: rgba(132, 204, 22, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(132,204,22,0.05), rgba(132,204,22,0) 70%);
+}
+.location-map {
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: .25rem;
+  background: rgba(255, 255, 255, .03);
+}
+/* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
+ * by renderWeather() based on WMO code + is_day. All intentionally
+ * gentle (<=8% alpha), the dashboard's information density is the
+ * star; this is mood lighting, not a Weather Channel takeover. */
+.weather-panel.wx-bg-clear-day {
+  border-color: rgba(245, 158, 11, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(250,204,21,0.08), rgba(245,158,11,0.02) 70%);
+}
+.weather-panel.wx-bg-clear-night {
+  border-color: rgba(99, 102, 241, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(30,41,59,0.02) 70%);
+}
+.weather-panel.wx-bg-partly-day {
+  border-color: rgba(125, 211, 252, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(125,211,252,0.08), rgba(125,211,252,0) 70%);
+}
+.weather-panel.wx-bg-partly-night {
+  border-color: rgba(100, 116, 139, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(100,116,139,0.08), rgba(100,116,139,0) 70%);
+}
+.weather-panel.wx-bg-cloudy {
+  border-color: rgba(148, 163, 184, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(148,163,184,0.08), rgba(148,163,184,0) 70%);
+}
+.weather-panel.wx-bg-fog {
+  border-color: rgba(203, 213, 225, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(203,213,225,0.08), rgba(203,213,225,0) 70%);
+}
+.weather-panel.wx-bg-drizzle {
+  border-color: rgba(56, 189, 248, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(56,189,248,0.07), rgba(56,189,248,0) 70%);
+}
+.weather-panel.wx-bg-rain {
+  border-color: rgba(59, 130, 246, 0.24);
+  --panel-tint: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(30,64,175,0.02) 70%);
+}
+.weather-panel.wx-bg-snow {
+  border-color: rgba(186, 230, 253, 0.28);
+  --panel-tint: linear-gradient(135deg, rgba(224,242,254,0.10), rgba(186,230,253,0.02) 70%);
+}
+.weather-panel.wx-bg-thunder {
+  border-color: rgba(168, 85, 247, 0.26);
+  --panel-tint: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(67,56,202,0.03) 70%);
+}
+.weather-strip {
+  display: flex; flex-direction: column; gap: .65rem;
+}
+.weather-hero {
+  display: flex; align-items: center; gap: 1rem;
+}
+.weather-icon {
+  width: 56px; height: 56px; flex: none;
+  color: var(--accent);
+}
+.weather-icon svg { width: 100%; height: 100%; }
+.weather-temp {
+  display: flex; align-items: baseline; gap: .15rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.weather-temp-v { font-size: 2.4rem; line-height: 1; color: var(--text); }
+.weather-temp-unit { font-size: 1rem; color: var(--text-2); }
+.weather-cond {
+  font-size: 1rem; color: var(--text-2);
+  margin-left: auto;       /* push to the right */
+  font-weight: 500;
+}
+.weather-meta {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: .5rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-meta { grid-template-columns: repeat(3, 1fr); }
+  .weather-cond { margin-left: 0; font-size: .85rem; }
+}
+.weather-cell { display: flex; flex-direction: column; min-width: 0; }
+.weather-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .9rem;
+  color: var(--text);
+}
+
+/* Hourly forecast strip (next ~8 hours). Sits under the meta row; on
+ * narrow viewports the cells scroll horizontally rather than wrap so
+ * the row keeps reading as a continuous timeline. */
+.weather-hourly {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: .35rem;
+  padding-top: .6rem;
+  margin-top: .25rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-hourly {
+    grid-auto-flow: column;
+    grid-auto-columns: 56px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: .15rem;
+  }
+}
+.weather-hour {
+  display: flex; flex-direction: column;
+  align-items: center; gap: .15rem;
+  padding: .35rem .15rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.weather-hour-t {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--text-3);
+}
+.weather-hour-i {
+  width: 24px; height: 24px;
+  color: var(--accent);
+  display: block;
+}
+.weather-hour-i svg { width: 100%; height: 100%; display: block; }
+.weather-hour-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .85rem;
+  color: var(--text);
+}
+
+/* Today panel, two-column layout: hero numbers on the left, the
+ * forecast sparkline on the right. The hero's big kWh-so-far reading
+ * sits above three compact sub-cells (charged Ah, peak, load). The
+ * sparkline shows the day's predicted PV curve with the past portion
+ * solid and the "still to come" portion dashed; a faint vertical line
+ * marks "now". On narrow screens we stack vertically so neither half
+ * gets squeezed. */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .today-grid { grid-template-columns: 1fr; gap: .75rem; }
+}
+.today-hero {
+  display: flex; flex-direction: column; gap: .8rem;
+  min-width: 0;
+}
+.today-hero-block {
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.today-hero-k {
+  /* Caption above the big number, was unlabeled, leaving users
+     guessing "what's 940?". meta-k already gives the uppercase
+     micro-label aesthetic used in every other cell on the card. */
+  display: block;
+}
+.today-hero-val {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.6rem; line-height: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+.today-hero-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.today-hero-cells .today-cell {
+  border-left: none;
+  padding-left: 0;
+}
+.today-hero-cells .today-v {
+  font-size: .95rem;
+  margin-top: .15rem;
+}
+.today-spark { min-height: 64px; }
+.today-spark svg { display: block; width: 100%; }
+
+/* One-line Tomorrow preview at the bottom of the Today tile. Reads
+ * as a footnote, not another headline. */
+.today-tomorrow {
+  margin-top: .65rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .82rem; color: var(--text-2);
+}
+.today-tomorrow svg {
+  width: 16px; height: 16px; flex: none; color: var(--amber);
+}
+
+/* Sleep mode, after sunset (no PV remaining today + tomorrow forecast
+ * known) the panel flips: the hero shows tomorrow's expected kWh, and
+ * today's tally demotes to the footer. Sub-stats stay live so the user
+ * can still see the day's totals at a glance. */
+.today-panel--sleep .panel-header h2 .h-icon { color: var(--text-3); }
+
+/* Settings → About: "Latest available" row gains a soft amber tint
+ * when a newer version is published, so the user notices on the
+ * Settings tab without having to read the labels. The button + link
+ * inside the row are styled separately from the row tint so they
+ * remain readable. */
+.settings-row--update {
+  background: rgba(210,153,34,0.07);
+  border-left: 2px solid var(--amber);
+  padding-left: .5rem;
+  border-radius: var(--r-sm);
+}
+
+/* "Yesterday: predicted X kWh · actual Y kWh · Z% of forecast" line.
+ * Lives at the bottom of the Today panel so the user can see how
+ * well the previous day's forecast held up, drift here is the early
+ * signal that Solcast's array model needs re-tuning (capacity, tilt,
+ * azimuth, shading). */
+.forecast-accuracy {
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap;
+}
+.forecast-accuracy strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.acc-ok   { color: var(--green, #3fb950); }
+.acc-warn { color: var(--amber); }
+.acc-off  { color: var(--red,   #f85149); }
+
+/* 5-day outlook strip: horizontal row of day-cards under the Today
+ * tile. Today's card is highlighted with a slightly brighter border
+ * so it reads as the "you are here" of the week, matching the Today
+ * headline above. Cards scroll horizontally on narrow screens rather
+ * than wrapping; a 5-card row that wraps to 2 rows looks worse than
+ * one row the user can swipe. */
+.week-panel { border-color: rgba(210,153,34,0.18); }
+.week-panel .panel-header h2 .h-icon { color: var(--amber); }
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: .55rem;
+  overflow-x: auto;
+  padding-bottom: .15rem;     /* room for any horizontal scrollbar */
+}
+@media (max-width: 720px) {
+  .week-strip {
+    /* Pin to 5 fixed-width cards so the grid still feels intentional
+     * even when it overflows; the user can swipe to reach the later
+     * days rather than seeing them wrap badly. */
+    grid-template-columns: repeat(5, 130px);
+  }
+}
+.week-card {
+  display: flex; flex-direction: column;
+  padding: .5rem .6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.week-card--featured {
+  border-color: rgba(210,153,34,0.55);
+  background: rgba(210,153,34,0.06);
+}
+.week-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .35rem;
+}
+.week-card-day {
+  font-weight: 600; font-size: .82rem; color: var(--text);
+  white-space: nowrap;
+}
+.week-card-date {
+  font-size: .68rem; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.week-card-spark {
+  margin: .35rem 0 .35rem;
+  height: 32px;
+  display: flex; align-items: stretch;
+}
+.week-card-spark svg { width: 100%; }
+.week-card-num {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+.week-card-num .meta-k { font-size: .68rem; font-family: inherit; }
+.week-card-foot {
+  font-size: .68rem; color: var(--text-2); margin-top: .2rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Empty-state nudge for users without Solcast set up. Mid-weight,
+ * present enough to be discovered, polite enough to be ignored. */
+.tomorrow-empty {
+  position: relative;
+  border: 1px dashed var(--border-2, var(--border));
+  background: var(--surface-2);
+}
+.tomorrow-empty-body {
+  display: flex; gap: .9rem; align-items: flex-start;
+  padding: .35rem .2rem;
+}
+.tomorrow-empty-icon {
+  width: 38px; height: 38px; flex: none;
+  color: var(--amber);
+  opacity: .85;
+}
+.tomorrow-empty-text { flex: 1; min-width: 0; }
+.tomorrow-empty-text h3 {
+  margin: 0 0 .25rem; font-size: .95rem; color: var(--text);
+}
+.tomorrow-empty-text p {
+  margin: 0 0 .35rem; font-size: .85rem; color: var(--text-2); line-height: 1.45;
+}
+.tomorrow-empty-text a { color: var(--accent); }
+.tomorrow-empty-cta {
+  display: inline-block; font-size: .8rem;
+  margin-top: .15rem;
+}
+.tomorrow-empty-close {
+  position: absolute; top: .35rem; right: .55rem;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 1.2rem; line-height: 1;
+  padding: .15rem .35rem; border-radius: var(--r-sm);
+}
+.tomorrow-empty-close:hover { background: var(--surface-3); color: var(--text); }
+
+/* Integrations panel (Settings → Integrations) */
+.integrations-block {
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.integration-row {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .55rem .65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.integration-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
+.integration-row-head { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
+.integration-row-name { font-weight: 600; color: var(--text); }
+.integration-row-sub {
+  font-size: .78rem; color: var(--text-2);
+  overflow-wrap: anywhere;     /* long resource_id / endpoint URL */
+}
+.integration-row-sub a { color: var(--accent); }
+.integration-row-sub code {
+  font-family: var(--mono); font-size: .9em;
+  background: var(--surface-3); padding: 0 .2rem; border-radius: 3px;
+}
+.integration-row-actions { display: flex; gap: .35rem; }
+.alerts-form-status.ok { color: var(--green, #3fb950); }
+.alerts-form-status.err { color: var(--red, #f85149); }
+
+/* Per-window efficiency breakdown on the device detail page. Hidden
+ * until the fetch resolves so an unfinished smart_battery (no data
+ * yet) doesn't show an empty grid. */
+.dev-efficiency-detail {
+  margin-top: .75rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+.dev-efficiency-detail h4 {
+  margin: 0 0 .4rem; font-size: .82rem; color: var(--text-2);
+  font-weight: 600;
+}
+.eff-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+}
+.eff-cell {
+  display: flex; flex-direction: column;
+  padding: .5rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.eff-cell-val {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-top: .15rem;
+}
+.eff-cell-foot {
+  font-size: .7rem;
+  color: var(--text-2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+}
+.eff-cell--unreliable .eff-cell-val,
+.eff-cell--unreliable .eff-cell-foot,
+.eff-cell--unreliable .meta-k { opacity: .5; }
+
+/* Battery health tile (#109), cycle/lifetime stats + SoC residency */
+#panel-battery-health { --panel-tint: linear-gradient(180deg, rgba(99,140,242,0.05), transparent 50%); }
+#panel-battery-health .h-icon { color: var(--blue, #6c8ef2); }
+.bhealth-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: .8rem;
+  margin-bottom: 1rem;
+}
+.bhealth-stat {
+  display: flex; flex-direction: column;
+  gap: .15rem;
+  padding: .55rem .65rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bhealth-k {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-3);
+}
+.bhealth-v {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+/* #294, honest empty state when a BMS-only field has no data.
+   Shrunk + dim'd so it reads as "not available" rather than
+   "the number happens to be small". */
+.bhealth-v.bhealth-v-empty {
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--text-2);
+  font-family: var(--font);
+  letter-spacing: .02em;
+}
+.bhealth-v-redundant {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+/* #295, provenance caption under cycle/lifetime numbers.
+   "from BMS" / "from shunt" hint, small + grey so it reads as
+   metadata not data. */
+.bhealth-src {
+  font-size: .68rem;
+  color: var(--text-3);
+  letter-spacing: .02em;
+  margin-top: -.15rem;
+}
+.bhealth-residency {
+  margin-top: .25rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.bhealth-residency-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .5rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.bhealth-residency-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.bhealth-bars {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  height: 80px;
+  align-items: end;
+  padding: 0 2px;
+}
+.bhealth-bar {
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: opacity .15s ease;
+}
+.bhealth-bar:hover { opacity: .8; cursor: help; }
+.bhealth-bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: .25rem;
+  font-size: .68rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+
+/* Cell-drift trend sparkline */
+.cell-drift-trend {
+  margin-top: .9rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.cell-drift-trend-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .35rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.cell-drift-trend-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+#cell-drift-spark {
+  min-height: 90px;
+}
+.empty-spark {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .8rem;
+  font-style: italic;
+}
+
+/* Load heatmap, uses the default panel background like the chart panel
+ * above it, so the two siblings on the History route match. */
+.heatmap-panel { /* no tint */ }
+.heatmap-rows {
+  display: flex; flex-direction: column;
+  gap: 3px;
+  margin: .5rem 0 .75rem;
+}
+.hm-row {
+  display: grid;
+  grid-template-columns: 38px repeat(24, 1fr);
+  gap: 3px;
+}
+.hm-cell {
+  height: 22px;
+  border-radius: 2px;
+  font-size: .65rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.hm-cell--label {
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  padding-right: .35rem;
+  font-size: .72rem;
+}
+.hm-row--head { gap: 3px; }
+.hm-row--head .hm-cell--hour {
+  height: 16px;
+  color: var(--text-3);
+  font-size: .65rem;
+  font-family: var(--mono);
+}
+.hm-cell--empty {
+  background: var(--surface-3);
+  opacity: 0.3;
+}
+.hm-cell--data {
+  cursor: help;
+  transition: transform 0.12s ease;
+}
+.hm-cell--data:hover { transform: scale(1.4); z-index: 5; position: relative; }
+.hm-legend {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .78rem;
+  color: var(--text-3);
+  margin-top: .5rem;
+}
+.hm-legend-grad {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    hsl(50, 35%, 18%),
+    hsl(35, 65%, 32%),
+    hsl(15, 85%, 45%),
+    hsl(0, 95%, 50%));
+}
+@media (max-width: 540px) {
+  .hm-row { grid-template-columns: 28px repeat(24, 1fr); gap: 2px; }
+  .hm-cell { height: 16px; font-size: .55rem; }
+  .hm-cell--label { font-size: .65rem; padding-right: .2rem; }
+}
+
+/* ---------------- panel-actions / action buttons ---------------- */
+.panel-actions { display: flex; gap: .5rem; }
+.btn-action {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .4rem .85rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.btn-action:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-action--primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.btn-action--primary:hover {
+  background: #79b7ff;
+  color: var(--bg);
+  border-color: #79b7ff;
+}
+.btn-action svg { width: 14px; height: 14px; }
+
+/* ---------------- per-device detail page ---------------- */
+.dev-detail-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: -.5rem 0 .25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.dev-detail-crumb { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.dev-detail-crumb > a {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: .78rem;
+}
+.dev-detail-crumb > a:hover { color: var(--accent); }
+.dev-detail-title {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: 1.25rem; font-weight: 600;
+}
+.dev-detail-icon {
+  display: inline-flex; align-items: center;
+  width: 22px; height: 22px;
+  color: var(--text-2);
+}
+.dev-detail-icon svg { width: 100%; height: 100%; }
+.dev-detail-meta {
+  font-size: .8rem; color: var(--text-3); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dev-detail-nav { display: flex; gap: .4rem; flex-shrink: 0; }
+@media (max-width: 540px) { .dev-detail-title { font-size: 1.05rem; } }
+
+/* dev-card is now an <a>, kill default link decoration */
+a.dev-card { text-decoration: none; color: inherit; display: block; }
+a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); transition: all 0.15s; }
+
+/* ---------------- placeholder pages ---------------- */
+.placeholder-panel { --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.05), transparent 60%); }
+.placeholder {
+  padding: 1.5rem .5rem .5rem;
+  display: flex; flex-direction: column;
+  gap: .9rem;
+  max-width: 640px;
+}
+.placeholder-headline {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.placeholder-sub {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+.placeholder-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+.placeholder-list li::marker { color: var(--accent); }
+.placeholder-status {
+  margin: .25rem 0 0;
+  padding: .55rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  font-size: .85rem;
+}
+.placeholder-status code {
+  background: var(--surface-3);
+  padding: .1rem .4rem;
+  border-radius: 3px;
+  font-size: .82rem;
+  font-family: var(--mono);
+}
+
+/* ---------------- settings page ---------------- */
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: .5rem;
+}
+
+/* ───── Settings sub-page navigation (#328) ─────────────────────
+   Menu landing on /#/settings; sub-pages on /#/settings/<section>.
+   body[data-route-sub] is set by the router on entry/exit. CSS
+   handles all show/hide so no JS layer needed beyond the router
+   already there. */
+.settings-menu {
+  display: none;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  margin: .25rem 0 .75rem;
+}
+.settings-menu-row {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .85rem 1rem;
+  text-decoration: none;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  transition: background .12s ease;
+}
+.settings-menu-row:last-child { border-bottom: 0; }
+.settings-menu-row:hover { background: rgba(255,255,255,.04); }
+.settings-menu-icon {
+  flex: none;
+  width: 30px; height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
+.settings-menu-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  min-width: 0;
+}
+.settings-menu-title { font-weight: 600; color: var(--text); }
+.settings-menu-sub { font-size: .78rem; color: var(--text-3); }
+.settings-menu-chev { color: var(--text-3); font-size: 1.2rem; }
+
+.settings-sub-back {
+  display: none;
+  margin: 0 0 .5rem;
+  color: var(--accent, #3a7bd5);
+  text-decoration: none;
+  font-size: .9rem;
+}
+.settings-sub-back:hover { text-decoration: underline; }
+
+/* On menu landing: show menu, hide every settings-block. */
+body[data-route-sub="menu"] .settings-menu { display: flex; }
+body[data-route-sub="menu"] .settings-grid > .settings-block { display: none; }
+body[data-route-sub="menu"] .settings-sub-back { display: none; }
+
+/* On a sub-route: hide menu, show ONLY blocks for that sub. The
+   :not selector list mirrors SETTINGS_SUBROUTES in app.js. */
+body[data-route-sub]:not([data-route-sub="menu"]) .settings-menu { display: none; }
+body[data-route-sub]:not([data-route-sub="menu"]) .settings-sub-back { display: inline-block; }
+body[data-route-sub="devices"]      .settings-grid > .settings-block:not([data-subroute="devices"])      { display: none; }
+body[data-route-sub="alerts"]       .settings-grid > .settings-block:not([data-subroute="alerts"])       { display: none; }
+body[data-route-sub="backup"]       .settings-grid > .settings-block:not([data-subroute="backup"])       { display: none; }
+body[data-route-sub="privacy"]      .settings-grid > .settings-block:not([data-subroute="privacy"])      { display: none; }
+body[data-route-sub="integrations"] .settings-grid > .settings-block:not([data-subroute="integrations"]) { display: none; }
+body[data-route-sub="advanced"]     .settings-grid > .settings-block:not([data-subroute="advanced"])     { display: none; }
+body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-subroute="about"])        { display: none; }
+
+.settings-block {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .9rem 1rem 1rem;
+}
+.settings-block h3 {
+  margin: 0 0 .55rem;
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+.settings-row {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  padding: .25rem 0;
+  font-size: .87rem;
+  color: var(--text-2);
+}
+.settings-row > span:first-child {
+  /* Keep the label readable when the value is long, small viewports
+   * were wrapping "Latest available" to two lines because the value
+   * had a version + link + button competing for the same line. */
+  flex-shrink: 0;
+}
+.settings-row .v {
+  color: var(--text);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
+}
+.settings-block--cta {
+  /* spans the whole row, more visual weight than the data blocks */
+  grid-column: 1 / -1;
+  background: linear-gradient(135deg, rgba(88,166,255,0.08), rgba(88,166,255,0) 70%), var(--surface-2);
+  border-color: rgba(88,166,255,0.25);
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.settings-cta-blurb {
+  margin: 0;
+  color: var(--text-2);
+  font-size: .88rem;
+  line-height: 1.45;
+}
+
+/* footer removed, version + identity already live in Settings → About */
+main { padding-bottom: 3rem; }
+
+/* ---------------- kiosk mode ---------------- */
+/* The kiosk route is chrome-free: header, nav, alerts banner all hidden
+   so a wall-mounted tablet shows only the at-a-glance facts. Activated
+   by body.kiosk-active (set by setRoute when the route name is "kiosk"). */
+body.kiosk-active .app-header,
+body.kiosk-active .app-nav,
+body.kiosk-active .alerts { display: none !important; }
+body.kiosk-active main {
+  max-width: none;
+  padding: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+body.kiosk-active .route.kiosk-route.active {
+  /* Column flex + margin:auto on the inner stage = vertically centered
+     when content fits, scrollable when it doesn't. Avoids the previous
+     "align-items: center clips equally top + bottom" failure on phones
+     where the donut + flow stack is taller than 100dvh. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Respect notch / home-bar / status-bar so the donut doesn't clip
+     under iOS chrome. env() falls back to 0 on platforms without it. */
+  padding-top:    max(2vh, env(safe-area-inset-top));
+  padding-right:  max(4vw, env(safe-area-inset-right));
+  padding-bottom: max(2vh, env(safe-area-inset-bottom));
+  padding-left:   max(4vw, env(safe-area-inset-left));
+  gap: 0;
+}
+.kiosk-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4vw;
+  align-items: center;
+  justify-items: center;
+  width: 100%; max-width: 1400px;
+  margin: auto 0;  /* vertical centering only when room allows */
+}
+@media (max-width: 820px) {
+  .kiosk-stage { grid-template-columns: 1fr; gap: 3vh; }
+}
+.kiosk-donut {
+  position: relative;
+  /* Pick whichever axis is the constraint, a landscape phone is short
+     vertically, a portrait phone is narrow horizontally. Bumped the cap
+     to 560px so the ring fills more of the left half on a landscape
+     tablet without crowding the flow column. */
+  width: min(72vh, 80vw, 560px);
+  aspect-ratio: 1 / 1;
+}
+.kiosk-donut .hero-donut { width: 100%; height: 100%; display: block; }
+.kiosk-donut .donut-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.kiosk-donut .donut-pct {
+  font-family: var(--mono);
+  font-size: clamp(2.6rem, 11vh, 7rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  /* "%" should hug "83.4" instead of wrapping to a new line when the
+     donut is small (landscape phone). The clamp floor also drops so the
+     two together stay shorter than the donut diameter. */
+  white-space: nowrap;
+}
+.kiosk-donut .donut-pct-unit {
+  font-size: clamp(0.95rem, 3.5vh, 2rem);
+  color: var(--text-2);
+  margin-left: .2rem;
+  /* Lift the % off the baseline so it reads like a superscript hugging
+     the top-right of the digits, instead of slumping under "5". */
+  vertical-align: 0.45em;
+}
+.kiosk-donut .donut-label {
+  font-size: clamp(.8rem, 1.6vh, 1rem);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-top: .5rem;
+}
+.kiosk-donut .donut-flow {
+  margin-top: 1rem;
+  padding: .25rem .85rem;
+  font-size: clamp(.9rem, 1.8vh, 1.05rem);
+}
+.kiosk-flow {
+  width: 100%;
+  /* Reuse the existing flow strip components inside this host, but
+     scale typography & padding up so the tiles read from a couch. */
+  font-size: 1.15rem;
+  /* When the viewport is short (landscape phone), the column scrolls
+     internally instead of pushing content under the bottom chrome.
+     padding adds breathing room so the top Solar tile doesn't sit
+     flush with the top of the viewport. */
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 2vh 0;
+}
+/* The "53 W" / "0 W" pills in the connector are redundant at kiosk
+   scale, the Solar / Battery / Load tiles already show the wattage,
+   and one less label to read across the room is cleaner. Keep the
+   animated dot so flow direction is still obvious. */
+.kiosk-flow .flow-arrow-label { display: none !important; }
+.kiosk-flow .flow-tile {
+  padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
+}
+.kiosk-flow .flow-tile-power {
+  font-size: clamp(1.6rem, 3.6vh, 2.4rem);
+}
+.kiosk-flow .flow-tile-label {
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+}
+.kiosk-flow .flow-tile-sub {
+  font-size: clamp(.8rem, 1.5vh, .95rem);
+}
+.kiosk-flow .flow-arrow-label {
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+}
+.kiosk-exit {
+  position: fixed;
+  /* Sit inside the safe-area inset so it never overlaps the Solar tile
+     on a landscape phone where the right column starts at the route's
+     padding edge. */
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  z-index: 50;
+}
+.kiosk-exit svg { width: 20px; height: 20px; }
+.kiosk-exit:hover, .kiosk-exit:focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: var(--surface-2);
+}
+body:not(.kiosk-active) .kiosk-exit { display: none; }
+/* Honour `hidden` set by JS, needed because the `.kiosk-exit`
+   author rule above has equal specificity to the UA `[hidden]`
+   declaration and wins by source order, silently leaving the
+   broker-view + kiosk-share Exit button visible. Bit us when the
+   broker dashboard kept showing Exit at top-right. */
+.kiosk-exit[hidden] { display: none !important; }
+
+/* Settings toggle row (Appearance → Kiosk default) */
+.settings-toggle {
+  display: flex; align-items: flex-start; gap: .7rem;
+  margin-top: .75rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.settings-toggle input[type="checkbox"] {
+  margin-top: .15rem;
+  accent-color: var(--accent);
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+.settings-toggle-label { display: flex; flex-direction: column; gap: .15rem; }
+.settings-toggle-label > span:first-child { font-weight: 500; color: var(--text); }
+.settings-toggle-sub {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+
+/* ---------------- setup wizard ---------------- */
+.wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0; }
+.wiz-step { display: flex; flex-direction: column; gap: 0.6rem; }
+
+/* BLE-adapter status banner at the top of the wizard. Lights up
+ * the moment the user lands on Setup so they know whether their
+ * dongle / Docker passthrough is reaching the daemon, before they
+ * try (and fail) to scan. */
+.wiz-ble-status {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .55rem .8rem;
+  border-radius: 8px;
+  font-size: .9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.wiz-ble-status .wiz-ble-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+.wiz-ble-status.wiz-ble-ok   { border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.08); }
+.wiz-ble-status.wiz-ble-ok   .wiz-ble-dot { background: #3fb950; }
+.wiz-ble-status.wiz-ble-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.08); }
+.wiz-ble-status.wiz-ble-warn .wiz-ble-dot { background: #d29922; }
+.wiz-ble-status.wiz-ble-bad  { border-color: rgba(248, 81, 73, 0.4); background: rgba(248, 81, 73, 0.08); }
+.wiz-ble-status.wiz-ble-bad  .wiz-ble-dot { background: #f85149; }
+.wiz-ble-warn-text { color: #d29922; }
+.wiz-ble-status code { background: transparent; padding: 0; font-size: .85em; }
+
+/* BLE diagnostic widget (#158). Sits below the status pill, expands
+ * into a counts + verdict box when the user clicks Run diagnostics.
+ * Colour tracks the verdict similar to the status pill. */
+.wiz-ble-diag-row { margin: -.4rem 0 .85rem .25rem; display: flex; align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
+.wiz-ble-diag-row .btn-sm { font-size: .78rem; padding: .2rem .6rem; }
+.wiz-ble-diag-out {
+  flex: 1 1 240px; min-width: 240px;
+  font-size: .85rem; line-height: 1.35;
+  padding: .55rem .75rem; border: 1px solid var(--surface-3);
+  border-radius: 8px; background: var(--surface-1);
+}
+.wiz-ble-diag-counts { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.wiz-ble-diag-suggest { margin-top: .4rem; opacity: .85; }
+.wiz-ble-diag-err { color: #f85149; }
+.wiz-ble-diag-running { color: var(--text-muted); }
+.wiz-ble-diag-ok   { border-color: rgba(63, 185, 80, 0.4);  background: rgba(63, 185, 80, 0.06); }
+.wiz-ble-diag-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
+.wiz-ble-diag-bad  { border-color: rgba(248, 81, 73, 0.4);  background: rgba(248, 81, 73, 0.06); }
+
+/* History & polling editor (#172). Two-column form rows; numeric input
+ * with a unit suffix on the right. Match the dashboard's settings-row
+ * grammar so the new tile sits naturally beside the existing rows. */
+.hist-form { display: flex; flex-direction: column; gap: .5rem; }
+.hist-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .9rem; min-width: 0; }
+.hist-row > span:first-child { color: var(--text-muted); min-width: 0; }
+.hist-input { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; max-width: 100%; }
+.hist-input input {
+  width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums;
+  padding: .25rem .4rem; border: 1px solid var(--surface-3);
+  border-radius: 6px; background: var(--surface-1); color: inherit;
+}
+/* <select> inside hist-input would otherwise size to the longest
+   option's text, when the placeholder is something verbose like
+   "No smart plug or AC charger output configured" (solar-pause panel
+   with no plugs yet), the dropdown blows past the row's right edge
+   on narrow viewports. Cap the width and let the browser ellipsis
+   the visible option. */
+.hist-input select {
+  max-width: 14rem;
+  min-width: 0;
+  text-overflow: ellipsis;
+  padding: .25rem .4rem; border: 1px solid var(--surface-3);
+  border-radius: 6px; background: var(--surface-1); color: inherit;
+  font: inherit;
+}
+.hist-input .hist-unit { color: var(--text-muted); font-size: .82rem; min-width: 3.5rem; }
+.hist-actions { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-top: .35rem; }
+.hist-status { margin: 0; }
+.hist-status--ok  { color: var(--success, #3fb950); }
+.hist-status--err { color: #f85149; }
+
+/* "Find my dongle" result rows. Each is a flex card with the device
+ * name + MAC on the left and a "Use this" button on the right. */
+.wiz-result-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+  padding: .65rem .8rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2);
+  margin-top: .55rem;
+}
+.wiz-result-info { flex: 1 1 auto; min-width: 0; }
+/* Transport list row: button-styled card on the left + small trash
+ * delete on the right. Clicking the trash disconnects the BT-2 and
+ * removes the entry from config.yaml (cascades to its devices). */
+.wiz-transport-row {
+  display: flex; align-items: stretch; gap: .35rem;
+  margin-bottom: .4rem;
+  min-width: 0;
+}
+.wiz-transport-row .wiz-transport {
+  flex: 1 1 0;
+  margin: 0;
+  min-width: 0;
+}
+.wiz-transport-del {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.wiz-transport-del:hover {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.6);
+  background: rgba(248, 81, 73, 0.08);
+}
+.wiz-transport-del svg { width: 16px; height: 16px; }
+/* On narrow viewports the trash + pencil buttons crowd the
+ * status pill and force the row text to wrap. Tighten everything
+ * a notch so a 390 px iPhone still fits id + pill + 2 action
+ * buttons on one line. */
+@media (max-width: 420px) {
+  .wiz-transport-row { gap: .25rem; }
+  .wiz-transport-del { width: 32px; }
+  .wiz-transport-del svg { width: 14px; height: 14px; }
+}
+
+/* "Recently visible but missing" panel on the dongle-scan results.
+ * Calls out devices we KNEW were broadcasting but aren't now,
+ * because the #1 BLE debug surprise is "my Renogy BT-2 was here
+ * a minute ago, where is it?". Amber tint = informational, not
+ * an error. */
+.wiz-missing {
+  border: 1px solid rgba(210, 153, 34, 0.35);
+  background: rgba(210, 153, 34, 0.08);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+  margin: 0 0 .65rem;
+}
+.wiz-missing-head {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: .35rem;
+  color: var(--text);
+  font-size: .88rem;
+}
+.wiz-missing-row {
+  display: flex; gap: .75rem;
+  align-items: flex-start; justify-content: space-between;
+  padding: .35rem 0;
+  border-top: 1px dashed rgba(210, 153, 34, 0.20);
+  font-size: .85rem;
+}
+.wiz-missing-row:first-of-type { border-top: none; }
+.wiz-missing-cause {
+  color: var(--text-2);
+  font-size: .78rem;
+  text-align: right;
+  max-width: 55%;
+  line-height: 1.4;
+}
+
+.wiz-vendor-hint {
+  display: inline-block;
+  margin-left: .4rem;
+  padding: 1px 7px;
+  font-size: .72rem;
+  border-radius: 999px;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.32);
+}
+.wiz-step-head {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-weight: 600; color: var(--text);
+}
+.wiz-num {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.78rem; font-weight: 700;
+}
+.wiz-help { color: var(--text-2); font-size: 0.88rem; margin: 0; }
+.wiz-transports { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-transport {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.wiz-transport:hover:not(:disabled) { background: var(--surface-3); }
+.wiz-transport:disabled { opacity: 0.55; cursor: not-allowed; }
+.wiz-transport.active {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+.wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
+.wiz-transport-id { font-weight: 600; }
+.wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
+/* Status pill on each transport row, one-line nowrap, ellipsis if
+ * something larger ever lands. Previous copy "offline · will
+ * reconnect on scan" was misleading (the daemon auto-retries every
+ * poll regardless of user action) AND wrapped across two lines
+ * inside the pill on iPhone widths. Shortened in JS to "offline ·
+ * retrying"; this keeps it visually tidy. */
+.wiz-transport-state {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 0.15rem 0.55rem; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.wiz-transport-state.on  { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-transport-state.off { background: rgba(107,118,137,0.12); color: var(--text-3); }
+.wiz-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.wiz-status { color: var(--text-2); font-size: 0.88rem; }
+.wiz-results { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-empty {
+  color: var(--text-3);
+  font-size: 0.88rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.wiz-empty--quiet {
+  /* Mid-scan placeholder. Borderless, very low contrast, doesn't
+   * compete for attention while live results stream in below it. */
+  background: transparent;
+  border: 0;
+  padding: 0.5rem 0;
+  color: var(--text-3);
+  font-style: italic;
+}
+.wiz-spinner {
+  display: inline-block;
+  width: 0.85em; height: 0.85em;
+  margin-right: 0.35em;
+  border: 2px solid var(--text-3);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: wiz-spin 0.9s linear infinite;
+}
+@keyframes wiz-spin {
+  to { transform: rotate(360deg); }
+}
+.wiz-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  transition: background 0.15s, opacity 0.2s;
+}
+.wiz-row.known { opacity: 0.65; }
+.wiz-row-main { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1 1 0; }
+.wiz-row-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.wiz-row-slave {
+  font-family: var(--mono); font-weight: 600; color: var(--text-3);
+  font-size: 0.82rem;
+}
+.wiz-row-model { font-weight: 600; color: var(--text); }
+.wiz-row-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.wiz-tag {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.wiz-tag--known { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-row-action { flex-shrink: 0; }
+.wiz-add-form {
+  display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.wiz-label {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  min-width: 10rem;
+}
+.wiz-saved {
+  font-size: 0.82rem;
+  color: var(--green);
+  font-weight: 500;
+}
+.wiz-error {
+  flex-basis: 100%;
+  color: var(--red);
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+.wiz-restart {
+  display: flex; align-items: center; gap: 0.7rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.7rem 0.95rem;
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.45);
+  border-radius: var(--r);
+  color: var(--text);
+}
+.wiz-restart svg { width: 18px; height: 18px; color: var(--amber); flex-shrink: 0; }
+.wiz-restart strong { color: var(--amber); margin-right: 0.4rem; }
+.wiz-restart[hidden] { display: none; }
+@media (max-width: 540px) {
+  .wiz-row { flex-direction: column; align-items: stretch; }
+  .wiz-row-action { width: 100%; }
+  .wiz-add-form { width: 100%; }
+  .wiz-label { flex: 1 1 0; min-width: 0; }
+}
+
+/* ---------------- settings → alerts ---------------- */
+.settings-block--alerts { grid-column: 1 / -1; }
+.alerts-list {
+  display: flex; flex-direction: column;
+  gap: .55rem;
+  margin-top: .25rem;
+}
+.alerts-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem;
+  padding: .6rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.alerts-row--alarm { border-color: rgba(248,81,73,0.45); background: rgba(248,81,73,0.04); }
+.alerts-row--warn  { border-color: rgba(210,153,34,0.35); }
+.alerts-row-main { display: flex; flex-direction: column; gap: .2rem; min-width: 0; flex: 1 1 0; }
+.alerts-row-title { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.alerts-row-name  { font-weight: 600; color: var(--text); }
+.alerts-row-cond  {
+  font-family: var(--mono); font-size: .78rem; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  /* Long values (Discord webhook URLs, SMTP from-addresses with
+   * angle brackets, etc.) used to spill past the row's right edge.
+   * Wrap by character so a single long token can't blow the layout. */
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.alerts-row-meta  {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+  font-size: .72rem; color: var(--text-2);
+}
+.alerts-row-tag {
+  padding: .1rem .5rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+.alerts-row-tag--warn  { background: rgba(210,153,34,0.12); color: var(--amber); }
+.alerts-row-tag--alarm { background: rgba(248,81,73,0.12); color: var(--red); }
+.alerts-row-action {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: .35rem;
+}
+.alerts-test-btn {
+  font: inherit; font-size: .8rem; font-weight: 500;
+  padding: .35rem .7rem;
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.alerts-test-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.alerts-test-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.alerts-test-status { font-size: .76rem; color: var(--text-3); }
+.alerts-test-status.ok { color: var(--green); }
+.alerts-test-status.err { color: var(--red); }
+.settings-empty {
+  color: var(--text-3); font-size: .85rem;
+  padding: .6rem .75rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.settings-foot {
+  font-size: .76rem;
+  color: var(--text-3);
+  margin: .5rem 0 0;
+}
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.settings-table td {
+  padding: .55rem .65rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-row-label {
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-row-help {
+  font-size: .74rem;
+  color: var(--text-3);
+  margin-top: .15rem;
+}
+.settings-row-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-align: right;
+}
+/* Edit modal for #111 phase 2. Hand-rolled rather than carrying a
+ * generic modal component just for this. */
+.settings-edit-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.settings-edit-modal {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem 1.25rem 1rem;
+  width: 100%; max-width: 24rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.settings-edit-modal h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+.settings-edit-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin: .85rem 0;
+}
+.settings-edit-row label {
+  font-size: .82rem; color: var(--text-2); flex-shrink: 0;
+}
+.settings-edit-row input[type="number"],
+.settings-edit-row select {
+  width: 11rem;
+  padding: .45rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+.settings-edit-cur-label { font-size: .78rem; color: var(--text-3); }
+.settings-edit-cur {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.settings-edit-warn {
+  font-size: .78rem; color: #d9886f;
+  padding: .4rem .55rem;
+  background: rgba(255, 138, 122, .08);
+  border: 1px solid rgba(255, 138, 122, .25);
+  border-radius: 6px;
+  margin-top: .25rem;
+}
+.settings-edit-actions {
+  display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem;
+}
+.btn-action--primary {
+  background: var(--accent, #3a86ff);
+  color: #fff;
+  border-color: transparent;
+}
+.btn-action--primary:hover { filter: brightness(1.1); }
+.btn-action--primary[disabled] { opacity: .6; cursor: not-allowed; }
+.alerts-sub-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: .85rem 0 .35rem;
+}
+.alerts-sub-head:first-child { margin-top: 0; }
+.alerts-sub-head h4 {
+  margin: 0;
+  font-size: .82rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-2);
+}
+.alerts-add-btn {
+  font: inherit; font-size: .8rem; font-weight: 500;
+  padding: .25rem .6rem;
+  background: var(--surface-3);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.alerts-add-btn:hover { border-color: var(--accent); background: var(--surface); }
+.alerts-icon-btn {
+  font: inherit;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.alerts-icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
+.alerts-icon-btn--danger:hover { color: var(--red); border-color: var(--red); }
+.alerts-row-tag--ok   { background: rgba(63,185,80,0.12); color: var(--green); }
+.alerts-row-tag--warn { background: rgba(210,153,34,0.12); color: var(--amber); }
+
+/* Inline forms (add / edit) */
+.alerts-form {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  padding: .85rem;
+  display: flex; flex-direction: column;
+  gap: .7rem;
+  margin-bottom: .55rem;
+}
+.alerts-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .55rem .75rem;
+  /* min-width on the grid container caps any intrinsic-width child
+   * (e.g. an input with a long placeholder) so the whole form can't
+   * push past its parent's right edge on narrow viewports. */
+  min-width: 0;
+}
+/* The HTML5 `hidden` attribute defaults to `display:none` via the
+ * UA stylesheet, but ANY class rule with `display: grid|flex|etc`
+ * wins the specificity fight and leaves the element visible.
+ * Without this, the forecast form's provider-switched field groups
+ * stay visible when their provider isn't selected, every Solcast
+ * user sees the Open-Meteo lat/lon/array fields uselessly. */
+.alerts-form-grid[hidden],
+.alerts-form .settings-foot[hidden] {
+  display: none !important;
+}
+.alerts-form-grid--full { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.alerts-form label {
+  display: flex; flex-direction: column; gap: .25rem;
+  font-size: .76rem;
+  color: var(--text-2);
+  /* CSS-grid items refuse to shrink below content size by default;
+   * min-width:0 lets the input below it use width:100% without
+   * blowing out the column on long placeholders / values. */
+  min-width: 0;
+}
+.alerts-form .alerts-field-wide { grid-column: span 2; min-width: 0; }
+.alerts-form input,
+.alerts-form select {
+  font: inherit; font-size: .88rem;
+  padding: .4rem .55rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  /* Fill the grid column. box-sizing makes border + padding count
+   * toward 100% so inputs don't peek out by 2px. */
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.alerts-form select { font-family: inherit; }
+.alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
+.alerts-form input[name="metric_custom"][hidden] { display: none; }
+.alerts-form-transports {
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  padding: .5rem .7rem;
+  display: flex; flex-direction: column; gap: .35rem;
+}
+.alerts-form-transports legend {
+  padding: 0 .35rem;
+  font-size: .76rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.alerts-checkbox {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: .4rem;
+  font-size: .85rem !important;
+  color: var(--text) !important;
+}
+.alerts-checkbox input { width: 16px; height: 16px; flex-shrink: 0; }
+.alerts-form-actions {
+  display: flex; align-items: center; gap: .55rem;
+  flex-wrap: wrap;
+}
+.alerts-form-status { font-size: .78rem; color: var(--text-3); }
+.alerts-form-status.err { color: var(--red); }
+.alerts-restart-banner {
+  background: rgba(210,153,34,0.12);
+  border: 1px solid rgba(210,153,34,0.45);
+  color: var(--text);
+  padding: .55rem .8rem;
+  border-radius: var(--r-sm);
+  font-size: .82rem;
+  margin-bottom: .55rem;
+}
+
+/* ---------------- status legend popover ---------------- */
+.status-legend {
+  position: fixed;
+  top: 64px;            /* below the header */
+  right: 1rem;
+  z-index: 60;
+  width: min(360px, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: .85rem 1rem;
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.status-legend[hidden] { display: none; }
+.status-legend-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-weight: 600; font-size: .92rem;
+}
+.status-legend-close {
+  font: inherit; font-size: 1.1rem; line-height: 1;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer;
+}
+.status-legend-close:hover { color: var(--text); border-color: var(--accent); }
+.status-legend-list {
+  list-style: none; padding: 0; margin: 0;
+  display: flex; flex-direction: column; gap: .45rem;
+}
+.status-legend-list li {
+  font-size: .82rem; color: var(--text-2);
+  line-height: 1.45;
+}
+.status-legend-pill {
+  display: inline-block;
+  font-size: .72rem; font-weight: 600;
+  padding: .12rem .5rem;
+  border-radius: 999px;
+  margin-right: .4rem;
+  white-space: nowrap;
+}
+.status-legend-pill--ok   { background: rgba(63,185,80,0.14);  color: var(--green); }
+.status-legend-pill--warn { background: rgba(210,153,34,0.16); color: var(--amber); }
+.status-legend-pill--err  { background: rgba(248,81,73,0.14);  color: var(--red); }
+.status-legend-link {
+  font-size: .78rem;
+  color: var(--accent);
+  text-decoration: none;
+  margin-top: .25rem;
+}
+.status-legend-link:hover { text-decoration: underline; }
+
+/* ---------------- diagnostics (Settings → Diagnostics) ---------------- */
+.settings-block--diagnostics { grid-column: 1 / -1; }
+.settings-block--danger {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(220, 38, 38, .45);
+  background: rgba(220, 38, 38, .04);
+  border-radius: 12px;
+  padding: .85rem 1rem;
+}
+.settings-block--danger h3 {
+  color: #b91c1c;
+  margin-top: 0;
+}
+.settings-block--danger #reset-go:not([disabled]) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+.settings-block--danger #reset-confirm-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.diag-controls {
+  display: flex; align-items: center; gap: .65rem; flex-wrap: wrap;
+  margin-bottom: .45rem;
+}
+.diag-log {
+  margin: 0;
+  background: #0a0d12;
+  color: #cdd6f4;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+  font-family: var(--mono);
+  font-size: .72rem;
+  line-height: 1.45;
+  max-height: 360px;
+  overflow: auto;
+  white-space: pre;
+}
+[data-theme="light"] .diag-log {
+  background: #f6f8fa;
+  color: #1f2328;
+}
+.diag-line { display: block; }
+.diag-line--error    { color: #ff9a9a; }
+.diag-line--warning  { color: #f1cf6f; }
+.diag-line--info     { color: #cdd6f4; }
+.diag-line--debug    { color: #6b7689; }
+[data-theme="light"] .diag-line--error   { color: #cf222e; }
+[data-theme="light"] .diag-line--warning { color: #9a6700; }
+[data-theme="light"] .diag-line--info    { color: #1f2328; }
+[data-theme="light"] .diag-line--debug   { color: #7a8595; }
+
+/* ---------------- docs route ---------------- */
+.docs-panel { padding: 0; }
+.docs-panel .panel-header { padding: 1.1rem 1.25rem .9rem; }
+.docs-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  min-height: 60vh;
+}
+@media (max-width: 720px) {
+  .docs-layout { grid-template-columns: 1fr; }
+}
+.docs-nav {
+  border-right: 1px solid var(--border);
+  padding: .85rem 0;
+  display: flex; flex-direction: column;
+  background: var(--surface-2);
+}
+@media (max-width: 720px) {
+  .docs-nav { border-right: none; border-bottom: 1px solid var(--border); }
+}
+.docs-nav-section {
+  font-size: .68rem; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-3);
+  padding: .55rem 1.15rem .25rem;
+}
+.docs-nav-link {
+  display: block;
+  padding: .42rem 1.15rem;
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: .88rem;
+  border-left: 3px solid transparent;
+}
+.docs-nav-link:hover { color: var(--text); background: var(--surface-3); }
+.docs-nav-link.active {
+  color: var(--accent);
+  background: var(--surface-3);
+  border-left-color: var(--accent);
+  font-weight: 600;
+}
+.docs-content {
+  padding: 1.25rem 1.5rem;
+  max-width: 800px;
+  line-height: 1.55;
+  /* CRITICAL on mobile: grid items default to `min-width: auto`
+   * which equals the intrinsic content width, so any long
+   * unbreakable token (a URL, an inline code chip, a wide table)
+   * silently pushes the column past the viewport, with text
+   * running off the right edge. `min-width: 0` lets the grid
+   * track shrink as expected; `overflow-wrap: anywhere` makes
+   * long English compounds ("Stripe-managed") and code identifiers
+   * break at character level if there's no natural break. */
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* Inline code in body text, wrap at character boundaries on
+ * mobile so a long path / package id doesn't push the column wide. */
+.docs-content p code,
+.docs-content li code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.docs-content h1 {
+  font-size: 1.55rem; margin: 0 0 .9rem;
+}
+.docs-content h2 {
+  font-size: 1.15rem; margin: 1.6rem 0 .55rem;
+  padding-top: .35rem;
+  border-top: 1px solid var(--border);
+}
+.docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 1.2rem; }
+.docs-content h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
+.docs-content p { margin: .5rem 0; color: var(--text-2); }
+.docs-content ul, .docs-content ol {
+  margin: .5rem 0 .5rem 1.4rem;
+  color: var(--text-2);
+}
+.docs-content li { margin: .15rem 0; }
+.docs-content code {
+  font-family: var(--mono);
+  font-size: .88em;
+  background: var(--surface-2);
+  padding: .1rem .35rem;
+  border-radius: var(--r-sm);
+  color: var(--text);
+}
+.docs-content pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .85rem;
+  overflow-x: auto;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.docs-content pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.docs-content table {
+  border-collapse: collapse;
+  margin: .85rem 0;
+  font-size: .88rem;
+  width: 100%;
+  /* Wide markdown tables (the SD-card vs Docker comparison in
+   * docker-install.md is the canonical case) get a horizontal
+   * scroll bar instead of overflowing the viewport on mobile.
+   * `display: block` is what lets `overflow-x` work on a table. */
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.docs-content td code {
+  /* Don't wrap inline-code chips that live inside table cells,
+   * "docker compose pull && up -d" reads better as one chunk that
+   * the cell scrolls to than as wrapping fragments. */
+  white-space: nowrap;
+}
+.docs-content th, .docs-content td {
+  text-align: left;
+  padding: .42rem .65rem;
+  border-bottom: 1px solid var(--border);
+}
+.docs-content th { color: var(--text); }
+.docs-content td  { color: var(--text-2); }
+.docs-content a { color: var(--accent); }
+.docs-content blockquote {
+  margin: .85rem 0;
+  padding: .5rem .85rem;
+  background: rgba(88,166,255,0.08);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+}
+.docs-content blockquote p { margin: 0; }
+.docs-content hr { border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+.docs-placeholder { color: var(--text-3); font-style: italic; }
+
+/* ---------------- restart overlay ---------------- */
+.restart-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+[data-theme="light"] .restart-overlay { background: rgba(15, 23, 42, 0.35); }
+.restart-overlay[hidden] { display: none; }
+.restart-overlay-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.4rem 1.8rem;
+  box-shadow: var(--shadow);
+  display: flex; flex-direction: column; align-items: center;
+  gap: .75rem;
+  min-width: 240px;
+}
+.restart-overlay-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.restart-overlay-sub {
+  font-size: .82rem;
+  color: var(--text-3);
+}
+.restart-spinner {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--surface-3);
+  border-top-color: var(--accent);
+  animation: restart-spin 0.9s linear infinite;
+}
+@keyframes restart-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------------- theme picker (Settings → Appearance) ---------------- */
+.theme-picker {
+  display: flex;
+  gap: .4rem;
+  margin-top: .25rem;
+}
+.theme-opt {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: .65rem .5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text-2);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.08s;
+}
+.theme-opt svg {
+  width: 20px; height: 20px;
+}
+.theme-opt:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.theme-opt:active { transform: scale(0.98); }
+.theme-opt[aria-checked="true"] {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Vendor-hint variants for the USB-scan classification: NMEA GPS
+ * receivers get an accent-coloured tag so they're visually distinct
+ * from the default Modbus-hint adapter; unknown / busy ports get an
+ * amber warning tone. */
+.wiz-vendor-hint--gps {
+  background: rgba(63,185,80,0.12);
+  border-color: rgba(63,185,80,0.4);
+  color: var(--green, #3fb950);
+}
+.wiz-vendor-hint--warn {
+  background: rgba(210,153,34,0.10);
+  border-color: rgba(210,153,34,0.4);
+  color: var(--amber);
+}
+/* Victron-branded chip, uses their familiar accent blue. */
+.wiz-vendor-hint--victron {
+  background: rgba(0,114,206,0.12);
+  border-color: rgba(0,114,206,0.45);
+  color: #0072ce;
+}
+/* Key-entry form revealed under a Victron scan row when the user
+ * taps Pair. Tucked inside the same .wiz-results card. */
+.wiz-victron-key {
+  margin: -.5rem 0 .5rem 0;
+  padding: .65rem .85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.wiz-victron-key .settings-foot { margin-bottom: .55rem; }
+
+/* "Add another transport", collapsible block in the wizard's
+ * transport-list view. Lets a customer wire up BLE + USB side by
+ * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
+ * without faking-out the wizard by deleting and re-adding. */
+.wiz-add-another {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px dashed var(--border);
+}
+.wiz-add-another-btn {
+  width: auto;
+  font-size: .9rem;
+}
+.wiz-add-another-panel {
+  margin-top: .65rem;
+  padding: .65rem .85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+/* Quick-template chips for the Alerts panel (#107). Sit above the
+ * rule list with a "Quick templates:" label. Clicking pre-fills the
+ * add-rule form so users don't have to learn the metric-path schema
+ * or invent thresholds from scratch. */
+.alerts-templates {
+  display: flex; flex-wrap: wrap;
+  align-items: center; gap: .35rem;
+  margin: .35rem 0 .65rem;
+}
+.alerts-templates .settings-foot { margin-right: .15rem; }
+.alerts-template-chip {
+  font-size: .78rem;
+  padding: .25rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.alerts-template-chip:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Source-disagreement hint (#121). Tucked under the donut-flow pill
+ * inside the donut centre. Only shows when shunt + BMS SoC differ
+ * by >5pp. Deliberately quiet, small, low-contrast, because it's
+ * a "for your information" diagnostic, not an alarm. */
+.donut-disagreement {
+  margin-top: .35rem;
+  font-size: .65rem;
+  font-family: var(--mono);
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  /* Single-line clamp so the hint never pushes content past the
+   * bottom of the donut ring on narrow viewports. The compact JS
+   * format ("shunt 94% · BMS 0%") fits well under 12rem; the
+   * ellipsis is a last-resort guard. */
+  max-width: 13rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------------- controllable outputs (#104) ---------------- */
+/* Per-device output panel: lives on the device detail page under the
+ * vendor-specific data panels. Toggle + state pill + audit footer. */
+.output-panel {
+  --panel-tint: linear-gradient(135deg, rgba(63,185,80,0.05), transparent 65%);
+}
+.output-state-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .15rem .55rem; border-radius: 999px;
+  font-family: var(--mono);
+  font-size: .82rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.output-on  { color: var(--green, #3fb950); border-color: rgba(63,185,80,0.45); }
+.output-off { color: var(--text-3); }
+.output-unknown { color: var(--text-3); font-style: italic; }
+
+.output-safety {
+  margin: .25rem 0 .75rem;
+  padding: .75rem .85rem;
+  background: rgba(210,153,34,0.08);
+  border: 1px solid rgba(210,153,34,0.35);
+  border-radius: var(--r);
+  font-size: .9rem; color: var(--text-2); line-height: 1.45;
+}
+.output-safety strong { color: var(--text); }
+.output-safety .btn-action { margin-top: .65rem; }
+
+.output-controls {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .5rem 0 .25rem;
+}
+/* The toggle is a chunky on/off switch with a sliding thumb, same
+ * pattern as Settings → Kiosk view, just wider so it reads as the
+ * primary control on the panel rather than a checkbox. */
+.output-toggle {
+  position: relative;
+  display: inline-flex; align-items: center;
+  width: 96px; height: 34px;
+  padding: 0 .6rem; gap: .5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.output-toggle:hover { background: var(--surface-3); }
+.output-toggle:disabled { opacity: .55; cursor: wait; }
+.output-toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 26px; height: 26px;
+  background: var(--text-3);
+  border-radius: 999px;
+  transition: left .18s, background .18s;
+}
+.output-toggle.is-on {
+  background: rgba(63,185,80,0.18);
+  border-color: rgba(63,185,80,0.55);
+}
+.output-toggle.is-on .output-toggle-thumb {
+  left: 67px;
+  background: var(--green, #3fb950);
+}
+.output-toggle-label {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--text-2);
+}
+.output-toggle.is-on .output-toggle-label { color: var(--green, #3fb950); }
+.output-busy {
+  font-size: .8rem; color: var(--text-3);
+  font-family: var(--mono);
+}
+.output-foot {
+  margin-top: .65rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+  font-size: .78rem;
+}
+.output-foot strong { color: var(--text-2); font-weight: 600; }
+
+/* Schedules section (#117). Collapsible <details> tucked under the
+ * output controls. Default-closed so the panel reads cleanly when
+ * the user just wants to flip the toggle. */
+.output-schedules {
+  margin-top: .75rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+}
+.output-schedules > summary {
+  cursor: pointer;
+  display: flex; align-items: center; gap: .4rem;
+  list-style: none;
+  font-size: .9rem; color: var(--text-2);
+  user-select: none;
+}
+.output-schedules > summary::-webkit-details-marker { display: none; }
+.output-schedules > summary svg {
+  width: 14px; height: 14px;
+}
+.output-schedules > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--text-3);
+  transition: transform .15s;
+}
+.output-schedules[open] > summary::after { transform: rotate(90deg); }
+.output-schedules-count { font-size: .8rem; color: var(--text-3); }
+.output-schedules-list {
+  margin-top: .55rem;
+  display: flex; flex-direction: column; gap: .4rem;
+}
+
+.schedule-row {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .5rem .65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.schedule-enabled { display: flex; align-items: center; }
+.schedule-info { flex: 1; min-width: 0; }
+.schedule-summary {
+  font-size: .9rem; color: var(--text);
+  line-height: 1.3;
+}
+.schedule-last {
+  font-size: .75rem; margin-top: .15rem;
+  font-family: var(--mono);
+}
+
+/* Inline "add schedule" form. Renders into the same host slot as
+ * the "+ Add schedule" button, replacing it on click and restoring
+ * the button on cancel. */
+.schedule-add-host { margin-top: .25rem; }
+.schedule-form {
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  display: flex; flex-direction: column; gap: .55rem;
+}
+.schedule-form-row {
+  display: flex; align-items: center; gap: .65rem;
+  flex-wrap: wrap;
+}
+.schedule-form-label {
+  font-size: .8rem; color: var(--text-3);
+  min-width: 130px;
+}
+.schedule-form-group {
+  display: flex; gap: .85rem; flex-wrap: wrap;
+  font-size: .85rem;
+}
+.schedule-form input[type="time"],
+.schedule-form input[type="number"] {
+  padding: .25rem .4rem;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--mono);
+}
+.schedule-days { gap: .35rem; }
+.schedule-day {
+  display: inline-flex; align-items: center; gap: .2rem;
+  padding: .15rem .35rem;
+  font-size: .8rem;
+  background: var(--surface-3);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  min-width: 28px; justify-content: center;
+}
+.schedule-form-actions {
+  display: flex; align-items: center; gap: .55rem; margin-top: .25rem;
+}
+.schedule-form-status { font-size: .8rem; color: var(--text-3); }
+.schedule-form-status.err { color: var(--red, #f85149); }
+
+/* ───────────── In-WattPost-app shell: strip our chrome ─────────────
+   When the appliance dashboard renders inside the WattPost native
+   shell (detected via navigator.userAgent contains "WattPostApp/"),
+   the cloud already gives us a status bar + tab bar; ours would be
+   duplicate chrome. Hide it. Also hide the floating help-FAB,
+   docs route lives in the cloud's Account tab anyway. */
+html.in-wattpost-app .app-header { display: none !important; }
+html.in-wattpost-app .help-fab,
+html.in-wattpost-app #help-fab,
+html.in-wattpost-app .docs-fab {
+  display: none !important;
+}
+/* Tighten main padding now the header's gone */
+html.in-wattpost-app body > main,
+html.in-wattpost-app .container {
+  padding-top: max(12px, env(safe-area-inset-top)) !important;
+}
+/* No bottom tab bar inside the broker tunnel, the appliance HTML
+   is served on its own origin (<slug>.wattpost.cloud) so the cloud's
+   /app tab bar isn't reachable from here. Native back-gesture
+   returns the user to Sites. */
+
+
+/* #292, Battery detail page. Bank summary grid + per-pack mini-cards.
+   Drilled into from the SoC donut on the dashboard. */
+.bank-sum-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: .65rem;
+}
+.bank-sum-cell {
+  display: flex; flex-direction: column;
+  gap: .2rem;
+  padding: .6rem .7rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bank-sum-v { font-size: 1.05rem; color: var(--text); }
+
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .75rem;
+}
+.pack-card {
+  display: flex; flex-direction: column;
+  gap: .35rem;
+  padding: .75rem .85rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--text);
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+.pack-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.pack-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+}
+.pack-card-name {
+  font-weight: 600; font-size: .9rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pack-card-soc { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.pack-card-meta {
+  display: flex; gap: .75rem;
+  font-size: .82rem; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.pack-card-drift {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding-top: .15rem;
+  border-top: 1px solid var(--border);
+}
+.pack-drift-ok   { color: var(--green, #56d364); }
+.pack-drift-warn { color: var(--amber, #f0c849); }
+.pack-drift-bad  { color: var(--red,   #ff7b72); }
+.pack-drift-na   { color: var(--text-3); opacity: .65; }

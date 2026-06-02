@@ -1,0 +1,102 @@
+WattPost
+Copyright 2026 Ritual North
+
+This product includes software developed by Ritual North
+(https://ritualnorth.com).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    https://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+implied. See the License for the specific language governing
+permissions and limitations under the License.
+
+"WattPost" is a trademark of Ritual North. The license above does
+not grant trademark rights.
+
+============================================================
+Safety disclaimer
+============================================================
+
+This software is intended for monitoring only. It must not be used
+as the sole means of detecting, preventing, or responding to safety-
+critical events (e.g. battery fire, over-discharge, over-temperature).
+Always maintain the manufacturer's own protection systems on your
+energy hardware.
+
+============================================================
+Third-party protocol references
+============================================================
+
+Some vendor drivers in solar_monitor/vendors/ document register
+maps and protocol details cross-referenced against the following
+open-source projects and public protocol documents. Register
+definitions are facts, not creative expression; field names and
+structure are paraphrased to canonical WattPost metrics.
+
+  EG4 / Luxpower inverter driver (vendors/eg4)
+    - joyfulhouse/eg4_web_monitor              (MIT)
+    - celsworth/lxp-bridge                     (MIT)
+    - EG4 18kPV-12LV Modbus Protocol PDF       (publicly mirrored)
+
+  Deye / Sunsynk / Sol-Ark driver pair (vendors/deye)
+    - kellerza/sunsynk                         (Apache-2.0)
+    - StephanJoubert/home_assistant_solarman   (Apache-2.0)
+    - Deye Modbus PDF (mirrored at domotica.solar)
+
+  Voltronic / Axpert / MPP Solar / EG4 6500EX (vendors/voltronic)
+    - Voltronic Inverter Communication Protocol v3.6 (vendor doc)
+    - Community rebadge reports (Axpert, MPP Solar PIP/LV-MK,
+      EG4 6000XP/6500EX, Mecer, RCT, Infinisolar, etc.)
+
+  JK BMS driver (vendors/jkbms)
+    - syssi/esphome-jk-bms                     (MIT)
+
+  JBD / Overkill Solar BMS driver (vendors/jbd)
+    - Overkill Solar published protocol docs
+    - syssi/esphome-jbd-bms                    (MIT)
+
+  Daly BMS driver (vendors/daly)
+    - dalybms.com published protocol docs
+    - bigmonkeyboy/daly-bms-uart               (community)
+
+  AiLi smart shunt driver (vendors/aili)
+    - ChrisAndrews-Photos/aili-shunt           (community)
+    - somewattsolar/aili-shunt-mqtt            (community)
+
+  Junctek smart shunt driver (vendors/junctek)
+    - Community ASCII-protocol reverse engineering
+
+  EPEVER / EPSolar Tracer MPPT driver (vendors/epever)
+    - EPEVER Modbus protocol PDF               (vendor doc)
+
+  Renogy driver families (vendors/renogy)
+    - cyrils/renogy-bt protocol reverse engineering
+      (parsers ported in; no runtime dependency)
+
+  Victron VE.Direct + Instant Readout drivers (vendors/victron)
+    - Victron VE.Direct Protocol PDF           (vendor doc)
+    - victron-ble Python reference             (encryption format)
+
+  Mopeka tank-level driver (vendors/mopeka)
+    - Mopeka BLE advertisement format          (public)
+
+  Govee + Ruuvi ambient sensor drivers (transport/ble_*)
+    - Community advertisement-format documentation
+
+============================================================
+Vendored runtime dependencies
+============================================================
+
+  uPlot                                        (MIT)
+    https://github.com/leeoniya/uPlot
+    Vendored under solar_monitor/web/uPlot.iife.min.js
+
+  Other Python and JavaScript runtime dependencies are listed
+  in pyproject.toml and mobile-app/package.json; each carries
+  its own license terms in the upstream package metadata.

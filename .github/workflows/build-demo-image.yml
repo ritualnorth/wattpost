@@ -1,0 +1,94 @@
+name: Build demo image
+
+# Builds the appliance Docker image (used by demo.wattpost.io) on every
+# main push that touches the appliance source. Pushes to GHCR; the
+# next-step SSH-deploy pulls + restarts the wattpost-demo container.
+#
+# Independent of the appliance/updater image builds; shares the
+# same runner pool.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'solar_monitor/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - '.github/workflows/build-demo-image.yml'
+  workflow_dispatch:
+
+# Coalesce so a flurry of commits to main only rebuilds the demo
+# image once. demo.wattpost.io always reflects the newest build
+# anyway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/wattpost-demo
+
+jobs:
+  build-and-push:
+    name: Build + push to GHCR
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+
+      - name: Build + push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: SSH-deploy (compose pull + up)
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            # Deploy mechanics live in an on-host script so they stay out
+            # of this public repo. It pulls the new image, restarts the
+            # demo container, and reloads the front proxy.
+            wattpost-demo-deploy

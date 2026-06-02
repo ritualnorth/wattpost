@@ -1,0 +1,435 @@
+#!/usr/bin/env bash
+# WattPost install / upgrade script.
+#
+# Usage (as root, or via sudo):
+#   curl -sSL https://wattpost.cloud/install.sh | sudo bash
+#   # or, from a local checkout:
+#   sudo ./packaging/install.sh
+#
+# Idempotent: re-running upgrades the venv + service in place without
+# touching /etc/wattpost/config.yaml or the SQLite database.
+
+set -euo pipefail
+
+# ----- paths -----
+APP_USER="wattpost"
+APP_GROUP="wattpost"
+APP_ROOT="/opt/wattpost"
+APP_VENV="${APP_ROOT}/venv"
+CONFIG_DIR="/etc/wattpost"
+CONFIG_FILE="${CONFIG_DIR}/config.yaml"
+STATE_DIR="/var/lib/wattpost"
+SERVICE_DEST="/etc/systemd/system/wattpost.service"
+
+# Atomic-swap layout (#36). The customer-visible path stays
+# /opt/wattpost — what changes is that it's now a symlink to one
+# of two slot directories under /opt/wattpost-slots/. Slot a is
+# the bootstrap target; subsequent updates (#36 Slice 2) install
+# into the inactive slot, run a health probe, then atomic-flip
+# the /opt/wattpost symlink. wattpost-update + an OnFailure
+# watchdog enable automated rollback (#36 Slice 3).
+SLOTS_DIR=/opt/wattpost-slots
+SLOT_A="${SLOTS_DIR}/a"
+SLOT_B="${SLOTS_DIR}/b"
+
+# Default: install from the local checkout (the directory this script
+# lives in). For a future remote-install path, override with
+# WATTPOST_SOURCE=git+https://... or a wheel URL.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+SOURCE="${WATTPOST_SOURCE:-${REPO_ROOT}}"
+
+# ----- preflight -----
+if [[ $EUID -ne 0 ]]; then
+    echo "install.sh must run as root (sudo $0)" >&2
+    exit 1
+fi
+
+step() { echo -e "\n\033[1;36m==>\033[0m $*"; }
+warn() { echo -e "\033[1;33mwarn:\033[0m $*" >&2; }
+
+step "checking prerequisites"
+if ! command -v python3 >/dev/null; then
+    echo "python3 not found — apt install python3 first" >&2; exit 1
+fi
+PYVER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+if [[ "$(printf '%s\n' "3.11" "${PYVER}" | sort -V | head -1)" != "3.11" ]]; then
+    echo "python ${PYVER} too old — need 3.11+" >&2; exit 1
+fi
+if ! command -v systemctl >/dev/null; then
+    echo "systemd not detected (this is intended for Pi OS / Debian)." >&2; exit 1
+fi
+if ! systemctl is-active --quiet bluetooth 2>/dev/null; then
+    warn "bluetooth service isn't active — make sure BlueZ is installed and running before first poll."
+fi
+
+# ----- user + dirs -----
+step "creating user/group ${APP_USER}"
+if ! getent group "${APP_GROUP}" >/dev/null; then
+    groupadd --system "${APP_GROUP}"
+fi
+if ! id "${APP_USER}" >/dev/null 2>&1; then
+    useradd --system --gid "${APP_GROUP}" \
+            --home-dir "${APP_ROOT}" --shell /usr/sbin/nologin \
+            "${APP_USER}"
+fi
+# bluetooth group: gives DBus access to BlueZ for BLE scans/connects.
+# Ensure the group exists even when bluez isn't installed yet —
+# the systemd unit declares `SupplementaryGroups=bluetooth` and
+# misses-fatally with `216/GROUP` if the group is absent. Pi OS
+# ships bluez (so the group is pre-created); plain Ubuntu Server
+# does not. Group creation is cheap and harmless.
+if ! getent group bluetooth >/dev/null; then
+    groupadd --system bluetooth
+fi
+usermod -a -G bluetooth "${APP_USER}"
+
+step "preparing ${APP_ROOT}, ${CONFIG_DIR}, ${STATE_DIR}"
+mkdir -p "${CONFIG_DIR}" "${STATE_DIR}"
+
+# ---- atomic-swap slot layout (#36) ----
+# Three states ${APP_ROOT} can be in:
+#   1. missing — fresh install. Create slot a, symlink ${APP_ROOT} → a.
+#   2. real directory — legacy pre-#36 install. Move it into slot a,
+#      replace the directory with a symlink. One-way migration.
+#   3. symlink — already in slot layout. No-op, just resolve the
+#      target to know which slot we're installing into.
+mkdir -p "${SLOTS_DIR}"
+if [ -L "${APP_ROOT}" ]; then
+    TARGET=$(readlink -f "${APP_ROOT}")
+    if [ ! -d "${TARGET}" ]; then
+        # Dangling symlink — slot dir was deleted out from under us.
+        # Recover by recreating slot a and re-pointing.
+        warn "${APP_ROOT} → ${TARGET} is dangling; recreating slot a"
+        rm -f "${APP_ROOT}"
+        mkdir -p "${SLOT_A}"
+        ln -sfn "${SLOT_A}" "${APP_ROOT}"
+    fi
+elif [ -d "${APP_ROOT}" ]; then
+    step "migrating legacy ${APP_ROOT}/ into slot layout"
+    # Pause the service so the venv isn't in active use while we
+    # rename its parent directory. The mv is atomic on the same FS;
+    # the symlink replace below is also atomic via mv -T.
+    systemctl stop wattpost.service 2>/dev/null || true
+    if [ -d "${SLOT_A}" ]; then
+        # Both legacy dir AND slot a exist — operator did something
+        # weird (manual rsync etc.). Don't clobber the slot; bail
+        # with instructions.
+        echo "error: ${APP_ROOT} and ${SLOT_A} both exist." >&2
+        echo "  Resolve by hand: either rm -rf ${SLOT_A} (if it's" >&2
+        echo "  stale) or rm -rf ${APP_ROOT} (if the slot is canonical)." >&2
+        exit 1
+    fi
+    mv "${APP_ROOT}" "${SLOT_A}"
+    ln -s "${SLOT_A}" "${APP_ROOT}.new"
+    mv -Tf "${APP_ROOT}.new" "${APP_ROOT}"
+else
+    # Fresh install — no prior layout to migrate.
+    mkdir -p "${SLOT_A}"
+    ln -sfn "${SLOT_A}" "${APP_ROOT}"
+fi
+
+# Migrate the legacy /opt/wattpost-src into the active slot. Prior
+# to #36, wattpost-update downloaded source into a sibling dir;
+# now it lives under the slot so an inactive-slot install has its
+# own source tree.
+ACTIVE_SLOT=$(readlink -f "${APP_ROOT}")
+LEGACY_SRC=/opt/wattpost-src
+if [ -d "${LEGACY_SRC}" ] && [ ! -e "${ACTIVE_SLOT}/src" ]; then
+    step "migrating ${LEGACY_SRC}/ → ${ACTIVE_SLOT}/src/"
+    mv "${LEGACY_SRC}" "${ACTIVE_SLOT}/src"
+    # If SOURCE was pointing at the legacy path (the pi-gen chroot
+    # invokes us with WATTPOST_SOURCE=/opt/wattpost-src, see
+    # packaging/pi-gen/stage-wattpost/01-install/00-run-chroot.sh),
+    # update SOURCE now — otherwise the pip install below will fail
+    # with "Hint: It looks like a path. File '/opt/wattpost-src'
+    # does not exist." Every tagged SD-image build since v0.1.32
+    # was failing here.
+    if [ "${SOURCE}" = "${LEGACY_SRC}" ]; then
+        SOURCE="${ACTIVE_SLOT}/src"
+        step "rewriting SOURCE → ${SOURCE} (pi-gen path migrated)"
+    fi
+    # v0.1.45 patched SOURCE after the move but missed SCRIPT_DIR /
+    # REPO_ROOT (both captured at line 38-39 from BASH_SOURCE before
+    # the slot dance). When the chroot ran us out of /opt/wattpost-src,
+    # SCRIPT_DIR was /opt/wattpost-src/packaging; after the mv that
+    # path is gone, so the `install -m 0644 "${SCRIPT_DIR}/systemd/
+    # wattpost.service"` ~250 lines down errors with "cannot stat".
+    # Every tagged SD-image build since v0.1.45 failed silently here
+    # (the earlier wattpost-rollback + wattpost-config install lines
+    # have `if [ -f ]` guards so they no-op'd; wattpost.service had
+    # no guard and crashed the build). Re-derive both vars when the
+    # captured path is under LEGACY_SRC.
+    case "${SCRIPT_DIR}" in
+        "${LEGACY_SRC}"/*|"${LEGACY_SRC}")
+            SCRIPT_DIR="${ACTIVE_SLOT}/src/packaging"
+            REPO_ROOT="${ACTIVE_SLOT}/src"
+            step "rewriting SCRIPT_DIR → ${SCRIPT_DIR} (pi-gen path migrated)"
+            ;;
+    esac
+fi
+
+chown -R "${APP_USER}:${APP_GROUP}" "${SLOTS_DIR}" "${STATE_DIR}"
+chown "${APP_USER}:${APP_GROUP}" "${CONFIG_DIR}"
+
+# Hotspot captive portal (Pillar 3b): NetworkManager reads dnsmasq
+# drop-ins for shared (AP) connections from here. Let the wattpost user
+# manage its catch-all drop-in so the captive portal can arm/disarm with
+# the AP, without giving the daemon broader root. Best-effort: skip
+# cleanly on hosts without NetworkManager (e.g. Docker installs), where
+# captive simply stays a no-op.
+NM_DNSMASQ_DIR=/etc/NetworkManager/dnsmasq-shared.d
+if [[ -d /etc/NetworkManager ]]; then
+    mkdir -p "${NM_DNSMASQ_DIR}"
+    chgrp "${APP_GROUP}" "${NM_DNSMASQ_DIR}" 2>/dev/null || true
+    chmod 0775 "${NM_DNSMASQ_DIR}" 2>/dev/null || true
+fi
+
+# ----- venv -----
+step "installing venv at ${APP_VENV}"
+if [[ ! -x "${APP_VENV}/bin/python" ]]; then
+    python3 -m venv "${APP_VENV}"
+fi
+"${APP_VENV}/bin/pip" install --upgrade pip wheel >/dev/null
+# A stale `solar_monitor.egg-info/` from a developer's earlier
+# `pip install -e .` can break the wheel build with "Cannot update
+# time stamp of directory". Real installs (curl|bash, fresh git clone,
+# pi-gen rsync) never have one; this is a no-op there. Silently
+# ignored if SOURCE is read-only — pip would already have failed in
+# that case for other reasons.
+find "${SOURCE}" -maxdepth 3 -name '*.egg-info' -type d \
+    -exec rm -rf {} + 2>/dev/null || true
+# --prefer-binary: when pi-gen runs this inside a qemu-emulated chroot,
+# Python-C-extension compilation is glacial. All our deps publish
+# aarch64 wheels on PyPI; this flag tells pip to grab those even when
+# a newer sdist exists. Native installs are unaffected (wheel still
+# chosen first by default).
+#
+# --force-reinstall --no-deps: pyproject.toml hardcodes version="0.0.1"
+# (the package metadata never bumps even when solar_monitor/__init__.py
+# does), so a plain `--upgrade` is a no-op when the upstream version
+# string didn't change — pip says "0.0.1 already installed". Force-
+# reinstall makes wattpost-update actually swap the venv contents.
+# --no-deps so we don't reinstall the entire dep tree on every update
+# (deps move on their own cadence; `pip install --upgrade` above
+# already bumped them if needed).
+"${APP_VENV}/bin/pip" install --prefer-binary --upgrade --force-reinstall --no-deps "${SOURCE}"
+
+# ----- config (only if not present — don't clobber the user's edits) -----
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    step "seeding ${CONFIG_FILE} from config.example.yaml"
+    if [[ -f "${REPO_ROOT}/config.example.yaml" ]]; then
+        cp "${REPO_ROOT}/config.example.yaml" "${CONFIG_FILE}"
+    else
+        cat > "${CONFIG_FILE}" <<'YAML'
+# Edit via the Setup wizard at http://<this-pi>:8000/#/setup
+# or by hand. See https://github.com/ritualnorth/wattpost
+transports: []
+devices: []
+exporters: []
+notification_transports: []
+alerts: []
+YAML
+    fi
+    chown "${APP_USER}:${APP_GROUP}" "${CONFIG_FILE}"
+    chmod 0640 "${CONFIG_FILE}"
+else
+    step "keeping existing ${CONFIG_FILE}"
+fi
+
+# ----- local web UI password (opt-in) -----
+# By default, the local dashboard accepts any LAN client — same trust
+# model as Pi-hole, Solar Assistant, Home Assistant Yellow. Most
+# off-grid setups have a single trusted network, and the cloud
+# tunnel's auth is the strong gate for remote access. Security-
+# conscious users (shared housing, corporate LAN, multi-tenant
+# warehouses) opt in via `wattpost-config → Set local web password`,
+# which writes /etc/wattpost/web-password.hash. The middleware
+# (solar_monitor/web_auth.py) auto-detects the hash file's presence
+# and starts enforcing.
+#
+# install.sh deliberately does NOT auto-generate. Auto-creating a
+# password the user didn't ask for puts a "wattpost-7f3a2b" string in
+# their notes/password-manager forever, even though they'll never
+# need it — pure friction.
+
+# ----- sudoers fragment for the update + rollback helpers -----
+# The dashboard's "Update now" button + the OnFailure rollback unit
+# both need to invoke root-owned helpers from the unprivileged
+# wattpost daemon. Limited to two fixed scripts (no args) so the
+# escalation surface stays tight.
+step "granting wattpost user sudo access for the update helper"
+SUDOERS_FILE="/etc/sudoers.d/wattpost"
+cat > "${SUDOERS_FILE}.tmp" <<'SUDO'
+# Allow the wattpost daemon to fire the in-place upgrade helper from
+# the dashboard's "Update now" button (and from wattpost-config). The
+# helper itself is a fixed, trusted script — locked to no args so the
+# daemon can't pass a malicious source URL.
+wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-update
+# Allow rollback from the dashboard / wattpost-config — also a fixed
+# trusted script, no args (the --auto flag is only added by the
+# systemd OnFailure unit which doesn't go through sudo).
+wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-rollback
+SUDO
+# visudo -c validates syntax before we move it into /etc/sudoers.d/
+if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
+    install -m 0440 "${SUDOERS_FILE}.tmp" "${SUDOERS_FILE}"
+fi
+rm -f "${SUDOERS_FILE}.tmp"
+# Tear down the old Tailscale sudoers fragment unconditionally — it
+# pre-dated the merged /etc/sudoers.d/wattpost file above and shipped
+# on every install up through v0.1.33. Removing it on each run of
+# install.sh is the migration path for existing appliances (which
+# the auto-updater re-runs anyway).
+rm -f /etc/sudoers.d/wattpost-tailscale
+
+# Install the update helper. Root-owned, world-readable, world-
+# executable — sudoers takes care of who can actually run it.
+step "installing wattpost-update helper"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-update" ]; then
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/cli/wattpost-update" /usr/local/bin/wattpost-update
+    # Pre-create the log file with permissions that let the wattpost
+    # daemon read it back via /api/system/update/log. The helper runs
+    # as root and writes to it; the daemon (group wattpost) reads.
+    touch /var/log/wattpost-update.log
+    chgrp wattpost /var/log/wattpost-update.log
+    chmod 0644 /var/log/wattpost-update.log
+fi
+
+# Install the rollback helper + its OnFailure systemd unit (#36 Slice 3).
+step "installing wattpost-rollback helper + OnFailure watchdog"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-rollback" ]; then
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/cli/wattpost-rollback" /usr/local/bin/wattpost-rollback
+    touch /var/log/wattpost-rollback.log
+    chgrp wattpost /var/log/wattpost-rollback.log
+    chmod 0644 /var/log/wattpost-rollback.log
+fi
+if [ -f "${SCRIPT_DIR}/systemd/wattpost-rollback.service" ]; then
+    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-rollback.service" \
+        /etc/systemd/system/wattpost-rollback.service
+fi
+
+# ----- cloudflared (optional, for cloud tunnel) -----
+# Install Cloudflare's cloudflared binary so the daemon can expose
+# the local dashboard at <slug>.wattpost.io once it's paired to the
+# cloud. Idempotent: skipped if already installed. Apt-managed (via
+# Cloudflare's signed repo) so `apt upgrade` keeps it current.
+#
+# Skip entirely on architectures Cloudflare doesn't ship for —
+# tunnel will simply stay off, appliance keeps working locally.
+if ! command -v cloudflared >/dev/null; then
+    step "installing cloudflared (for cloud tunnel — optional)"
+    ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
+    case "${ARCH}" in
+        amd64|arm64|armhf)
+            if ! [ -f /usr/share/keyrings/cloudflare-main.gpg ]; then
+                curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
+                    | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+            fi
+            if ! [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
+                # Cloudflare ships `bookworm` + `any` distros only —
+                # no `trixie` repo as of mid-2026. The package is a
+                # statically-linked Go binary, so the bookworm package
+                # works fine on a trixie host. Pin to bookworm to
+                # avoid "Release file not found" on newer Pi OS.
+                echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
+https://pkg.cloudflare.com/cloudflared bookworm main" \
+                    > /etc/apt/sources.list.d/cloudflared.list
+            fi
+            apt-get update -qq
+            apt-get install -y cloudflared
+            ;;
+        *)
+            warn "cloudflared not available for arch '${ARCH}' — cloud tunnel will be disabled."
+            ;;
+    esac
+else
+    step "cloudflared already installed ($(cloudflared --version 2>/dev/null | head -1))"
+fi
+
+# ----- version file (read by motd) -----
+# Cheap source of truth that doesn't require invoking the venv. Read
+# from the source's solar_monitor/__init__.py at install time.
+INIT_VERSION="$(grep -E '^__version__' "${SOURCE}/solar_monitor/__init__.py" 2>/dev/null \
+                | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
+if [ -n "${INIT_VERSION}" ]; then
+    echo "${INIT_VERSION}" > "${CONFIG_DIR}/version"
+    chmod 0644 "${CONFIG_DIR}/version"
+fi
+
+# ----- web port -----
+# Default to 80 on a Pi-style SD-card install (single-purpose appliance,
+# users hit http://wattpost.local without typing a port) and 8000 on
+# anything else (Docker hosts, manual installs on shared machines where
+# port 80 is taken). Operator can force-pick by setting WATTPOST_PORT
+# before running install.sh, or by editing /etc/wattpost/port.env and
+# `systemctl restart wattpost` afterwards. The systemd unit reads this
+# via EnvironmentFile= so a port change doesn't require a unit edit.
+if [ -z "${WATTPOST_PORT:-}" ]; then
+    # Pi OS image ships /etc/rpi-issue (and similar). If that's
+    # missing, assume a shared host and default to 8000.
+    if [ -f /etc/rpi-issue ] || [ -f /etc/rpi-eeprom-update-2025.05 ]; then
+        WATTPOST_PORT=80
+    else
+        WATTPOST_PORT=8000
+    fi
+fi
+step "web port: ${WATTPOST_PORT}"
+echo "WATTPOST_PORT=${WATTPOST_PORT}" > "${CONFIG_DIR}/port.env"
+chmod 0644 "${CONFIG_DIR}/port.env"
+
+# ----- MOTD banner -----
+# Drop our SSH login banner. /etc/update-motd.d/ is read on every login
+# (when PAM motd is enabled, default on Debian/Pi OS). Numeric prefix
+# orders us early so the WattPost block shows up at the top.
+step "installing SSH login banner (/etc/update-motd.d/10-wattpost)"
+if [ -d "${SCRIPT_DIR}/motd" ] && [ -d /etc/update-motd.d ]; then
+    install -m 0755 "${SCRIPT_DIR}/motd/10-wattpost" /etc/update-motd.d/10-wattpost
+fi
+
+# ----- wattpost-config CLI -----
+# The raspi-config-style menu for "I just SSH'd in, now what?" — wraps
+# the most common admin actions (logs, restart, port change, pair
+# status). Installed at /usr/local/bin so it's on root's $PATH without
+# editing /etc/profile.
+step "installing wattpost-config CLI"
+if [ -f "${SCRIPT_DIR}/cli/wattpost-config" ]; then
+    install -m 0755 "${SCRIPT_DIR}/cli/wattpost-config" /usr/local/bin/wattpost-config
+fi
+
+# ----- systemd unit -----
+step "installing wattpost.service"
+install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"
+systemctl daemon-reload
+systemctl enable wattpost.service >/dev/null
+systemctl restart wattpost.service
+
+# ----- summary -----
+step "done"
+IP=$(hostname -I | awk '{print $1}')
+# Show port in the URL only when it's not the default :80 (which is
+# implicit in any browser).
+PORT_SUFFIX=""
+if [ "${WATTPOST_PORT}" != "80" ]; then
+    PORT_SUFFIX=":${WATTPOST_PORT}"
+fi
+cat <<EOF
+
+WattPost is running. Open the dashboard:
+
+    http://${IP:-<this-pi>}${PORT_SUFFIX}/
+
+Useful commands:
+    sudo systemctl status wattpost     # health
+    journalctl -u wattpost -f           # live logs
+    sudo systemctl restart wattpost     # apply config changes (the UI's
+                                        # "Restart daemon" button does the
+                                        # same via /api/system/restart)
+
+Config file:       ${CONFIG_FILE}
+Database:          ${STATE_DIR}/solar-monitor.db
+App + venv:        ${APP_ROOT}/
+
+EOF

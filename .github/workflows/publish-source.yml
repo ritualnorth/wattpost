@@ -1,0 +1,187 @@
+name: Publish appliance source
+
+# Builds a tar.gz of the appliance source on tagged releases and
+# uploads it to releases.wattpost.io. This is what
+# `/api/system/update/apply` on a paired appliance pulls down to
+# get new features without a fresh SD-card flash.
+#
+# Tarball includes: solar_monitor/, packaging/, pyproject.toml,
+# README.md. Excludes: cloud/ (private), .github/, dev artefacts.
+#
+# Only fires on `v*` tag pushes — NOT on every main commit. That
+# way the manifest version bump (= "Update available" badge on
+# every paired Pi appliance) only happens at deliberate release
+# points, not on every fix commit. See docs/release-pipeline.md
+# for the full ritual.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# Coalesce back-to-back tags: only the newest tarball matters for
+# "Update now" (manifest.json always points at latest), and the
+# appleboy/scp-action Docker layer occasionally flakes on the
+# runner with a "pull access denied" — cancelling
+# in-flight older runs trims the failure-email noise.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish:
+    name: tar + scp to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Need history so we can stamp the tarball with the commit SHA.
+          fetch-depth: 0
+
+      - name: Build tarball
+        id: tarball
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse --short HEAD)
+          VERSION=$(grep -E '^__version__' solar_monitor/__init__.py | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          NAME="wattpost-source-${VERSION}+${SHA}.tar.gz"
+          # Output goes inside $GITHUB_WORKSPACE because appleboy/scp-action
+          # runs in a Docker container that only mounts the workspace —
+          # /tmp on the host isn't visible to it.
+          OUT_DIR="${GITHUB_WORKSPACE}/_release_out"
+          mkdir -p "${OUT_DIR}"
+          # -h dereferences symlinks at archive time. solar_monitor/web/docs/
+          # is a symlink into /docs/ (single source of truth for docs across
+          # appliance + cloud); -h folds the real .md files into the tarball
+          # so the appliance is self-contained after install.
+          tar -czhf "${OUT_DIR}/${NAME}" \
+              --exclude='./solar_monitor/__pycache__' \
+              --exclude='./solar_monitor/**/__pycache__' \
+              --exclude='*.egg-info' \
+              ./solar_monitor ./packaging ./pyproject.toml ./README.md
+          ( cd "${OUT_DIR}" && sha256sum "${NAME}" > "${NAME}.sha256" )
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "out_dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
+          ls -lah "${OUT_DIR}"
+
+      - name: Upload to releases.wattpost.io
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "_release_out/*"
+          target: /srv/wattpost-releases/source/
+          strip_components: 1
+
+      - name: Upload CHANGELOG.md to releases root
+        # Lives at the releases-root, not under source/, because it
+        # describes the cross-cutting release history rather than
+        # belonging to any one tarball. The appliance's update
+        # checker fetches it on every manifest poll so the dashboard
+        # can preview release notes BEFORE the user installs the
+        # new version.
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "CHANGELOG.md"
+          target: /srv/wattpost-releases/
+
+      - name: Update `latest` symlink + manifest version
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          NEW_VERSION: ${{ steps.tarball.outputs.version }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: NEW_VERSION
+          script: |
+            set -euo pipefail
+            # Channel routing (#11). A semver pre-release (a hyphen in
+            # NEW_VERSION, e.g. 0.2.0-rc1) publishes source to the BETA
+            # channel only; a final version publishes to STABLE and is
+            # mirrored into beta (a final release is the newest beta too).
+            case "$NEW_VERSION" in
+              *-*) CHANNEL=beta ;;
+              *)   CHANNEL=stable ;;
+            esac
+            if [ "$CHANNEL" = beta ]; then
+              SRC_LINK=beta.tar.gz;   MANIFEST=/srv/wattpost-releases/img/manifest-beta.json
+            else
+              SRC_LINK=latest.tar.gz; MANIFEST=/srv/wattpost-releases/img/manifest.json
+            fi
+            echo "source publish: $NEW_VERSION -> channel=$CHANNEL (src=$SRC_LINK)"
+
+            # No-downgrade guard against THIS channel's manifest
+            # (incident 2026-05-28). A re-pushed old tag must not roll
+            # the channel backwards.
+            if [ -f "$MANIFEST" ]; then
+              CUR=$(python3 -c "import json;print(json.load(open('$MANIFEST')).get('version',''))" 2>/dev/null || echo "")
+              if [ -n "$CUR" ] && [ "$CUR" != "$NEW_VERSION" ] \
+                 && [ "$(printf '%s\n%s\n' "$CUR" "$NEW_VERSION" | sort -V | tail -1)" = "$CUR" ]; then
+                echo "no-downgrade: $CHANNEL channel at $CUR, this release is $NEW_VERSION -- skipping source publish"
+                exit 0
+              fi
+            fi
+            cd /srv/wattpost-releases/source
+            newest=$(ls -1t wattpost-source-*.tar.gz 2>/dev/null | head -1)
+            if [ -z "$newest" ]; then
+              echo "no source tarballs found" >&2
+              exit 1
+            fi
+
+            # Manifest patcher written once to a temp file, then called
+            # per channel. Kept OUT of any shell function so this heredoc
+            # terminator sits at the YAML-dedented column 0 (a quoted
+            # heredoc won't close on an indented terminator). Image fields
+            # are left untouched — they're owned by build-image.yml.
+            cat > /tmp/wp_patch_manifest.py <<'PY'
+            import json, sys, pathlib
+            path, version, src_sha, now = sys.argv[1:]
+            p = pathlib.Path(path)
+            m = json.loads(p.read_text())
+            m["version"]       = version
+            m["released_at"]   = now
+            m["source_sha256"] = src_sha
+            # Relative URL — the appliance dashboard resolves it against
+            # its own origin so it works on Pi/Docker LAN IPs or via the
+            # cloudflared tunnel without the manifest knowing the host.
+            m["release_url"]   = "/docs/release-notes"
+            p.write_text(json.dumps(m, indent=2) + "\n")
+            print(f"manifest {path}: version={version} released_at={now}")
+            PY
+
+            publish_source_channel() {
+              local src_link="$1" manifest="$2"
+              ln -sfn "$newest" "$src_link"
+              ln -sfn "$newest.sha256" "$src_link.sha256"
+              echo "$src_link -> $newest"
+              if [ -f "$manifest" ]; then
+                local source_sha; source_sha=$(awk '{print $1}' "${newest}.sha256")
+                local now; now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+                python3 /tmp/wp_patch_manifest.py "$manifest" "$NEW_VERSION" "$source_sha" "$now"
+              else
+                echo "manifest $manifest missing — skipping manifest bump"
+              fi
+            }
+            publish_source_channel "$SRC_LINK" "$MANIFEST"
+            # A final release is the newest beta too — mirror the source.
+            if [ "$CHANNEL" = stable ]; then
+              publish_source_channel "beta.tar.gz" "/srv/wattpost-releases/img/manifest-beta.json"
+            fi
+
+            # Keep only the 10 most recent tarballs — older ones are
+            # historical only; appliances pulling latest/beta don't care.
+            ls -1t wattpost-source-*.tar.gz 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f
+            ls -1t wattpost-source-*.tar.gz.sha256 2>/dev/null | tail -n +11 \
+                | xargs -r rm -f

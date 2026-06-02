@@ -1,0 +1,86 @@
+#!/bin/sh
+# WattPost SSH login banner.
+#
+# Lives at /etc/update-motd.d/10-wattpost (installed by
+# packaging/install.sh). The motd subsystem runs every file under
+# /etc/update-motd.d/ on each interactive SSH/console login and
+# concatenates their stdout into the login message.
+#
+# Keep this fast (no apt, no network) and graceful — runs whether or
+# not the daemon is up, whether or not the user has paired with the
+# cloud.
+
+# ANSI: golden accent matches the dashboard's WattPost-amber.
+BOLD=$(printf '\033[1m')
+DIM=$(printf '\033[2m')
+AMBER=$(printf '\033[38;5;214m')
+GREEN=$(printf '\033[38;5;42m')
+RED=$(printf '\033[38;5;203m')
+GREY=$(printf '\033[38;5;245m')
+RESET=$(printf '\033[0m')
+
+# --- version + uptime ---
+# install.sh drops /etc/wattpost/version on every install so the motd
+# script doesn't need to invoke the venv (sudo permission gotchas, and
+# we want this banner to be FAST so login is snappy).
+VERSION="$(cat /etc/wattpost/version 2>/dev/null || echo '?')"
+UPTIME="$(uptime -p 2>/dev/null | sed 's/^up //')"
+
+# --- daemon status ---
+if systemctl is-active --quiet wattpost 2>/dev/null; then
+    DAEMON="${GREEN}● running${RESET}"
+else
+    DAEMON="${RED}○ stopped${RESET}"
+fi
+
+# --- cloud + tunnel (best-effort, swallow errors) ---
+CLOUD="${GREY}not paired${RESET} ${DIM}(pair at https://wattpost.cloud/app/pair)${RESET}"
+TUNNEL="${GREY}─${RESET}"
+DASH_URL="http://wattpost.local"
+
+CFG=/etc/wattpost/config.yaml
+if [ -r "$CFG" ]; then
+    if grep -qE '^  bearer_token:' "$CFG"; then
+        LABEL="$(awk '/^cloud:/{f=1} f && /^  label:/{print substr($0, index($0,$2)); exit}' "$CFG" 2>/dev/null | tr -d '"')"
+        CLOUD="${GREEN}● paired${RESET}${LABEL:+ ${DIM}($LABEL)${RESET}}"
+    fi
+    if grep -qE '^  tunnel_hostname:' "$CFG"; then
+        HOST="$(awk '/^cloud:/{f=1} f && /^  tunnel_hostname:/{print $2; exit}' "$CFG" 2>/dev/null | tr -d '"')"
+        TUNNEL="${GREEN}● ${HOST}${RESET}"
+    fi
+fi
+
+# --- dashboard URL: try to derive a useful hostname ---
+HOST="$(hostname 2>/dev/null || echo wattpost)"
+WEB_PORT="$(awk '/^web:/{f=1} f && /^  port:/{print $2; exit}' "$CFG" 2>/dev/null)"
+if [ -z "$WEB_PORT" ] || [ "$WEB_PORT" = "80" ]; then
+    DASH_URL="http://${HOST}.local"
+else
+    DASH_URL="http://${HOST}.local:${WEB_PORT}"
+fi
+
+# --- print ---
+# Web password line — only shown when the install plaintext file
+# still exists (operator hasn't deleted it). After changing the
+# password via wattpost-config the file is removed and this line
+# disappears.
+WEB_PASS_LINE=""
+if [ -r /etc/wattpost/web-password ]; then
+    WP_PASS="$(cat /etc/wattpost/web-password 2>/dev/null)"
+    if [ -n "${WP_PASS}" ]; then
+        WEB_PASS_LINE="  Web password: ${BOLD}${AMBER}${WP_PASS}${RESET}  ${DIM}(change with 'wattpost-config' → Reset web password)${RESET}\n"
+    fi
+fi
+
+cat <<EOF
+
+${AMBER}${BOLD}  WattPost${RESET} ${DIM}v${VERSION}${RESET}    ${DIM}uptime: ${UPTIME}${RESET}
+
+  Dashboard:  ${BOLD}${DASH_URL}${RESET}
+$(printf "${WEB_PASS_LINE}")  Daemon:     ${DAEMON}
+  Cloud:      ${CLOUD}
+  Tunnel:     ${TUNNEL}
+
+  Type ${BOLD}wattpost-config${RESET} for the setup menu.
+
+EOF

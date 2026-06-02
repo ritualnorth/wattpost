@@ -1,0 +1,118 @@
+# WattPost appliance — example docker-compose for Linux hosts.
+#
+# Copy this to docker-compose.yml in a working directory, then:
+#   docker compose up -d
+#   open http://localhost:8000   (or http://<this-host-ip>:8000)
+#
+# Updates: the watchtower sidecar at the bottom polls GHCR daily and
+#   restarts wattpost when a new tag lands. Same sidecar is what the
+#   cloud's "Update now" button drives — it POSTs to the local
+#   watchtower HTTP API and gets an instant pull + restart.
+#   To control updates manually instead, comment out the watchtower
+#   service and run `docker compose pull && docker compose up -d`.
+#
+# Linux host only — macOS / Windows / WSL2 can't pass host Bluetooth
+# through to a container. For those, use the SD-card image (Pi) or
+# any Linux host with BLE (cheap Mini PC, NUC, recycled laptop, etc).
+
+services:
+  wattpost:
+    image: ghcr.io/ritualnorth/wattpost-appliance:latest
+    container_name: wattpost
+
+    # Host networking is the simplest path to BLE on Linux. The
+    # alternative (cap_add + dbus bind-mount) works on most distros
+    # but bluez integration varies by version — host mode is the path
+    # we test. Trade-off: the container shares the host's network
+    # namespace, so :8000 binds the host directly.
+    network_mode: host
+
+    # Bluetooth on Linux Docker requires:
+    #   1. The host's system DBus socket. /var/run/dbus is a symlink
+    #      to /run/dbus on most modern distros — mount the source
+    #      explicitly so Docker doesn't get confused.
+    #   2. NET_ADMIN + SYS_ADMIN caps for BLE scan + bluez ops.
+    #   3. AppArmor unconfined — the default docker profile blocks
+    #      the container from talking through the system bus socket
+    #      on Ubuntu / Debian hosts. Without this, bluetoothctl in
+    #      the container fails with "connection != NULL" assertion.
+    #   If your distro's bluez is patchy with this combo, replace
+    #   the three options below with `privileged: true` (bigger
+    #   hammer, equivalent result).
+    volumes:
+      - /run/dbus:/var/run/dbus
+      # Persist config + history across `docker compose pull`.
+      - ./wattpost-config:/etc/wattpost
+      - ./wattpost-data:/var/lib/wattpost
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+
+    # On startup the entrypoint drops a default /etc/wattpost/config.yaml
+    # the first time the volume is empty, then runs `solar-monitor serve`.
+    restart: unless-stopped
+
+    environment:
+      # Tells the daemon to find the updater sidecar at this URL for
+      # cloud-triggered updates. If unset, cloud Update-now is refused
+      # with "no updater available". Match the token in the updater
+      # service below — generate once with
+      #   openssl rand -hex 32
+      # and paste the same value in both places. Keep it secret; it
+      # gives anyone who reaches the updater port full control of
+      # this container.
+      WATTPOST_DEPLOYMENT: docker
+      WATCHTOWER_URL:   "http://localhost:8080"
+      WATCHTOWER_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
+
+    # Pulled by the updater below — the label tells it which
+    # container(s) to update and ignore everything else on the host.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ────────────────────────────────────────────────────────────────
+  # Updater sidecar — drives both scheduled auto-updates and the
+  # cloud's "Update now" button.
+  #
+  # This is a Wattpost-owned image (ghcr.io/ritualnorth/wattpost-updater)
+  # because the obvious choice, containrrr/watchtower, doesn't work
+  # with Docker engine 29+ (Ubuntu 24.04 LTS default) — its Docker
+  # SDK client is rejected by Docker's MinAPIVersion gate. Our
+  # updater shells out to the docker compose CLI against your bind-
+  # mounted compose file, so it inherits whatever compose version is
+  # in the base image and stays compat with modern Docker.
+  #
+  # Same HTTP API shape as Watchtower (POST /v1/update + Bearer),
+  # same env var names → drop-in replacement.
+  #
+  # Without this service, cloud Update-now is refused (Pi installs use
+  # wattpost-update; Docker has no equivalent helper otherwise) and
+  # the appliance only gets new image tags when the human runs
+  # `docker compose pull` by hand.
+  # ────────────────────────────────────────────────────────────────
+  wattpost-updater:
+    image: ghcr.io/ritualnorth/wattpost-updater:latest
+    container_name: wattpost-updater
+    restart: unless-stopped
+    # Host networking so the daemon can reach localhost:8080 cleanly
+    # (the wattpost container also uses host networking above).
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Bind-mount THIS compose file (read-write) so the updater can:
+      #   - Run `docker compose pull wattpost && up -d wattpost` for
+      #     regular updates.
+      #   - Rewrite the `image:` tag line for auto-rollback (#270),
+      #     when the cloud queues a pin_image_tag command targeting a
+      #     previous version. Read-only would block the rollback path.
+      - ./docker-compose.yml:/host-compose/docker-compose.yml
+    environment:
+      COMPOSE_FILE:  "/host-compose/docker-compose.yml"
+      SERVICE_NAME:  "wattpost"
+      POLL_INTERVAL: "86400"      # daily auto-poll; 0 disables
+      # Match the token in the wattpost service above. Anyone with
+      # this token + network reach to :8080 can force-restart this
+      # container — don't expose this port outside the box.
+      WATCHTOWER_HTTP_API_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"

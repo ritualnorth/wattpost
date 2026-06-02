@@ -1,0 +1,214 @@
+# WattPost config — copy to config.yaml and edit.
+#
+# Each transport is one connection to one bus. Each device sits on a transport
+# at a Modbus slave id. The same transport can carry many devices.
+
+transports:
+  - id: hub_bt
+    type: ble_modbus
+    address: CC:45:A5:83:B7:42       # the BT-2 dongle's BLE MAC
+    # Optional overrides:
+    # write_char: "0000ffd1-0000-1000-8000-00805f9b34fb"
+    # notify_char: "0000fff1-0000-1000-8000-00805f9b34fb"
+    # discovery_timeout: 20
+
+  # When you wire RS-485 directly into the Pi, add a second transport:
+  # - id: hub_rs485
+  #   type: serial_modbus
+  #   port: /dev/ttyUSB0
+  #   baudrate: 9600
+
+devices:
+  - vendor: renogy
+    kind: charge_controller
+    transport: hub_bt
+    slave_id: 16
+    label: rover_mppt
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 48
+    label: battery_0
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 49
+    label: battery_1
+
+  - vendor: renogy
+    kind: smart_battery
+    transport: hub_bt
+    slave_id: 50
+    label: battery_2
+
+# Optional: stream every poll result to an MQTT broker so power users can
+# pipe data into Home Assistant, Grafana, or their own automations.
+# Topics published (with default prefix "solar"):
+#   solar/<device_label>/state       full device snapshot (retained)
+#   solar/<device_label>/<metric>    individual values (retained, optional)
+#   solar/_status                    online/offline (LWT)
+# exporters:
+#   - id: hass_mqtt
+#     type: mqtt
+#     host: 192.168.1.20
+#     port: 1883
+#     username: solar
+#     password: changeme
+#     topic_prefix: solar
+#     retain: true
+#     publish_per_metric: true
+#     # Home Assistant MQTT discovery — when on, the daemon publishes a
+#     # `homeassistant/sensor/<node>/<label>_<metric>/config` payload the
+#     # first time it sees each (device, metric) pair. HA auto-creates the
+#     # sensors and groups them by device. Safe to leave on even without
+#     # an HA install — the discovery configs are tiny retained messages.
+#     ha_discovery: true
+#     ha_discovery_prefix: homeassistant
+#     ha_node_id: solar_monitor   # unique-id namespace; change if running
+#                                  # multiple WattPost units on one broker
+#
+#   # Prometheus exporter (#14). Serves the latest readings at GET /metrics
+#   # for Grafana via the standard pull model — no credentials, read-only.
+#   # Point Prometheus (or Grafana Agent) at
+#   # http://<appliance>:<dashboard-port>/metrics, then add Prometheus as a
+#   # Grafana data source. Run it ALONGSIDE the MQTT exporter above — MQTT
+#   # for Home Assistant, Prometheus for Grafana. Each numeric per-device
+#   # reading becomes a gauge, e.g. wattpost_soc_pct{device="battery_0"}.
+#   - id: prom
+#     type: prometheus
+#     metric_prefix: wattpost     # optional; gauge-name prefix (default)
+
+# Notification transports — outbound channels the alert engine can fan
+# events to. Each entry needs a unique `id` you reference from alert
+# rules below.
+# notification_transports:
+#   - id: ntfy_main
+#     type: ntfy
+#     topic: my-private-rv-alerts   # pick something obscure — public broker
+#     # server: https://ntfy.sh     # default; override for self-hosted
+#
+#   - id: discord_main
+#     type: discord_webhook
+#     url: https://discord.com/api/webhooks/...   # channel webhook URL
+#
+#   - id: my_webhook
+#     type: webhook
+#     url: https://example.com/wattpost-hook
+#     method: POST                                # default
+#     headers: { "X-Auth-Token": "..." }          # optional
+#
+#   - id: email_main
+#     type: smtp
+#     host: smtp.gmail.com
+#     port: 587                                   # 587 STARTTLS, 465 SSL
+#     username: alerts@example.com
+#     password: app-specific-password             # Gmail: create at myaccount.google.com/apppasswords
+#     from_addr: "WattPost <alerts@example.com>"
+#     to_addrs: [you@example.com, partner@example.com]
+#     use_starttls: true                          # default; set use_ssl on port 465 instead
+#
+#   - id: pushover_main
+#     type: pushover
+#     app_token: <your-pushover-app-token>         # https://pushover.net/apps/build (one-time setup)
+#     user_key:  <your-pushover-user-key>          # top of your https://pushover.net dashboard
+#     # device: pixel-9                            # optional: only this device. Omit for all.
+
+# WattPost cloud (wattpost.io). Optional. Pair the appliance to your
+# cloud account so the multi-site dashboard sees it and overdue
+# heartbeats fire an offline alert. The bearer_token is normally
+# written here by the Settings → Integrations → WattPost cloud
+# pairing flow — you don't have to edit it manually.
+# cloud:
+#   endpoint:          https://wattpost.io
+#   bearer_token:      <fill via UI pairing>
+#   appliance_id:      <set by cloud on pair>
+#   label:             <set by cloud on pair>
+#   heartbeat_minutes: 5
+
+# WiFi hotspot (appliance-as-AP) — optional, off by default. Turns the
+# appliance's WiFi radio into a NetworkManager access point so a phone or
+# laptop can reach the dashboard with no other network (field setup /
+# off-grid). While up, the dashboard answers at http://10.42.0.1. Needs
+# NetworkManager on the host (default on Pi OS Bookworm). `enabled: true`
+# brings it up on boot; either way you can toggle it from
+# Settings -> WiFi hotspot. See docs/hotspot.md. (Auto-handoff + captive
+# portal are Phase 3b.)
+# hotspot:
+#   enabled: false            # always-on: bring the AP up on boot
+#   auto_handoff: false       # auto-enable the AP whenever there's no
+#                             # other network, drop it when one returns.
+#                             # Local-first (no cloud needed); the off-grid
+#                             # path. Ignored when enabled: true.
+#   captive_portal: false     # when a device joins, auto-pop the dashboard
+#                             # (the "Sign in to network" sheet). Needs NM
+#                             # DNS access (built into the appliance image).
+#   ssid: WattPost-Setup
+#   password: "changeme123"   # 8..63 chars (WPA2), or "" for open
+#   band: bg                  # "bg" = 2.4 GHz, "a" = 5 GHz
+#   channel: 6
+#   interface: wlan0
+
+# Current weather (Open-Meteo, free, no API key). When set, the
+# daemon polls Open-Meteo for temperature, cloud cover, wind, and
+# sunrise/sunset, and the dashboard's "Right now" tile populates.
+# Lat/lon are required; if you also have a Solcast site registered,
+# use the same coordinates.
+# weather:
+#   provider: openmeteo
+#   lat: 51.5074
+#   lon: -0.1278
+#   poll_minutes: 15
+
+# PV forecast — optional. When set, the daemon polls Solcast (or
+# another supported provider) every poll_hours and caches the result;
+# the History chart overlays the forecast on pv_power_w. Sign up
+# free at https://solcast.com/free-rooftop-solar-forecasting for a
+# residential API key, register your rooftop array, paste the
+# resource UUID below.
+# forecast:
+#   provider: solcast
+#   api_key:  <your-36-char-key>
+#   resource_id: <site-uuid>
+#   poll_hours: 3   # 8 calls/day; Solcast hobbyist limit is 10/day
+
+# Quiet hours — warn-severity alerts inside this window are buffered
+# and flushed when the window ends. alarm-severity always pages through
+# immediately. Hours are local time, 0-23. Overnight (start > end) works.
+# Omit or set start_hour == end_hour to disable.
+# quiet_hours:
+#   start_hour: 22    # 22:00 local
+#   end_hour:   7     # ...until 07:00 next morning
+
+# Alert rules — evaluated after every poll. Metric is a dotted path
+# into the alert context (bank.soc_pct, bank.netW, bank.meanV,
+# bank.worst_pack_drift_v, aggregate.max_cell_drift_v, or
+# devices.<label>.<metric_key>). Cooldown rate-limits re-fires.
+# alerts:
+#   - id: low_soc
+#     name: Battery low
+#     metric: bank.soc_pct
+#     op: lt
+#     threshold: 30
+#     severity: warn          # warn | alarm
+#     cooldown_seconds: 1800  # 30 min between re-fires
+#     transports: [ntfy_main]
+#
+#   - id: critical_soc
+#     name: Critical battery
+#     metric: bank.soc_pct
+#     op: lt
+#     threshold: 15
+#     severity: alarm
+#     cooldown_seconds: 600
+#     transports: [ntfy_main, discord_main]
+#
+#   - id: cell_drift
+#     name: Cell drift high
+#     metric: aggregate.max_cell_drift_v
+#     op: gt
+#     threshold: 0.05         # 50 mV
+#     severity: warn
+#     cooldown_seconds: 3600
+#     transports: [ntfy_main]

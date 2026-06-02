@@ -1,0 +1,112 @@
+# WattPost appliance — Docker image.
+#
+# A docker-distributed alternative to the SD-card install. Same Python
+# daemon (solar_monitor) running under the same `solar-monitor serve`
+# entry point — only the deployment surface differs.
+#
+# BLE passthrough: Bluetooth on Linux Docker requires either
+#   (a) network_mode: host + access to /var/run/dbus (recommended)
+# or
+#   (b) --privileged (last resort)
+# macOS / Windows / WSL2 can't pass host BLE through, so this image is
+# Linux-host only for the appliance use case. See docker-compose.example.yml
+# at the repo root.
+#
+# Updates: `docker compose pull && docker compose up -d`. No source-
+# tarball swap, no Update-now button — image replacement is the update.
+
+# Mirror via AWS Public ECR. Identical bits to docker.io/library/python
+# (Docker Inc. publishes both); no rate limit on anonymous pulls. Switched
+# 2026-05-23 after Docker Hub rate-limited three appliance builds in a
+# row during a busy release. Docker Hub auth in the workflow is
+# the right long-term fix (#283); this gets us unblocked today.
+FROM public.ecr.aws/docker/library/python:3.12-slim
+
+LABEL org.opencontainers.image.source="https://github.com/ritualnorth/wattpost"
+LABEL org.opencontainers.image.description="WattPost appliance — off-grid solar monitor daemon for Renogy gear over Bluetooth"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+# System deps:
+#   - bluez + bluez-tools: BlueZ CLI (only needed for diagnostics; the
+#     daemon talks to BLE via bleak which uses host DBus when running
+#     with network_mode: host).
+#   - libffi8: argon2-cffi runtime.
+#   - ca-certificates: HTTPS to alert webhooks / Solcast / Open-Meteo.
+#   - curl: only needed to fetch cloudflared in the next layer.
+#   - network-manager: the `nmcli` client for the WiFi hotspot
+#     (appliance-as-AP). In host-network + /run/dbus-mount mode it
+#     drives the host's NetworkManager; the in-container NM daemon is
+#     never started. No-op when the hotspot feature is unconfigured.
+#   - iw: best-effort connected-client count for the hotspot status.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        bluez bluez-tools libffi8 ca-certificates dbus curl \
+        network-manager iw \
+ && rm -rf /var/lib/apt/lists/*
+
+# cloudflared — Cloudflare Tunnel client. Used by the paired-cloud
+# flow to expose this appliance's dashboard at <slug>.wattpost.io
+# without the user having to port-forward or run a reverse proxy.
+# Pi installs get it from the SD image's apt setup; for Docker we
+# pin a known-good static binary so the tunnel feature works
+# identically across both deployment types. Architecture detected
+# from dpkg so the multi-arch image picks the right one.
+ARG CLOUDFLARED_VERSION=2024.12.2
+RUN ARCH=$(dpkg --print-architecture) \
+ && curl -fsSL -o /usr/local/bin/cloudflared \
+      "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${ARCH}" \
+ && chmod +x /usr/local/bin/cloudflared \
+ && /usr/local/bin/cloudflared --version
+
+WORKDIR /app
+
+# Two-step install for dep-layer cache:
+#   1. Copy pyproject.toml + a stub package so pip resolves deps to a
+#      cached layer.
+#   2. Copy the real source on top so the console-script entry-point
+#      can actually find solar_monitor at import time.
+COPY pyproject.toml /app/
+RUN mkdir -p /app/solar_monitor \
+ && touch /app/solar_monitor/__init__.py \
+ && pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir . \
+ && rm -rf /app/solar_monitor
+
+COPY solar_monitor /app/solar_monitor
+COPY packaging    /app/packaging
+# Docs live at /app/docs because solar_monitor/web/docs is a
+# repo-root symlink (../../docs). With solar_monitor at /app/...,
+# the symlink resolves to /app/docs — putting docs anywhere else
+# leaves a dangling symlink and /web/docs/<slug>.md 404s in-app.
+COPY docs         /app/docs
+
+# Belt+braces: expose /app on PYTHONPATH so both the installed entry
+# point and `python -m solar_monitor` resolve.
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+# Tells the daemon's update-checker that this install is Docker —
+# the dashboard shows "docker compose pull" copy instead of an
+# Update-now button that wouldn't work (wattpost-update helper
+# isn't part of the image).
+ENV WATTPOST_DEPLOYMENT=docker
+
+# Mountpoints the operator should bind to host volumes so config + DB
+# survive `docker compose pull && up -d`.
+VOLUME ["/etc/wattpost", "/var/lib/wattpost"]
+
+# Default config path mirrors the Pi install layout so docs +
+# wattpost-config TUI behave identically.
+ENV WATTPOST_CONFIG=/etc/wattpost/config.yaml
+ENV WATTPOST_DB_PATH=/var/lib/wattpost/solar-monitor.db
+
+# Web UI port. Host-network mode means this is a hint, not a binding.
+EXPOSE 8000
+
+# First-boot bootstrap: if /etc/wattpost/config.yaml doesn't exist on
+# the mounted volume, drop a minimal default in so the daemon starts
+# without errors and the user can edit through Settings → Devices.
+COPY packaging/docker/entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
+
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+CMD ["solar-monitor", "serve", "--config", "/etc/wattpost/config.yaml", "--port", "8000"]
