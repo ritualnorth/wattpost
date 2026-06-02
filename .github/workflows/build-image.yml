@@ -99,22 +99,17 @@ jobs:
           echo "checksum=$IMG.sha256" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$IMG")" >> "$GITHUB_OUTPUT"
 
-      # NB: we used to upload-artifact the .img.xz here for manual-run
-      # convenience. Removed 2026-05-21 because (a) the build runners
-      # made the SD images live on the runner's disk and ALSO get scp'd
-      # to releases.wattpost.io/img/ (the actual public distribution),
-      # so the GitHub copy was redundant; and (b) at ~570 MB per build
-      # × 14 d retention the cumulative artefact storage blew through
-      # the 2 GB free tier in ~3-4 builds. If you need the image on a
-      # manual test run, grab it from releases.wattpost.io/img/ — the
-      # scp step uploads it whether or not we're on a tag push.
+      # NB: we don't upload-artifact the .img.xz — at ~570 MB per build
+      # × 14 d retention it blew through the 2 GB free artefact tier in
+      # ~3-4 builds. The image is attached to the GitHub Release below;
+      # grab it from there for a manual test run.
 
-      # On tag pushes only: attach to a GitHub Release. action-gh-release
-      # creates the release if it doesn't exist, or appends to an
-      # existing one — so we can re-run on the same tag to repair a
-      # failed upload without losing the original release body.
-      # The canonical public download is the scp-to-VPS step below
-      # (releases.wattpost.io); the GitHub Release is a secondary copy.
+      # On tag pushes only: attach the .img.xz + sha256 to a GitHub
+      # Release — the canonical public download (the /download page and
+      # the cloud's /api/releases/latest both resolve to it).
+      # action-gh-release creates the release if absent or appends to an
+      # existing one, so a re-run on the same tag repairs a failed upload
+      # without losing the release body.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -124,164 +119,3 @@ jobs:
             ${{ steps.locate.outputs.checksum }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-
-      # Public-facing release channel: scp the .img.xz + sha256 to the
-      # release host, which serves it anonymously as releases.wattpost.io.
-      # The GH-release path above is a secondary archive; this scp is what
-      # end-users actually download.
-      #
-      # NOT using appleboy/scp-action — that's a Docker action, and
-      # pi-gen's 90-minute build seems to disrupt GH Actions' internal
-      # Docker state (the action's image gets garbage-collected). Plain
-      # ssh/scp commands have no such dependency.
-      - name: Publish to releases.wattpost.io (scp) + symlink update
-        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        env:
-          SSH_KEY:  ${{ secrets.VPS_SSH_KEY }}
-          SSH_USER: ${{ secrets.VPS_USER }}
-          SSH_HOST: ${{ secrets.VPS_HOST }}
-          IMG:      ${{ steps.locate.outputs.image }}
-          CHECKSUM: ${{ steps.locate.outputs.checksum }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printenv SSH_KEY > ~/.ssh/id_release
-          chmod 0600 ~/.ssh/id_release
-          # ssh-keyscan can transiently fail (DNS race, network blip on
-          # the GH runner side); a failure here used to bail the script
-          # via `set -e` with NO output (because of the 2>/dev/null mute).
-          # Log + tolerate it: known_hosts is just an optimisation —
-          # the actual SSH calls below set StrictHostKeyChecking=accept-new
-          # so they discover the host themselves on first connect.
-          if ! ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts; then
-            echo "warn: ssh-keyscan failed, ssh will discover the host on first connect" >&2
-          fi
-
-          # Azure (runner) → the release VPS path silently drops idle TCP every
-          # so often. Keepalives surface a dead connection in ~60s
-          # instead of waiting out the 6h job timeout, and ConnectTimeout
-          # caps the initial dial. ServerAliveCountMax=4 keeps long scp
-          # transfers alive even through a brief network hiccup.
-          SSH_COMMON=(-i ~/.ssh/id_release
-                      -o BatchMode=yes
-                      -o ConnectTimeout=20
-                      -o ServerAliveInterval=15
-                      -o ServerAliveCountMax=4
-                      -o StrictHostKeyChecking=accept-new)
-
-          # Retry helper. Pi-gen takes ~90 minutes, then we try to
-          # publish; by then the runner is on a relatively old Azure
-          # NAT and the release VPS route flaps can knock SSH out for 5-10
-          # minutes at a stretch. Old config (3 retries, ~60s total
-          # wait) bailed before routes recovered.
-          #
-          # New: 8 attempts, exponential backoff capped at 5 min, so
-          # total wait is ~25 minutes before giving up. Pi-gen images
-          # are valuable (~90 min of compute), worth waiting on a
-          # transient route. The artefact is also attached to a GH
-          # Release in the previous step, so a failed publish here
-          # doesn't lose the image — operator can scp it manually
-          # from the artefact (see docs/release-pipeline.md).
-          retry() {
-            local n=0
-            local delays=(10 30 60 120 240 300 300 300)
-            until "$@"; do
-              n=$((n+1))
-              if [ "$n" -ge "${#delays[@]}" ]; then
-                echo "FAIL after $n attempts: $*" >&2
-                return 1
-              fi
-              local d="${delays[$((n-1))]}"
-              echo "retry $n in ${d}s: $*" >&2
-              sleep "$d"
-            done
-          }
-
-          # Preflight: confirm we can open a session at all.
-          retry ssh -v "${SSH_COMMON[@]}" \
-              "${SSH_USER}@${SSH_HOST}" 'echo OK_AUTH'
-          # Upload both artefacts.
-          retry scp -v "${SSH_COMMON[@]}" "$IMG" "$CHECKSUM" \
-              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/"
-          # Build the manifest.json the cloud reads at request time.
-          # Cloud's releases.get_latest() fetches this file every 60s,
-          # so within a couple minutes of this scp finishing, the
-          # /download page + /api/releases/latest reflect the new
-          # build automatically. No commit-to-cloud step.
-          VERSION=$(grep -E '^__version__' solar_monitor/__init__.py \
-                    | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          # Channel routing (#11). A semver pre-release (a hyphen in the
-          # version, e.g. 0.2.0-rc1) publishes to BETA only; a final
-          # version publishes to STABLE and is then mirrored into beta
-          # (a final release is the newest beta too). RC builds therefore
-          # never touch the stable manifest/image.
-          case "$VERSION" in
-            *-*) CHANNEL=beta ;;
-            *)   CHANNEL=stable ;;
-          esac
-          if [ "$CHANNEL" = beta ]; then
-            MANIFEST_NAME=manifest-beta.json; IMG_LINK=beta.img.xz;   SRC_LINK=beta.tar.gz
-          else
-            MANIFEST_NAME=manifest.json;      IMG_LINK=latest.img.xz; SRC_LINK=latest.tar.gz
-          fi
-          echo "publishing $VERSION -> channel=$CHANNEL (manifest=$MANIFEST_NAME img=$IMG_LINK)"
-
-          # No-downgrade guard, per channel. A tag force-push re-fires
-          # this workflow for old tags; refuse to roll THIS channel's
-          # manifest backwards (incident 2026-05-28: a re-run of v0.0.35
-          # clobbered the manifest to 0.0.35).
-          CUR_RAW=$(ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" \
-            "grep -oE '\"version\"[^,]*' /srv/wattpost-releases/img/${MANIFEST_NAME} 2>/dev/null | head -1" || echo "")
-          CUR=$(printf '%s' "$CUR_RAW" | sed -E 's/.*"([0-9][^"]*)".*/\1/')
-          if [ -n "$CUR" ] && [ "$CUR" != "$VERSION" ] \
-             && [ "$(printf '%s\n%s\n' "$CUR" "$VERSION" | sort -V | tail -1)" = "$CUR" ]; then
-            echo "no-downgrade: $CHANNEL channel at $CUR, this build is $VERSION -- skipping publish"
-            exit 0
-          fi
-          SHA=$(awk '{print $1}' "$CHECKSUM")
-          SIZE=$(stat -c %s "$IMG")
-          FNAME=$(basename "$IMG")
-          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          # Emit + scp a channel manifest, then repoint that channel's
-          # image symlink. image_url / source_url use the channel's
-          # stable symlink names so an appliance on this channel always
-          # pulls channel-appropriate artefacts.
-          publish_channel() {
-            local ch="$1" out="$2" img_link="$3" src_link="$4"
-            cat > /tmp/${out} <<JSON
-          {
-            "version":      "${VERSION}",
-            "released_at":  "${NOW}",
-            "channel":      "${ch}",
-            "image_filename": "${FNAME}",
-            "image_url":    "https://releases.wattpost.io/img/${img_link}",
-            "sha256":       "${SHA}",
-            "sha256_url":   "https://releases.wattpost.io/img/${img_link}.sha256",
-            "size_bytes":   ${SIZE},
-            "release_url":  "/docs/release-notes",
-            "source_url":   "https://releases.wattpost.io/source/${src_link}",
-            "source_sha256_url": "https://releases.wattpost.io/source/${src_link}.sha256"
-          }
-          JSON
-            retry scp "${SSH_COMMON[@]}" /tmp/${out} \
-                "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/img/${out}"
-            retry ssh "${SSH_COMMON[@]}" "${SSH_USER}@${SSH_HOST}" "
-              set -euo pipefail
-              cd /srv/wattpost-releases/img
-              ln -sfn '${FNAME}' '${img_link}'
-              ln -sfn '${FNAME}.sha256' '${img_link}.sha256'
-              echo '${img_link} -> ${FNAME}'
-            "
-          }
-          publish_channel "${CHANNEL}" "${MANIFEST_NAME}" "${IMG_LINK}" "${SRC_LINK}"
-          # Also publish CHANGELOG.md at the releases root — the
-          # appliance update checker fetches it so the dashboard can
-          # preview release notes before the user installs.
-          retry scp "${SSH_COMMON[@]}" CHANGELOG.md \
-              "${SSH_USER}@${SSH_HOST}:/srv/wattpost-releases/CHANGELOG.md"
-          # A final release is the newest beta too — mirror it so beta
-          # testers never fall BEHIND stable. Pre-releases already wrote
-          # beta directly above, so only mirror when we just did stable.
-          if [ "$CHANNEL" = stable ]; then
-            publish_channel "beta" "manifest-beta.json" "beta.img.xz" "beta.tar.gz"
-          fi
