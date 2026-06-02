@@ -101,6 +101,55 @@ def test_check_once_fetches_channel_specific_url(monkeypatch):
     assert c.state.latest_version == "0.2.0-rc1"
 
 
+# --- cloud-delivered channel (heartbeat apply, "cloud wins when set") ---
+
+import types
+
+from solar_monitor.cloud.service import CloudService
+
+
+def _svc_with_updater(channel="stable"):
+    upd = UpdateChecker(channel=channel)
+    sched = types.SimpleNamespace(_updater=upd)
+    # Bind only the attribute the method touches; call the method unbound
+    # so we don't need the full CloudService constructor.
+    svc = types.SimpleNamespace(scheduler=sched)
+    return svc, upd
+
+
+def test_cloud_sets_channel_and_reports_change():
+    svc, upd = _svc_with_updater("stable")
+    changed = CloudService._apply_cloud_update_channel(svc, "beta")
+    assert changed is True
+    assert upd.channel == "beta"
+    # set_channel cleared the cached latest so has_update recomputes.
+    assert upd.state.latest_version is None
+
+
+def test_cloud_absent_channel_is_noop():
+    """None = cloud hasn't overridden; the appliance's local channel stands."""
+    svc, upd = _svc_with_updater("edge")
+    assert CloudService._apply_cloud_update_channel(svc, None) is False
+    assert upd.channel == "edge"
+
+
+def test_cloud_same_channel_is_noop():
+    svc, upd = _svc_with_updater("beta")
+    assert CloudService._apply_cloud_update_channel(svc, "beta") is False
+
+
+def test_cloud_garbage_channel_normalizes_to_stable():
+    svc, upd = _svc_with_updater("stable")
+    # "garbage" -> stable, which equals current -> no change reported.
+    assert CloudService._apply_cloud_update_channel(svc, "garbage") is False
+    assert upd.channel == "stable"
+
+
+def test_cloud_missing_updater_is_safe():
+    svc = types.SimpleNamespace(scheduler=types.SimpleNamespace(_updater=None))
+    assert CloudService._apply_cloud_update_channel(svc, "beta") is False
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn) and "monkeypatch" not in fn.__code__.co_varnames:
