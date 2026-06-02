@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Need history so we can stamp the tarball with the commit SHA.
           fetch-depth: 0
@@ -71,7 +71,7 @@ jobs:
           ls -lah "${OUT_DIR}"
 
       - name: Upload to releases.wattpost.io
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -87,7 +87,7 @@ jobs:
         # checker fetches it on every manifest poll so the dashboard
         # can preview release notes BEFORE the user installs the
         # new version.
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
