@@ -6,6 +6,13 @@ Versions follow [Semantic Versioning].
 [Keep a Changelog]: https://keepachangelog.com/
 [Semantic Versioning]: https://semver.org/
 
+## [0.1.129-edge.1] - 2026-06-03
+
+Edge prerelease — first on-hardware test of the new kiosk.
+
+### Added
+- New kiosk skin engine + the **Halo** skin (#28 Phase 1). The wall-mount kiosk is now driven by a versioned `KioskViewModel` and a swappable skin: Halo leads with the state-of-charge ring, an animated power-flow (colour = source, thickness = watts), and time-to-full / harvested-today at a glance. Foundation for selectable skins (Ember/Command), a skin selector, night mode, and an eventual community skin gallery. Skin is chosen per-device; defaults to Halo.
+
 ## [Unreleased]
 
 ### Added
