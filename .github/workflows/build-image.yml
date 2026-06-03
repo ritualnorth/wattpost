@@ -118,4 +118,8 @@ jobs:
             ${{ steps.locate.outputs.image }}
             ${{ steps.locate.outputs.checksum }}
           generate_release_notes: true
+          # RC tags (v…-rcN) publish as prereleases so the cloud's beta
+          # channel finds them and `releases/latest` stays on the last
+          # stable build.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true

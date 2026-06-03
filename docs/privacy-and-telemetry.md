@@ -18,7 +18,7 @@ The appliance queries [Open-Meteo](https://open-meteo.com/) directly with your c
 
 ### 3. CHANGELOG fetch, daily, alongside the update check
 
-Same 24-hour cadence as #1, hitting `https://releases.wattpost.io/CHANGELOG.md`. Anonymous; same as fetching any static file. Used so the dashboard can preview what's in a not-yet-installed version's release notes.
+Same 24-hour cadence as #1, hitting `https://raw.githubusercontent.com/ritualnorth/wattpost/main/CHANGELOG.md`. Anonymous; same as fetching any static file. Used so the dashboard can preview what's in a not-yet-installed version's release notes.
 
 ### 4. Local-install beacon, *daily, anonymous, opt-in, default OFF*
 
@@ -74,7 +74,7 @@ If you pair (the SaaS tier), all of the above flow to the cloud as part of the h
 ## How to verify yourself
 
 - `journalctl -u wattpost | grep -E "manifest|beacon|open-meteo"`, every outbound call we log shows up here.
-- `tcpdump -i <iface> host wattpost.cloud or host releases.wattpost.io or host api.open-meteo.com`, captures the four production hostnames the appliance talks to.
+- `tcpdump -i <iface> host wattpost.cloud or host github.com or host raw.githubusercontent.com or host objects.githubusercontent.com or host api.open-meteo.com`, captures the production hostnames the appliance talks to (version-check + heartbeat → wattpost.cloud; source + changelog → GitHub; weather → Open-Meteo).
 - The source of every outbound call is open: `solar_monitor/update/checker.py` (update + beacon), `solar_monitor/weather/service.py` (Open-Meteo), `solar_monitor/cloud/service.py` (heartbeat, paired only), `solar_monitor/discovery/service.py` (BLE fingerprint, opt-in only).
 
 ## Changelog

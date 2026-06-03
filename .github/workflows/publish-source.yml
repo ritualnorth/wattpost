@@ -83,4 +83,7 @@ jobs:
           files: |
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz.sha256
+          # RC tags (v…-rcN) publish as prereleases — keeps the beta channel
+          # and `releases/latest` (stable) correctly separated.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           fail_on_unmatched_files: true

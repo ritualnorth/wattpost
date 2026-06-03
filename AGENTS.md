@@ -19,7 +19,7 @@ Read in this order if you're new:
 ## Repo conventions
 
 - **Public, Apache 2.0.** Don't commit anything cloud-side, SaaS-side, or commercially sensitive here.
-- **Binary distribution via `releases.wattpost.io`** (self-hosted, see `docs/release-pipeline.md`).
+- **Binary distribution via GitHub Releases** (see `docs/release-pipeline.md`).
 - **Commit style.** Plain technical voice, imperative mood; no personal names or session-diary narratives.
 
 ## Common ops
@@ -55,13 +55,12 @@ The tag push triggers, in parallel:
 - **`build-appliance-image.yml`** → pushes Docker tags `:v0.0.4`,
   `:0.0`, `:latest` to GHCR. Docker users on `:latest` get it on
   next `docker compose pull`.
-- **`publish-source.yml`** → uploads source tarball to
-  `releases.wattpost.io/source/` + bumps `manifest.json` version
-  to 0.0.4. Pi users see "Update available v0.0.4" badge within
-  their next poll cycle (or via Check now).
+- **`publish-source.yml`** → attaches the source tarball to the
+  tag's GitHub Release. Pi users see "Update available v0.0.4"
+  badge within their next poll cycle (or via Check now).
 - **`build-image.yml`** → pi-gen builds the SD `.img.xz` (~90 min),
-  scp's to `releases.wattpost.io/img/`. `/download` page on
-  wattpost.io serves the new image.
+  attaches it to the tag's GitHub Release. `/download` page on
+  wattpost.io links to the new image.
 
 ### When to cut a release
 
@@ -88,4 +87,4 @@ The tag push triggers, in parallel:
 
 - **Pi-gen + qemu**: must use `tonistiigi/binfmt:latest` (qemu 9.x) for Python 3.13 to not segfault inside the chroot. Ubuntu's apt qemu is too old. See `.github/workflows/build-image.yml`.
 - **Heartbeat hot-start**: pairing now starts the heartbeat service in-process via the API endpoint (`solar_monitor/api/cloud_admin.py`). Don't reintroduce "restart required for pairing" — that bit users earlier in development.
-- **Source tarball channel is anonymous.** Don't add auth to `releases.wattpost.io` — the appliance Update-now flow relies on it being un-gated.
+- **Source tarball channel is anonymous.** It's a public GitHub Release asset — the appliance Update-now flow relies on it being un-gated.

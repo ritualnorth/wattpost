@@ -45,7 +45,7 @@ rollback if it goes wrong. No clicks.
 
 ### On the SD-card install (Pi)
 
-1. The cloud manifest at [`releases.wattpost.io/img/manifest.json`](https://releases.wattpost.io/img/manifest.json) names the current published version.
+1. The cloud's [`/api/releases/latest`](https://wattpost.cloud/api/releases/latest) — which reads the GitHub Releases API — names the current published version.
 2. Your appliance polls that manifest every 24 hours.
 3. If a newer version is available, **Settings → About** shows "v0.0.X available".
 4. Click **Update now** in the appliance's local dashboard → `wattpost-update`
@@ -126,8 +126,8 @@ Internal note for our future selves:
 
 1. `git tag v0.0.X && git push --tags` triggers `build-image.yml`
 2. ~90 minutes of pi-gen produces the new `.img.xz`
-3. The workflow scp's the image + a fresh `manifest.json` to `releases.wattpost.io`
-4. Within ~60s the cloud picks up the new manifest (in-process cache TTL)
+3. The workflow attaches the image to the tag's GitHub Release
+4. Within ~60s the cloud picks up the new release from the GitHub API (in-process cache TTL)
 5. Within ~24h every paired appliance discovers the new version and offers the Update button
 
-[Source tarballs](https://releases.wattpost.io/source/latest.tar.gz) update independently. Every push to `main` that touches the appliance refreshes them via the `publish-source.yml` workflow. So in-place upgrades flow continuously while image rebuilds are quarterly-ish.
+[Source tarballs](https://github.com/ritualnorth/wattpost/releases/latest/download/wattpost-source.tar.gz) update independently. Every push to `main` that touches the appliance refreshes them via the `publish-source.yml` workflow. So in-place upgrades flow continuously while image rebuilds are quarterly-ish.

@@ -37,7 +37,7 @@ The cloud's heartbeat watcher flips to Offline after 15 minutes of no heartbeat.
 
 Tail `/var/log/wattpost-update.log` on the Pi (`sudo tail -f`). Common causes:
 
-- **No internet**. The helper has to reach `releases.wattpost.io`. Verify with `curl -sI https://releases.wattpost.io/source/latest.tar.gz`.
+- **No internet**. The helper has to reach GitHub. Verify with `curl -sIL https://github.com/ritualnorth/wattpost/releases/latest/download/wattpost-source.tar.gz`.
 - **SHA256 mismatch**. The tarball was truncated mid-download. Run Update Now again; it's idempotent.
 - **install.sh fails on apt**. Apt is busy (unattended-upgrades?) or out of disk. Free up space, wait for apt locks to clear, retry.
 
