@@ -16,13 +16,14 @@ from solar_monitor.update.checker import (
 
 
 def test_valid_channels_and_default():
-    assert VALID_CHANNELS == ("stable", "beta", "edge")
+    assert VALID_CHANNELS == ("stable", "beta")
     assert DEFAULT_CHANNEL == "stable"
 
 
 def test_normalize_channel_coerces_garbage_to_stable():
     assert normalize_channel("beta") == "beta"
-    assert normalize_channel("  EDGE ") == "edge"      # trim + lowercase
+    assert normalize_channel("  BETA ") == "beta"      # trim + lowercase
+    assert normalize_channel("edge") == "stable"       # retired channel -> default
     assert normalize_channel("nonsense") == "stable"   # unknown -> default
     assert normalize_channel("") == "stable"
     assert normalize_channel(None) == "stable"
@@ -67,7 +68,8 @@ def test_set_channel_updates_state_and_clears_latest():
 
 def test_set_channel_normalizes():
     c = UpdateChecker()
-    assert c.set_channel("EDGE") == "edge"
+    assert c.set_channel("  BETA ") == "beta"   # trim + lowercase
+    assert c.set_channel("EDGE") == "stable"    # retired channel -> default
     assert c.set_channel("junk") == "stable"
 
 
@@ -128,9 +130,9 @@ def test_cloud_sets_channel_and_reports_change():
 
 def test_cloud_absent_channel_is_noop():
     """None = cloud hasn't overridden; the appliance's local channel stands."""
-    svc, upd = _svc_with_updater("edge")
+    svc, upd = _svc_with_updater("beta")
     assert CloudService._apply_cloud_update_channel(svc, None) is False
-    assert upd.channel == "edge"
+    assert upd.channel == "beta"
 
 
 def test_cloud_same_channel_is_noop():
