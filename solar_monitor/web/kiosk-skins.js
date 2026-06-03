@@ -188,6 +188,132 @@
   function totalWatts(arr) { return (arr || []).reduce(function (t, x) { return t + (x.watts || 0); }, 0); }
   function fmtKwh(k) { return (k == null ? '·' : (Math.round(k * 10) / 10) + ' kWh'); }
 
+  // =====================================================================
+  //  EMBER — cozy van / night-native. Warm 'hearth' palette, a day-arc
+  //  with the sun's position, big human runtime. The differentiator.
+  // =====================================================================
+  register({
+    id: 'ember', name: 'Ember', night: true,
+    render: function (root, vm) { root.innerHTML = emberSVG(vm); },
+  });
+
+  // Quadratic-bezier day arc: P0(250,300) C(640,-40) P1(1030,300). A true
+  // semicircle would peak off-screen at midday; this shallow arc keeps the
+  // sun on screen all day. t = sun progress (0 sunrise … 1 sunset).
+  function bezXY(t) {
+    var mt = 1 - t;
+    return {
+      x: mt * mt * 250 + 2 * mt * t * 640 + t * t * 1030,
+      y: mt * mt * 300 + 2 * mt * t * (-40) + t * t * 300,
+    };
+  }
+
+  function emberSVG(vm) {
+    var solar = pick(vm.sources, 'pv') || { watts: 0 };
+    var load = totalWatts(vm.loads);
+    var batt = vm.battery || {};
+    var p = (vm.sun && typeof vm.sun.progress === 'number') ? H.clamp(vm.sun.progress, 0, 1) : null;
+    var sun = p != null ? bezXY(p) : null;
+    var discharging = vm.state === 'discharging';
+    var runMin = discharging ? vm.timeToEmptyMin : vm.timeToFullMin;
+    var runWord = discharging ? 'left' : 'to full';
+    var fillW = (44 * H.clamp(vm.soc, 0, 100) / 100).toFixed(0);
+    return '' +
+'<svg viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid meet" class="wp-skin wp-ember">' +
+  '<defs>' +
+    '<linearGradient id="kEmA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a4a1f"/><stop offset=".5" stop-color="#f0b860"/><stop offset="1" stop-color="#e8743b"/></linearGradient>' +
+    '<radialGradient id="kEmS" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe3a3"/><stop offset="1" stop-color="#f0a13c"/></radialGradient>' +
+    '<radialGradient id="kEmBg" cx=".5" cy=".26" r=".95"><stop offset="0" stop-color="#2a1d14"/><stop offset=".48" stop-color="#1a1310"/><stop offset="1" stop-color="#0d0907"/></radialGradient>' +
+    '<filter id="kEmG" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="9"/></filter>' +
+  '</defs>' +
+  '<rect width="1280" height="800" fill="url(#kEmBg)"/>' +
+  '<text x="56" y="62" font-size="24" font-weight="600" class="k-dim">' + H.esc(vm.siteName || 'WattPost') + '</text>' +
+  '<text x="1224" y="62" font-size="24" text-anchor="end" class="k-dim k-num">' + H.esc(vm.clock || '') + '</text>' +
+  '<path d="M250,300 Q640,-40 1030,300" fill="none" stroke="#2c2118" stroke-width="10" stroke-linecap="round"/>' +
+  (vm.sun ? '<text x="250" y="338" font-size="20" text-anchor="middle" class="k-dim k-num">' + H.esc(vm.sun.riseStr || '') + '</text><text x="1030" y="338" font-size="20" text-anchor="middle" class="k-num" fill="#e8946a">' + H.esc(vm.sun.setStr || '') + '</text>' : '') +
+  (sun ? '<g transform="translate(' + sun.x.toFixed(0) + ',' + sun.y.toFixed(0) + ')"><circle r="34" fill="#f0a13c" filter="url(#kEmG)" opacity=".5"/><circle r="19" fill="url(#kEmS)"/></g>' : '') +
+  '<text x="640" y="206" font-size="22" text-anchor="middle" fill="#f0b860" font-weight="700" class="k-num">' + fmtKwh(vm.todayKwh) + ' harvested today</text>' +
+  '<text x="640" y="430" text-anchor="middle" font-size="150" font-weight="800" letter-spacing="-3" fill="#f6d79b" class="k-num">' + Math.round(vm.soc) + '<tspan font-size="60" fill="#9a8163" font-weight="600" dx="2">%</tspan></text>' +
+  '<text x="640" y="474" text-anchor="middle" font-size="20" fill="#e8946a" class="k-label">' + H.esc(vm.stateLabel || vm.state) + '</text>' +
+  '<text x="640" y="540" text-anchor="middle" font-size="40" font-weight="700" class="k-num">' + (runMin != null ? '≈ ' + H.fmtDur(runMin) + ' ' + runWord : H.fmtW(vm.netW)) + '</text>' +
+  '<text x="640" y="572" text-anchor="middle" font-size="22" class="k-dim k-num">' + H.fmtW(vm.netW) + ' · ' + (+batt.v || 0).toFixed(1) + ' V · ' + Math.round(batt.ah || 0) + ' Ah of ' + Math.round(batt.cap || 0) + '</text>' +
+  '<g transform="translate(0,672)">' +
+    '<g transform="translate(300,0)"><circle r="34" fill="#241a10" stroke="#3a2c12" stroke-width="2"/><circle r="9" fill="none" stroke="#caa05a" stroke-width="2.5"/><text x="0" y="62" text-anchor="middle" font-size="22" font-weight="700" fill="#caa05a" class="k-num">' + Math.round(solar.watts) + ' W</text><text x="0" y="84" text-anchor="middle" font-size="13" fill="#9a8163" class="k-label">Solar</text></g>' +
+    '<g transform="translate(640,0)"><rect x="-40" y="-26" width="80" height="52" rx="9" fill="#1d1510" stroke="#5a4326" stroke-width="2"/><rect x="40" y="-9" width="6" height="18" rx="2" fill="#5a4326"/><rect x="-34" y="-20" width="' + fillW + '" height="40" rx="4" fill="#f0b860" opacity=".85"/><text x="0" y="62" text-anchor="middle" font-size="13" fill="#9a8163" class="k-label">Battery</text></g>' +
+    '<g transform="translate(980,0)"><circle r="34" fill="#241a10" stroke="#3a2c12" stroke-width="2"/>' + houseGlyph('#f3e7d6') + '<text x="0" y="62" text-anchor="middle" font-size="22" font-weight="700" class="k-num">' + Math.round(load) + ' W</text><text x="0" y="84" text-anchor="middle" font-size="13" fill="#9a8163" class="k-label">Loads</text></g>' +
+    (solar.watts > 2 ? '<path class="k-flow" d="M334,0 L600,0" stroke="#caa05a" stroke-width="4"/>' : '') +
+    (load > 2 ? '<path class="k-flow" d="M680,0 L946,0" stroke="#f0b860" stroke-width="6"/>' : '') +
+  '</g>' +
+'</svg>';
+  }
+
+  // =====================================================================
+  //  COMMAND — rich command-centre. Branching flow + a tile band. For the
+  //  workshop / cabin / boat owner who wants everything at a glance.
+  // =====================================================================
+  register({
+    id: 'command', name: 'Command',
+    render: function (root, vm) { root.innerHTML = commandSVG(vm); },
+  });
+
+  function cmdTile(x, w, label, body) {
+    return '<g transform="translate(' + x + ',470)"><rect width="' + w + '" height="270" rx="16" fill="#0d121a" stroke="#1b2430" stroke-width="1.5"/>' +
+      '<text x="22" y="40" font-size="14" class="k-label">' + label + '</text>' + body + '</g>';
+  }
+
+  function commandSVG(vm) {
+    var solar = pick(vm.sources, 'pv') || { watts: 0 };
+    var shore = pick(vm.sources, 'grid') || pick(vm.sources, 'dc') || { watts: 0, label: 'Shore' };
+    var load = totalWatts(vm.loads);
+    var maxFlow = Math.max(solar.watts, shore.watts, load, 600);
+    var sColor = H.stateColor(vm.state);
+    var batt = vm.battery || {};
+    var solarOn = solar.watts > 2, shoreOn = shore.watts > 2, loadOn = load > 2;
+    var remFrac = batt.cap ? H.clamp((batt.ah || 0) / batt.cap, 0, 1) : 0;
+    var ttf = vm.timeToFullMin != null ? ' · ' + H.fmtDur(vm.timeToFullMin) + ' to full'
+            : (vm.timeToEmptyMin != null ? ' · ' + H.fmtDur(vm.timeToEmptyMin) + ' left' : '');
+    // day sparkline from daySeries (0..1)
+    var ds = vm.daySeries || [];
+    var spark = ds.length > 1 ? ds.map(function (v, i) {
+      return (22 + 176 * i / (ds.length - 1)).toFixed(0) + ',' + (210 - 70 * H.clamp(v, 0, 1)).toFixed(0);
+    }).join(' ') : '';
+    // forecast bars
+    var fc = (vm.forecast || []).slice(0, 7);
+    var fcMax = fc.reduce(function (m, f) { return Math.max(m, f.kwh || 0); }, 1);
+    var fcBars = fc.map(function (f, i) {
+      var h = 70 * H.clamp((f.kwh || 0) / fcMax, 0, 1);
+      return '<rect x="' + (i * 26) + '" y="' + (90 - h).toFixed(0) + '" width="18" height="' + h.toFixed(0) + '" rx="3" fill="' + H.color('pv') + '"/>';
+    }).join('');
+    // bank cells
+    var cells = (vm.cells || []).slice(0, 3).map(function (c, i) {
+      return '<g transform="translate(0,' + (i * 46) + ')"><rect width="152" height="34" rx="6" fill="#10202a" stroke="#1d3a44" stroke-width="1.5"/><rect x="6" y="6" width="' + (118 * H.clamp(c.frac, 0, 1)).toFixed(0) + '" height="22" rx="3" fill="#56d364" opacity=".85"/><text x="142" y="23" font-size="14" text-anchor="end" fill="#cdd6e2" font-weight="800" class="k-num">' + Math.round(c.ah) + 'Ah</text></g>';
+    }).join('');
+    return '' +
+'<svg viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid meet" class="wp-skin wp-command">' +
+  '<defs><linearGradient id="kCmA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + sColor + '" stop-opacity=".75"/><stop offset="1" stop-color="' + sColor + '"/></linearGradient>' +
+  '<filter id="kCmG" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter></defs>' +
+  '<text x="56" y="60" font-size="24" font-weight="700" class="k-num">' + H.esc(vm.siteName || 'WattPost') + '</text>' +
+  '<text x="1224" y="60" font-size="22" text-anchor="end" class="k-dim k-num">' + H.esc(vm.clock || '') + ' · ' + Math.round(solar.watts + shore.watts) + ' W in · ' + Math.round(load) + ' W out</text>' +
+  flowPath('M250,200 C420,210 460,260 540,268', H.color('pv'), H.strokeFor(solar.watts, maxFlow), solarOn) +
+  (shoreOn ? flowPath('M250,360 C420,350 460,300 540,288', H.color('grid'), H.strokeFor(shore.watts, maxFlow), true) : '<path d="M250,360 C420,350 460,300 540,288" fill="none" stroke="#16202c" stroke-width="4"/>') +
+  flowPath('M735,272 C860,272 900,272 1010,272', '#cdd6e2', H.strokeFor(load, maxFlow), loadOn, true) +
+  '<g transform="translate(196,200)" opacity="' + (solarOn ? 1 : .5) + '"><circle r="50" fill="#120f06" stroke="#3a2c12" stroke-width="2"/>' + sunGlyph(H.color('pv')) + '<text x="0" y="78" text-anchor="middle" font-size="26" font-weight="700" fill="' + H.color('pv') + '" class="k-num">' + Math.round(solar.watts) + ' W</text><text x="0" y="100" text-anchor="middle" font-size="14" class="k-label">' + H.esc(solar.label || 'Solar') + '</text></g>' +
+  '<g transform="translate(196,360)" opacity="' + (shoreOn ? 1 : .55) + '"><circle r="44" fill="#0c1015" stroke="#1b2532" stroke-width="2"/>' + boltGlyph(shoreOn ? H.color('grid') : '#41506a') + '<text x="0" y="70" text-anchor="middle" font-size="24" font-weight="700" fill="' + (shoreOn ? H.color('grid') : '#5a6678') + '" class="k-num">' + Math.round(shore.watts) + ' W</text><text x="0" y="92" text-anchor="middle" font-size="14" class="k-label">' + H.esc(shore.label || 'Shore') + '</text></g>' +
+  '<g transform="translate(640,272)"><circle r="92" fill="none" stroke="#161c26" stroke-width="15"/>' +
+    '<circle r="92" fill="none" stroke="url(#kCmA)" stroke-width="15" stroke-linecap="round" pathLength="100" stroke-dasharray="' + H.arcDash(vm.soc) + '" transform="rotate(-90)" filter="url(#kCmG)" opacity=".5"/>' +
+    '<circle r="92" fill="none" stroke="url(#kCmA)" stroke-width="15" stroke-linecap="round" pathLength="100" stroke-dasharray="' + H.arcDash(vm.soc) + '" transform="rotate(-90)"/>' +
+    '<text x="0" y="2" text-anchor="middle" font-size="58" font-weight="800" class="k-num">' + Math.round(vm.soc) + '<tspan font-size="26" fill="#76828f" dx="1">%</tspan></text>' +
+    '<text x="0" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="' + sColor + '" class="k-num">' + H.fmtW(vm.netW) + '</text>' +
+    '<text x="0" y="138" text-anchor="middle" font-size="14" class="k-label" fill="' + sColor + '">' + H.esc(vm.stateLabel || vm.state) + ttf + '</text></g>' +
+  '<g transform="translate(1064,272)"><circle r="50" fill="#0e1219" stroke="#2a3340" stroke-width="2"/>' + houseGlyph('#cdd6e2') + '<text x="0" y="78" text-anchor="middle" font-size="26" font-weight="700" class="k-num">' + Math.round(load) + ' W</text><text x="0" y="100" text-anchor="middle" font-size="14" class="k-label">Loads</text></g>' +
+  cmdTile(56, 220, 'Battery', '<text x="22" y="104" font-size="46" font-weight="800" class="k-num">' + (+batt.v || 0).toFixed(1) + '<tspan font-size="22" fill="#76828f" dx="3">V</tspan></text><text x="22" y="152" font-size="34" font-weight="700" fill="' + sColor + '" class="k-num">' + ((+batt.a || 0) >= 0 ? '+' : '') + (+batt.a || 0).toFixed(1) + '<tspan font-size="18" fill="#76828f" dx="3">A</tspan></text>') +
+  cmdTile(296, 220, 'Remaining', '<text x="22" y="104" font-size="46" font-weight="800" class="k-num">' + Math.round(batt.ah || 0) + '<tspan font-size="22" fill="#76828f" dx="3">Ah</tspan></text><text x="22" y="138" font-size="18" class="k-dim">of ' + Math.round(batt.cap || 0) + ' Ah</text><rect x="22" y="160" width="176" height="14" rx="7" fill="#161c26"/><rect x="22" y="160" width="' + (176 * remFrac).toFixed(0) + '" height="14" rx="7" fill="#56d364"/>') +
+  cmdTile(536, 220, 'Bank', '<g transform="translate(34,66)">' + cells + '</g><text x="22" y="244" font-size="15" class="k-dim">' + H.esc(vm.bankLabel || '') + '</text>') +
+  cmdTile(776, 220, 'Harvested today', '<text x="22" y="104" font-size="46" font-weight="800" fill="' + H.color('pv') + '" class="k-num">' + (vm.todayKwh == null ? '·' : (Math.round(vm.todayKwh * 10) / 10)) + '<tspan font-size="22" fill="#76828f" dx="3">kWh</tspan></text>' + (spark ? '<polyline points="' + spark + '" fill="none" stroke="' + H.color('pv') + '" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' : '') + '<line x1="22" y1="214" x2="198" y2="214" stroke="#1b2430" stroke-width="1.5"/>') +
+  cmdTile(1016, 208, 'Forecast', '<g transform="translate(22,120)">' + fcBars + '</g>' + (vm.weather ? '<text x="22" y="250" font-size="17" class="k-dim">' + H.esc(vm.weather.desc || '') + ' · ' + Math.round(vm.weather.tempC) + ' °C</text>' : '')) +
+'</svg>';
+  }
+
   // ---- sample view-model (playground fixture + harness) ----
   function sampleVM() {
     return {
