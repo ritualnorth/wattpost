@@ -3297,6 +3297,15 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   padding: .25rem .4rem; border: 1px solid var(--surface-3);
   border-radius: 6px; background: var(--surface-1); color: inherit;
 }
+/* Free-text settings fields (hotspot SSID / WPA password) — fill the row
+   and left-align, instead of the narrow right-aligned numeric default, so
+   the value + placeholder don't truncate. Grows on wide settings columns,
+   shrinks gracefully on a narrow one. */
+.hist-input--text { flex: 1 1 11rem; min-width: 0; }
+.hist-input--text input {
+  width: 100%; text-align: left; min-width: 0;
+  font-variant-numeric: normal;
+}
 /* <select> inside hist-input would otherwise size to the longest
    option's text, when the placeholder is something verbose like
    "No smart plug or AC charger output configured" (solar-pause panel
