@@ -9,16 +9,12 @@ name: Build appliance image
 # recycled laptops. Buildx with both targets in one workflow.
 
 on:
-  # Two channels:
-  #   - main push: builds + tags `:edge` and `:sha-<short>` for
-  #     dev / beta testers tracking bleeding-edge.
-  #   - tag push (vX.Y.Z): builds + tags `:vX.Y.Z`, `:X.Y`, `:latest`
-  #     for customers who want batched, version-numbered releases.
-  # See docs/release-pipeline.md for the full release ritual.
+  # Builds on version tags only (vX.Y.Z[-beta.N]): tags `:vX.Y.Z`, `:X.Y`,
+  # `:beta` for pre-releases, `:latest` for finals. (The old main-push
+  # `:edge` image was retired along with the Edge channel — Stable + Beta
+  # only now.) See docs/release-pipeline.md for the release ritual.
   push:
-    branches: [main]
     tags:    ['v*']
-    paths-ignore: []
   workflow_dispatch:
 
 # Concurrency strategy:
@@ -82,8 +78,6 @@ jobs:
           # tag (a final release IS the newest beta too). See "Behaviors"
           # in https://github.com/docker/metadata-action.
           tags: |
-            type=edge,branch=main
-            type=sha,prefix=sha-,format=short
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') }}

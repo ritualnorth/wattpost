@@ -9,12 +9,11 @@ name: Build updater image
 # touches updater/.
 
 on:
+  # Tags only — the updater sidecar image ships with releases (:beta on
+  # pre-releases, :latest on finals). The old main-push :edge build was
+  # retired with the Edge channel.
   push:
-    branches: [main]
     tags:    ['v*']
-    paths:
-      - 'updater/**'
-      - '.github/workflows/build-updater-image.yml'
   workflow_dispatch:
 
 concurrency:
@@ -57,11 +56,10 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=edge,branch=main
-            type=sha,prefix=sha-,format=short
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' && !contains(github.ref_name, '-') }}
 
       - name: Build + push
         uses: docker/build-push-action@v5
