@@ -449,13 +449,60 @@ matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
 // "default to kiosk on this device" preference is localStorage so other
 // devices keep their normal view.
 const KIOSK_KEY = "wp-kiosk-default";
+const KIOSK_SKIN_KEY = "wp-kiosk-skin";
 let wakeLock = null;
+// Appliance-side kiosk config (#28). Stored on the box (not per-browser),
+// so a setting made from a cloud session reaches the local wall display.
+// localStorage mirrors it as an instant-boot cache.
+let APPLIANCE_KIOSK = null;   // {default, skin} once /api/kiosk/config loads
 function kioskDefault() {
+  if (APPLIANCE_KIOSK) return !!APPLIANCE_KIOSK.default;
   try { return localStorage.getItem(KIOSK_KEY) === "1"; }
   catch (_) { return false; }
 }
-function setKioskDefault(on) {
+async function loadKioskConfig() {
+  try {
+    const k = await api("/api/kiosk/config");
+    APPLIANCE_KIOSK = { default: !!k.default, skin: (k.skin || "halo") };
+    try {
+      localStorage.setItem(KIOSK_KEY, k.default ? "1" : "0");
+      localStorage.setItem(KIOSK_SKIN_KEY, APPLIANCE_KIOSK.skin);
+    } catch (_) {}
+    // The local display may have booted before this loaded — if the
+    // appliance now says default-kiosk and we're on the dashboard with
+    // no explicit route, go to kiosk (never on a broker/cloud view).
+    if (APPLIANCE_KIOSK.default && !IS_BROKER_VIEW &&
+        (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
+      window.location.hash = "#/kiosk";
+    } else {
+      renderKiosk();  // pick up a skin change while already in kiosk
+    }
+  } catch (_) { /* offline / older daemon: keep the localStorage cache */ }
+}
+async function setKioskDefault(on) {
+  // Persist to the APPLIANCE so it travels (cloud session → wall screen),
+  // not just this browser.
+  try {
+    await fetch(_withKiosk("/api/kiosk/config"), {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ default: !!on }),
+    });
+  } catch (_) {}
+  if (!APPLIANCE_KIOSK) APPLIANCE_KIOSK = { default: !!on, skin: activeSkinId() };
+  else APPLIANCE_KIOSK.default = !!on;
   try { localStorage.setItem(KIOSK_KEY, on ? "1" : "0"); } catch (_) {}
+}
+async function setKioskSkin(skin) {
+  try {
+    await fetch(_withKiosk("/api/kiosk/config"), {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ skin }),
+    });
+  } catch (_) {}
+  if (!APPLIANCE_KIOSK) APPLIANCE_KIOSK = { default: kioskDefault(), skin };
+  else APPLIANCE_KIOSK.skin = skin;
+  try { localStorage.setItem(KIOSK_SKIN_KEY, skin); } catch (_) {}
+  renderKiosk();
 }
 async function requestWakeLock() {
   if (!("wakeLock" in navigator)) return;
@@ -582,7 +629,8 @@ async function api(path) {
 // Which skin is active. Per-device (localStorage) so a wall tablet and a
 // van screen on the same box can differ. Default Halo.
 function activeSkinId() {
-  try { return localStorage.getItem("wp-kiosk-skin") || "halo"; }
+  if (APPLIANCE_KIOSK && APPLIANCE_KIOSK.skin) return APPLIANCE_KIOSK.skin;
+  try { return localStorage.getItem(KIOSK_SKIN_KEY) || "halo"; }
   catch (e) { return "halo"; }
 }
 
@@ -7586,15 +7634,11 @@ if (kioskToggle) {
     setKioskDefault(kioskToggle.checked);
   });
 }
-// "Default to kiosk on this device" is a LAN-only convenience for
-// wall-mounted tablets booting straight to SoC. Over the cloud broker
-// the canonical kiosk path is the share-token flow (#225); the
-// localStorage flag is the wrong tool there and surprises operators
-// when their broker URL starts auto-rendering as kiosk.
-const kioskDefaultRow = $("#kiosk-default-row");
-if (kioskDefaultRow && IS_BROKER_VIEW) {
-  kioskDefaultRow.hidden = true;
-}
+// "Open the local display in kiosk" is now an APPLIANCE-side setting
+// (#28), so it's meaningful from a cloud session too — setting it there
+// PATCHes the appliance and the local wall display obeys. The cloud tab
+// itself never auto-kiosks (the boot redirect is gated on !IS_BROKER_VIEW),
+// so showing the toggle here is safe and is the whole point of the fix.
 const kioskExitBtn = $("#kiosk-exit");
 if (kioskExitBtn) {
   // Hide Exit Kiosk for two cases:
@@ -7812,10 +7856,11 @@ if (_kioskPathMatch) {
   }
   window.location.hash = "#/kiosk";
 }
-// If this device is set to default-to-kiosk and the URL has no explicit
-// hash, redirect before the initial setRoute runs. Skipped on broker
-// views; the localStorage flag is per-origin so it can only have been
-// set there by accident from a UI we now hide.
+// If the appliance is set to default-to-kiosk and the URL has no explicit
+// hash, redirect before the initial setRoute runs (instant via the cached
+// flag; loadKioskConfig() below corrects it from the appliance config and
+// re-routes if needed). Skipped on broker/cloud views — only the local
+// wall display should auto-kiosk.
 else if (
   !IS_BROKER_VIEW &&
   kioskDefault() &&
@@ -7823,6 +7868,10 @@ else if (
 ) {
   window.location.hash = "#/kiosk";
 }
+
+// Pull the appliance-side kiosk config (default + skin) so it reflects what
+// was set from anywhere — incl. a cloud session — not just this browser.
+loadKioskConfig();
 
 $("#sel-device").addEventListener("change", () => onDeviceChanged());
 $("#sel-metric").addEventListener("change", refreshChart);

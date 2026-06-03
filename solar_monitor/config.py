@@ -501,6 +501,15 @@ class HistoryCfg(msgspec.Struct, kw_only=True):
     retention_hour_days: int | None = None    # default 365
 
 
+class KioskCfg(msgspec.Struct, kw_only=True):
+    """Wall-display kiosk defaults, stored on the APPLIANCE so they apply
+    to the local dashboard regardless of which browser opens it — set it
+    once (from the cloud or the LAN) and the wall screen obeys. A
+    per-browser localStorage override still wins for that one browser."""
+    default: bool = False    # open the local dashboard straight into kiosk
+    skin: str = "halo"       # active skin: halo | ember | command
+
+
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
@@ -535,6 +544,7 @@ class Config(msgspec.Struct, kw_only=True):
     smart_plugs: list[SmartPlugCfg] = []      # optional, LAN-attached smart plugs for solar-pause to drive
     mqtt_in: MqttInCfg | None = None     # optional, ingest from user's MQTT broker (#256)
     hotspot: HotspotCfg | None = None    # optional, appliance-as-WiFi-AP (Pillar 3, off by default)
+    kiosk: KioskCfg | None = None        # optional, wall-display kiosk defaults (skin + default-on), appliance-side so they travel
 
 
 # #258, default alert rules seeded on first boot. System-voltage-

@@ -65,6 +65,7 @@ from .captive import (
     android_204, apple_detect, win_connecttest, win_ncsi, ubuntu_canonical,
 )
 from .location_admin import get_location_status, update_location_share
+from .kiosk_admin import get_kiosk_config, update_kiosk_config
 from .energy import energy_today
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
@@ -1626,6 +1627,8 @@ def build_app(
             ubuntu_canonical,
             get_location_status,
             update_location_share,
+            get_kiosk_config,
+            update_kiosk_config,
             get_weather_config,
             update_weather_config,
             test_weather_fetch,
