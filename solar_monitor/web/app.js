@@ -472,13 +472,39 @@ function releaseWakeLock() {
   wakeLock.release().catch(() => {});
   wakeLock = null;
 }
+// Exit-button discoverability (#kiosk-exit is easy to forget on a wall
+// display): flash it for a few seconds on entry, then reveal it whenever
+// the mouse moves or the screen is tapped and fade it back out after a
+// couple of seconds of stillness.
+let _kioskExitHideTimer = null;
+function _kioskRevealExit() {
+  const btn = document.getElementById("kiosk-exit");
+  if (!btn) return;
+  btn.classList.add("kiosk-exit--show");
+  clearTimeout(_kioskExitHideTimer);
+  _kioskExitHideTimer = setTimeout(
+    () => btn.classList.remove("kiosk-exit--show"), 2500);
+}
 function onEnterKiosk() {
   document.body.classList.add("kiosk-active");
   requestWakeLock();
+  const btn = document.getElementById("kiosk-exit");
+  if (btn) {
+    btn.classList.remove("kiosk-exit--flash");
+    void btn.offsetWidth;                 // reflow so the flash re-triggers
+    btn.classList.add("kiosk-exit--flash");
+  }
+  window.addEventListener("mousemove", _kioskRevealExit, { passive: true });
+  window.addEventListener("touchstart", _kioskRevealExit, { passive: true });
 }
 function onLeaveKiosk() {
   document.body.classList.remove("kiosk-active");
   releaseWakeLock();
+  window.removeEventListener("mousemove", _kioskRevealExit);
+  window.removeEventListener("touchstart", _kioskRevealExit);
+  clearTimeout(_kioskExitHideTimer);
+  const btn = document.getElementById("kiosk-exit");
+  if (btn) btn.classList.remove("kiosk-exit--show", "kiosk-exit--flash");
 }
 // Reacquire the wake lock when the tab comes back to the foreground.
 document.addEventListener("visibilitychange", () => {
