@@ -6,24 +6,26 @@ Versions follow [Semantic Versioning].
 [Keep a Changelog]: https://keepachangelog.com/
 [Semantic Versioning]: https://semver.org/
 
-## [0.1.129-edge.1] - 2026-06-03
+## [Unreleased]
 
-Edge prerelease — first on-hardware test of the new kiosk.
+## [0.1.130-beta.1] - 2026-06-03
+
+Beta — bundles the new kiosk, the history analytics, the simpler update model, and the headless-onboarding work. Supersedes the 0.1.129-edge.1 test build.
 
 ### Added
 - New kiosk skin engine + the **Halo** skin (#28 Phase 1). The wall-mount kiosk is now driven by a versioned `KioskViewModel` and a swappable skin: Halo leads with the state-of-charge ring, an animated power-flow (colour = source, thickness = watts), and time-to-full / harvested-today at a glance. Foundation for selectable skins (Ember/Command), a skin selector, night mode, and an eventual community skin gallery. Skin is chosen per-device; defaults to Halo.
-
-## [Unreleased]
-
-### Added
+- Kiosk exit button is now easy to find on a wall display: it flashes a few times when the kiosk loads, then reveals + highlights whenever you move the mouse or tap, fading out when the screen goes still.
+- History — **PV actual vs forecast**: the PV forecast is now overlaid across the historical window (interpolated onto your actual samples), so you can see at a glance how the day tracked the forecast, not just the future curve. Drag to zoom, **double-click to reset**, and MIN/AVG/MAX recompute for whatever range you've zoomed into.
 - First-boot setup hotspot (headless onboarding): a freshly-flashed appliance with **no network** — no WiFi set in Raspberry Pi Imager, no Ethernet — now raises its own `WattPost-Setup` WiFi access point automatically, so you can reach the dashboard from your phone with **no monitor and no router**. That's the van / off-grid setup case. Joining the AP pops the dashboard via the captive portal. It only triggers on a box that has *never* been on a network; once it's seen a LAN it latches off for good, so a home appliance that briefly loses WiFi never gets a surprise AP. Opt out with `hotspot.onboarding: false` (#27).
 - Selective restore: when restoring a backup you can now choose which parts to bring back — **History & readings**, **Configuration**, **Dashboard password** (all on by default = a full restore). Untick *Configuration* to restore your history onto a fresh, clean config — the fix for "my config got broken, I just want my data back" (#26).
 
-### Fixed
-- Restoring a backup no longer silently drops your **WiFi-hotspot/onboarding settings** and **release-channel choice** — the restore's config allow-list was stale and stripped the `hotspot` and `update` keys (#26).
-
 ### Changed
+- **Updates are simpler.** Two channels now — **Stable** and **Beta** — the confusing Edge channel is gone. And the in-dashboard **Update button now works on Docker too** (one click, via the bundled `wattpost-updater` sidecar) — no more `docker compose pull`.
 - Docker appliance now defaults to **port 80** so the bare host IP works (`http://<host-ip>`), matching the SD-card image — no more `:8000`. Override with the `WATTPOST_PORT` env var if port 80 is already taken on the host. After pulling the new image, the dashboard moves from `http://<host-ip>:8000` to `http://<host-ip>`.
+
+### Fixed
+- WiFi-hotspot settings: the SSID and password fields no longer truncate ("WattPost-Sett") — they're full-width and left-aligned.
+- Restoring a backup no longer silently drops your **WiFi-hotspot/onboarding settings** and **release-channel choice** — the restore's config allow-list was stale and stripped the `hotspot` and `update` keys (#26).
 
 ### Security
 - The SD-card image now ships with **no default login or password** and **SSH disabled by default**. You set your own username, password, SSH and WiFi in Raspberry Pi Imager's settings when you flash (or via the first-boot wizard on an attached monitor). Previously the image shipped a default `wattpost` / `wattpost` SSH account — removed to meet the UK PSTI Act / EU Cyber Resilience Act ban on default credentials on consumer devices. The daemon runs as a separate locked system account and is unaffected.
