@@ -1335,38 +1335,9 @@
          ROUTE: Kiosk, chrome-free SoC + flow for wall-mounted tablets
          ===================================================== -->
     <section class="route kiosk-route" data-route="kiosk">
-      <div class="kiosk-stage">
-        <div class="kiosk-donut donut-state" id="kiosk-donut-wrap" data-radius="88">
-          <svg class="hero-donut" viewBox="0 0 200 200" aria-hidden="true">
-            <defs>
-              <linearGradient id="g-soc-k-charging" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#2ea043"/><stop offset="100%" stop-color="#56d364"/>
-              </linearGradient>
-              <linearGradient id="g-soc-k-holding" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#1f6feb"/><stop offset="100%" stop-color="#58a6ff"/>
-              </linearGradient>
-              <linearGradient id="g-soc-k-discharging" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#d29922"/><stop offset="100%" stop-color="#f0c849"/>
-              </linearGradient>
-              <linearGradient id="g-soc-k-critical" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#da3633"/><stop offset="100%" stop-color="#ff7b72"/>
-              </linearGradient>
-            </defs>
-            <circle class="donut-track" cx="100" cy="100" r="88" fill="none" stroke-width="14"/>
-            <circle class="donut-arc"   cx="100" cy="100" r="88" fill="none" stroke-width="14"
-                    stroke-linecap="round" pathLength="100"
-                    stroke-dasharray="0 100" transform="rotate(-90 100 100)"/>
-            <circle class="donut-head-glow" cx="100" cy="12" r="9"/>
-            <circle class="donut-head" cx="100" cy="12" r="5" stroke-width="1.5"/>
-          </svg>
-          <div class="donut-center">
-            <div class="donut-pct"><span id="kiosk-soc">·</span><span class="donut-pct-unit">%</span></div>
-            <div class="donut-label">state of charge</div>
-            <div class="donut-flow" id="kiosk-flow-pill"><span class="donut-flow-arrow"></span><span id="kiosk-flow-text">·</span></div>
-          </div>
-        </div>
-        <div class="kiosk-flow" id="kiosk-flow"></div>
-      </div>
+      <!-- The active skin (kiosk-skins.js) renders a full-bleed SVG here
+           each frame from the KioskViewModel app.js builds. -->
+      <div id="kiosk-skin-root" class="kiosk-skin-root"></div>
       <button class="kiosk-exit" id="kiosk-exit" aria-label="Exit kiosk view" title="Exit kiosk view">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
@@ -1376,6 +1347,7 @@
   </main>
 
   <script src="/web/uPlot.iife.min.js"></script>
-  <script src="/web/app.js?v=227"></script>
+  <script src="/web/kiosk-skins.js?v=1"></script>
+  <script src="/web/app.js?v=228"></script>
 </body>
 </html>

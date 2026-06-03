@@ -552,6 +552,65 @@ async function api(path) {
 // flow tile had just classed as silent, leaving the two tiles in visible
 // disagreement. We now stamp the frame's "now" once and memoise the
 // bank + flow model so every consumer sees the same view of the world.
+// ---------- kiosk skin view-model + render (kiosk-skins.js) ----------
+// Which skin is active. Per-device (localStorage) so a wall tablet and a
+// van screen on the same box can differ. Default Halo.
+function activeSkinId() {
+  try { return localStorage.getItem("wp-kiosk-skin") || "halo"; }
+  catch (e) { return "halo"; }
+}
+
+// Map the dashboard's bank + flow model onto the stable KioskViewModel
+// (see kiosk-skins.js for the contract). Skins bind to THIS, never to
+// app internals, so they survive refactors.
+function buildKioskViewModel() {
+  const bank = _frame.bank || aggregateBank();
+  const fm = _frame.flowModel || buildFlowModel();
+  const KS = window.WattPostKioskSkins;
+  const netW = +bank.netW || 0;
+  let state = Math.abs(netW) < 1 ? "holding" : (netW > 0 ? "charging" : "discharging");
+  if ((+bank.soc || 0) <= 12 && state !== "charging") state = "critical";
+  const stateLabel = { charging: "Charging", discharging: "Discharging",
+                       holding: "Holding", critical: "Low battery" }[state];
+  const sources = (fm.sources || []).map((s) => ({
+    id: s.id, label: s.label, role: s.color || "pv", watts: Math.max(0, +s.power || 0),
+  }));
+  const loads = (fm.loads || []).map((l) => ({
+    id: l.id, label: l.label, role: l.color || "load", watts: Math.max(0, +l.power || 0),
+  }));
+  const cap = +bank.totalCap || 0, rem = +bank.totalRem || 0, a = +bank.sumI || 0;
+  let timeToFullMin = null, timeToEmptyMin = null;
+  if (state === "charging" && a > 0.1 && cap > rem) timeToFullMin = ((cap - rem) / a) * 60;
+  if (state === "discharging" && a < -0.1 && rem > 0) timeToEmptyMin = (rem / Math.abs(a)) * 60;
+  const sourcesWh = (todayAggregate && +todayAggregate.sources_today_wh) || 0;
+  const now = new Date();
+  return {
+    version: KS ? KS.VERSION : 1,
+    siteName: (window.WP_SITE_NAME || ""),
+    clock: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    isNight: false,  // night-mode auto-switch lands with the Ember skin
+    soc: +bank.soc || 0, state, stateLabel, netW,
+    battery: { v: +bank.meanV || 0, a, ah: rem, cap },
+    timeToFullMin, timeToEmptyMin,
+    sources, loads,
+    todayKwh: sourcesWh / 1000,
+    daySeries: [], forecast: [], weather: null, sun: null,
+    bankLabel: cap ? (Math.round(cap) + "Ah bank") : "Bank",
+    cells: [],
+  };
+}
+
+function renderKiosk() {
+  const root = document.getElementById("kiosk-skin-root");
+  const KS = window.WattPostKioskSkins;
+  if (!root || !KS) return;       // engine not loaded / not on kiosk route
+  try {
+    KS.get(activeSkinId()).render(root, buildKioskViewModel());
+  } catch (e) {
+    if (window.console) console.warn("kiosk skin render failed", e);
+  }
+}
+
 function applySnapshot(frame) {
   devices = frame.devices || [];
   lastRun = frame.poll_run?.last_run || null;
@@ -569,10 +628,10 @@ function applySnapshot(frame) {
   renderStatus(frame.poll_run || {});
   renderHero();
   renderFlow();
-  // Kiosk view shares aggregateBank/buildFlowModel but lives in a
-  // separate DOM tree, mirror the flow strip into it on every frame.
-  const kioskFlow = $("#kiosk-flow");
-  if (kioskFlow) renderFlow(kioskFlow);
+  // Kiosk skin: build the versioned view-model from the same bank + flow
+  // model the dashboard uses, and render the active skin. Wrapped so a
+  // skin error can never break the main render loop.
+  renderKiosk();
   renderToday();
   renderWeather();
   renderLocationTile();  // #264, "Where you are" map
