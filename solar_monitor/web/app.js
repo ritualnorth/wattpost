@@ -4121,7 +4121,25 @@ function updateStatStrip(metric, data) {
     samples_1day: "1-day avg",
   }[data?.table] || "·";
   const res = $("#cs-res");
-  if (res) res.textContent = `${s.count ?? 0} points · ${tableLabel}`;
+  if (res) {
+    res.textContent = `${s.count ?? 0} points · ${tableLabel}`;
+    res.dataset.full = res.textContent;   // remembered so zoom can restore it
+  }
+}
+
+// Recompute min / avg / max over a zoomed x-window (epoch seconds) from the
+// actual samples, so the stat strip reflects what you've drilled into rather
+// than the whole window. null = nothing in range.
+function computeRangeStats(ts, vals, xMin, xMax) {
+  let mn = Infinity, mx = -Infinity, sum = 0, n = 0;
+  for (let i = 0; i < ts.length; i++) {
+    const t = ts[i], v = vals[i];
+    if (t < xMin || t > xMax || v == null) continue;
+    if (v < mn) mn = v;
+    if (v > mx) mx = v;
+    sum += v; n++;
+  }
+  return n ? { min: mn, max: mx, avg: sum / n, count: n } : null;
 }
 
 // Linear-interpolate a forecast field (pv_w / pv_w_p10 / pv_w_p90) at an
@@ -4357,6 +4375,34 @@ function drawChart(label, metric, data, forecast = null) {
               u.setScale("x", { min: tsMin, max: tsMax });
             }
           });
+        },
+      ],
+      setScale: [
+        (u, key) => {
+          // Make MIN/AVG/MAX range-aware: when you drag-zoom, recompute
+          // them over the visible window; on reset, restore the server's
+          // whole-window stats.
+          if (key !== "x") return;
+          const xs = u.scales.x;
+          const fmtV = (v) => v == null ? "·" : `${(+v).toFixed(2)}${unit ? " " + unit : ""}`;
+          const isFull = tsMin == null || (xs.min <= tsMin + 1 && xs.max >= tsMax - 1);
+          if (isFull) {
+            const s = data?.stats || {};
+            $("#cs-min").textContent = fmtV(s.min);
+            $("#cs-avg").textContent = fmtV(s.avg);
+            $("#cs-max").textContent = fmtV(s.max);
+            const res = $("#cs-res");
+            if (res && res.dataset.full) res.textContent = res.dataset.full;
+          } else {
+            const r = computeRangeStats(ts, vals, xs.min, xs.max);
+            if (r) {
+              $("#cs-min").textContent = fmtV(r.min);
+              $("#cs-avg").textContent = fmtV(r.avg);
+              $("#cs-max").textContent = fmtV(r.max);
+              const res = $("#cs-res");
+              if (res) res.textContent = `${r.count} points · selected range`;
+            }
+          }
         },
       ],
     },
