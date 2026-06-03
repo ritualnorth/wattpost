@@ -30,10 +30,12 @@ DEFAULT_BEACON_URL     = "https://wattpost.cloud/api/local_installs/beacon"
 DEFAULT_CHANGELOG_URL  = "https://raw.githubusercontent.com/ritualnorth/wattpost/main/CHANGELOG.md"
 USER_AGENT             = f"wattpost-appliance/{APPLIANCE_VERSION}"
 
-# Release channels the appliance can follow (#11). Ordered loosest-last
-# for display; "stable" is the default and the only one a fresh install
-# tracks until the user opts in via Settings -> About.
-VALID_CHANNELS = ("stable", "beta", "edge")
+# Release channels the appliance can follow (#11). Two, kept simple:
+# "stable" (soaked releases, the default) and "beta" (release candidates,
+# opt in via Settings -> About). A legacy "edge" value coerces to stable
+# via normalize_channel(). (Edge was a Docker-internal main-push image
+# stream that degraded to stable and only confused people — removed.)
+VALID_CHANNELS = ("stable", "beta")
 DEFAULT_CHANNEL = "stable"
 
 

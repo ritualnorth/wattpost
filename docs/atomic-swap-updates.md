@@ -58,7 +58,7 @@ After a rollback, `previous` points at the slot you *just left*, so a second rol
 
 If you've ticked **"Auto-apply updates fleet-wide"** in WattPost Cloud, the cloud watches each appliance's heartbeat-reported version. When it sees a Pi appliance running an older version than the latest GitHub release, it auto-queues an `update` command for that appliance, the same command the dashboard's manual "Update now" button issues. The appliance picks it up on its next heartbeat (5min default) and runs the full atomic-swap flow described above. If the new release misbehaves, the OnFailure watchdog rolls it back without your involvement.
 
-Docker installs ignore the flag, they update via `docker compose pull && docker compose up -d` on the host.
+Docker installs update the same one-click way — the **Update** button (in the appliance UI or the cloud per-site page) fires the bundled `wattpost-updater` sidecar, which pulls the new image and recreates the container via the local Docker socket. No `docker compose pull` needed (that still works as a manual fallback). The sidecar must be configured (`WATCHTOWER_URL`/`WATCHTOWER_TOKEN` + the `wattpost-updater` service — see the Docker install guide); without it, the UI falls back to telling you to pull on the host.
 
 ## What this gives you
 

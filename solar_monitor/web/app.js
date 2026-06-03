@@ -5659,20 +5659,19 @@ async function refreshUpdateState() {
     row?.classList.remove("settings-row--update");
   }
 
-  // Apply button: only on Pi installs with an actual pending update.
-  // Docker users update via `docker compose pull` on the host, no
-  // in-app button, by design (matches Immich, Pi-hole, Vaultwarden
-  // conventions).
+  // Apply button: shown whenever there's a pending update AND the box
+  // can apply it in-UI. Pi always can (slot-swap). Docker can iff the
+  // wattpost-updater sidecar is configured (updater_available) — then
+  // the button fires the sidecar's pull+recreate, no `docker compose
+  // pull` needed. One-click on both, cloud or no cloud.
+  const canApply = u.updater_available !== false;  // default true (older daemons)
   const applyBtn = $("#settings-update-apply");
-  if (applyBtn) applyBtn.hidden = isDocker || !pendingUpdate;
+  if (applyBtn) applyBtn.hidden = !(pendingUpdate && canApply);
 
-  // "Updates: docker compose pull..." row, only when there's
-  // actually an update pending on a Docker install. Used to be
-  // shown all the time on Docker, which read as "you need to do
-  // something" even when up to date. The Docker-update path is
-  // documented anyway; only surface the hint when actionable.
+  // The "docker compose pull…" hint only when a Docker box has a
+  // pending update but NO sidecar to apply it for them.
   const dockerRow = $("#settings-update-docker-row");
-  if (dockerRow) dockerRow.hidden = !(isDocker && pendingUpdate);
+  if (dockerRow) dockerRow.hidden = !(isDocker && pendingUpdate && !canApply);
 
   // Force-hide the in-flight progress row whenever refreshUpdateState
   // runs. The apply handler is the ONLY thing that should ever unhide

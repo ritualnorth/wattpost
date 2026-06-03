@@ -17,6 +17,8 @@ import sys
 import time
 from typing import Any
 
+import httpx
+
 import msgspec
 from litestar import Request, get, patch, post
 from litestar.datastructures import State
@@ -248,24 +250,32 @@ def _disk_usage_exists(path: str) -> bool:
 async def update_state(state: State) -> dict[str, Any]:
     """Current vs latest version of WattPost, from the daily manifest
     poll. UI uses this to surface "Update available" on Settings →
-    About. Also reports the deployment type so the UI shows the right
-    update path, Docker users can't fire wattpost-update, they need
-    `docker compose pull` on the host."""
+    About. Also reports the deployment type + whether the in-UI Update
+    button can fire: Pi always can (slot-swap helper); Docker can iff the
+    wattpost-updater sidecar is configured (WATCHTOWER_URL/TOKEN), else
+    the user is told to add the sidecar or `docker compose pull`."""
     deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
+    # Can the local Update button apply an update on this box?
+    updater_available = (deployment != "docker") or bool(
+        (os.environ.get("WATCHTOWER_URL") or "").strip()
+        and (os.environ.get("WATCHTOWER_TOKEN") or "").strip()
+    )
     scheduler = state["scheduler"]
     updater = getattr(scheduler, "_updater", None)
     if updater is None:
         from .. import __version__ as v
         return {
-            "current_version": v,
-            "latest_version":  None,
-            "has_update":      False,
-            "last_checked_at": None,
-            "last_error":      "update checker not running",
-            "deployment":      deployment,
+            "current_version":  v,
+            "latest_version":   None,
+            "has_update":       False,
+            "last_checked_at":  None,
+            "last_error":       "update checker not running",
+            "deployment":       deployment,
+            "updater_available": updater_available,
         }
     state_dict = updater.state.as_dict()
     state_dict["deployment"] = deployment
+    state_dict["updater_available"] = updater_available
     return state_dict
 
 
@@ -517,18 +527,54 @@ async def update_apply() -> dict[str, Any]:
     so the daemon's wattpost user can fire it. Helper handles tarball
     download, sha256 verify, atomic swap into /opt/wattpost-src, then
     runs install.sh. Live log at /var/log/wattpost-update.log.
+
+    On Docker there's no slot-swap helper — the daemon can't pull a new
+    image + recreate its own container. Instead it fires the same
+    `/v1/update` on the wattpost-updater sidecar that the cloud "Update"
+    button uses, so the local UI button works on the box itself with no
+    `docker compose pull`.
     """
+    if os.environ.get("WATTPOST_DEPLOYMENT") == "docker":
+        wt_url   = (os.environ.get("WATCHTOWER_URL")   or "").strip()
+        wt_token = (os.environ.get("WATCHTOWER_TOKEN") or "").strip()
+        if not (wt_url and wt_token):
+            raise HTTPException(
+                status_code=400,
+                detail="No updater sidecar configured. Add the "
+                       "wattpost-updater service + WATCHTOWER_URL / "
+                       "WATCHTOWER_TOKEN (see the Docker install guide), "
+                       "or run `docker compose pull && docker compose up -d`.",
+            )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.post(
+                    f"{wt_url.rstrip('/')}/v1/update",
+                    headers={"Authorization": f"Bearer {wt_token}"},
+                )
+        except Exception as e:
+            raise HTTPException(
+                status_code=502,
+                detail=f"could not reach the updater sidecar at {wt_url}: "
+                       f"{type(e).__name__}: {e}",
+            )
+        if r.status_code >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"updater sidecar returned HTTP {r.status_code}: {r.text[:200]}",
+            )
+        return {"ok": True, "method": "docker",
+                "detail": "Updater sidecar is pulling the new image and "
+                          "recreating the container."}
+
     if not os.path.exists("/usr/local/bin/wattpost-update"):
         # 400, not 500, Litestar hides the `detail` on 5xx so the user
         # would see a useless "Internal Server Error" otherwise. This
-        # branch happens on Docker installs (no helper bundled) and on
-        # broken Pi installs; both are precondition failures, not
-        # server-side bugs.
+        # branch happens on a broken Pi install (helper missing); it's a
+        # precondition failure, not a server-side bug.
         raise HTTPException(
             status_code=400,
-            detail="wattpost-update helper not found, Docker installs "
-                   "should run `docker compose pull && docker compose up -d` "
-                   "on the host instead.",
+            detail="wattpost-update helper not found — the install may be "
+                   "incomplete. Re-run install.sh.",
         )
     # setsid + nohup so the child survives this Python process getting
     # SIGTERM'd by install.sh's `systemctl restart wattpost`. We don't

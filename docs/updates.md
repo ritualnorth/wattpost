@@ -107,11 +107,10 @@ On Docker, pin the previous image tag in your `docker-compose.yml` and
 
 ## Release channels
 
-Pick a channel in **Settings → About**. Each one follows a different release stream:
+Pick a channel in **Settings → About**. Two streams:
 
-- **Stable** (default) — tagged releases that have soaked. What customers run.
-- **Beta** — release candidates the moment they're cut, before the soak. Pre-release, may be unstable; opt in to see new builds days before they reach stable.
-- **Edge** — every commit to `main`. Bleeding edge, expect breakage. Docker-only (there's no per-commit Pi image), so on a Pi the edge channel version-checks but an in-place apply uses the latest beta build.
+- **Stable** (default) — tagged releases that have soaked. What most people run.
+- **Beta** — release candidates the moment they're cut, before the soak. Pre-release, may be unstable; opt in to see new builds days before they reach stable, and to test new features (a "pre-release" warning is shown).
 
 Your appliance's daily poll carries the chosen channel, and the cloud serves the matching build. See [Release pipeline](/docs/release-pipeline#release-channels-11) for how the streams map to GitHub Releases and Docker tags.
 
