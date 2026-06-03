@@ -42,7 +42,7 @@ sudo wattpost-config              # WattPost's TUI config tool
 In `wattpost-config`:
 
 1. Pick **Display** → **Kiosk URL**
-2. Set to `http://localhost:8000/kiosk?lock=1`. The `lock=1` hides the "Exit kiosk" button so a curious passenger can't tap into Settings.
+2. Set to `http://localhost/kiosk?lock=1`. The `lock=1` hides the "Exit kiosk" button so a curious passenger can't tap into Settings.
 3. Pick **Display** → **Hide cursor**: **Yes**
 4. Pick **Display** → **Auto-rotate**: leave at `0` for landscape, set `270` if you mounted the screen vertically.
 5. Reboot.

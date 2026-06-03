@@ -100,7 +100,9 @@ ENV WATTPOST_CONFIG=/etc/wattpost/config.yaml
 ENV WATTPOST_DB_PATH=/var/lib/wattpost/solar-monitor.db
 
 # Web UI port. Host-network mode means this is a hint, not a binding.
-EXPOSE 8000
+# The entrypoint listens on WATTPOST_PORT (default 80), so the bare host
+# IP works like the Pi image.
+EXPOSE 80
 
 # First-boot bootstrap: if /etc/wattpost/config.yaml doesn't exist on
 # the mounted volume, drop a minimal default in so the daemon starts
@@ -109,4 +111,6 @@ COPY packaging/docker/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
-CMD ["solar-monitor", "serve", "--config", "/etc/wattpost/config.yaml", "--port", "8000"]
+# --port is intentionally omitted — the entrypoint appends it from
+# WATTPOST_PORT (default 80). See packaging/docker/entrypoint.sh.
+CMD ["solar-monitor", "serve", "--config", "/etc/wattpost/config.yaml"]

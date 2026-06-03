@@ -61,7 +61,7 @@ broker. If you want a self-managed alternative:
   then `sudo tailscale up`). The WattPost daemon no longer
   configures or surfaces Tailscale state, but it doesn't conflict
   with it either, once your host is on a tailnet you can reach
-  `http://<host>.<tailnet>.ts.net:8000/` from any logged-in device.
+  `http://<host>.<tailnet>.ts.net/` from any logged-in device (append `:<port>` if you changed the web port).
 - **A VPN / WireGuard tunnel of your own.**
 - **A reverse-proxy with your own cert** (Caddy, Traefik, nginx +
   Let's Encrypt). The appliance binds `0.0.0.0:<port>`; point your

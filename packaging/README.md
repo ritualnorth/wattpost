@@ -23,7 +23,7 @@ What it does:
 - Enables + starts the service.
 
 After it finishes:
-- Dashboard: `http://<pi>:8000/`
+- Dashboard: `http://<pi>/` (`http://wattpost.local/`)
 - Live logs: `journalctl -u wattpost -f` (or via the dashboard's
   Settings → Diagnostics block).
 - Apply config changes: tap **Restart daemon** in Settings → System

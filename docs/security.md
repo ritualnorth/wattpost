@@ -1,7 +1,7 @@
 # About the "Not Secure" warning
 
 You'll see **"Not Secure"** in your browser's URL bar when you open
-WattPost via `http://<pi-ip>:8000/` on the LAN. **This is normal and
+WattPost via `http://<pi-ip>/` on the LAN. **This is normal and
 expected** for a local-only appliance.
 
 ## Why it's there
@@ -27,7 +27,7 @@ Two ways, in order of difficulty:
    access](/docs/remote-access) for pairing.
 
 2. **Browser exceptions**.
-   If you'd rather keep using `http://<pi-ip>:8000`, every browser
+   If you'd rather keep using `http://<pi-ip>/`, every browser
    lets you dismiss / hide the warning permanently for a known
    address. iOS Safari hides it from the URL bar by default once
    you've visited the site a few times.

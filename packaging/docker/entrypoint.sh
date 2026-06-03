@@ -48,4 +48,10 @@ YAML
     echo "[wattpost-docker] wrote default config at ${CFG}"
 fi
 
-exec "$@"
+# Web port. Defaults to 80 so the bare host IP works out of the box —
+# parity with the SD-card (Pi) image. Override with WATTPOST_PORT, e.g.
+# when port 80 is already taken on a multi-app host. Host networking
+# means this binds the host directly (container runs as root, so <1024
+# is fine). The CMD intentionally omits --port so this is the only
+# place the port is decided.
+exec "$@" --port "${WATTPOST_PORT:-80}"

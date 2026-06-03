@@ -56,7 +56,7 @@ Then:
 docker compose up -d
 ```
 
-Open `http://<this-host-ip>:8000` in a browser on the same network.
+Open `http://<this-host-ip>` in a browser on the same network (it serves on port 80 by default).
 First-boot drops a minimal `config.yaml` in `./wattpost-config/` ·
 edit via **Settings → Devices & setup** in the dashboard, no SSH or
 file-editing needed.
@@ -93,7 +93,7 @@ The example compose uses `network_mode: host` and bind-mounts
 `/var/run/dbus`. That's the most reliable combo across distros ·
 the container shares the host's network namespace and talks to the
 host's `bluetoothd` over the DBus socket. Trade-off: the container
-is on the host network, so `:8000` binds the host directly.
+is on the host network, so the dashboard binds the host directly on **port 80** by default (override with `WATTPOST_PORT`).
 
 If your distro's BlueZ is patchy with that combo, fall back to
 `privileged: true` on the service. It's a bigger hammer; we'd rather
@@ -262,9 +262,9 @@ The Docker image:
   lives under About, and a Reset to defaults button lives at the
   bottom of Diagnostics (type `RESET` to enable, keeps history
   and cloud pairing by default). The one thing that has to stay
-  on the host is the web port, change the `8000:8000` mapping
-  in your `docker-compose.yml` and `docker compose up -d` to
-  apply.
+  on the host is the web port · it defaults to **80** (the bare host
+  IP works). To change it, set `WATTPOST_PORT` (e.g. `WATTPOST_PORT=8080`)
+  in the `wattpost` service environment, then `docker compose up -d`.
 - **Doesn't** auto-update via the daemon's "Update now" button ·
   that's image-replacement (`docker compose pull`) instead.
 - **Remote access goes through [WattPost Cloud](pairing.md).**
@@ -273,5 +273,5 @@ The Docker image:
   port-forwarding, no public IP. See [Remote access](remote-access.md)
   for the broker overview.
   If you'd rather self-host a VPN / WireGuard / reverse-proxy in
-  front of the container, the daemon binds `0.0.0.0:8000` like
+  front of the container, the daemon binds `0.0.0.0:80` (or your `WATTPOST_PORT`) like
   normal, wire your own ingress at that port.

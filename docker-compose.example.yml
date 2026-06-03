@@ -2,7 +2,7 @@
 #
 # Copy this to docker-compose.yml in a working directory, then:
 #   docker compose up -d
-#   open http://localhost:8000   (or http://<this-host-ip>:8000)
+#   open http://localhost   (or http://<this-host-ip>)   — port 80 by default
 #
 # Updates: the watchtower sidecar at the bottom polls GHCR daily and
 #   restarts wattpost when a new tag lands. Same sidecar is what the
@@ -24,7 +24,8 @@ services:
     # alternative (cap_add + dbus bind-mount) works on most distros
     # but bluez integration varies by version — host mode is the path
     # we test. Trade-off: the container shares the host's network
-    # namespace, so :8000 binds the host directly.
+    # namespace, so the dashboard binds the host directly — port 80
+    # by default; set WATTPOST_PORT below to change it.
     network_mode: host
 
     # Bluetooth on Linux Docker requires:
@@ -64,6 +65,9 @@ services:
       # gives anyone who reaches the updater port full control of
       # this container.
       WATTPOST_DEPLOYMENT: docker
+      # Web port — defaults to 80 so the bare host IP works (parity with
+      # the Pi image). Uncomment + change if port 80 is taken on this host.
+      # WATTPOST_PORT: "8080"
       WATCHTOWER_URL:   "http://localhost:8080"
       WATCHTOWER_TOKEN: "REPLACE_WITH_OPENSSL_RAND_HEX_32"
 

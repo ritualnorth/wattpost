@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Changed
+- Docker appliance now defaults to **port 80** so the bare host IP works (`http://<host-ip>`), matching the SD-card image — no more `:8000`. Override with the `WATTPOST_PORT` env var if port 80 is already taken on the host. After pulling the new image, the dashboard moves from `http://<host-ip>:8000` to `http://<host-ip>`.
+
 ## [0.1.128] - 2026-06-02
 
 ### Added

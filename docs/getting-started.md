@@ -48,7 +48,7 @@ What you need:
 
 Then follow [Run in Docker](/docs/docker-install). One compose file,
 two volumes, one `docker compose up -d`. Open
-`http://<this-host-ip>:8000` once it's up.
+`http://<this-host-ip>` once it's up.
 
 Both paths land in the same place: the WattPost dashboard, ready to
 pair gear.
