@@ -11,6 +11,9 @@ Versions follow [Semantic Versioning].
 ### Changed
 - Docker appliance now defaults to **port 80** so the bare host IP works (`http://<host-ip>`), matching the SD-card image — no more `:8000`. Override with the `WATTPOST_PORT` env var if port 80 is already taken on the host. After pulling the new image, the dashboard moves from `http://<host-ip>:8000` to `http://<host-ip>`.
 
+### Security
+- The SD-card image now ships with **no default login or password** and **SSH disabled by default**. You set your own username, password, SSH and WiFi in Raspberry Pi Imager's settings when you flash (or via the first-boot wizard on an attached monitor). Previously the image shipped a default `wattpost` / `wattpost` SSH account — removed to meet the UK PSTI Act / EU Cyber Resilience Act ban on default credentials on consumer devices. The daemon runs as a separate locked system account and is unaffected.
+
 ## [0.1.128] - 2026-06-02
 
 ### Added

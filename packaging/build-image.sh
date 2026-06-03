@@ -112,10 +112,16 @@ DEPLOY_COMPRESSION=xz
 LOCALE_DEFAULT=en_GB.UTF-8
 TIMEZONE_DEFAULT=Europe/London
 TARGET_HOSTNAME=wattpost
-FIRST_USER_NAME=wattpost
-FIRST_USER_PASS=wattpost   # user must change on first login — TODO swap for a prompt
-DISABLE_FIRST_BOOT_USER_RENAME=1
-ENABLE_SSH=1
+# No baked-in login user, no default password, and SSH off by default —
+# the image ships ZERO default credentials (the UK PSTI Act and EU Cyber
+# Resilience Act require this for consumer IoT). The user sets their own
+# username, password, SSH and WiFi in Raspberry Pi Imager's OS-customisation
+# settings (the gear icon) at flash time, or via the first-boot setup
+# wizard on an attached monitor. Leaving FIRST_USER_NAME / FIRST_USER_PASS
+# unset (and not disabling the rename) is what enables that first-boot flow.
+#
+# The daemon does NOT use a human login: install.sh creates a separate
+# locked 'wattpost' *system* account (useradd --system) and runs as that.
 STAGE_LIST="stage0 stage1 stage2 ${STAGE_NAME}"
 EOF
 

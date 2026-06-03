@@ -30,11 +30,18 @@ Then:
 2. [Download the WattPost image](/download). About 600 MB.
 3. In Imager: **Choose OS → Use custom** → select the `.img.xz`.
 4. **Choose Storage** → pick the SD card.
-5. Hit **Write**. ~3–5 minutes.
+5. Click **Next**, then **Edit Settings** (the OS-customisation gear) and set:
+   - a **username + password** — this is your SSH / console login. WattPost
+     ships *no default login or password*, so set your own here.
+   - **Enable SSH** only if you actually want shell access (most people never
+     do — the dashboard does everything). Key-based auth is the safest choice.
+   - your **WiFi**, if the Pi isn't on Ethernet.
+   Save, then hit **Write**. ~3–5 minutes.
 6. Slot the SD card into the Pi, plug in your BT dongle, power on.
 7. After ~60 seconds, open `http://wattpost.local` from any browser
    on the same network. If `.local` doesn't resolve, look up the
-   Pi's IP and use that.
+   Pi's IP and use that. (No login needed for the dashboard — the
+   username/password above is only for SSH / the console.)
 
 ## Path B. Docker on an existing Linux host
 

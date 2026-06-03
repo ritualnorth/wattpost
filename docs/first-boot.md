@@ -4,7 +4,7 @@ Power on a freshly-flashed WattPost Pi and a lot happens in the first 30 seconds
 
 ## The MOTD
 
-SSH in (`ssh wattpost@wattpost.local`, default password `wattpost`. Change it!) and you'll see:
+WattPost ships no default login, and SSH is off unless you enabled it (with your own username/password) in Raspberry Pi Imager when you flashed. If you did, SSH in (`ssh <your-user>@wattpost.local`) and you'll see the MOTD:
 
 ```
   WattPost v0.1.34    uptime: 1m

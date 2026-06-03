@@ -43,7 +43,7 @@ Tail `/var/log/wattpost-update.log` on the Pi (`sudo tail -f`). Common causes:
 
 ## "I forgot the local web password"
 
-SSH in (the OS-level user · `wattpost@wattpost.local`, password `wattpost` by default unless you changed that too) and run `wattpost-config` → **Set / reset web password**. Generates a new random password and prints it.
+On the Pi's console, or over SSH if you enabled it in Pi Imager (logging in with the username/password you set there — there's no default), run `wattpost-config` → **Set / reset web password**. Generates a new random password and prints it.
 
 Lost SSH too? Re-flash the SD image, copy your `config.yaml` and `solar-monitor.db` back. The cloud pairing is preserved.
 

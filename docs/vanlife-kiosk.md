@@ -35,7 +35,7 @@ Total: **~£155 + £8 dongle if needed**.
 After setup is finished and your hardware is paired, switch the Pi's launch URL to the kiosk view.
 
 ```bash
-ssh wattpost@wattpost.local       # default password is printed on first boot
+ssh <your-user>@wattpost.local       # the login you set in Pi Imager (enable SSH there first)
 sudo wattpost-config              # WattPost's TUI config tool
 ```
 

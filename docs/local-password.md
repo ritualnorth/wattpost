@@ -17,7 +17,7 @@ You probably don't need one if:
 
 ## Setting one
 
-SSH into the Pi → `wattpost-config` → **Set / reset web password**. A random `wattpost-<5-hex>` password is generated, hashed (argon2), stored at `/etc/wattpost/web-password.hash`. The plaintext is also written to `/etc/wattpost/web-password` so the MOTD shows it on next login.
+On the Pi's console — or over SSH, if you enabled it — run `wattpost-config` → **Set / reset web password**. A random `wattpost-<5-hex>` password is generated, hashed (argon2), stored at `/etc/wattpost/web-password.hash`. The plaintext is also written to `/etc/wattpost/web-password` so the MOTD shows it on next login.
 
 ```
 $ wattpost-config
@@ -52,6 +52,6 @@ Visits arriving through `<slug>.wattpost.io` come from `cloudflared` on the loca
 
 ## Lost the password?
 
-SSH in (the OS-level `wattpost` user account is a different password · `wattpost` by default unless you changed it). Run `wattpost-config` → Set / reset web password → it generates a new one.
+On the Pi's console, or over SSH if you enabled it, log in with the username/password you set in Raspberry Pi Imager (the OS login is separate from the web password, and WattPost ships no default for it). Run `wattpost-config` → Set / reset web password → it generates a new one.
 
 Worst case (SSH locked out + dashboard locked out): re-flash the SD image, restore your `config.yaml` backup, you're back. The cloud-side data is preserved because the appliance is identified by its bearer token in `config.yaml`.

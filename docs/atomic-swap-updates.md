@@ -48,7 +48,7 @@ From the dashboard or `wattpost-config`:
 
 - `wattpost-config` → menu option **12 (Roll back to previous slot)**
 - Or call `POST /api/system/slots/rollback` against the appliance
-- Or SSH in and run `sudo /usr/local/bin/wattpost-rollback`
+- Or, if you enabled SSH, run `sudo /usr/local/bin/wattpost-rollback` over SSH (or from the Pi's console)
 
 All three call the same script, so behaviour is identical.
 
