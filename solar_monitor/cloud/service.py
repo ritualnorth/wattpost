@@ -1285,6 +1285,14 @@ class CloudService:
         # 'pi'.
         import os as _os
         extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
+        # Local dashboard port the appliance actually serves on, so the cloud
+        # can point the per-appliance tunnel ingress at it even if the user
+        # changed WATTPOST_PORT. systemd + the Docker entrypoint both set this
+        # env to the served port; default 80. (wattpost-cloud#7)
+        try:
+            extras["local_port"] = int(_os.environ.get("WATTPOST_PORT") or 80)
+        except (TypeError, ValueError):
+            extras["local_port"] = 80
         # #267, host-health snapshot (disk, memory, load, uptime,
         # hostname, LAN IP). Cheap stdlib reads; the cloud renders
         # this as a Device-health card on /app/site/{id} and uses it
