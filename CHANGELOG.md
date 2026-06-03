@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- **Shared cloud kiosk now shows the chosen skin.** When you share a read-only kiosk link (`wattpost.cloud/k/…`), the visitor's brokered view is the appliance's own kiosk page — but it was always falling back to the default **Halo** skin because the read-only kiosk allow-list blocked it from reading the appliance's kiosk settings. It can now read (but never change) the skin, so a shared kiosk matches what you set on the wall display. (#28 Milestone D)
+
 ## [0.1.131-beta.1] - 2026-06-03
 
 Beta — completes the wall-display kiosk (selectable skins) and fixes a couple of real-world gremlins (USB GPS vs ModemManager, the cloud→display kiosk toggle).

@@ -1196,6 +1196,32 @@ def manifest() -> File:
     )
 
 
+# Path prefixes a cloud-broker KIOSK-scope request (#225) may reach on
+# this appliance. GET/HEAD/OPTIONS only — enforced at the call site. The
+# brokered cloud kiosk (`<slug>.wattpost.cloud/kiosk`) is the appliance's
+# own SPA, so it must be able to read `/api/kiosk/config` to render the
+# owner's chosen skin; without it a shared kiosk silently falls back to
+# the default skin (Milestone D). Module-level so it's a single source of
+# truth + regression-testable.
+KIOSK_BROKER_GET_PATHS = (
+    "/kiosk", "/api/snapshot", "/api/devices", "/api/poll_run",
+    "/api/today", "/api/weather", "/api/kiosk/config", "/web/", "/static/",
+)
+
+
+def kiosk_scope_allows(method: str, path: str) -> bool:
+    """Whether a cloud-broker KIOSK-scope request (#225) for (method, path)
+    is permitted on this appliance. Read-only by construction — only safe
+    GET-family methods on the `KIOSK_BROKER_GET_PATHS` allow-list pass; a
+    kiosk visitor can never mutate (e.g. PATCH /api/kiosk/config is denied,
+    so a guest can't change the wall display's skin)."""
+    if method.upper() not in ("GET", "HEAD", "OPTIONS"):
+        return False
+    return path == "/kiosk" or any(
+        path.startswith(p) for p in KIOSK_BROKER_GET_PATHS
+    )
+
+
 def build_app(
     config: Config,
     db_path: str,
@@ -1387,9 +1413,6 @@ def build_app(
             # appliance-side share token to leak, rotate, or revoke.
             _path = scope.get("path", "/")
             _method = scope.get("method", "GET").upper()
-            _kiosk_paths = ("/kiosk", "/api/snapshot", "/api/devices",
-                            "/api/poll_run", "/api/today", "/api/weather",
-                            "/web/", "/static/")
             # Cloud broker (#139). When the cloud proxies a logged-in
             # user's request through to this appliance, it stamps the
             # request with X-WP-Broker-Auth = <ts>.<hmac> signed with
@@ -1447,10 +1470,7 @@ def build_app(
                         await self.app(scope, receive, send)
                         return
                     if _bscope == "kiosk":
-                        if _method in ("GET", "HEAD", "OPTIONS") and (
-                            _path == "/kiosk"
-                            or any(_path.startswith(p) for p in _kiosk_paths)
-                        ):
+                        if kiosk_scope_allows(_method, _path):
                             await self.app(scope, receive, send)
                             return
                         # Outside the allow-list: fall through to
