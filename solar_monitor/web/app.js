@@ -468,6 +468,11 @@ async function loadKioskConfig() {
       localStorage.setItem(KIOSK_KEY, k.default ? "1" : "0");
       localStorage.setItem(KIOSK_SKIN_KEY, APPLIANCE_KIOSK.skin);
     } catch (_) {}
+    // Reflect into the Settings controls if they're already on-screen.
+    const _sel = document.getElementById("kiosk-skin-select");
+    if (_sel) _sel.value = APPLIANCE_KIOSK.skin;
+    const _tog = document.getElementById("kiosk-default-toggle");
+    if (_tog) _tog.checked = !!APPLIANCE_KIOSK.default;
     // The local display may have booted before this loaded — if the
     // appliance now says default-kiosk and we're on the dashboard with
     // no explicit route, go to kiosk (never on a broker/cloud view).
@@ -658,17 +663,46 @@ function buildKioskViewModel() {
   if (state === "discharging" && a < -0.1 && rem > 0) timeToEmptyMin = (rem / Math.abs(a)) * 60;
   const sourcesWh = (todayAggregate && +todayAggregate.sources_today_wh) || 0;
   const now = new Date();
+  const nowS = Date.now() / 1000;
+
+  // Sun (Ember's day-arc + night flag), weather + per-day forecast bars
+  // (Command) — built from the same data the dashboard already fetches
+  // each frame. All best-effort: a missing source just degrades the skin.
+  let sun = null, isNight = false;
+  if (weatherData && weatherData.sunrise_ts && weatherData.sunset_ts) {
+    const rise = weatherData.sunrise_ts, set = weatherData.sunset_ts;
+    const fmtT = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    sun = {
+      riseStr: fmtT(rise), setStr: fmtT(set),
+      progress: set > rise ? Math.max(0, Math.min(1, (nowS - rise) / (set - rise))) : 0,
+    };
+    isNight = nowS < rise || nowS > set;
+  }
+  let weather = null;
+  if (weatherData && weatherData.provider) {
+    weather = {
+      desc: (typeof WMO !== "undefined" ? WMO.describe(weatherData.weather_code, weatherData.is_day) : ""),
+      tempC: weatherData.temperature_c,
+    };
+  }
+  let forecast = [];
+  try {
+    if (forecastData && forecastData.points && typeof bucketByDay === "function") {
+      forecast = bucketByDay(forecastData.points).slice(0, 7).map((b) => ({ kwh: (b.wh || 0) / 1000 }));
+    }
+  } catch (_) {}
+
   return {
     version: KS ? KS.VERSION : 1,
     siteName: (window.WP_SITE_NAME || ""),
     clock: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    isNight: false,  // night-mode auto-switch lands with the Ember skin
+    isNight,
     soc: +bank.soc || 0, state, stateLabel, netW,
     battery: { v: +bank.meanV || 0, a, ah: rem, cap },
     timeToFullMin, timeToEmptyMin,
     sources, loads,
     todayKwh: sourcesWh / 1000,
-    daySeries: [], forecast: [], weather: null, sun: null,
+    daySeries: [], forecast, weather, sun,
     bankLabel: cap ? (Math.round(cap) + "Ah bank") : "Bank",
     cells: [],
   };
@@ -679,7 +713,11 @@ function renderKiosk() {
   const KS = window.WattPostKioskSkins;
   if (!root || !KS) return;       // engine not loaded / not on kiosk route
   try {
-    KS.get(activeSkinId()).render(root, buildKioskViewModel());
+    const vm = buildKioskViewModel();
+    KS.get(activeSkinId()).render(root, vm);
+    // Night mode: gently dim the wall display after local sunset so it
+    // isn't a lightbox in a dark van/cabin/bedroom.
+    document.body.classList.toggle("kiosk-night", !!vm.isNight);
   } catch (e) {
     if (window.console) console.warn("kiosk skin render failed", e);
   }
@@ -7632,6 +7670,15 @@ if (kioskToggle) {
   kioskToggle.checked = kioskDefault();
   kioskToggle.addEventListener("change", () => {
     setKioskDefault(kioskToggle.checked);
+  });
+}
+// Kiosk skin selector — PATCHes the appliance (travels to the wall display
+// + cloud kiosk). Value reflects the appliance config once it has loaded.
+const kioskSkinSelect = $("#kiosk-skin-select");
+if (kioskSkinSelect) {
+  kioskSkinSelect.value = activeSkinId();
+  kioskSkinSelect.addEventListener("change", () => {
+    setKioskSkin(kioskSkinSelect.value);
   });
 }
 // "Open the local display in kiosk" is now an APPLIANCE-side setting

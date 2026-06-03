@@ -3081,6 +3081,10 @@ body.kiosk-active .route.kiosk-route.active {
 .wp-skin .k-flow { stroke-dasharray: 2 16; animation: k-march 1s linear infinite; }
 .wp-skin .k-flow.k-rev { animation-direction: reverse; }
 @keyframes k-march { to { stroke-dashoffset: -18; } }
+/* Night mode: dim the wall display after local sunset (toggled by app.js
+   from the sun times) so it isn't a lightbox in a dark van/cabin/bedroom.
+   Slow transition so it's never jarring. */
+body.kiosk-night .wp-skin { filter: brightness(0.6); transition: filter 2s ease; }
 .kiosk-donut {
   position: relative;
   /* Pick whichever axis is the constraint, a landscape phone is short

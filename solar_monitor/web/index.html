@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=143" />
+  <link rel="stylesheet" href="/web/styles.css?v=144" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -885,6 +885,16 @@
                 <span class="settings-toggle-sub">The appliance's own screen boots straight into the kiosk skin. Set it from here or a cloud session — it's stored on the appliance, so the wall display obeys either way. Visit <code>/#/kiosk</code> any time, or come back to Settings to switch off.</span>
               </span>
             </label>
+            <div class="hist-row" id="kiosk-skin-row" style="margin-top:.5rem">
+              <span>Kiosk skin</span>
+              <span class="hist-input">
+                <select id="kiosk-skin-select" style="font-size:.85em">
+                  <option value="halo">Halo &middot; minimal</option>
+                  <option value="ember">Ember &middot; cozy / night</option>
+                  <option value="command">Command &middot; detailed</option>
+                </select>
+              </span>
+            </div>
           </div>
           <div class="settings-block settings-block--alerts" data-subroute="alerts">
             <h3>Alerts</h3>
@@ -1347,6 +1357,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=2"></script>
-  <script src="/web/app.js?v=234"></script>
+  <script src="/web/app.js?v=235"></script>
 </body>
 </html>
