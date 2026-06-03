@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.131-beta.1] - 2026-06-03
+
+Beta — completes the wall-display kiosk (selectable skins) and fixes a couple of real-world gremlins (USB GPS vs ModemManager, the cloud→display kiosk toggle).
+
+### Added
+- **Kiosk skins** — pick how your wall display looks in **Settings → Appearance → Kiosk skin**: **Halo** (minimal, SoC-ring hero), **Ember** (warm van/night, a day-arc with the sun's position + big runtime, and it dims after sunset so it isn't a lightbox in a dark van), or **Command** (command-centre with a branching power flow + a tile band of battery / bank / forecast / weather). All three render from live data.
+- Kiosk **defaults are now stored on the appliance**, not the browser — so set the skin or "open in kiosk" from a cloud session and the **local wall display obeys**. (Previously the toggle was per-browser localStorage and never reached the screen.)
+
+### Fixed
+- USB GPS: the appliance no longer fights **ModemManager** for the serial port — the SD image / `install.sh` ship a udev rule that keeps ModemManager off GPS + USB-RS485 adapters (the classic "GPS opens but returns no data, vanishes after a reboot"), and the daemon user is added to `dialout`.
+- Location panel: the **share-with-cloud radios** (Off / Approximate / Precise) are settable before a fix exists — they're a preference that applies once a source comes online — instead of being greyed out.
+
 ## [0.1.130-beta.1] - 2026-06-03
 
 Beta — bundles the new kiosk, the history analytics, the simpler update model, and the headless-onboarding work. Supersedes the 0.1.129-edge.1 test build.
