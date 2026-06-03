@@ -27,7 +27,7 @@ Read in this order if you're new:
 | Task                                  | Where                                                                 |
 | ------------------------------------- | --------------------------------------------------------------------- |
 | **Cut a real release** (see below)    | Bump `__version__` + CHANGELOG, commit, `git tag vX.Y.Z`, push tag.   |
-| Ship a feature to bleeding-edge testers | Just push to `main`. Builds `:edge` Docker tag, no manifest bump.    |
+| Ship a feature to beta testers        | Cut a pre-release tag `vX.Y.Z-beta.N` (builds `:beta` + a prerelease GitHub Release). A plain `main` push only redeploys the cloud. |
 | Debug a failed pi-gen run             | `gh run view <id> --log-failed`. Common failure modes in release-pipeline.md operator runbook. |
 
 ## Cutting a release (the ritual)
@@ -40,7 +40,7 @@ sed -i 's/__version__ = "0.0.3"/__version__ = "0.0.4"/' solar_monitor/__init__.p
 #    [0.0.4] — YYYY-MM-DD section. Leave [Unreleased] empty
 #    above it for the next batch.
 
-# 3. Commit (push to main fires :edge build only — harmless).
+# 3. Commit (push to main only redeploys the cloud — no appliance build).
 git add solar_monitor/__init__.py CHANGELOG.md
 git commit -m "Release v0.0.4"
 git push origin main
@@ -66,8 +66,9 @@ The tag push triggers, in parallel:
 
 - After landing a coherent batch of fixes/features, especially
   anything user-visible.
-- NOT after every commit — that's what `:edge` is for. Customers
-  on `:latest` should see batched, version-numbered releases.
+- NOT after every commit — cut a `:beta` pre-release for soak
+  testing. Customers on `:latest` should see batched,
+  version-numbered Stable releases.
 
 ### Things that often go wrong
 

@@ -135,12 +135,15 @@ docker compose pull   # fetch newest image
 docker compose up -d  # roll the container
 ```
 
-The `latest` tag follows `main`. For traceability, pin to a
-`sha-<short>` tag in your compose file:
+Image tags:
 
-```yaml
-image: ghcr.io/ritualnorth/wattpost-appliance:sha-abc1234
-```
+- **`:latest`** — the current **Stable** release. Most installs want this.
+- **`:beta`** — the newest **pre-release**, to try new features before they reach Stable.
+- **`:vX.Y.Z`** — pin an exact version (reproducibility, or to hold a known-good build).
+
+> The old `:edge` and `:sha-<short>` tags were **retired** along with the Edge
+> channel. If your compose still pins `:edge` it's stuck on a frozen image —
+> change it to `:beta` (or `:latest`), then `docker compose pull && docker compose up -d`.
 
 ### Adding the updater sidecar (existing installs)
 

@@ -3,12 +3,12 @@
 How a code change reaches a customer's Raspberry Pi.
 
 ```
-git push main               git tag v0.0.5
-       │                          │
-       ▼                          ▼
-build-appliance-image.yml   publish-source.yml + build-image.yml
-  (:edge Docker tag)          tar.gz+sha      .img.xz+sha (pi-gen, ~90 min)
-                                  │                  │
+git tag vX.Y.Z (final)      ·     git tag vX.Y.Z-beta.N (prerelease)
+       │                                  │
+       ▼                                  ▼
+build-appliance-image.yml + publish-source.yml + build-image.yml
+  :latest / :vX.Y.Z           tar.gz+sha       .img.xz+sha (pi-gen, ~90 min)
+  (:beta on a prerelease tag)     │                  │
                                   ▼                  ▼
                          attached as assets to the GitHub Release
                                   │
@@ -22,17 +22,16 @@ build-appliance-image.yml   publish-source.yml + build-image.yml
 
 ## What gets released
 
-Three artefacts, all triggered by **git tags** for release builds. Only the
-Docker `:edge` channel publishes on every commit. This keeps version numbers
-honest and stops the "Update available" badge from nagging users on every
-fix-commit.
+Every release artefact is triggered by a **git tag** — there are no per-commit
+image builds. A final tag (`vX.Y.Z`) feeds the **Stable** channel; a pre-release
+tag (`vX.Y.Z-beta.N`) feeds **Beta**. This keeps version numbers honest and
+stops the "Update available" badge from nagging users on every fix-commit.
 
 | Artefact | Source pipeline | Where it lands | Trigger |
 | --- | --- | --- | --- |
 | `wattpost-source.tar.gz` | `publish-source.yml` | GitHub Release asset (stable URL `releases/latest/download/wattpost-source.tar.gz`) | Git tag `v*` (or `workflow_dispatch`) |
 | `image_*.img.xz` | `build-image.yml` | GitHub Release asset | Git tag `v*` (or `workflow_dispatch`) |
-| `ghcr.io/.../wattpost-appliance:latest` | `build-appliance-image.yml` | GHCR. Gets `:vX.Y.Z`, `:X.Y`, `:latest` | Git tag `v*` |
-| `ghcr.io/.../wattpost-appliance:edge` | `build-appliance-image.yml` | GHCR. Gets `:edge`, `:sha-<short>` | Every push to `main` |
+| `ghcr.io/.../wattpost-appliance:latest` | `build-appliance-image.yml` | GHCR. Final tag gets `:vX.Y.Z`, `:X.Y`, `:latest`; a prerelease tag gets `:vX.Y.Z` + `:beta` | Git tag `v*` |
 
 The source tarball is what the appliance's **Update now** button pulls down for
 in-place upgrades. The `.img.xz` is what a new user flashes onto a fresh SD card
@@ -63,16 +62,11 @@ workflows attach the `.img.xz` + source tarball to the Release for the tag, and:
 
 ## Cutting a release
 
-A normal main push automatically:
-
-- Rebuilds + deploys the cloud (`build-cloud-image.yml`)
-- Builds + pushes the appliance Docker image as `:edge` and `:sha-<short>`
-  (`build-appliance-image.yml`)
-
-That's the bleeding-edge channel — fine for dev + tester opt-in
-(`image: ghcr.io/ritualnorth/wattpost-appliance:edge`), NOT what customers track.
-It deliberately does NOT cut a release, so paired Pi appliances aren't nagged on
-every fix commit.
+A normal main push only **rebuilds + deploys the cloud**
+(`build-cloud-image.yml`). It does **not** build an appliance image and does
+**not** cut a release, so paired Pi appliances aren't nagged on every fix commit.
+To get a build in front of testers, cut a **beta** tag (below) — there is no
+longer a per-commit Edge image.
 
 **To cut a real release that flows to customers**:
 
@@ -101,42 +95,38 @@ every fix commit.
 The pi-gen workflow takes the longest: tag → 90 min break → check it landed. CI
 emails on failure.
 
-## Release channels (#11)
+## Release channels
 
-Appliances pick a channel in **Settings → About**. Each channel is a separate
-stream of the artefacts above:
+Appliances pick a channel in **Settings → About**. There are **two** channels —
+Stable and Beta (the old Edge channel was retired along with per-commit image
+builds). Each is a separate stream of the artefacts above:
 
 | Channel | Who | Docker tag | Pi image (GitHub Release) | Trigger |
 | --- | --- | --- | --- | --- |
 | stable | customers | `:latest` | newest **non-prerelease** release | **final** tag `vX.Y.Z` |
-| beta | testers | `:beta` | newest **prerelease** release | **pre-release** tag `vX.Y.Z-rcN` |
-| edge | dev | `:edge` | — (Docker-only) | every push to `main` |
+| beta | testers | `:beta` | newest **prerelease** release | **pre-release** tag `vX.Y.Z-beta.N` |
 
 The appliance's daily poll hits `…/api/releases/latest?channel=<ch>`; the cloud
-maps **stable → newest non-prerelease** release, **beta → newest prerelease**,
-and degrades edge (and a not-yet-published channel) to stable so no appliance
-ever sees the 0.0.1 fallback.
+maps **stable → newest non-prerelease** release and **beta → newest prerelease**,
+and degrades an unknown / not-yet-published channel to stable so no appliance
+ever sees the 0.0.1 fallback. (A legacy `edge` setting coerces to stable.)
 
-**Beta sits between edge and stable.** edge is every commit; beta is a tagged
-release candidate that hasn't soaked; stable is a final release. A **final** tag
-is published as a normal (latest) Release; a release candidate is published as a
-**prerelease**, so it's the newest beta without becoming "latest" — beta testers
-move forward but stable users are untouched.
+**Beta is the only pre-stable channel.** A beta is a tagged release that hasn't
+soaked; stable is a final release. A **final** tag is published as a normal
+(latest) Release; a beta is published as a **prerelease**, so it's the newest
+beta without becoming "latest" — beta testers move forward but stable users are
+untouched.
 
-**Edge is Docker-only** — we don't pi-gen every commit. On a Pi the edge channel
-still version-checks but an in-place apply uses the latest beta build; the
-Settings selector says as much.
+**To cut a beta**:
 
-**To cut a beta / release candidate**:
-
-1. Bump `__version__` to a semver pre-release, e.g. `0.2.0-rc1` (the hyphen is
+1. Bump `__version__` to a semver pre-release, e.g. `0.2.0-beta.1` (the hyphen is
    what routes the build to the beta channel everywhere — Docker `latest=auto`
    skips `:latest`, both Pi workflows detect the `*-*` version, and the
    GitHub Release is marked **prerelease** so `releases/latest` keeps pointing at
    the last stable build).
-2. Tag `v0.2.0-rc1` and push. Only `:beta` + the prerelease Release move;
+2. Tag `v0.2.0-beta.1` and push. Only `:beta` + the prerelease Release move;
    `:latest` and the stable "latest" Release are untouched.
-3. When the RC has soaked, cut the final `v0.2.0` (drop the `-rcN`). That
+3. When the beta has soaked, cut the final `v0.2.0` (drop the `-beta.N`). That
    publishes a normal (latest) Release — the newest beta too.
 
 ### Recovering when pi-gen's publish step fails
@@ -166,8 +156,8 @@ The cloud picks the asset up from the GitHub Releases API within ~60 s, so
 | Install type | Channel | Command / action | Notes |
 | --- | --- | --- | --- |
 | Pi (SD card) | Stable | "Update now" in Settings → About | Fetches the source tarball from GitHub → `wattpost-update` swaps + restarts the daemon |
-| Docker, stable | `image: ghcr.io/ritualnorth/wattpost-appliance:latest` | `docker compose pull && docker compose up -d` | Pulls the most recent tagged release |
-| Docker, edge | `image: ghcr.io/ritualnorth/wattpost-appliance:edge` | Same | Every main commit. Opt-in for testers. |
+| Docker, stable | `image: ghcr.io/ritualnorth/wattpost-appliance:latest` | `docker compose pull && docker compose up -d` | Pulls the most recent final tagged release |
+| Docker, beta | `image: ghcr.io/ritualnorth/wattpost-appliance:beta` | Same | Newest pre-release. Opt-in for testers. |
 | Docker, pinned | `image: ghcr.io/.../wattpost-appliance:0.0.4` | Pull when ready | Pinned forever. Use when you want reproducibility above all. |
 
 ### What if I forgot to bump __version__?

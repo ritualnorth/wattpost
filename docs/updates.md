@@ -60,9 +60,9 @@ docker compose pull   # fetch newest image
 docker compose up -d  # roll the container
 ```
 
-That's the update. The `latest` tag follows main; for traceability, pin to a
-`sha-<short>` tag in your compose file. Your config + history persist via the
-bind-mounted volumes.
+That's the update. `:latest` tracks the current **Stable** release; use `:beta`
+to ride pre-releases, or pin an exact `:vX.Y.Z` tag for reproducibility. Your
+config + history persist via the bind-mounted volumes.
 
 ## What changes between updates
 
