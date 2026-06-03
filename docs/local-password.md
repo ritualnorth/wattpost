@@ -52,6 +52,28 @@ Visits arriving through `<slug>.wattpost.io` come from `cloudflared` on the loca
 
 ## Lost the password?
 
+### Pi (SD image)
+
 On the Pi's console, or over SSH if you enabled it, log in with the username/password you set in Raspberry Pi Imager (the OS login is separate from the web password, and WattPost ships no default for it). Run `wattpost-config` → Set / reset web password → it generates a new one.
 
 Worst case (SSH locked out + dashboard locked out): re-flash the SD image, restore your `config.yaml` backup, you're back. The cloud-side data is preserved because the appliance is identified by its bearer token in `config.yaml`.
+
+### Docker
+
+You usually don't need to reset it — the plaintext is kept on the box for exactly this. The config volume is `./wattpost-config` on the host ↔ `/etc/wattpost` in the container, and the password lives at `web-password` there. **Read it back** with any of:
+
+```bash
+docker exec wattpost cat /etc/wattpost/web-password   # from the container
+cat ./wattpost-config/web-password                    # the same file on the host
+docker compose logs wattpost | grep -i password       # it's logged when first generated
+```
+
+To force a **fresh** password (e.g. the plaintext file is gone), delete the hash + plaintext and restart — the daemon regenerates a random one on boot, writes both files, and logs it:
+
+```bash
+rm -f ./wattpost-config/web-password ./wattpost-config/web-password.hash
+docker compose restart wattpost
+docker exec wattpost cat /etc/wattpost/web-password   # the new password
+```
+
+Restarting also signs out any existing browser sessions. (Container/service name is `wattpost` in the example compose file — adjust if you renamed it.)
