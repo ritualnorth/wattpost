@@ -84,6 +84,33 @@ if ! getent group bluetooth >/dev/null; then
 fi
 usermod -a -G bluetooth "${APP_USER}"
 
+# Serial access for a USB GPS (NMEA over /dev/ttyACM*/ttyUSB*, group
+# 'dialout') and USB-RS485 charge controllers. Without this the daemon
+# can't open the receiver / controller.
+usermod -a -G dialout "${APP_USER}"
+
+# Keep ModemManager's hands off the appliance's USB serial devices. MM
+# probes ttyACM/ttyUSB devices as cellular modems and steals the port —
+# the classic USB-GPS-on-Linux failure ("multiple access on port /
+# returned no data", with /dev/ttyACM0 intermittently vanishing), and the
+# same thing bites serial charge controllers. We DON'T mask MM (some
+# off-grid rigs use a real USB cellular modem it should manage) — we just
+# tell it to ignore the common GPS / USB-serial adapter chips. See
+# docs/gps-and-location.md.
+install -d /etc/udev/rules.d
+cat > /etc/udev/rules.d/99-wattpost-gps.rules <<'UDEV'
+# WattPost: exclude USB GPS receivers + serial adapters from ModemManager
+# so the daemon can own the port. Add your own device with the same flag.
+ATTRS{idVendor}=="1546", ENV{ID_MM_DEVICE_IGNORE}="1"                          # u-blox (VK-162 etc.)
+ATTRS{idVendor}=="0403", ENV{ID_MM_DEVICE_IGNORE}="1"                          # FTDI (VE.Direct, RS485)
+ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", ENV{ID_MM_DEVICE_IGNORE}="1" # Prolific PL2303
+ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ENV{ID_MM_DEVICE_IGNORE}="1" # Silicon Labs CP210x
+ATTRS{idVendor}=="1a86", ENV{ID_MM_DEVICE_IGNORE}="1"                          # CH340/CH341
+ATTRS{idVendor}=="0e8d", ENV{ID_MM_DEVICE_IGNORE}="1"                          # MediaTek GPS
+UDEV
+udevadm control --reload-rules 2>/dev/null || true
+udevadm trigger 2>/dev/null || true
+
 step "preparing ${APP_ROOT}, ${CONFIG_DIR}, ${STATE_DIR}"
 mkdir -p "${CONFIG_DIR}" "${STATE_DIR}"
 

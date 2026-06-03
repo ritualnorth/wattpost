@@ -28,6 +28,57 @@ to `config.yaml` on every move (that would thrash the disk in a moving
 van). On restart, the lat/lon on disk is the fallback until the first new
 fix arrives.
 
+### Reboot-proof port path
+
+`/dev/ttyACM0` can renumber if you add another serial/CDC device. Point
+`port` at the stable **by-id** symlink instead — it never changes across
+reboots or replugs:
+
+```yaml
+gps:
+  port: /dev/serial/by-id/usb-u-blox_AG_-_www.u-blox.com_u-blox_7_-_GPS_GNSS_Receiver-if00
+```
+
+Get the exact name from `ls /dev/serial/by-id/`.
+
+### Docker / VM passthrough
+
+On Docker, pass the device into the container — add to the `wattpost`
+service in `docker-compose.yml`:
+
+```yaml
+    devices:
+      - "/dev/ttyACM0:/dev/ttyACM0"
+```
+
+On a Proxmox / KVM VM, pass the USB device through to the guest **by
+Vendor/Device ID**, not by port — port-based passthrough breaks on a host
+reboot. On Docker Desktop for **Mac/Windows**, USB passthrough isn't
+supported at all — use a static `forecast.lat`/`lon` instead.
+
+### "GPS stops working after a reboot" — ModemManager
+
+The number-one cause of a GPS that *opens* but returns no data (logs:
+*"multiple access on port / returned no data"*, with `/dev/ttyACM0`
+intermittently vanishing) is **ModemManager** grabbing the port to probe
+it as a cellular modem. The SD image and `install.sh` ship a udev rule
+(`/etc/udev/rules.d/99-wattpost-gps.rules`) that tells ModemManager to
+ignore common GPS / serial chips, so it's handled out of the box.
+
+**On Docker the rule lives on the host, not the container** — if your GPS
+keeps dropping, add it on the host:
+
+```bash
+sudo tee /etc/udev/rules.d/99-wattpost-gps.rules >/dev/null <<'EOF'
+ATTRS{idVendor}=="1546", ENV{ID_MM_DEVICE_IGNORE}="1"
+EOF
+sudo udevadm control --reload-rules && sudo udevadm trigger
+docker restart wattpost
+```
+
+If the host has no cellular modem, you can instead just
+`sudo systemctl mask --now ModemManager`.
+
 ## How location feeds the rest of the appliance
 
 The current best location drives:
