@@ -11,7 +11,7 @@ port-forwarding, no public IP, no certs to manage.
    infrastructure. Nothing inbound on your network, no holes in your
    router, no public IP needed.
 2. The cloud assigns your appliance a stable subdomain like
-   `https://<slug>.wattpost.io/`. Real HTTPS cert, valid
+   `https://<slug>.wattpost.cloud/`. Real HTTPS cert, valid
    everywhere, auto-renewed.
 3. Authentication is gated by your wattpost.cloud account. Every
    request is signed with a short-lived HMAC and verified against the

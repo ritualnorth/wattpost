@@ -253,7 +253,7 @@ The Docker image:
 - **Carries `cloudflared`** in the image, so the paired-cloud
   feature's "Open site" tunnel works identically to the Pi
   install. Your appliance's local dashboard is reachable at
-  `<your-slug>.wattpost.io` over the Cloudflare Tunnel once
+  `<your-slug>.wattpost.cloud` over the Cloudflare Tunnel once
   pairing is complete.
 - **Doesn't** ship the `wattpost-config` whiptail TUI. Everything
   the TUI did is reachable from the dashboard's Settings UI:
@@ -269,7 +269,7 @@ The Docker image:
   that's image-replacement (`docker compose pull`) instead.
 - **Remote access goes through [WattPost Cloud](pairing.md).**
   Pair the appliance once and you get a stable
-  `https://<your-slug>.wattpost.io/` URL with a real cert, no
+  `https://<your-slug>.wattpost.cloud/` URL with a real cert, no
   port-forwarding, no public IP. See [Remote access](remote-access.md)
   for the broker overview.
   If you'd rather self-host a VPN / WireGuard / reverse-proxy in

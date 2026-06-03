@@ -81,7 +81,7 @@ Ventilate the back. The Pi 5 throttles at 80 Â°C, and a sealed cabinet on a 35 Â
 If you have multiple appliances paired to wattpost.cloud. Say, the van and a cabin. And want one kiosk that flips between them, use the cloud broker URL in Chromium's launch URL instead of `localhost`:
 
 ```
-https://<slug>.wattpost.io/kiosk?lock=1
+https://<slug>.wattpost.cloud/kiosk?lock=1
 ```
 
 Different SSID, different appliance, same dashboard URL. The cloud broker (#139) reverse-proxies to whichever appliance you're paired to from this device.
