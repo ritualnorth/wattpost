@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Added
+- First-boot setup hotspot (headless onboarding): a freshly-flashed appliance with **no network** — no WiFi set in Raspberry Pi Imager, no Ethernet — now raises its own `WattPost-Setup` WiFi access point automatically, so you can reach the dashboard from your phone with **no monitor and no router**. That's the van / off-grid setup case. Joining the AP pops the dashboard via the captive portal. It only triggers on a box that has *never* been on a network; once it's seen a LAN it latches off for good, so a home appliance that briefly loses WiFi never gets a surprise AP. Opt out with `hotspot.onboarding: false` (#27).
+
 ### Changed
 - Docker appliance now defaults to **port 80** so the bare host IP works (`http://<host-ip>`), matching the SD-card image — no more `:8000`. Override with the `WATTPOST_PORT` env var if port 80 is already taken on the host. After pulling the new image, the dashboard moves from `http://<host-ip>:8000` to `http://<host-ip>`.
 

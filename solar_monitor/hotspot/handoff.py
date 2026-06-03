@@ -1,5 +1,11 @@
-"""Auto-handoff (Pillar 3b): raise the hotspot when the appliance has no
-network, drop it when a real LAN returns.
+"""Auto-handoff (Pillar 3b) + first-boot onboarding (#27): raise the hotspot
+when the appliance has no network, drop it when a real LAN returns.
+
+First-boot onboarding makes a *never-networked* box raise the setup AP on its
+own (the headless van/off-grid case — no monitor, no router), independent of
+the auto_handoff opt-in. It latches off once the box has seen a LAN (the
+`.networked` marker), so a home box that briefly loses WiFi never gets a
+surprise AP.
 
 LOCAL-ONLY. The trigger is `hotspot.auto_handoff` in the appliance's own
 config — it works with no cloud subscription, which matters because the
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from pathlib import Path
 
 from .service import HotspotService
 
@@ -29,6 +36,15 @@ log = logging.getLogger(__name__)
 POLL_SECONDS = 30        # how often tick() runs
 GRACE_CHECKS = 2         # consecutive offline ticks before raising the AP
 RETRY_AFTER_POLLS = 10   # while AP up w/o ethernet, ticks before a probe-drop
+
+# Marker written the first time the appliance sees a real LAN. Its presence
+# means "this box has been networked at least once", which ends first-boot
+# onboarding: a never-networked box raises the setup AP; a box that has been
+# online and later drops offline is the auto_handoff path (opt-in). Lives in
+# the state dir on the Pi image (writable by the wattpost user); a failed
+# write elsewhere just means onboarding can't latch — harmless on a host with
+# no AP radio anyway.
+NETWORKED_MARKER = Path("/var/lib/wattpost/.networked")
 
 
 class AutoHandoffMonitor:
@@ -41,6 +57,8 @@ class AutoHandoffMonitor:
         self._raised_by_monitor = False
         self._miss_streak = 0          # consecutive offline ticks
         self._polls_since_raise = 0    # for the single-radio probe-drop
+        # Cached "has this box ever been networked?" — gates onboarding.
+        self._networked = NETWORKED_MARKER.exists()
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -53,7 +71,8 @@ class AutoHandoffMonitor:
             return False
         if self.service.cfg.enabled:
             return False  # AP is always-on; nothing to hand off
-        return self.service.cfg.auto_handoff
+        return (self.service.cfg.auto_handoff
+                or self._onboarding_active(self.service.cfg))
 
     async def start(self) -> None:
         if not self.should_run():
@@ -94,7 +113,8 @@ class AutoHandoffMonitor:
         if not HotspotService.is_available(cfg):
             return "skip:unavailable"
 
-        eff = cfg.auto_handoff
+        onboarding = self._onboarding_active(cfg)
+        eff = cfg.auto_handoff or onboarding
         ap_up = await self.service._is_active()
 
         if not eff:
@@ -107,6 +127,8 @@ class AutoHandoffMonitor:
             return "off"
 
         lan = await self.service.lan_kind()
+        if lan is not None:
+            self._mark_networked()
 
         if ap_up and self._raised_by_monitor:
             if lan is not None:
@@ -118,7 +140,11 @@ class AutoHandoffMonitor:
                 return f"drop:{lan}"
             # No ethernet and our AP holds the (single) radio, so we
             # can't see a known wifi network from here. Periodically let
-            # go to give NetworkManager a chance to rejoin one.
+            # go to give NetworkManager a chance to rejoin one — UNLESS
+            # we're onboarding: a never-networked box has no known WiFi to
+            # find, so don't blip the setup AP a user is mid-setup on.
+            if onboarding:
+                return "hold:onboarding"
             self._polls_since_raise += 1
             if self._polls_since_raise >= RETRY_AFTER_POLLS:
                 await self.service.deactivate()
@@ -158,3 +184,23 @@ class AutoHandoffMonitor:
         self._miss_streak = 0
         self._polls_since_raise = 0
         self._raised_by_monitor = False
+
+    # ------------------------------------------------------------------
+    # first-boot onboarding
+    # ------------------------------------------------------------------
+    def _onboarding_active(self, cfg) -> bool:
+        """True while a never-networked box should auto-raise the setup AP.
+        Independent of auto_handoff; latches off once we've seen a LAN."""
+        return bool(cfg.onboarding) and not self._networked
+
+    def _mark_networked(self) -> None:
+        """Record that we've seen a real LAN — ends onboarding for good."""
+        if self._networked:
+            return
+        self._networked = True
+        try:
+            NETWORKED_MARKER.parent.mkdir(parents=True, exist_ok=True)
+            NETWORKED_MARKER.touch()
+        except OSError as e:
+            log.debug("hotspot: couldn't write networked marker: %s", e)
+        log.info("hotspot: first LAN seen — first-boot onboarding complete")

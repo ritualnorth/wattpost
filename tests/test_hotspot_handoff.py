@@ -11,6 +11,13 @@ from solar_monitor.hotspot.service import HotspotService
 
 # Pretend nmcli is present so the policy actually runs on this host.
 HotspotService.is_available = staticmethod(lambda cfg: True)
+# Keep the first-boot "networked" marker off the real state dir during tests.
+from pathlib import Path as _Path
+H.NETWORKED_MARKER = _Path("/tmp/wp-test-networked-marker")
+try:
+    H.NETWORKED_MARKER.unlink()
+except FileNotFoundError:
+    pass
 
 
 class FakeService:
@@ -35,9 +42,13 @@ class FakeService:
         return {"ok": True, "error": ""}
 
 
-def mon(cfg):
+def mon(cfg, networked=True):
+    # Default: pretend the box has already been on a network, so onboarding is
+    # off and these scenarios isolate the auto_handoff policy. Onboarding
+    # tests pass networked=False to exercise the fresh-box path.
     svc = FakeService(cfg)
     m = AutoHandoffMonitor(svc)
+    m._networked = networked
     return m, svc
 
 
@@ -124,10 +135,49 @@ async def t_lan_present_noop():
     print("PASS lan-present: connected → AP never raised")
 
 
+async def t_onboarding_raises_fresh_box():
+    # A never-networked box (onboarding on) raises the setup AP even with
+    # auto_handoff off — the headless van/off-grid first-boot path.
+    m, svc = mon(HotspotCfg(auto_handoff=False, onboarding=True), networked=False)
+    svc.lan = None
+    r1 = await m.tick(); r2 = await m.tick()
+    assert (r1, r2) == ("wait", "raise"), (r1, r2)
+    assert svc._active and svc.calls == ["activate"]
+    print("PASS onboarding: fresh box raises setup AP even with auto_handoff off")
+
+
+async def t_onboarding_no_probe_drop_blip():
+    # While onboarding, the single-radio probe-drop is skipped — a fresh box
+    # has no known WiFi to find, so the setup AP must stay rock-stable.
+    m, svc = mon(HotspotCfg(auto_handoff=False, onboarding=True), networked=False)
+    svc.lan = None
+    await m.tick(); await m.tick()          # raise
+    for _ in range(H.RETRY_AFTER_POLLS + 2):
+        assert await m.tick() == "hold:onboarding"
+    assert svc._active and "deactivate" not in svc.calls
+    print("PASS onboarding: setup AP stays stable (no probe-drop blip)")
+
+
+async def t_onboarding_latches_off_after_lan():
+    # Once a LAN is seen, onboarding completes; going offline later does NOT
+    # re-raise an AP (that path is auto_handoff, opt-in) — no surprise AP.
+    m, svc = mon(HotspotCfg(auto_handoff=False, onboarding=True), networked=False)
+    svc.lan = "eth"
+    assert await m.tick() == "ok"
+    assert m._networked
+    svc.lan = None
+    for _ in range(5):
+        assert await m.tick() == "off"
+    assert svc.calls == []
+    print("PASS onboarding: latches off after first LAN; no surprise AP later")
+
+
 async def main():
     for t in (t_not_opted_in, t_local_flag_raises_after_grace, t_eth_return_drops,
               t_single_radio_probe_drop, t_flag_off_cleans_up, t_enabled_is_skipped,
-              t_manual_ap_untouched, t_lan_present_noop):
+              t_manual_ap_untouched, t_lan_present_noop,
+              t_onboarding_raises_fresh_box, t_onboarding_no_probe_drop_blip,
+              t_onboarding_latches_off_after_lan):
         await t()
     print("\nALL HANDOFF SCENARIOS PASS")
 

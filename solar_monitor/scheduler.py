@@ -21,7 +21,7 @@ from .mqtt_in import MqttInService
 from .tunnel import TunnelService
 from .hotspot import HotspotService, AutoHandoffMonitor
 from .update import UpdateChecker
-from .config import Config
+from .config import Config, HotspotCfg
 from .export import EXPORTERS, Exporter
 from .orchestrator import Poller
 from .outputs.service import OutputsService
@@ -214,11 +214,14 @@ class PollScheduler:
         # missing NetworkManager is handled inside the service and
         # never breaks the daemon.
         self._hotspot: HotspotService | None = None
-        if config.hotspot is not None:
-            try:
-                self._hotspot = HotspotService(config.hotspot)
-            except Exception:
-                log.exception("hotspot service failed to initialise")
+        # Always stand up the hotspot service (it no-ops without nmcli, so
+        # Docker/dev hosts are unaffected) so first-boot onboarding can raise
+        # the setup AP even when there's no `hotspot:` block in config — a
+        # missing block just means defaults (onboarding on, AP off until needed).
+        try:
+            self._hotspot = HotspotService(config.hotspot or HotspotCfg())
+        except Exception:
+            log.exception("hotspot service failed to initialise")
 
         # Auto-handoff monitor (Pillar 3b). Watches connectivity and
         # raises/drops the hotspot automatically. Local-only: driven by

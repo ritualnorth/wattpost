@@ -10,6 +10,23 @@ the box in, join the `WattPost-Setup` network, open the page.
 > there's no other network (*Auto-handoff*), and have a joining device
 > pop the dashboard automatically (*Captive portal*) — all below.
 
+## First-boot onboarding (no monitor, no router)
+
+On a **freshly-flashed** appliance that has **never been on a network** — you
+didn't set WiFi in Raspberry Pi Imager and there's no Ethernet — the appliance
+raises the `WattPost-Setup` AP **automatically** within a minute of boot, so you
+can reach the dashboard from a phone with no screen and no router. Join the
+network, the captive portal pops the dashboard, and you set up your gear (or, on
+a van with no other network, just keep using the AP).
+
+This is **on by default** (`hotspot.onboarding: true`) and is the headless
+setup path that pairs with the image shipping no default SSH login. It's
+deliberately narrow: it only fires on a box that has *never* seen a LAN and
+**latches off the moment it does** (a `/var/lib/wattpost/.networked` marker), so
+a home appliance that briefly loses WiFi never gets a surprise AP — that ongoing
+"raise the AP whenever offline" behaviour is the separate, opt-in
+[Auto-handoff](#auto-handoff). Set `hotspot.onboarding: false` to disable.
+
 ## What it does
 
 When enabled, the appliance runs a 2.4 GHz access point named after

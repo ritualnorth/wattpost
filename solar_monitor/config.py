@@ -451,13 +451,21 @@ class HotspotCfg(msgspec.Struct, kw_only=True):
     # auto-handoff without the user touching this flag. Ignored when
     # `enabled` is true (the AP is always on then, nothing to hand off).
     auto_handoff: bool = False
+    # First-boot onboarding (#27): if the appliance has NEVER had a working
+    # network (fresh flash — no WiFi set in Pi Imager, no Ethernet), raise the
+    # setup AP automatically so a headless user reaches the dashboard with no
+    # monitor and no router (the van / off-grid case). Distinct from
+    # auto_handoff: onboarding only ever helps a *never-networked* box and
+    # stops for good once it has seen a LAN — so a home box that briefly loses
+    # WiFi never gets a surprise AP (that path stays opt-in via auto_handoff).
+    onboarding: bool = True
     # Captive portal: while the AP is up, hijack DNS (via a NetworkManager
     # dnsmasq drop-in) so a joining device's OS connectivity check lands
     # on the dashboard and the "Sign in to network" sheet pops
     # automatically — no need to type http://10.42.0.1 by hand. Needs the
     # daemon to be able to write NM's dnsmasq-shared.d dir (the packaged
     # Pi image grants this); degrades to a no-op otherwise, AP unaffected.
-    captive_portal: bool = False
+    captive_portal: bool = True
     ssid: str = "WattPost-Setup"
     # WPA2-PSK passphrase. Empty string => open network (no auth).
     # NetworkManager/WPA require 8..63 chars when set; validated at

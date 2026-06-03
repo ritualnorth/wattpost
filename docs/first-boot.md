@@ -2,6 +2,16 @@
 
 Power on a freshly-flashed WattPost Pi and a lot happens in the first 30 seconds.
 
+## No screen, no network? It makes its own.
+
+If the Pi has **no network** on first boot — you didn't set WiFi in Raspberry
+Pi Imager and there's no Ethernet — it raises its own `WattPost-Setup` WiFi
+access point within about a minute. Join it from your phone, the dashboard pops
+up automatically (captive portal), and you're in with no monitor and no router.
+On a van with no other network, just keep using the AP; otherwise set things up
+from there. See [first-boot onboarding](hotspot.md) — it only happens on a box
+that's never been online.
+
 ## The MOTD
 
 WattPost ships no default login, and SSH is off unless you enabled it (with your own username/password) in Raspberry Pi Imager when you flashed. If you did, SSH in (`ssh <your-user>@wattpost.local`) and you'll see the MOTD:
