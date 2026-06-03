@@ -25,6 +25,16 @@ WATTPOST_SOURCE="${INSTALL_DIR}" bash packaging/install.sh
 systemctl disable --now wattpost.service 2>/dev/null || true
 systemctl enable wattpost.service
 
+# ── Security hardening ──────────────────────────────────────────────
+# pi-gen's stage1 sets a baseline root password (root:root). Lock the
+# root account so the shipped image carries NO default credential of any
+# kind — together with SSH off by default and no baked first-user
+# password. The daemon runs as the unprivileged 'wattpost' user, and
+# humans use their own sudo account created at first boot, so nothing
+# needs a root login. Lock (don't delete) — sudo still works, it doesn't
+# need root's password.
+passwd -l root 2>/dev/null || true
+
 # Keep the source tree around at /opt/wattpost-src on the running
 # image — this is the same tree the Update-now button's helper
 # operates on (atomic-swap a new tarball into place + re-run
