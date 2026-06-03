@@ -4124,6 +4124,28 @@ function updateStatStrip(metric, data) {
   if (res) res.textContent = `${s.count ?? 0} points · ${tableLabel}`;
 }
 
+// Linear-interpolate a forecast field (pv_w / pv_w_p10 / pv_w_p90) at an
+// arbitrary timestamp from the hourly Solcast points, so the forecast can
+// be overlaid onto the per-minute actuals for the same window (compare
+// "forecast said X" vs "actual was Y"). Returns null outside the forecast
+// range. Points are sparse (hourly) so a linear scan is plenty.
+function makeForecastInterp(points) {
+  const pts = (points || []).slice().sort((a, b) => a.ts - b.ts);
+  return function (t, key) {
+    if (!pts.length || t < pts[0].ts || t > pts[pts.length - 1].ts) return null;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      if (t >= a.ts && t <= b.ts) {
+        const va = a[key], vb = b[key];
+        if (va == null || vb == null) return va ?? vb ?? null;
+        const f = (b.ts - a.ts) ? (t - a.ts) / (b.ts - a.ts) : 0;
+        return va + (vb - va) * f;
+      }
+    }
+    return null;
+  };
+}
+
 function drawChart(label, metric, data, forecast = null) {
   const root = $("#chart");
   if (chart) { chart.destroy(); chart = null; }
@@ -4197,39 +4219,39 @@ function drawChart(label, metric, data, forecast = null) {
   });
   dataCols.push(vals);
 
-  // Build the combined timeline including forecast points so the X
-  // axis extends into the future. Historic columns get null-padded
-  // past their last sample so all series share one X axis. The
-  // forecast contributes up to three series:
-  //   - p10 (invisible anchor, lower band edge)
-  //   - p90 (invisible anchor, upper band edge)
-  //   - median (the dashed line the user actually sees)
-  // The fill between p10 and p90 visualises Solcast's stated
-  // confidence interval, a wide band means the forecast model
-  // isn't sure, a narrow one means high confidence.
+  // Forecast overlay. Draw the PV forecast across BOTH the historical
+  // window (interpolated onto the actuals' timestamps, so you can compare
+  // what the forecast expected vs what actually happened for the same
+  // hours) AND the future extension. Up to three series: p10/p90
+  // (invisible band edges) + the median dashed line. The p10–p90 fill is
+  // the forecast confidence interval (wide = unsure, narrow = confident).
   let combinedTs = ts.slice();
-  if (forecastFuture.length) {
-    const lastHistoric = ts.length ? ts[ts.length - 1] : 0;
+  if (forecast?.points?.length && ts.length) {
+    const interp = makeForecastInterp(forecast.points);
+    const hasBand = forecast.points.some(p => p.pv_w_p10 != null && p.pv_w_p90 != null);
+
+    // Historical window: interpolate the forecast at each actual sample so
+    // the dashed forecast line sits directly over the measured line.
+    const forecastCol = ts.map(t => interp(t, "pv_w"));
+    const p10Col = hasBand ? ts.map(t => interp(t, "pv_w_p10")) : null;
+    const p90Col = hasBand ? ts.map(t => interp(t, "pv_w_p90")) : null;
+
+    // Future extension beyond the last actual sample (the original behaviour).
+    const lastHistoric = ts[ts.length - 1];
     const fTs = forecastFuture.map(p => p.ts).filter(t => t > lastHistoric);
-    combinedTs = combinedTs.concat(fTs);
-    const pad = new Array(fTs.length).fill(null);
-    for (let i = 1; i < dataCols.length; i++) {
-      dataCols[i] = dataCols[i].concat(pad);
+    if (fTs.length) {
+      combinedTs = combinedTs.concat(fTs);
+      const pad = new Array(fTs.length).fill(null);
+      for (let i = 1; i < dataCols.length; i++) dataCols[i] = dataCols[i].concat(pad);
+      const byTs = new Map(forecastFuture.map(p => [p.ts, p]));
+      for (const t of fTs) {
+        const p = byTs.get(t);
+        forecastCol.push(p ? p.pv_w : null);
+        if (p10Col) p10Col.push(p ? (p.pv_w_p10 ?? null) : null);
+        if (p90Col) p90Col.push(p ? (p.pv_w_p90 ?? null) : null);
+      }
     }
-    const histPad = new Array(ts.length).fill(null);
-    const forecastCol = histPad.slice();
-    const p10Col      = histPad.slice();
-    const p90Col      = histPad.slice();
-    const fTsSet = new Set(fTs);
-    const hasBand = forecastFuture.some(p =>
-      p.pv_w_p10 != null && p.pv_w_p90 != null
-    );
-    for (const p of forecastFuture) {
-      if (!fTsSet.has(p.ts)) continue;
-      forecastCol.push(p.pv_w);
-      p10Col.push(p.pv_w_p10 ?? null);
-      p90Col.push(p.pv_w_p90 ?? null);
-    }
+
     if (hasBand) {
       const p10Idx = series.length;
       series.push({
@@ -4324,6 +4346,20 @@ function drawChart(label, metric, data, forecast = null) {
     ],
     legend: { live: false },
     plugins: [valueTooltipPlugin()],
+    hooks: {
+      ready: [
+        (u) => {
+          // Double-click the plot to reset a drag-zoom back to the full
+          // window. uPlot drag-zooms the X axis, but with a static range
+          // there was no way back out — this is the reset.
+          u.over.addEventListener("dblclick", () => {
+            if (tsMin != null && tsMax != null) {
+              u.setScale("x", { min: tsMin, max: tsMax });
+            }
+          });
+        },
+      ],
+    },
   };
 
   try {
