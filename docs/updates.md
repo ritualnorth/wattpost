@@ -105,9 +105,15 @@ If you ran the manual path (option 3) and it broke, SSH in and re-run
 On Docker, pin the previous image tag in your `docker-compose.yml` and
 `docker compose up -d`.
 
-## Beta channel
+## Release channels
 
-Not yet shipped. Planned: an opt-in toggle in **Settings → System → Update channel** that switches the daemon to poll a different manifest (`latest-beta.json`) so volunteers see new builds days before they go to stable.
+Pick a channel in **Settings → About**. Each one follows a different release stream:
+
+- **Stable** (default) — tagged releases that have soaked. What customers run.
+- **Beta** — release candidates the moment they're cut, before the soak. Pre-release, may be unstable; opt in to see new builds days before they reach stable.
+- **Edge** — every commit to `main`. Bleeding edge, expect breakage. Docker-only (there's no per-commit Pi image), so on a Pi the edge channel version-checks but an in-place apply uses the latest beta build.
+
+Your appliance's daily poll carries the chosen channel, and the cloud serves the matching build. See [Release pipeline](/docs/release-pipeline#release-channels-11) for how the streams map to GitHub Releases and Docker tags.
 
 ## Image upgrades
 

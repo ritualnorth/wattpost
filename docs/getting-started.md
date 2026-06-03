@@ -43,6 +43,16 @@ Then:
    Pi's IP and use that. (No login needed for the dashboard — the
    username/password above is only for SSH / the console.)
 
+**No router, no screen, no WiFi set?** A headless Pi on a boat or in a
+van isn't stranded. If the Pi boots with **no network** — you didn't set
+WiFi in Imager and there's no Ethernet — it raises its own WiFi access
+point named **`WattPost-Setup`** within about a minute. Join it from your
+phone and the setup page pops up automatically (a captive portal, like
+hotel WiFi); if it doesn't, browse to `http://10.42.0.1`. From there you
+set up your gear, or just keep using the AP if there's no other network
+around. See [First boot](/docs/first-boot) and [WiFi hotspot](/docs/hotspot)
+for the full behaviour.
+
 ## Path B. Docker on an existing Linux host
 
 What you need:
@@ -113,6 +123,7 @@ No config files to hand-edit.
 
 ## What's next?
 
+- [First boot](/docs/first-boot) — what happens in the first 30 seconds, the MOTD, and finding the dashboard
 - [Pair an account](/docs/pairing) for the multi-site cloud dashboard
 - [Set up alerts](/docs/alerts). Ntfy, Discord, Pushover, email, MQTT
 - [Browse supported hardware](/docs/supported-hardware)

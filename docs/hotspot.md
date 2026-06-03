@@ -42,7 +42,12 @@ network stack on Raspberry Pi OS Bookworm. There's nothing to install
 or hand-configure — no `hostapd`, no `dnsmasq`. NetworkManager provides
 the AP, the DHCP server and the NAT.
 
-It is **off by default** and strictly opt-in.
+The AP itself does not come up on boot by default (`enabled` and
+`auto_handoff` are both **false**). What *is* on by default is
+first-boot **onboarding** (`onboarding: true`) and the **captive
+portal** (`captive_portal: true`) — so that when the AP *does* come up,
+a joining phone is taken straight to the dashboard. See [first-boot
+onboarding](#first-boot-onboarding-no-monitor-no-router) above.
 
 ## Requirements
 
@@ -75,8 +80,9 @@ up automatically every time the appliance starts.
 ```yaml
 hotspot:
   enabled: true            # bring the AP up on boot (default false)
-  auto_handoff: false      # auto-enable when offline (see below)
-  captive_portal: false    # auto-pop the dashboard on join (see below)
+  auto_handoff: false      # auto-enable when offline (default false; see below)
+  onboarding: true         # first-boot AP on a never-networked box (default true)
+  captive_portal: true     # auto-pop the dashboard on join (default true; see below)
   ssid: WattPost-Setup
   password: "changeme123"  # 8..63 chars, or "" for an open network
   band: bg                 # "bg" = 2.4 GHz (default), "a" = 5 GHz

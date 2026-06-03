@@ -30,9 +30,9 @@ Yes. On a Linux host with BLE (laptop, mini PC, Synology, Unraid, etc), `docker 
 
 ## Is the code open source?
 
-**Source-available**, not full open source. The SD image ships with the full appliance source under `/opt/wattpost-src`, so you can audit + modify what runs on your Pi. We retain commercial rights via the license so we can build a sustainable business around WattPost.
+Yes. WattPost is **open source under the Apache License 2.0**. The full appliance source ships on the device — `/opt/wattpost-src` on the SD image, `/app/solar_monitor` in the Docker image — so you can audit, modify, fork, and even build a commercial product on exactly what runs on your hardware. See [License](/docs/license) for the plain-English summary.
 
-The cloud-tier code (multi-site dashboard, heartbeat ingest, tunnel provisioning) is private.
+Only the cloud-tier code (multi-site dashboard, heartbeat ingest, tunnel provisioning) is private and outside that licence; the appliance in this repository is fully open.
 
 ## Is the cloud data private?
 

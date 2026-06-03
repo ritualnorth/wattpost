@@ -22,7 +22,7 @@ real cert.
 Two ways, in order of difficulty:
 
 1. **Pair with wattpost.cloud** (recommended).
-   The cloud broker gives you `https://yourname.wattpost.cloud/` with
+   The cloud broker gives you `https://<slug>.wattpost.io/` with
    a real Let's Encrypt cert maintained by us. See [Remote
    access](/docs/remote-access) for pairing.
 
@@ -43,7 +43,7 @@ Two ways, in order of difficulty:
 
 ## How the cloud broker authenticates requests
 
-Once you pair, requests to `https://yourname.wattpost.cloud/` are
+Once you pair, requests to `https://<slug>.wattpost.io/` are
 proxied through our broker before they hit your appliance's tunnel.
 The broker enforces:
 

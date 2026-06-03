@@ -269,7 +269,7 @@ The Docker image:
   that's image-replacement (`docker compose pull`) instead.
 - **Remote access goes through [WattPost Cloud](pairing.md).**
   Pair the appliance once and you get a stable
-  `https://yourname.wattpost.cloud/` URL with a real cert, no
+  `https://<your-slug>.wattpost.io/` URL with a real cert, no
   port-forwarding, no public IP. See [Remote access](remote-access.md)
   for the broker overview.
   If you'd rather self-host a VPN / WireGuard / reverse-proxy in

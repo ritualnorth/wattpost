@@ -9,6 +9,7 @@
     { "slug": "pairing",         "title": "Pair with the cloud",      "section": "Setup" },
 
     { "slug": "alerts",          "title": "Alerts & notifications",   "section": "Features" },
+    { "slug": "outputs",         "title": "Controllable outputs",     "section": "Features" },
     { "slug": "history",         "title": "History & CSV export",     "section": "Features" },
     { "slug": "kiosk",           "title": "Kiosk mode",               "section": "Features" },
     { "slug": "vanlife-kiosk",   "title": "Vanlife kiosk install",    "section": "Features" },
@@ -18,6 +19,8 @@
     { "slug": "forecast",        "title": "PV forecast (Solcast)",          "section": "Integrations" },
     { "slug": "weather",         "title": "Current weather (Open-Meteo)",   "section": "Integrations" },
     { "slug": "integrations",    "title": "Home Assistant, Grafana, MQTT",  "section": "Integrations" },
+    { "slug": "mqtt-in",         "title": "MQTT-IN (ingest sensors)",       "section": "Integrations" },
+    { "slug": "gps-and-location","title": "GPS & location",                 "section": "Integrations" },
     { "slug": "remote-access",   "title": "Remote access (wattpost.cloud)", "section": "Integrations" },
     { "slug": "hotspot",         "title": "WiFi hotspot (appliance-as-AP)", "section": "Integrations" },
 

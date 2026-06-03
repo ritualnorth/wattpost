@@ -10,7 +10,7 @@ There are **three** ways to put WattPost on your phone, and the differences matt
 | A WattPost icon on your home screen, no app store | **Add to Home Screen from wattpost.cloud/app** |
 | Fast lookup from a desktop browser | A regular browser bookmark to `wattpost.cloud/app` |
 
-Whatever you do, **always install from `wattpost.cloud/app`**, never from the per-appliance URL (`abc123xyz0.wattpost.cloud/` etc). The reason's [below](#why-not-the-broker-url).
+Whatever you do, **always install from `wattpost.cloud/app`**, never from the per-appliance URL (`abc123xyz0.wattpost.io/` etc). The reason's [below](#why-not-the-broker-url).
 
 ## Option 1 · Native app (recommended on phone)
 
@@ -52,11 +52,11 @@ You can still receive push notifications without installing, same Enable button 
 
 ## Why not the broker URL? {#why-not-the-broker-url}
 
-Each appliance has its own remote-access URL, `abc123xyz0.wattpost.cloud/`, `def456uvw0.wattpost.cloud/`, etc. These open the appliance's local dashboard through a Cloudflare tunnel.
+Each appliance has its own remote-access URL, `abc123xyz0.wattpost.io/`, `def456uvw0.wattpost.io/`, etc. These open the appliance's local dashboard through a Cloudflare tunnel.
 
 You **can** browse them, but you should not **install** them as a PWA.
 
-Push notifications register against the page's origin (the part of the URL before the first `/`). If you install a PWA from `abc123xyz0.wattpost.cloud/`:
+Push notifications register against the page's origin (the part of the URL before the first `/`). If you install a PWA from `abc123xyz0.wattpost.io/`:
 
 - The PWA only knows about that one appliance
 - Push registers against that subdomain, but cloud-fired alerts (like "appliance offline") are sent from `wattpost.cloud`'s origin

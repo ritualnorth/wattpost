@@ -24,6 +24,12 @@ sudo tar czf wattpost-backup-$(date +%F).tar.gz \
 Copy that file off the Pi. Restore is the reverse · `tar xzf` into
 the new SD card after installing WattPost, then restart the daemon.
 
+> **Caveat:** unlike the in-app backup below, a raw `tar` copy of
+> `config.yaml` **contains your plaintext third-party secrets** (SMTP
+> password, MQTT credentials, Solcast / weather API keys, the hotspot
+> WiFi password). Store it somewhere private and don't paste it into a
+> ticket or share it.
+
 ## Manual backup. Docker install
 
 Both the config and database live in the volumes you bind-mounted
@@ -38,12 +44,45 @@ tar czf wattpost-backup-$(date +%F).tar.gz wattpost-config/ wattpost-data/
 Restore: copy that file to the new host, untar in place, `docker
 compose up -d`.
 
+> **Caveat:** as with the Pi manual path, this raw copy of `config.yaml`
+> **contains plaintext third-party secrets** (SMTP / MQTT credentials,
+> API keys, hotspot password) — unlike the in-app backup, which redacts
+> them. Keep it private.
+
 ## Built-in local backups
 
 **Settings → System → Backups** runs a Home-Assistant-style snapshot
 flow: rotating weekly archives of `config.yaml` + the SQLite DB,
 stored on the appliance itself (or any USB stick you mount). Restore
 is one click from the same panel.
+
+### What's in a backup, what's redacted
+
+The in-app backup (and any cloud-uploaded copy) is built to be safe to
+move around. Before the archive leaves the box it **redacts your
+third-party secrets** — SMTP password, MQTT credentials, Solcast /
+weather API keys, the hotspot WiFi password — and it **never includes
+the plaintext dashboard password** (only the argon2 hash). The
+appliance's own **cloud pairing tokens are kept**, so restoring onto a
+fresh Pi recovers its cloud identity and history without re-pairing.
+
+After a restore, any redacted secret comes back blank — re-enter it from
+the matching Settings page, and the restore summary lists exactly which
+fields to re-set.
+
+### Selective restore
+
+You don't have to restore everything. The restore picker lets you pull
+back any combination of three independent components:
+
+- **Data** — the SQLite DB (all history / samples).
+- **Config** — `config.yaml` (devices, alerts, transports).
+- **Password** — the dashboard password hash.
+
+The common case is **data-only**: keep a clean fresh config but bring
+your history back. On a true fresh install the password is never taken
+from the backup — the first-boot generator mints a new one regardless,
+which you read from `wattpost-config` / the SSH MOTD.
 
 ## Cloud backups (WattPost Cloud)
 
