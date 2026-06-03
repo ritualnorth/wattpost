@@ -10,6 +10,10 @@ Versions follow [Semantic Versioning].
 
 ### Added
 - First-boot setup hotspot (headless onboarding): a freshly-flashed appliance with **no network** — no WiFi set in Raspberry Pi Imager, no Ethernet — now raises its own `WattPost-Setup` WiFi access point automatically, so you can reach the dashboard from your phone with **no monitor and no router**. That's the van / off-grid setup case. Joining the AP pops the dashboard via the captive portal. It only triggers on a box that has *never* been on a network; once it's seen a LAN it latches off for good, so a home appliance that briefly loses WiFi never gets a surprise AP. Opt out with `hotspot.onboarding: false` (#27).
+- Selective restore: when restoring a backup you can now choose which parts to bring back — **History & readings**, **Configuration**, **Dashboard password** (all on by default = a full restore). Untick *Configuration* to restore your history onto a fresh, clean config — the fix for "my config got broken, I just want my data back" (#26).
+
+### Fixed
+- Restoring a backup no longer silently drops your **WiFi-hotspot/onboarding settings** and **release-channel choice** — the restore's config allow-list was stale and stripped the `hotspot` and `update` keys (#26).
 
 ### Changed
 - Docker appliance now defaults to **port 80** so the bare host IP works (`http://<host-ip>`), matching the SD-card image — no more `:8000`. Override with the `WATTPOST_PORT` env var if port 80 is already taken on the host. After pulling the new image, the dashboard moves from `http://<host-ip>:8000` to `http://<host-ip>`.

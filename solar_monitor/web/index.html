@@ -1193,12 +1193,19 @@
                      style="display:none"/>
               <span class="settings-foot" id="backup-msg"></span>
             </div>
+            <div class="restore-components settings-foot" style="margin-top:.6rem;display:flex;gap:1.1rem;flex-wrap:wrap;align-items:center">
+              <span>Restore:</span>
+              <label style="cursor:pointer"><input type="checkbox" id="restore-comp-data" checked> History &amp; readings</label>
+              <label style="cursor:pointer"><input type="checkbox" id="restore-comp-config" checked> Configuration</label>
+              <label style="cursor:pointer"><input type="checkbox" id="restore-comp-password" checked> Dashboard password</label>
+            </div>
             <p class="settings-foot" style="margin-top:.6rem">
               <strong>Restore is destructive.</strong> It overwrites
-              the current database and config, then restarts the
-              daemon. The previous <code>config.yaml</code> is kept
-              as <code>config.yaml.restored.bak</code> in case you
-              need to back out.
+              whatever you ticked above, then restarts the daemon. The
+              previous <code>config.yaml</code> is kept as
+              <code>config.yaml.restored.bak</code> in case you need to
+              back out. Tip: untick <em>Configuration</em> to bring your
+              history back onto a fresh, clean config.
             </p>
             <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:1rem 0">
             <h4 style="margin:0 0 .35rem 0">Automatic backups</h4>

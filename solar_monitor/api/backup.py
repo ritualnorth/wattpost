@@ -223,6 +223,11 @@ _RESTORE_ALLOWED_TOPLEVEL = frozenset({
     "quiet_hours", "forecast", "weather", "cloud", "gps",
     "location", "bank", "backup", "discovery", "local_telemetry",
     "history", "solar_pause", "smart_plugs", "mqtt_in",
+    # Added after the list was first written; without these a restore
+    # silently dropped the user's WiFi-AP/onboarding config and their
+    # release-channel choice. Keep this in sync with Config's top-level
+    # fields — tests/test_backup_selective_restore.py guards against drift.
+    "hotspot", "update",
 })
 
 # Substring patterns matched (case-insensitive) against any dict key.
@@ -286,6 +291,7 @@ def _redact_credentials(value: Any, *, path: str, redacted: list) -> Any:
 
 def _stage_and_swap(
     tar_bytes: bytes, db_target: Path, config_target: Path,
+    components: set[str] | None = None,
 ) -> dict[str, Any]:
     """Extract each tar member into a sibling .new file alongside its
     eventual target, then rename atomically. Staging next to the
@@ -314,6 +320,17 @@ def _stage_and_swap(
     Returns a dict describing what was written."""
     import yaml as _yaml
     summary: dict[str, Any] = {"files": [], "preserved_pairing": False}
+
+    # Selective restore (#26). `components` None = restore everything (the
+    # default). Otherwise restore only the named parts: "data" (the DB /
+    # history), "config" (config.yaml), "password" (the web-UI password). The
+    # common case is data-only: keep a fresh/clean config but bring history back.
+    def _want(comp: str) -> bool:
+        return components is None or comp in components
+    summary["restored_components"] = (
+        sorted(components) if components is not None
+        else ["config", "data", "password"]
+    )
 
     # Read current cloud block + flag whether a password file is
     # already in place. Done up-front so we can apply both decisions
@@ -346,11 +363,15 @@ def _stage_and_swap(
     with tarfile.open(fileobj=buf, mode="r:gz") as tar:
         for member in tar.getmembers():
             if member.name == "data.sqlite":
+                if not _want("data"):
+                    continue
                 f = tar.extractfile(member)
                 if f is None:
                     continue
                 db_new.write_bytes(f.read())
             elif member.name == "config/config.yaml":
+                if not _want("config"):
+                    continue
                 f = tar.extractfile(member)
                 if f is None:
                     continue
@@ -402,6 +423,8 @@ def _stage_and_swap(
                     cfg_new.write_bytes(raw_bytes)
                 have_cfg = True
             elif member.name == "config/web-password.hash":
+                if not _want("password"):
+                    continue
                 # Preserve existing, operator's current password on the
                 # fresh install shouldn't get clobbered by an old one
                 # they may not remember.
@@ -428,6 +451,8 @@ def _stage_and_swap(
                 pw_hash_new.write_bytes(f.read())
                 have_pw_hash = True
             elif member.name == "config/web-password":
+                if not _want("password"):
+                    continue
                 if existing_pw_plain:
                     continue
                 if not existing_pw_hash:
@@ -494,7 +519,9 @@ def _stage_and_swap(
     # produce snapshots well over Litestar's default 10 MB ceiling.
     request_max_body_size=2 * 1024 * 1024 * 1024,
 )
-async def import_backup(request: Request, state: State) -> dict[str, Any]:
+async def import_backup(
+    request: Request, state: State, components: str | None = None,
+) -> dict[str, Any]:
     """Validate + apply a backup tarball uploaded as raw bytes (the JS
     sends `application/gzip` directly, no multipart wrapping, keeps
     the code on both sides simple).
@@ -513,13 +540,27 @@ async def import_backup(request: Request, state: State) -> dict[str, Any]:
     if len(body) > 2 * 1024 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="archive too large (>2 GB)")
 
+    # Selective restore (#26): ?components=data,config,password limits what
+    # gets restored. Absent/empty = everything (back-compat). Unknown values
+    # are rejected so a typo doesn't silently restore the wrong thing.
+    comp_set: set[str] | None = None
+    if components:
+        comp_set = {c.strip() for c in components.split(",") if c.strip()}
+        valid = {"data", "config", "password"}
+        bad = comp_set - valid
+        if bad or not comp_set:
+            raise HTTPException(
+                status_code=400,
+                detail=f"invalid components {sorted(bad)}; valid: {sorted(valid)}",
+            )
+
     verdict = await asyncio.to_thread(_verify_archive, body)
 
     db_target = _resolve_db_path(state)
     config_target = Path(state.get("config_path") or "/etc/wattpost/config.yaml")
 
     summary = await asyncio.to_thread(
-        _stage_and_swap, body, db_target, config_target,
+        _stage_and_swap, body, db_target, config_target, comp_set,
     )
 
     # Re-exec the daemon so it picks up the new DB and config cleanly.

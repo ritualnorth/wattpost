@@ -5343,19 +5343,31 @@ function wireBackupRestore() {
     const file = input.files && input.files[0];
     if (!file) return;
     const human = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+    // Selective restore (#26): which parts to bring back. All ticked (the
+    // default) = a full restore, and we omit the query for back-compat.
+    const comps = [];
+    if (document.getElementById("restore-comp-data")?.checked) comps.push("data");
+    if (document.getElementById("restore-comp-config")?.checked) comps.push("config");
+    if (document.getElementById("restore-comp-password")?.checked) comps.push("password");
+    if (comps.length === 0) {
+      if (msg) msg.textContent = "Tick at least one thing to restore.";
+      input.value = "";
+      return;
+    }
+    const _lbl = { data: "history", config: "configuration", password: "dashboard password" };
     if (!window.confirm(
       `Restore ${file.name} (${human})?\n\n` +
-      "This will OVERWRITE the current database, config, and " +
-      "local-UI password, then restart the daemon. The previous " +
-      "config is saved as config.yaml.restored.bak in case you " +
-      "need to back out."
+      `This will OVERWRITE: ${comps.map(c => _lbl[c]).join(", ")}, then ` +
+      "restart the daemon. The previous config is saved as " +
+      "config.yaml.restored.bak in case you need to back out."
     )) {
       input.value = "";
       return;
     }
     if (msg) msg.textContent = `Uploading ${human}…`;
     try {
-      const r = await fetch(_withKiosk("/api/system/restore"), {
+      const qs = comps.length < 3 ? `?components=${comps.join(",")}` : "";
+      const r = await fetch(_withKiosk("/api/system/restore" + qs), {
         method: "POST",
         headers: { "Content-Type": "application/gzip" },
         body: file,
