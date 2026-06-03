@@ -90,12 +90,39 @@ def build_archive_bytes(db_path: Path, config_path: Path | None) -> bytes:
         buf = io.BytesIO()
         with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=6) as tar:
             tar.add(tmpdb, arcname="data.sqlite")
+            # Redact credentials before they leave the box. A backup —
+            # especially a cloud-uploaded one — must not carry the user's
+            # third-party secrets (SMTP / MQTT / Solcast keys, hotspot
+            # password) or the local dashboard password. This is the same
+            # redaction the restore path applies on the way IN, now applied
+            # on the way OUT too. The `cloud` block (the appliance's OWN
+            # pairing tokens) is kept so a restore onto a fresh Pi recovers
+            # its cloud identity + history — those are cloud-issued +
+            # revocable, and the cloud already holds them. Fail SAFE: if
+            # redaction throws, omit config rather than ship it unredacted.
             if config_path and config_path.is_file():
-                tar.add(config_path, arcname="config/config.yaml")
+                try:
+                    import yaml as _yaml
+                    cfg_dict = _yaml.safe_load(config_path.read_text()) or {}
+                    if not isinstance(cfg_dict, dict):
+                        raise ValueError("config.yaml is not a mapping")
+                    cloud_block = cfg_dict.pop("cloud", None)
+                    cfg_dict = _redact_credentials(cfg_dict, path="", redacted=[])
+                    if cloud_block is not None:
+                        cfg_dict["cloud"] = cloud_block
+                    cfg_bytes = _yaml.safe_dump(cfg_dict, sort_keys=False).encode()
+                    ci = tarfile.TarInfo("config/config.yaml")
+                    ci.size = len(cfg_bytes)
+                    ci.mtime = ts
+                    tar.addfile(ci, io.BytesIO(cfg_bytes))
+                except Exception:
+                    log.exception("backup: config redaction failed; omitting "
+                                  "config from the archive to avoid leaking secrets")
+            # The argon2 hash is safe to back up; the PLAINTEXT password file
+            # (a live-box MOTD convenience) must never enter an exported /
+            # cloud-stored archive.
             if WEB_PASSWORD_HASH_PATH.is_file():
                 tar.add(WEB_PASSWORD_HASH_PATH, arcname="config/web-password.hash")
-            if WEB_PASSWORD_PLAIN_PATH.is_file():
-                tar.add(WEB_PASSWORD_PLAIN_PATH, arcname="config/web-password")
             manifest = (
                 f"wattpost_version={__version__}\n"
                 f"created_ts={ts}\n"

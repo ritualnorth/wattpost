@@ -20,6 +20,7 @@ Versions follow [Semantic Versioning].
 
 ### Security
 - The SD-card image now ships with **no default login or password** and **SSH disabled by default**. You set your own username, password, SSH and WiFi in Raspberry Pi Imager's settings when you flash (or via the first-boot wizard on an attached monitor). Previously the image shipped a default `wattpost` / `wattpost` SSH account — removed to meet the UK PSTI Act / EU Cyber Resilience Act ban on default credentials on consumer devices. The daemon runs as a separate locked system account and is unaffected.
+- Backups no longer carry your plaintext secrets. The backup builder now **redacts third-party credentials** (SMTP, MQTT, Solcast/weather API keys, the WiFi-hotspot password) and **omits the plaintext dashboard-password file** before writing the tarball — so a downloaded or cloud-uploaded backup can't leak them. You re-enter these via Settings after a restore. The appliance's own cloud pairing tokens are kept so a fresh-Pi restore recovers its identity + history (cloud-issued, revocable). Previously redaction ran only on *restore*, not on backup.
 
 ## [0.1.128] - 2026-06-02
 
