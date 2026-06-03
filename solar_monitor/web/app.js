@@ -5102,19 +5102,21 @@ async function refreshLocationPanel() {
     const age = s.current.fix_age_s != null ? ` · fix ${Math.round(s.current.fix_age_s)}s old` : "";
     currentEl.textContent = `${lat}, ${lon} (${src}${age})`;
   } else {
-    currentEl.textContent = "No location configured. Add `forecast.lat`/`lon` or plug in a USB GPS to enable.";
+    currentEl.textContent = "No location source yet — add a USB GPS (set `gps.port`, e.g. /dev/ttyACM0) or a static `forecast.lat`/`lon`.";
   }
-  // Pre-select the current mode.
+  // Pre-select the current mode. The share level is a preference, so it's
+  // always settable — it simply takes effect once a location source comes
+  // online. (Disabling it when there's no fix just confused people.)
   const mode = (s.share_with_cloud || "off").toLowerCase();
   for (const r of radios) {
     r.checked = (r.value === mode);
-    r.disabled = !s.current;  // can't share what we don't have
+    r.disabled = false;
     r.onchange = () => updateLocationShare(r.value);
   }
-  if (!s.current && msgEl) {
-    msgEl.textContent = "Sharing is disabled until a location source is configured.";
-  } else if (msgEl) {
-    msgEl.textContent = "";
+  if (msgEl) {
+    msgEl.textContent = s.current
+      ? ""
+      : "Set your preference now — it applies as soon as a location source is configured.";
   }
 }
 
