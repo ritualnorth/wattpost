@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.136-beta.1] - 2026-06-04
+
+Beta — the kiosk harvested-today sparkline draws a real PV curve.
+
 ### Added
 - Kiosk **harvested-today sparkline** now draws a real curve. The Command (and any skin using `daySeries`) tile plots today's PV production profile — pulled from `/api/energy/today`, normalised to the day's peak — instead of being blank. Also reachable through the brokered cloud kiosk.
 
