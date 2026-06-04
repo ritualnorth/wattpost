@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Added
+- Appliance accepts a new **`staff_read`** broker scope: an owner-approved, read-only support session (any GET, never a write). Part of the cloud back-office consent flow (#10) — a WattPost engineer can only reach your box after you approve a request, and a read grant can look but not touch.
+
 ## [0.1.138-beta.1] - 2026-06-04
 
 Beta — Ember kiosk skin: one seamless background, no more rectangular seam.

@@ -44,3 +44,34 @@ def test_non_allowlisted_paths_denied():
     for path in ("/api/config", "/api/cloud/config", "/api/backup",
                  "/api/system/update", "/", "/api/kiosk"):
         assert kiosk_scope_allows("GET", path) is False, path
+
+
+# --- staff_read broker scope (#10, consent-gated remote access) ---
+import base64 as _b64, hashlib as _hl, hmac as _hm, time as _t
+from solar_monitor.web_auth import verify_broker_auth_verdict
+
+
+def _sign(scope, secret_hex):
+    ts = str(int(_t.time()))
+    body = f"{ts}.{scope}"
+    sig = _hm.new(bytes.fromhex(secret_hex), body.encode(), _hl.sha256).digest()
+    return f"{ts}.{scope}." + _b64.urlsafe_b64encode(sig).decode().rstrip("=")
+
+
+def test_staff_read_scope_verifies():
+    sec = "ab" * 32
+    verdict, _age, scope = verify_broker_auth_verdict(_sign("staff_read", sec), sec)
+    assert verdict == "ok" and scope == "staff_read"
+
+
+def test_known_broker_scopes_accepted():
+    sec = "cd" * 32
+    for s in ("user", "kiosk", "staff_read"):
+        verdict, _a, scope = verify_broker_auth_verdict(_sign(s, sec), sec)
+        assert verdict == "ok" and scope == s, s
+
+
+def test_unknown_broker_scope_rejected():
+    sec = "ef" * 32
+    verdict, _a, _s = verify_broker_auth_verdict(_sign("staff_write", sec), sec)
+    assert verdict == "bad-format", "an unknown scope must not verify"

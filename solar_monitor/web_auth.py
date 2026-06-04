@@ -310,7 +310,8 @@ def verify_broker_auth_verdict(
             signed_body = ts_str
         elif len(parts) == 3:
             ts_str, scope, sig_b64 = parts
-            if scope not in ("user", "kiosk"):
+            # "staff_read" = an owner-approved read-only staff grant (#10).
+            if scope not in ("user", "kiosk", "staff_read"):
                 return "bad-format", None, "user"
             signed_body = f"{ts_str}.{scope}"
         else:

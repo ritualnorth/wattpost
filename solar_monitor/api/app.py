@@ -1466,7 +1466,9 @@ def build_app(
                     # Owner-scope ("user") = full access, same as a
                     # local logged-in session. Kiosk-scope ("kiosk")
                     # = read-only allow-list, identical to the legacy
-                    # ?key= bypass (#225).
+                    # ?key= bypass (#225). Staff-read ("staff_read") =
+                    # an owner-approved read-only support session (#10):
+                    # any safe GET, never a write.
                     if _bscope == "user":
                         await self.app(scope, receive, send)
                         return
@@ -1477,6 +1479,12 @@ def build_app(
                         # Outside the allow-list: fall through to
                         # auth-required. The kiosk visitor doesn't
                         # have a local session, so they get 401'd.
+                    if _bscope == "staff_read":
+                        if _method in ("GET", "HEAD", "OPTIONS"):
+                            await self.app(scope, receive, send)
+                            return
+                        # A read grant must never mutate: writes fall
+                        # through to auth-required and get 401'd.
             # No password file = misconfigured install. Fail-closed
             # to the login page (which itself surfaces a "password
             # not configured" message), NEVER let the request through.
