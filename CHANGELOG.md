@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.140-beta.1] - 2026-06-04
+
+Beta — Settings → Alerts redesigned as cards with arm/disarm toggles + inline threshold sliders.
+
 ### Changed
 - **Settings → Alerts is now a card layout.** Each rule is a card with an arm/disarm toggle; arming it reveals an inline threshold slider + number box (drag or type) and the rule's meta (severity, transports, cooldown, last-fired). Disarming keeps the rule and its history but stops it firing — no more deleting a rule just to silence it. Adds an `enabled` flag to alert rules.
 
