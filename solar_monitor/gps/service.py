@@ -26,7 +26,7 @@ import math
 import time
 from typing import Any
 
-from .nmea import parse_rmc
+from .nmea import parse_rmc, parse_gsv
 
 log = logging.getLogger(__name__)
 
@@ -86,6 +86,13 @@ class GpsService:
         self._last_applied_lon: float | None = None
         self._last_applied_at: float = 0.0
 
+        # Satellites-in-view, per constellation talker ("GP", "GL", …),
+        # so the UI can show "acquiring: N in view" while a cold GPS
+        # locks. Each entry: {"in_view": int, "snr": int, "ts": float}.
+        # `snr` is the max SNR (dB-Hz) seen across the talker's current
+        # GSV burst. Stale talkers age out in get_status().
+        self._sat_view: dict[str, dict[str, Any]] = {}
+
         self._task: asyncio.Task | None = None
         self._stop = asyncio.Event()
 
@@ -110,21 +117,65 @@ class GpsService:
                 pass
         self._task = None
 
+    # A fix is "live" if we decoded a valid (active) RMC recently. The
+    # receiver streams RMC ~1Hz; 10s of silence means we've lost lock.
+    _FIX_FRESH_S = 10
+    # Satellites-in-view entries older than this are dropped — a
+    # constellation that's no longer being reported has gone quiet.
+    _SAT_VIEW_FRESH_S = 12
+
     def get_status(self) -> dict[str, Any]:
-        """Read-only snapshot of the GPS state for the API."""
+        """Read-only snapshot of the GPS state for the API.
+
+        Beyond the latest fix, surfaces acquisition signal so the UI
+        can distinguish "no GPS" from "GPS present, still locking":
+          * satellites_in_view — total across live constellations
+          * best_snr_dbhz      — strongest signal right now (None if 0)
+          * has_fix            — a fresh, valid position
+          * acquiring          — hearing satellites but no fix yet
+        """
+        now = time.time()
+        fresh = {t: v for t, v in self._sat_view.items()
+                 if now - v["ts"] < self._SAT_VIEW_FRESH_S}
+        sats_in_view = sum(v["in_view"] for v in fresh.values())
+        best_snr = max((v["snr"] for v in fresh.values()), default=0)
+        fix_age = (now - self._latest_fix_at) if self._latest_fix_at else None
+        has_fix = (self._latest_fix is not None
+                   and fix_age is not None and fix_age < self._FIX_FRESH_S)
         return {
             "port":             self.port,
             "baudrate":         self.baudrate,
             "latest_fix":       dict(self._latest_fix) if self._latest_fix else None,
-            "latest_fix_age_s": max(0, int(time.time() - self._latest_fix_at))
-                                if self._latest_fix_at else None,
+            "latest_fix_age_s": max(0, int(fix_age)) if fix_age is not None else None,
             "last_applied_at":  int(self._last_applied_at)
                                 if self._last_applied_at else None,
             "last_applied_lat": self._last_applied_lat,
             "last_applied_lon": self._last_applied_lon,
+            "satellites_in_view": sats_in_view,
+            "best_snr_dbhz":      best_snr or None,
+            "has_fix":            has_fix,
+            "acquiring":          bool(not has_fix and sats_in_view > 0),
         }
 
     # ---- internals ----
+
+    def _record_gsv(self, gsv: dict[str, Any]) -> None:
+        """Fold one GSV sentence into per-talker satellites-in-view.
+        Resets the talker's SNR accumulator at the start of each burst
+        (msg_num == 1) so `snr` tracks the current cycle, not an
+        ever-growing all-time max."""
+        talker = gsv["talker"]
+        burst_snr = max(gsv["snrs"], default=0)
+        prev = self._sat_view.get(talker)
+        if gsv["msg_num"] == 1 or prev is None:
+            snr = burst_snr
+        else:
+            snr = max(prev.get("snr", 0), burst_snr)
+        self._sat_view[talker] = {
+            "in_view": gsv["total_in_view"],
+            "snr":     snr,
+            "ts":      time.time(),
+        }
 
     async def _run(self) -> None:
         """Open the serial port + loop reading lines. Reconnect on
@@ -157,6 +208,10 @@ class GpsService:
                     try:
                         line = line_bytes.decode("ascii", errors="replace")
                     except Exception:
+                        continue
+                    gsv = parse_gsv(line)
+                    if gsv is not None:
+                        self._record_gsv(gsv)
                         continue
                     fix = parse_rmc(line)
                     if fix is None:

@@ -5169,6 +5169,22 @@ async function hotspotPower(on) {
   }
 }
 
+// While a GPS is acquiring, re-poll the location panel every few seconds
+// so the user can watch satellites climb + the fix land, without manually
+// reopening Settings. Self-stops once a fix arrives or the panel is hidden.
+let _locReacquireTimer = null;
+function _scheduleLocationReacquirePoll() {
+  if (_locReacquireTimer) return;        // already polling
+  _locReacquireTimer = setInterval(() => {
+    const el = document.getElementById("settings-location-current-v");
+    if (!el || !el.offsetParent) { _stopLocationReacquirePoll(); return; }  // panel hidden
+    refreshLocationPanel();
+  }, 5000);
+}
+function _stopLocationReacquirePoll() {
+  if (_locReacquireTimer) { clearInterval(_locReacquireTimer); _locReacquireTimer = null; }
+}
+
 async function refreshLocationPanel() {
   const currentEl = document.getElementById("settings-location-current-v");
   const msgEl     = document.getElementById("settings-location-msg");
@@ -5187,8 +5203,34 @@ async function refreshLocationPanel() {
     const src = s.current.source === "gps" ? "GPS" : "static";
     const age = s.current.fix_age_s != null ? ` · fix ${Math.round(s.current.fix_age_s)}s old` : "";
     currentEl.textContent = `${lat}, ${lon} (${src}${age})`;
+    _stopLocationReacquirePoll();        // got a fix — stop watching
   } else {
-    currentEl.textContent = "No location source yet — add a USB GPS (set `gps.port`, e.g. /dev/ttyACM0) or a static `forecast.lat`/`lon`.";
+    // No usable location yet — but a configured GPS may simply be
+    // acquiring. Tell the user WHICH, rather than a flat "no source"
+    // that reads as "your GPS isn't detected" when it actually is.
+    let g = null;
+    try { g = await api("/api/gps"); } catch (_) {}
+    if (g && g.configured) {
+      const n = g.satellites_in_view || 0;
+      const snr = g.best_snr_dbhz;
+      if (g.acquiring || n > 0) {
+        const weak = snr != null && snr < 25;
+        currentEl.textContent =
+          `GPS connected — acquiring a fix: ${n} satellite${n === 1 ? "" : "s"} in view`
+          + (snr != null ? ` (best signal ${snr} dB-Hz${weak ? ", weak" : ""})` : "")
+          + ". " + (weak
+              ? "Signal is weak — give the antenna a clearer view of the sky (a window or outside)."
+              : "Hang tight — a cold start can take a minute.");
+      } else {
+        currentEl.textContent =
+          `GPS connected (${g.port || "serial"}) — searching, no satellites in view yet. `
+          + "The antenna needs a clear view of the sky: a window, or run it outside.";
+      }
+      _scheduleLocationReacquirePoll();  // watch it lock in real time
+    } else {
+      currentEl.textContent = "No location source yet — add a USB GPS (set `gps.port`, e.g. /dev/ttyACM0) or a static `forecast.lat`/`lon`.";
+      _stopLocationReacquirePoll();
+    }
   }
   // Pre-select the current mode. The share level is a preference, so it's
   // always settable — it simply takes effect once a location source comes

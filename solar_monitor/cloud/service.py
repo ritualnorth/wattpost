@@ -1322,6 +1322,16 @@ class CloudService:
         # of the audit log + isn't sensitive like the bearer_token.
         if self.cfg.kiosk_token:
             extras["kiosk_token"] = self.cfg.kiosk_token
+        # Active kiosk skin so the cloud can preview what a shared kiosk
+        # link will display ("this share shows the Command skin") without
+        # round-tripping through the broker. Cheap (~20 bytes); defaults
+        # to halo when unset.
+        try:
+            _kcfg = getattr(self._config, "kiosk", None)
+            if _kcfg is not None and getattr(_kcfg, "skin", None):
+                extras["kiosk_skin"] = _kcfg.skin
+        except Exception:
+            pass
         try:
             alert_count = len([
                 r for r in (getattr(self.scheduler._alerts, "rules", []) or [])

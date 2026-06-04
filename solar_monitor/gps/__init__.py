@@ -11,5 +11,5 @@ receivers: open the port, read NMEA at 9600 baud, decode RMC
 sentences for lat/lon. No `gpsd` dependency, pyserial is enough
 for a single device.
 """
-from .service import GpsService  # noqa: F401
-from .nmea import parse_rmc       # noqa: F401
+from .service import GpsService       # noqa: F401
+from .nmea import parse_rmc, parse_gsv  # noqa: F401

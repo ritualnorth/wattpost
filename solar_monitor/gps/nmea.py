@@ -77,6 +77,77 @@ def _parse_rmc_time(time_str: str, date_str: str) -> int | None:
         return None
 
 
+_GSV_PREFIXES = ("$GPGSV", "$GLGSV", "$GAGSV", "$GNGSV",
+                 "$BDGSV", "$GBGSV", "$QZGSV")
+
+
+def parse_gsv(line: str) -> dict | None:
+    """Decode one NMEA GSV (Satellites in View) sentence.
+
+    GSV is what tells us "the receiver can hear N satellites and how
+    strongly", which is exactly the signal a user needs while a cold
+    GPS is acquiring a fix — RMC only flips from void→active once a
+    full position is computed, so without GSV the UI can't tell
+    "no GPS" from "GPS present, still locking".
+
+    Returns `{talker, msg_num, total_in_view, snrs}`:
+      * talker        — constellation tag ("GP", "GL", "GA", …); a
+                        multi-constellation receiver emits one GSV
+                        stream per talker, each with its own total.
+      * msg_num       — 1-based sentence index within the burst; a
+                        burst of N sats spans ceil(N/4) sentences.
+                        Callers reset their per-talker SNR accumulator
+                        when msg_num == 1.
+      * total_in_view — satellites in view for this talker.
+      * snrs          — SNRs (dB-Hz) PRESENT in this sentence (blank
+                        SNR fields, i.e. detected-but-not-tracked
+                        satellites, are omitted).
+
+    Returns None for non-GSV / malformed lines. Checksum skipped for
+    the same reason parse_rmc skips it.
+
+    GSV layout:
+      0: $xxGSV
+      1: total sentences in this burst
+      2: sentence number (1-based)
+      3: total satellites in view
+      4…: repeating [PRN, elevation, azimuth, SNR] × up to 4
+    """
+    if not line:
+        return None
+    line = line.strip()
+    if "*" in line:
+        line = line.rsplit("*", 1)[0]
+    parts = line.split(",")
+    if not parts or parts[0] not in _GSV_PREFIXES or len(parts) < 4:
+        return None
+    talker = parts[0][1:3]
+    try:
+        msg_num = int(parts[2]) if parts[2] else 1
+    except ValueError:
+        msg_num = 1
+    try:
+        total_in_view = int(parts[3]) if parts[3] else 0
+    except ValueError:
+        total_in_view = 0
+    snrs: list[int] = []
+    # Satellite blocks begin at index 4, 4 fields each; SNR is the
+    # 4th field of each block → absolute indices 7, 11, 15, 19.
+    for i in range(7, len(parts), 4):
+        v = parts[i]
+        if v:
+            try:
+                snrs.append(int(v))
+            except ValueError:
+                pass
+    return {
+        "talker":        talker,
+        "msg_num":       msg_num,
+        "total_in_view": total_in_view,
+        "snrs":          snrs,
+    }
+
+
 def parse_rmc(line: str) -> dict | None:
     """Decode one NMEA RMC sentence into a fix dict, or return None
     if the line isn't an RMC sentence / fix is void / coordinates
