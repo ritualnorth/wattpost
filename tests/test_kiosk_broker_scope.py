@@ -33,7 +33,8 @@ def test_kiosk_scope_is_read_only():
 def test_kiosk_render_paths_allowed():
     # The data the kiosk SPA needs to render must all be reachable.
     for path in ("/kiosk", "/kiosk/van", "/api/snapshot", "/api/devices",
-                 "/api/today", "/api/weather", "/web/static/app.js"):
+                 "/api/today", "/api/energy/today", "/api/weather",
+                 "/web/static/app.js"):
         assert kiosk_scope_allows("GET", path) is True, path
 
 

@@ -1205,7 +1205,8 @@ def manifest() -> File:
 # truth + regression-testable.
 KIOSK_BROKER_GET_PATHS = (
     "/kiosk", "/api/snapshot", "/api/devices", "/api/poll_run",
-    "/api/today", "/api/weather", "/api/kiosk/config", "/web/", "/static/",
+    "/api/today", "/api/energy/today", "/api/weather", "/api/kiosk/config",
+    "/web/", "/static/",
 )
 
 

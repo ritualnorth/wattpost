@@ -692,6 +692,22 @@ function buildKioskViewModel() {
     }
   } catch (_) {}
 
+  // Today's PV production profile for the "harvested today" sparkline:
+  // the solar_w series from /api/energy/today, normalised 0..1 by the
+  // day's peak and downsampled. Empty (graceful) until the async fetch
+  // (kicked off in renderKiosk) lands.
+  let daySeries = [];
+  try {
+    const sw = energyTodayData && energyTodayData.series && energyTodayData.series.solar_w;
+    if (Array.isArray(sw) && sw.length > 1) {
+      const peak = sw.reduce((m, v) => (typeof v === "number" && v > m ? v : m), 0);
+      if (peak > 0) {
+        const clean = sw.map((v) => (typeof v === "number" && v > 0 ? v / peak : 0));
+        daySeries = downsampleSeries(clean, 48);
+      }
+    }
+  } catch (_) {}
+
   return {
     version: KS ? KS.VERSION : 1,
     siteName: (window.WP_SITE_NAME || ""),
@@ -702,7 +718,7 @@ function buildKioskViewModel() {
     timeToFullMin, timeToEmptyMin,
     sources, loads,
     todayKwh: sourcesWh / 1000,
-    daySeries: [], forecast, weather, sun,
+    daySeries, forecast, weather, sun,
     bankLabel: cap ? (Math.round(cap) + "Ah bank") : "Bank",
     cells: (bank && bank.bankCells) || [],
   };
@@ -724,10 +740,20 @@ function renderKiosk() {
     // Night mode: gently dim the wall display after local sunset so it
     // isn't a lightbox in a dark van/cabin/bedroom.
     document.body.classList.toggle("kiosk-night", !!vm.isNight);
+    // Lazily pull today's intraday PV series for the harvested-sparkline.
+    // Throttled cache, so calling each render is cheap; repaint once when
+    // the first payload lands so the curve appears without waiting for the
+    // next snapshot tick.
+    if (document.body.classList.contains("kiosk-active")) {
+      ensureEnergyToday().then((d) => {
+        if (d && !_energyKioskPainted) { _energyKioskPainted = true; renderKiosk(); }
+      });
+    }
   } catch (e) {
     if (window.console) console.warn("kiosk skin render failed", e);
   }
 }
+let _energyKioskPainted = false;
 
 function applySnapshot(frame) {
   devices = frame.devices || [];
@@ -2427,6 +2453,41 @@ async function ensureForecast(force = false) {
     forecastLastFetched = now;
   } catch (e) { forecastData = null; }
   return forecastData;
+}
+
+// Today's intraday energy series (5-min buckets). Used by the kiosk
+// skins' "harvested today" sparkline. Same throttled-cache shape as the
+// forecast: the buckets are 5 min wide, so a 5 min refresh is plenty.
+let energyTodayData = null;
+let energyTodayLastFetched = 0;
+const ENERGY_TODAY_REFRESH_MS = 5 * 60 * 1000;
+
+async function ensureEnergyToday(force = false) {
+  const now = Date.now();
+  if (!force && energyTodayData && (now - energyTodayLastFetched) < ENERGY_TODAY_REFRESH_MS) {
+    return energyTodayData;
+  }
+  try {
+    const e = await api("/api/energy/today");
+    energyTodayData = (e && e.series) ? e : null;
+    energyTodayLastFetched = now;
+  } catch (_) { /* keep last good cache */ }
+  return energyTodayData;
+}
+
+// Average a numeric series down to at most `n` points, preserving shape.
+// Keeps the kiosk sparkline path light when today has hundreds of buckets.
+function downsampleSeries(arr, n) {
+  if (arr.length <= n) return arr.slice();
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const lo = Math.floor(i * arr.length / n);
+    const hi = Math.max(lo + 1, Math.floor((i + 1) * arr.length / n));
+    let sum = 0, cnt = 0;
+    for (let j = lo; j < hi; j++) { sum += arr[j]; cnt++; }
+    out.push(cnt ? sum / cnt : 0);
+  }
+  return out;
 }
 
 // Group forecast points into per-day buckets keyed by midnight epoch
