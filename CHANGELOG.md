@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- Kiosk **Ember** skin: the warm background now fills the whole screen. The skin's artwork is letterboxed on most displays, and the page behind it was always the default cool-dark gradient — so Ember showed a jarring dark band in the gutters (usually below the flow row). The kiosk page background is now skin-aware and matches Ember's warm tone, so it blends seamlessly edge to edge.
+
 ## [0.1.134-beta.1] - 2026-06-04
 
 Beta — Command kiosk skin: the Bank tile shows real data, and the layout fits wide screens better.

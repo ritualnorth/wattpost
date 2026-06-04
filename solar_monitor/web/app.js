@@ -713,8 +713,14 @@ function renderKiosk() {
   const KS = window.WattPostKioskSkins;
   if (!root || !KS) return;       // engine not loaded / not on kiosk route
   try {
+    const skinId = activeSkinId();
     const vm = buildKioskViewModel();
-    KS.get(activeSkinId()).render(root, vm);
+    KS.get(skinId).render(root, vm);
+    // Expose the active skin so the page background can match it — the
+    // skin SVG is letterboxed on most displays, and a skin-blind page
+    // bg shows through as a mismatched band (e.g. cool dark behind
+    // Ember's warm palette). CSS paints a per-skin bg keyed off this.
+    document.body.dataset.kioskSkin = skinId;
     // Night mode: gently dim the wall display after local sunset so it
     // isn't a lightbox in a dark van/cabin/bedroom.
     document.body.classList.toggle("kiosk-night", !!vm.isNight);

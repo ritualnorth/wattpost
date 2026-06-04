@@ -3074,6 +3074,15 @@ body.kiosk-active .route.kiosk-route.active {
 body.kiosk-active .route.kiosk-route.active {
   background: radial-gradient(120% 90% at 50% 38%, #11161f 0%, #080b10 60%, #05070b 100%);
 }
+/* Per-skin page backgrounds. The skin SVG is letterboxed on most
+   displays; without a matching page bg the gutters show the default
+   cool gradient — jarring behind a warm skin. These mirror each skin's
+   own background fill (e.g. Ember's kEmBg radial) so the gutters blend
+   seamlessly into the artwork. Keyed off body[data-kiosk-skin], set by
+   renderKiosk(). */
+body.kiosk-active[data-kiosk-skin="ember"] .route.kiosk-route.active {
+  background: radial-gradient(110% 95% at 50% 26%, #2a1d14 0%, #1a1310 48%, #0d0907 100%);
+}
 .wp-skin text { fill: #e9eef5; }
 .wp-skin .k-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .wp-skin .k-dim { fill: #7b8694; }
