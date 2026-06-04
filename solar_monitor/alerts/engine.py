@@ -213,6 +213,8 @@ class AlertEngine:
 
         fired: list[AlertEvent] = []
         for rule in self.rules:
+            if not getattr(rule, "enabled", True):
+                continue   # disarmed via the UI toggle; keep config, skip eval
             op = _OPS.get(rule.op)
             if op is None:
                 log.warning("rule %r has unknown op %r", rule.id, rule.op)
@@ -296,6 +298,7 @@ class AlertEngine:
                     "threshold": r.threshold, "severity": r.severity,
                     "cooldown_seconds": r.cooldown_seconds,
                     "transports": r.transports,
+                    "enabled": getattr(r, "enabled", True),
                     "last_fired_ts": self._last_fired.get(r.id),
                     "last_value": self._last_event[r.id].value
                                   if r.id in self._last_event else None,

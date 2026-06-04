@@ -57,6 +57,7 @@ class AlertRuleCfg(msgspec.Struct, kw_only=True):
     severity: str = "warn"
     cooldown_seconds: int = 1800
     transports: list[str] = []
+    enabled: bool = True
 
 
 class ForecastCfg(msgspec.Struct, kw_only=True):

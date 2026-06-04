@@ -28,6 +28,11 @@ class AlertRule(msgspec.Struct, kw_only=True):
     # Transport ids to dispatch this rule to (must match an entry in
     # `notification_transports` in config.yaml).
     transports: list[str]
+    # Armed/disarmed without deleting it — the UI's per-rule toggle. A
+    # disabled rule keeps all its config + cooldown history but the
+    # engine skips evaluating it. Defaults True so existing rules and
+    # YAML written before this field stay armed.
+    enabled: bool = True
 
 
 class AlertEvent(msgspec.Struct):

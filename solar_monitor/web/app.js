@@ -7281,32 +7281,100 @@ function renderAlertsPanel() {
   wireAlertsHandlers();
 }
 
+// Sensible slider bounds inferred from the metric name, so the threshold
+// drag feels right whether it's a 0–100 % SoC or a 0–5 kW load. The number
+// box is always there for precise entry, and the range stretches to fit a
+// threshold that sits outside the inferred bounds.
+function metricRange(metric, threshold) {
+  const m = (metric || "").toLowerCase();
+  let min = 0, max = 100, step = 1;
+  if (/soc|pct|percent/.test(m))         { min = 0;    max = 100;  step = 1; }
+  else if (/temp/.test(m))               { min = -20;  max = 90;   step = 1; }
+  else if (/drift/.test(m))              { min = 0;    max = 1;    step = 0.01; }
+  else if (/_v$|volt/.test(m))           { min = 0;    max = 60;   step = 0.1; }
+  else if (/_a$|current|amp/.test(m))    { min = -200; max = 200;  step = 1; }
+  else if (/_w$|power|watt|load/.test(m)){ min = 0;    max = 5000; step = 25; }
+  else { max = Math.max(100, Math.ceil((+threshold || 0) * 2)); }
+  const t = +threshold || 0;
+  if (t < min) min = t;
+  if (t > max) max = t;
+  return { min, max, step };
+}
+
+// PUT the rule with a partial change merged over its current fields.
+// Optimistic: the caller has usually already updated `r` + the DOM.
+async function patchRule(r, changes) {
+  const body = {
+    id: r.id, name: r.name, metric: r.metric, op: r.op,
+    threshold: r.threshold, severity: r.severity,
+    cooldown_seconds: r.cooldown_seconds, transports: r.transports || [],
+    enabled: r.enabled !== false, ...changes,
+  };
+  try {
+    const resp = await fetch(`/api/alerts/rules/${encodeURIComponent(r.id)}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      throw new Error(d.detail || `HTTP ${resp.status}`);
+    }
+    Object.assign(r, changes);
+  } catch (e) {
+    if (window.console) console.warn("rule save failed", e);
+    refreshAlertsPanel();   // reload to reset the UI to server truth
+  }
+}
+
+const _BELL_ICO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+
+// Beszel-style alert card: header (icon + name + condition + arm toggle);
+// when armed it reveals the threshold slider + number and a meta/action
+// row. Disarmed rules collapse to the header + a compact edit/delete line.
 function renderRuleRow(r, transportIds) {
   const opLbl = ALERT_OP_LABEL[r.op] || r.op;
+  const on = r.enabled !== false;
   const cond = `${r.metric} ${opLbl} ${r.threshold}`;
   const lastFired = r.last_fired_ts ? `fired ${fmt.ago(r.last_fired_ts)}` : "never fired";
-  const cooldown = `cooldown ${Math.round(r.cooldown_seconds / 60)} min`;
-  const tlist = (r.transports || [])
-    .map(tid => transportIds.includes(tid) ? tid : `${tid} ⚠ missing`)
-    .join(", ") || "⚠ none";
+  const cdMin = Math.round((r.cooldown_seconds || 0) / 60);
+  const tmissing = (r.transports || []).some(t => !transportIds.includes(t));
+  const tlist = (r.transports || []).join(", ") || "⚠ none";
+  const rng = metricRange(r.metric, r.threshold);
+  const fill = Math.max(0, Math.min(100,
+    Math.round(((+r.threshold - rng.min) / (rng.max - rng.min || 1)) * 100)));
+  const reveal = on ? `
+      <div class="ar-controls">
+        <div class="ar-ctl-label" data-rule-cond="${r.id}">Triggers when <b>${escHtml(r.metric)} ${opLbl} ${r.threshold}</b></div>
+        <div class="ar-ctl-grid">
+          <input type="range" class="ar-slider" data-rule-threshold="${r.id}"
+                 min="${rng.min}" max="${rng.max}" step="${rng.step}" value="${r.threshold}" style="--fill:${fill}%">
+          <input type="number" class="ar-num" data-rule-threshold-num="${r.id}" step="${rng.step}" value="${r.threshold}">
+        </div>
+        <div class="ar-meta">
+          <span class="ar-tag ar-tag--${r.severity}">${r.severity}</span>
+          <span class="ar-tag">→ ${escHtml(tlist)}${tmissing ? " ⚠" : ""}</span>
+          <span class="ar-tag">repeat ≤ ${cdMin}m</span>
+          <span class="ar-tag">${lastFired}</span>
+        </div>
+      </div>` : "";
   return `
-    <div class="alerts-row alerts-row--${r.severity}" data-rule="${r.id}">
-      <div class="alerts-row-main">
-        <div class="alerts-row-title">
-          <span class="alerts-row-name">${r.name}</span>
-          <span class="alerts-row-cond">${cond}</span>
+    <div class="ar-card ${on ? "is-on" : ""}" data-rule="${r.id}">
+      <div class="ar-head">
+        <div class="ar-ico">${_BELL_ICO}</div>
+        <div class="ar-head-body">
+          <div class="ar-title">${escHtml(r.name)}</div>
+          <div class="ar-desc">${escHtml(cond)}${on ? "" : " · disarmed"}</div>
         </div>
-        <div class="alerts-row-meta">
-          <span class="alerts-row-tag alerts-row-tag--${r.severity}">${r.severity}</span>
-          <span class="alerts-row-tag">→ ${tlist}</span>
-          <span class="alerts-row-tag">${cooldown}</span>
-          <span class="alerts-row-tag">${lastFired}</span>
-        </div>
+        <label class="ar-switch" title="${on ? "Disarm" : "Arm"}">
+          <input type="checkbox" data-rule-toggle="${r.id}" ${on ? "checked" : ""}>
+          <span class="ar-track"></span>
+        </label>
       </div>
-      <div class="alerts-row-action">
-        <button class="alerts-test-btn" data-test-rule="${r.id}">Test</button>
-        <button class="alerts-icon-btn" data-edit-rule="${r.id}" title="Edit">✎</button>
-        <button class="alerts-icon-btn alerts-icon-btn--danger" data-delete-rule="${r.id}" title="Delete">×</button>
+      ${reveal}
+      <div class="ar-foot">
+        <button class="ar-link" data-test-rule="${r.id}">Test</button>
+        <button class="ar-link" data-edit-rule="${r.id}">Edit</button>
+        <button class="ar-link ar-link--danger" data-delete-rule="${r.id}">Delete</button>
         <span class="alerts-test-status" data-rule="${r.id}"></span>
       </div>
     </div>`;
@@ -7576,6 +7644,38 @@ function wireAlertsHandlers() {
   });
   host.querySelectorAll("[data-test-rule]").forEach(btn => {
     btn.addEventListener("click", () => testAlert(btn.dataset.testRule));
+  });
+  // Arm/disarm toggle — optimistic flip + reveal/collapse, then persist.
+  host.querySelectorAll("[data-rule-toggle]").forEach(cb => {
+    cb.addEventListener("change", () => {
+      const r = alertsState.rules.find(x => x.id === cb.dataset.ruleToggle);
+      if (!r) return;
+      r.enabled = cb.checked;
+      renderAlertsPanel();
+      patchRule(r, { enabled: cb.checked });
+    });
+  });
+  // Threshold slider + mirrored number box. Live-update the fill, the
+  // number and the condition text while dragging; persist on release.
+  host.querySelectorAll("[data-rule-threshold]").forEach(sl => {
+    const r = alertsState.rules.find(x => x.id === sl.dataset.ruleThreshold);
+    if (!r) return;
+    const num = host.querySelector(`[data-rule-threshold-num="${r.id}"]`);
+    const cond = host.querySelector(`[data-rule-cond="${r.id}"]`);
+    const live = (v) => {
+      const min = +sl.min, max = +sl.max;
+      sl.style.setProperty("--fill",
+        Math.max(0, Math.min(100, ((v - min) / (max - min || 1)) * 100)) + "%");
+      if (num) num.value = v;
+      if (cond) cond.innerHTML = `Triggers when <b>${escHtml(r.metric)} ${ALERT_OP_LABEL[r.op] || r.op} ${v}</b>`;
+    };
+    sl.addEventListener("input", () => live(+sl.value));
+    sl.addEventListener("change", () => { r.threshold = +sl.value; patchRule(r, { threshold: +sl.value }); });
+    if (num) num.addEventListener("change", () => {
+      const v = +num.value;
+      if (isNaN(v)) { num.value = r.threshold; return; }
+      sl.value = v; live(v); r.threshold = v; patchRule(r, { threshold: v });
+    });
   });
   host.querySelectorAll("form[data-form='rule']").forEach(f => {
     // Custom metric input toggles based on the dropdown

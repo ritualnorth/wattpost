@@ -48,6 +48,7 @@ class AlertRulePayload(msgspec.Struct, kw_only=True):
     severity: str = "warn"
     cooldown_seconds: int = 1800
     transports: list[str] = []
+    enabled: bool = True
 
 
 class NotificationTransportPayload(msgspec.Struct, kw_only=True):
@@ -117,6 +118,7 @@ def _refresh_rules_in_engine(scheduler: PollScheduler, config: Config) -> None:
             id=r.id, name=r.name, metric=r.metric, op=r.op,
             threshold=r.threshold, severity=r.severity,
             cooldown_seconds=r.cooldown_seconds, transports=r.transports,
+            enabled=getattr(r, "enabled", True),
         )
         for r in config.alerts
     ]
@@ -143,6 +145,7 @@ async def create_rule(data: AlertRulePayload, state: State) -> dict[str, Any]:
         id=data.id, name=data.name, metric=data.metric, op=data.op,
         threshold=data.threshold, severity=data.severity,
         cooldown_seconds=data.cooldown_seconds, transports=data.transports,
+        enabled=data.enabled,
     )
     config.alerts.append(new_cfg)
 
@@ -151,7 +154,7 @@ async def create_rule(data: AlertRulePayload, state: State) -> dict[str, Any]:
             "id": data.id, "name": data.name, "metric": data.metric,
             "op": data.op, "threshold": data.threshold,
             "severity": data.severity, "cooldown_seconds": data.cooldown_seconds,
-            "transports": data.transports,
+            "transports": data.transports, "enabled": data.enabled,
         })
         return raw
 
@@ -178,6 +181,7 @@ async def update_rule(rule_id: str, data: AlertRulePayload, state: State) -> dic
             id=data.id, name=data.name, metric=data.metric, op=data.op,
             threshold=data.threshold, severity=data.severity,
             cooldown_seconds=data.cooldown_seconds, transports=data.transports,
+            enabled=data.enabled,
         ) if r.id == rule_id else r
         for r in config.alerts
     ]
@@ -190,7 +194,7 @@ async def update_rule(rule_id: str, data: AlertRulePayload, state: State) -> dic
                     "id": data.id, "name": data.name, "metric": data.metric,
                     "op": data.op, "threshold": data.threshold,
                     "severity": data.severity, "cooldown_seconds": data.cooldown_seconds,
-                    "transports": data.transports,
+                    "transports": data.transports, "enabled": data.enabled,
                 }
                 break
         raw["alerts"] = rules
