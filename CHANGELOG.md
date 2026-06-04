@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- Kiosk **Command** skin: the **Bank** tile is no longer blank — it now shows a capacity bar per battery pack (or a single bar for a one-bank system) reading live fill, instead of just the "300Ah bank" label. The skin also fills the screen a touch better (trimmed dead space below the tile row), so it doesn't sit high on wide displays.
+
 ## [0.1.133-beta.1] - 2026-06-04
 
 Beta — GPS acquisition is finally legible, and the cloud knows which kiosk skin you're running.

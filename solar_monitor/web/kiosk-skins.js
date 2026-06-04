@@ -289,7 +289,7 @@
       return '<g transform="translate(0,' + (i * 46) + ')"><rect width="152" height="34" rx="6" fill="#10202a" stroke="#1d3a44" stroke-width="1.5"/><rect x="6" y="6" width="' + (118 * H.clamp(c.frac, 0, 1)).toFixed(0) + '" height="22" rx="3" fill="#56d364" opacity=".85"/><text x="142" y="23" font-size="14" text-anchor="end" fill="#cdd6e2" font-weight="800" class="k-num">' + Math.round(c.ah) + 'Ah</text></g>';
     }).join('');
     return '' +
-'<svg viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid meet" class="wp-skin wp-command">' +
+'<svg viewBox="0 0 1280 762" preserveAspectRatio="xMidYMid meet" class="wp-skin wp-command">' +
   '<defs><linearGradient id="kCmA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + sColor + '" stop-opacity=".75"/><stop offset="1" stop-color="' + sColor + '"/></linearGradient>' +
   '<filter id="kCmG" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter></defs>' +
   '<text x="56" y="60" font-size="24" font-weight="700" class="k-num">' + H.esc(vm.siteName || 'WattPost') + '</text>' +

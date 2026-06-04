@@ -704,7 +704,7 @@ function buildKioskViewModel() {
     todayKwh: sourcesWh / 1000,
     daySeries: [], forecast, weather, sun,
     bankLabel: cap ? (Math.round(cap) + "Ah bank") : "Bank",
-    cells: [],
+    cells: (bank && bank.bankCells) || [],
   };
 }
 
@@ -1074,9 +1074,28 @@ function aggregateBank() {
     }
   }
 
+  // Per-pack capacity bars for the kiosk Command skin's Bank tile.
+  // BMS path → one bar per physical pack (capacity + fill); shunt /
+  // inverter path → a single bar standing in for the whole declared
+  // bank, so the tile is never blank on a single-bank system.
+  const _clamp01 = (x) => Math.max(0, Math.min(1, x));
+  let bankCells = [];
+  if (batts.length) {
+    bankCells = batts.map((b) => {
+      const l = b.latest || {};
+      const cap = +l.capacity_ah || 0;
+      const rem = +l.remaining_charge_ah || 0;
+      return { ah: cap, frac: cap > 0 ? _clamp01(rem / cap) : 0 };
+    }).filter((c) => c.ah > 0);
+  }
+  if (!bankCells.length && chosen && +chosen.totalCap > 0) {
+    bankCells = [{ ah: +chosen.totalCap, frac: _clamp01((+chosen.soc || 0) / 100) }];
+  }
+
   const result = {
     ...chosen,
     packs: batts.length,
+    bankCells,
     cellMinV: cellMin,
     cellMaxV: cellMax,
     worstDriftV: cellMin === null ? null : worstDrift,
