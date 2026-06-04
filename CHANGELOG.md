@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.133-beta.1] - 2026-06-04
+
+Beta — GPS acquisition is finally legible, and the cloud knows which kiosk skin you're running.
+
 ### Added
 - **GPS acquisition is now visible.** When a USB GPS is connected but hasn't locked yet, the Location panel says **"GPS connected — acquiring a fix: N satellites in view (best signal X dB-Hz)"** and warns when the signal's too weak to lock (needs a clearer view of the sky), instead of the old "no location source" that read as "GPS not detected". It auto-refreshes every few seconds so you can watch satellites climb and the fix land. Reads new `satellites_in_view` / `best_snr_dbhz` / `acquiring` fields from `/api/gps` (GSV sentence parsing).
 - Heartbeat now reports the appliance's active **kiosk skin**, so the cloud's kiosk-share dialog can preview what a shared link will display ("Shared kiosks display the Command skin").
