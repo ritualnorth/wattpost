@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.138-beta.1] - 2026-06-04
+
+Beta — Ember kiosk skin: one seamless background, no more rectangular seam.
+
 ### Fixed
 - Kiosk **Ember** skin no longer shows a visible rectangular seam ("two backgrounds"). The skin painted its own warm rect inside its 1.6 box while the page painted a separate warm gradient in the letterbox gutters; the two didn't align. Ember now paints one continuous background that overspills into the gutters, so it's seamless on any display shape.
 
