@@ -3069,8 +3069,15 @@ body.kiosk-active .route.kiosk-route.active {
    #kiosk-skin-root. The svg's own viewBox scales it crisply to any wall
    display; these rules are just the shared chrome (background + the
    .k-* binding classes the skins reference). */
-.kiosk-skin-root { flex: 1 1 auto; width: 100%; min-height: 0; display: flex; }
-.kiosk-skin-root svg.wp-skin { width: 100%; height: 100%; display: block; }
+.kiosk-skin-root { flex: 1 1 auto; width: 100%; min-height: 0; position: relative; }
+/* Absolute-fill the SVG to its container. With only width/height:100% an
+   inline <svg> whose parent has an indefinite height collapses to its
+   intrinsic aspect height (width ÷ viewBox-ratio) and pins to the top —
+   so on a display taller than the skin's 1.6 ratio the artwork sat high
+   with a dead band beneath it. inset:0 forces the element to the full
+   container, so preserveAspectRatio="xMidYMid meet" centres the letterbox
+   instead. */
+.kiosk-skin-root svg.wp-skin { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 body.kiosk-active .route.kiosk-route.active {
   background: radial-gradient(120% 90% at 50% 38%, #11161f 0%, #080b10 60%, #05070b 100%);
 }

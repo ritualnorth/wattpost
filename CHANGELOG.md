@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- Kiosk skins now **centre on any display shape**. The skin SVG was collapsing to its intrinsic 1.6 aspect height and pinning to the top, so on a screen taller than that (e.g. a portrait-ish browser window) the artwork sat high with a dead band beneath it. The SVG now fills its container, so the letterbox is split evenly and every skin (Halo / Ember / Command) is vertically centred. Fixes the "sits too high" look across the board.
+
 ## [0.1.136-beta.1] - 2026-06-04
 
 Beta — the kiosk harvested-today sparkline draws a real PV curve.
