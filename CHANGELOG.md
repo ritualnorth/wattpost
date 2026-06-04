@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.139-beta.1] - 2026-06-04
+
+Beta — appliance support for the cloud consent-gated remote-access flow (read-only staff sessions).
+
 ### Added
 - Appliance accepts a new **`staff_read`** broker scope: an owner-approved, read-only support session (any GET, never a write). Part of the cloud back-office consent flow (#10) — a WattPost engineer can only reach your box after you approve a request, and a read grant can look but not touch.
 
