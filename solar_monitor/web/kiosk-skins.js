@@ -223,10 +223,16 @@
   '<defs>' +
     '<linearGradient id="kEmA" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7a4a1f"/><stop offset=".5" stop-color="#f0b860"/><stop offset="1" stop-color="#e8743b"/></linearGradient>' +
     '<radialGradient id="kEmS" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe3a3"/><stop offset="1" stop-color="#f0a13c"/></radialGradient>' +
-    '<radialGradient id="kEmBg" cx=".5" cy=".26" r=".95"><stop offset="0" stop-color="#2a1d14"/><stop offset=".48" stop-color="#1a1310"/><stop offset="1" stop-color="#0d0907"/></radialGradient>' +
+    // userSpaceOnUse so the gradient stays anchored to the artwork while
+    // the rect below overspills the viewBox to paint the letterbox gutters
+    // too (the SVG fills the whole display; content outside 0..1280/0..800
+    // lands in the gutters). One continuous background = no seam where the
+    // skin box meets the page behind it. The outer stop colour fills the
+    // far gutters uniformly.
+    '<radialGradient id="kEmBg" gradientUnits="userSpaceOnUse" cx="640" cy="200" r="900"><stop offset="0" stop-color="#2a1d14"/><stop offset=".48" stop-color="#1a1310"/><stop offset="1" stop-color="#0d0907"/></radialGradient>' +
     '<filter id="kEmG" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="9"/></filter>' +
   '</defs>' +
-  '<rect width="1280" height="800" fill="url(#kEmBg)"/>' +
+  '<rect x="-2000" y="-2000" width="5280" height="4800" fill="url(#kEmBg)"/>' +
   '<text x="56" y="62" font-size="24" font-weight="600" class="k-dim">' + H.esc(vm.siteName || 'WattPost') + '</text>' +
   '<text x="1224" y="62" font-size="24" text-anchor="end" class="k-dim k-num">' + H.esc(vm.clock || '') + '</text>' +
   '<path d="M250,300 Q640,-40 1030,300" fill="none" stroke="#2c2118" stroke-width="10" stroke-linecap="round"/>' +
