@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.145-beta.1] - 2026-06-05
+
+Beta — fix device delete button ("couldn't find its transport") + the settings dropdown z-index.
+
 ## [0.1.144-beta.1] - 2026-06-05
 
 Beta — fix the settings section dropdown rendering behind the section content.
