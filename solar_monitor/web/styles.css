@@ -4671,3 +4671,11 @@ html.in-wattpost-app .container {
 .sec-nav-opt.is-active { background: var(--surface-2); color: var(--text); font-weight: 600; }
 .sec-nav-check { width: 14px; color: var(--accent); font-size: .85rem; flex-shrink: 0; }
 .sec-nav-opt-label { flex: 1; }
+
+/* The section dropdown must paint above the section blocks below it.
+   .panel > * pins children to z-index:1, trapping the open menu inside
+   .sec-nav's stacking context so the later .settings-grid sibling paints
+   over it. Raise .sec-nav above its siblings; drop the settings panel's
+   overflow:hidden so a long menu isn't clipped at the panel edge. */
+.placeholder-panel { overflow: visible; }
+.sec-nav { z-index: 20; }
