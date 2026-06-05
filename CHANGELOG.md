@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.146-beta.1] - 2026-06-05
+
+Beta — device cards get per-metric icons + a SoC gauge (Beszel polish).
+
 ## [0.1.145-beta.1] - 2026-06-05
 
 Beta — fix device delete button ("couldn't find its transport") + the settings dropdown z-index.
