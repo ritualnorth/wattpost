@@ -287,7 +287,10 @@ body.is-demo #settings-update-apply { display: none !important; }
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  /* Above .sec-nav (20) and its open menu (30) so the sticky header
+     always clips scrolling settings content rather than being painted
+     over by it. */
+  z-index: 41;
   display: flex;
   /* Brand pushes right via margin-right:auto on .brand below, gives
      us a left-aligned brand with status + help-btn clustered on the
@@ -453,7 +456,9 @@ body.is-demo #settings-update-apply { display: none !important; }
 .app-nav {
   position: sticky;
   top: 56px;  /* below the header */
-  z-index: 9;
+  /* Above .sec-nav (20) + open menu (30); just under .app-header (41)
+     so the tabs stay layered correctly while clipping scroll content. */
+  z-index: 40;
   display: flex;
   gap: 0;
   padding: 0 1.5rem;
