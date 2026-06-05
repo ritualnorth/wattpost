@@ -3751,20 +3751,34 @@ function renderDeviceCards() {
   }
 }
 
+// Which metrics show on the device CARD (the rest are one tap away under
+// "View detail"). Curated + capped per kind so the card stays a tight
+// glance, not a full dump — the bank used to spill 11 rows.
 function headlineKeys(kind, l) {
-  if (kind === "charge_controller") {
-    return [
-      "charging_state", "battery_voltage_v", "battery_current_a",
-      "battery_percentage", "pv_voltage_v", "pv_current_a", "pv_power_w",
-      "energy_today_wh", "energy_total_wh",
-      "controller_temperature_c", "battery_temperature_c",
-      "battery_type", "serial",
-    ];
+  const present = (keys) => keys.filter(k => l[k] !== undefined && l[k] !== null);
+  if (kind === "bank") {
+    const cur = present(["soc_pct", "power_w", "voltage_v", "current_a",
+                         "remaining_ah", "capacity_ah"]);
+    if (cur.length >= 3) return cur;
+  } else if (kind === "charge_controller") {
+    const cur = present(["charging_state", "battery_voltage_v", "battery_current_a",
+                         "battery_percentage", "pv_power_w", "energy_today_wh"]);
+    if (cur.length >= 3) return cur;
+  } else if (kind === "smart_battery") {
+    const cur = present(["soc_pct", "voltage_v", "current_a",
+                         "remaining_charge_ah", "capacity_ah"]);
+    if (cur.length >= 3) return cur;
   }
-  if (kind === "smart_battery") {
-    return ["voltage_v", "current_a", "remaining_charge_ah", "capacity_ah", "serial"];
-  }
-  return Object.keys(l).filter(k => !k.startsWith("_"));
+  // Unknown / sparse kind: show the highest-priority generic metrics, capped.
+  const PRIORITY = ["soc_pct", "power_w", "voltage_v", "current_a", "remaining_ah",
+                    "capacity_ah", "output_power_w", "pv_power_w", "load_w",
+                    "temperature_c", "state", "charging_state"];
+  const keys = Object.keys(l).filter(k => !k.startsWith("_"));
+  keys.sort((a, b) => {
+    const ia = PRIORITY.indexOf(a), ib = PRIORITY.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return keys.slice(0, 6);
 }
 
 // ---------- history chart ----------
