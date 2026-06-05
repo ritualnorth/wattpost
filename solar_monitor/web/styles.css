@@ -4811,3 +4811,40 @@ html.in-wattpost-app .container {
 .dev-card-soc-fill.lvl-ok  { background: var(--green); }
 .dev-card-soc-fill.lvl-mid { background: var(--amber); }
 .dev-card-soc-fill.lvl-low { background: var(--red, #f85149); }
+
+/* ---- Devices: Cards / List view toggle + compact list (Beszel-style) ---- */
+.dev-view-toggle { display: inline-flex; gap: 2px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
+.dv-seg { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 0;
+  cursor: pointer; color: var(--text-2); font: inherit; font-size: .8rem; font-weight: 500;
+  padding: .3rem .6rem; border-radius: 7px; }
+.dv-seg svg { width: 15px; height: 15px; }
+.dv-seg.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-soft); }
+.dv-seg:hover:not(.is-active) { color: var(--text); }
+
+.device-list { display: flex; flex-direction: column; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
+  box-shadow: var(--shadow-soft); }
+.dev-row { display: flex; align-items: center; gap: .65rem; padding: .62rem .8rem;
+  border-top: 1px solid var(--border); color: var(--text); text-decoration: none; }
+.dev-row:first-child { border-top: 0; }
+.dev-row:hover { background: var(--surface-2); }
+.dev-row-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-3); display: inline-flex; }
+.dev-row-ico svg { width: 18px; height: 18px; }
+.dev-row-name { flex: 1; min-width: 0; font-weight: 500; font-size: .9rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dev-row-mid { display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0; }
+.dev-row-soc { width: 56px; height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+.dev-row-soc-fill { height: 100%; border-radius: 99px; }
+.dev-row-soc-fill.lvl-ok  { background: var(--green); }
+.dev-row-soc-fill.lvl-mid { background: var(--amber); }
+.dev-row-soc-fill.lvl-low { background: var(--red, #f85149); }
+.dev-row-pct { font-size: .8rem; color: var(--text-2); font-variant-numeric: tabular-nums;
+  width: 32px; text-align: right; }
+.dev-row-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem;
+  color: var(--text-2); font-family: var(--mono); }
+.dev-row-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+.dev-row-metric { font-family: var(--mono); font-size: .8rem; color: var(--text-2);
+  min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.dev-row-chev { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
+.dev-row-silent { opacity: .55; }

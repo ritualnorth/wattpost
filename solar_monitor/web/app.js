@@ -782,7 +782,7 @@ function applySnapshot(frame) {
   renderWeek();
   renderCells();
   renderSensors();
-  renderDeviceCards();
+  renderDevices();
   populateChartSelectors();
   renderAlerts();
   $("#devices-meta").textContent = lastRun
@@ -3592,6 +3592,88 @@ function _renderSensorCard(dev) {
       ${staleNote}
     </div>
   `;
+}
+
+// Devices page supports two views: rich cards (default) and a compact
+// Beszel-style one-row-per-device list. Choice persists across sessions.
+let deviceView = (() => {
+  try { return localStorage.getItem("wp_device_view") || "cards"; }
+  catch { return "cards"; }
+})();
+
+function renderDevices() {
+  const host = $("#device-cards");
+  if (!host) return;
+  host.className = deviceView === "list" ? "device-list" : "device-cards";
+  renderDeviceViewToggle();
+  if (deviceView === "list") renderDeviceList();
+  else renderDeviceCards();
+}
+
+function renderDeviceViewToggle() {
+  const host = document.getElementById("device-view-toggle");
+  if (!host) return;
+  const opt = (id, label, icon) =>
+    `<button type="button" class="dv-seg ${deviceView === id ? "is-active" : ""}" data-device-view="${id}" title="${label} view" aria-pressed="${deviceView === id}">
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${icon}</svg>
+       <span>${label}</span>
+     </button>`;
+  host.innerHTML =
+    opt("cards", "Cards", '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>') +
+    opt("list", "List", '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>');
+  host.querySelectorAll("[data-device-view]").forEach(b =>
+    b.addEventListener("click", () => {
+      const v = b.dataset.deviceView;
+      if (v === deviceView) return;
+      deviceView = v;
+      try { localStorage.setItem("wp_device_view", v); } catch {}
+      renderDevices();
+    }));
+}
+
+// Primary right-hand metric for a list row: power if present, else voltage.
+function deviceRowMetric(l) {
+  if (l.power_w != null && !isNaN(+l.power_w)) return `${fmt.num(l.power_w)} W`;
+  if (l.pv_power_w != null && !isNaN(+l.pv_power_w)) return `${fmt.num(l.pv_power_w)} W`;
+  if (l.voltage_v != null && !isNaN(+l.voltage_v)) return `${fmt.num(l.voltage_v)} V`;
+  if (l.battery_voltage_v != null && !isNaN(+l.battery_voltage_v)) return `${fmt.num(l.battery_voltage_v)} V`;
+  return "";
+}
+
+function renderDeviceList() {
+  const host = $("#device-cards");
+  host.innerHTML = "";
+  const visible = [...devices].sort((a, b) =>
+    a.kind === "bank" ? -1 : b.kind === "bank" ? 1 : 0);
+  for (const dev of visible) {
+    const l = dev.latest || {};
+    const row = document.createElement("a");
+    row.className = `dev-row kind-${dev.kind}`;
+    row.href = `#/device/${encodeURIComponent(dev.label)}`;
+
+    const socRaw = l.soc_pct ?? l.battery_percentage;
+    const hasSoc = socRaw != null && !isNaN(+socRaw);
+    let mid = "";
+    if (hasSoc) {
+      const pct = Math.max(0, Math.min(100, +socRaw));
+      const lvl = pct < 20 ? "lvl-low" : pct < 40 ? "lvl-mid" : "lvl-ok";
+      mid = `<span class="dev-row-soc"><span class="dev-row-soc-fill ${lvl}" style="width:${pct.toFixed(0)}%"></span></span>
+             <span class="dev-row-pct">${pct.toFixed(0)}%</span>`;
+    } else {
+      const status = l.charging_state || l.mode || l.state || "";
+      if (status) mid = `<span class="dev-row-status"><span class="dev-row-dot"></span>${escHtml(String(status))}</span>`;
+    }
+    const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
+    if (ageS != null && ageS > 60) row.classList.add("dev-row-silent");
+
+    row.innerHTML = `
+      <span class="dev-row-ico">${ICONS[KIND_ICON[dev.kind] || "unknown"] || ICONS.unknown}</span>
+      <span class="dev-row-name">${escHtml(dispName(dev))}</span>
+      <span class="dev-row-mid">${mid}</span>
+      <span class="dev-row-metric">${deviceRowMetric(l)}</span>
+      <svg class="dev-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
+    host.appendChild(row);
+  }
 }
 
 function renderDeviceCards() {
