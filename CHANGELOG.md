@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.143-beta.1] - 2026-06-05
+
+Beta — neater device cards (curated metrics) and Add-device moved to Settings → Devices.
+
 ## [0.1.142-beta.1] - 2026-06-05
 
 Beta — Settings now uses a section dropdown (land on a section, jump between them) instead of the menu drill-down.
