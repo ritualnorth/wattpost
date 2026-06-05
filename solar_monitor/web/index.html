@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=148" />
+  <link rel="stylesheet" href="/web/styles.css?v=149" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -759,73 +759,10 @@
           </h2>
         </div>
 
-        <!-- Sub-page back link, only visible when a sub-route is
-             active (CSS hides .settings-sub-back when
-             body[data-route-sub="menu"]). -->
-        <a href="#/settings" class="settings-sub-back">← Settings</a>
-
-        <!-- Menu landing, only visible when no sub-route is selected.
-             Each row deep-links to a sub-page where the matching
-             settings-blocks render. CSS in body[data-route-sub="menu"]
-             shows this and hides the .settings-grid blocks. -->
-        <nav class="settings-menu" aria-label="Settings sections">
-          <a class="settings-menu-row" href="#/settings/devices">
-            <span class="settings-menu-icon">🔌</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Devices</span>
-              <span class="settings-menu-sub">Scan over Bluetooth · pair Renogy, Victron, JK BMS</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/alerts">
-            <span class="settings-menu-icon">🔔</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Alerts</span>
-              <span class="settings-menu-sub">Threshold rules · transports · solar-aware charger pause</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/backup">
-            <span class="settings-menu-icon">💾</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Backup &amp; restore</span>
-              <span class="settings-menu-sub">Manual + automatic snapshots</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/privacy">
-            <span class="settings-menu-icon">🔐</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Privacy &amp; sharing</span>
-              <span class="settings-menu-sub">Location · web password · discovery telemetry</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/integrations">
-            <span class="settings-menu-icon">🔌</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Integrations</span>
-              <span class="settings-menu-sub">MQTT-out · MQTT-in · Home Assistant + Grafana hooks</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/advanced">
-            <span class="settings-menu-icon">⚙️</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">Advanced</span>
-              <span class="settings-menu-sub">History tiers · poll interval · diagnostics · theme</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-          <a class="settings-menu-row" href="#/settings/about">
-            <span class="settings-menu-icon">ℹ️</span>
-            <span class="settings-menu-body">
-              <span class="settings-menu-title">About</span>
-              <span class="settings-menu-sub">Version · update · session · reset to defaults</span>
-            </span>
-            <span class="settings-menu-chev">›</span>
-          </a>
-        </nav>
+        <!-- Section dropdown: you land on a section (DEFAULT_SETTINGS_SUB)
+             and switch between them here. Populated + wired by
+             renderSettingsNav() in app.js. -->
+        <div id="settings-section-nav" class="sec-nav"></div>
 
         <div class="settings-grid">
           <!-- Session + system actions promoted to the top of the
@@ -1357,6 +1294,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=241"></script>
+  <script src="/web/app.js?v=242"></script>
 </body>
 </html>

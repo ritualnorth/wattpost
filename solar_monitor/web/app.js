@@ -4985,6 +4985,60 @@ const SETTINGS_SUBROUTES = new Set([
   "integrations", "advanced", "about",
 ]);
 
+// Section dropdown (replaces the old menu-landing drill-down). Entering
+// Settings lands on DEFAULT_SETTINGS_SUB; the dropdown jumps between
+// sections. Order + labels + icons live here.
+const SETTINGS_SECTIONS = [
+  { id: "devices",      label: "Devices",            icon: "🔌" },
+  { id: "alerts",       label: "Alerts",             icon: "🔔" },
+  { id: "integrations", label: "Integrations",       icon: "🧩" },
+  { id: "backup",       label: "Backup & restore",   icon: "💾" },
+  { id: "privacy",      label: "Privacy & sharing",  icon: "🔐" },
+  { id: "advanced",     label: "Advanced",           icon: "⚙️" },
+  { id: "about",        label: "About",              icon: "ℹ️" },
+];
+const DEFAULT_SETTINGS_SUB = "devices";
+
+let _secNavOutsideWired = false;
+// Build/refresh the settings section dropdown for the active sub.
+function renderSettingsNav(sub) {
+  const host = document.getElementById("settings-section-nav");
+  if (!host) return;
+  const cur = SETTINGS_SECTIONS.find(s => s.id === sub) || SETTINGS_SECTIONS[0];
+  host.innerHTML = `
+    <button class="sec-nav-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
+      <span class="sec-nav-ico">${cur.icon}</span>
+      <span class="sec-nav-label">${escHtml(cur.label)}</span>
+      <span class="sec-nav-chev" aria-hidden="true">⌄</span>
+    </button>
+    <div class="sec-nav-menu" role="listbox" hidden>
+      ${SETTINGS_SECTIONS.map(s => `
+        <a class="sec-nav-opt ${s.id === cur.id ? "is-active" : ""}" href="#/settings/${s.id}" role="option">
+          <span class="sec-nav-check">${s.id === cur.id ? "✓" : ""}</span>
+          <span class="sec-nav-ico">${s.icon}</span>
+          <span class="sec-nav-opt-label">${escHtml(s.label)}</span>
+        </a>`).join("")}
+    </div>`;
+  const btn = host.querySelector(".sec-nav-btn");
+  const menu = host.querySelector(".sec-nav-menu");
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.hidden = !menu.hidden;
+    btn.setAttribute("aria-expanded", String(!menu.hidden));
+  });
+  // Selecting an option navigates (hash change re-renders this nav closed).
+  menu.querySelectorAll(".sec-nav-opt").forEach(a =>
+    a.addEventListener("click", () => { menu.hidden = true; }));
+  if (!_secNavOutsideWired) {
+    _secNavOutsideWired = true;
+    document.addEventListener("click", (e) => {
+      const h = document.getElementById("settings-section-nav");
+      const m = h && h.querySelector(".sec-nav-menu");
+      if (m && !m.hidden && !h.contains(e.target)) m.hidden = true;
+    });
+  }
+}
+
 function parseRoute() {
   const raw = (window.location.hash || "").replace(/^#\/?/, "").trim();
   const m = raw.match(/^device\/(.+)$/);
@@ -5055,9 +5109,12 @@ function setRoute(_unused) {
     requestAnimationFrame(() => { refreshEnergyOverview(); refreshChart(); refreshHeatmap(); });
   }
   if (route.name === "settings") {
-    // Reflect the sub-route onto the body so CSS can show only the
-    // requested block-group; menu landing renders when sub is null.
-    document.body.dataset.routeSub = route.sub || "menu";
+    // Reflect the sub-route onto the body so CSS shows only that section's
+    // blocks. No sub → land on the default section (the dropdown is the
+    // nav now, not a menu page).
+    const sub = route.sub || DEFAULT_SETTINGS_SUB;
+    document.body.dataset.routeSub = sub;
+    renderSettingsNav(sub);
     renderSettings();
     startDiagTimer();
   } else {
