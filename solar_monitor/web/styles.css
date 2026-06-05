@@ -4679,3 +4679,14 @@ html.in-wattpost-app .container {
    overflow:hidden so a long menu isn't clipped at the panel edge. */
 .placeholder-panel { overflow: visible; }
 .sec-nav { z-index: 20; }
+
+/* ---- Device card: per-metric icons + SoC gauge (Beszel-style) ---- */
+.dev-card-row-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-row-ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); display: flex; }
+.dev-card-row-ico svg { width: 16px; height: 16px; }
+.dev-card-soc { height: 5px; border-radius: 99px; background: var(--surface-3);
+  overflow: hidden; margin: .15rem 0 .7rem; }
+.dev-card-soc-fill { height: 100%; border-radius: 99px; transition: width .3s ease; }
+.dev-card-soc-fill.lvl-ok  { background: var(--green); }
+.dev-card-soc-fill.lvl-mid { background: var(--amber); }
+.dev-card-soc-fill.lvl-low { background: var(--red, #f85149); }

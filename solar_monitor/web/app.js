@@ -3723,21 +3723,39 @@ function renderDeviceCards() {
       });
     }
 
+    // SoC gauge (Beszel-style): a thin coloured fill under the header on
+    // any card that reports state of charge.
+    const socRaw = l.soc_pct ?? l.battery_percentage;
+    if (socRaw != null && !isNaN(+socRaw)) {
+      const pct = Math.max(0, Math.min(100, +socRaw));
+      const lvl = pct < 20 ? "lvl-low" : pct < 40 ? "lvl-mid" : "lvl-ok";
+      const bar = document.createElement("div");
+      bar.className = "dev-card-soc";
+      bar.innerHTML = `<div class="dev-card-soc-fill ${lvl}" style="width:${pct.toFixed(0)}%"></div>`;
+      card.appendChild(bar);
+    }
+
     for (const k of headlineKeys(dev.kind, l)) {
       const v = l[k];
       if (v === undefined || v === null) continue;
       const row = document.createElement("div");
       row.className = "dev-card-row";
+      const left = document.createElement("span");
+      left.className = "dev-card-row-left";
+      const ico = document.createElement("span");
+      ico.className = "dev-card-row-ico";
+      ico.innerHTML = metricIcon(k);
       const ke = document.createElement("span");
       ke.className = "k";
       ke.textContent = prettyKey(k);
+      left.append(ico, ke);
       const ve = document.createElement("span");
       ve.className = "v";
       const unit = unitFromKey(k);
       ve.textContent = typeof v === "number"
         ? `${fmt.num(v)}${unit ? " " + unit : ""}`
         : String(v);
-      row.append(ke, ve);
+      row.append(left, ve);
       card.appendChild(row);
     }
 
@@ -3749,6 +3767,28 @@ function renderDeviceCards() {
 
     host.appendChild(card);
   }
+}
+
+// A small line icon per metric (Beszel-style), keyed loosely off the
+// metric name. Muted by CSS so it reads as a quiet glyph, not clutter.
+function metricIcon(k) {
+  const m = (k || "").toLowerCase();
+  const I = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  if (/soc|percent|remaining|capacity|charge_ah|^bank/.test(m))
+    return I('<rect x="2" y="7" width="16" height="10" rx="2"/><line x1="22" y1="11" x2="22" y2="13"/>');
+  if (/pv|solar|irradiance/.test(m))
+    return I('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/>');
+  if (/power|energy|watt|_w$|_wh$/.test(m))
+    return I('<path d="M13 2 3 14h8l-2 8 10-12h-8l2-8z"/>');
+  if (/volt|_v$/.test(m))
+    return I('<path d="M9 2v6M15 2v6M5 8h14v3a7 7 0 0 1-14 0V8zM12 18v4"/>');
+  if (/current|amp|_a$/.test(m))
+    return I('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
+  if (/temp/.test(m))
+    return I('<path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4 4 0 1 0 5 0z"/>');
+  if (/state|status|mode|type|serial|drift|pack/.test(m))
+    return I('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>');
+  return I('<circle cx="12" cy="12" r="3"/>');
 }
 
 // Which metrics show on the device CARD (the rest are one tap away under
