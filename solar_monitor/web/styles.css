@@ -4699,7 +4699,7 @@ html.in-wattpost-app .container {
 .ar-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
   border-radius: 8px; padding: .5rem .9rem; font: inherit; font-size: .88rem; font-weight: 500; cursor: pointer; }
 .ar-btn:hover { border-color: var(--border-2); }
-.ar-btn--primary { background: var(--accent); border-color: var(--accent); color: #0a0d12; }
+.ar-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .ar-btn--primary:hover { filter: brightness(1.08); }
 .ar-form .alerts-form-status { font-size: .8rem; color: var(--text-3); }
 .ar-form .alerts-form-status.err { color: var(--red, #f85149); }
