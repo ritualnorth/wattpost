@@ -1,21 +1,33 @@
 /* solar-monitor, design tokens & layout
  * Dark by default (off-grid users live in dim places). Grid-organised,
  * generous spacing. Inspired by Cerbo GX overview + Sol-Ark flow + Solar-Assistant.
+ * Theme palette ported from Beszel (henrygd/beszel, shadcn tokens): warm
+ * neutral light, cool neutral dark, Inter, 0.8rem-scale radius — WattPost
+ * blue accent retained.
  */
 
-:root {
-  /* Surfaces */
-  --bg:        #0a0d12;
-  --surface:   #131820;
-  --surface-2: #1b212c;
-  --surface-3: #232a37;
-  --border:    #2a3343;
-  --border-2:  #3a4458;
+/* Inter (variable) — self-hosted for local-first; no CDN at runtime. */
+@font-face {
+  font-family: "InterVariable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/web/InterVariable.woff2") format("woff2");
+}
 
-  /* Text */
-  --text:      #e6edf3;
-  --text-2:    #9aa6b8;
-  --text-3:    #6b7689;
+:root {
+  /* Surfaces — Beszel .dark (cool neutral, hue 220) */
+  --bg:        hsl(220 5.5% 9%);
+  --surface:   hsl(220 5.5% 10.5%);
+  --surface-2: hsl(220 4% 16%);
+  --surface-3: hsl(220 4% 22%);
+  --border:    hsl(220 3% 17%);
+  --border-2:  hsl(220 4% 22%);
+
+  /* Text — Beszel .dark */
+  --text:      hsl(220 2% 97%);
+  --text-2:    hsl(220 4% 67%);
+  --text-3:    hsl(220 4% 50%);
 
   /* Source/storage/load colors, match Cerbo GX vocabulary */
   --pv:        #f0b429;   /* yellow = solar/PV */
@@ -42,12 +54,12 @@
   --sky:       #79c0ff;
   --violet:    #a371f7;
 
-  /* Radii / shadow */
-  --r-sm: 4px;
-  --r:    8px;
-  --r-lg: 14px;
-  --shadow: 0 2px 16px rgba(0,0,0,0.4);
-  --shadow-soft: 0 1px 4px rgba(0,0,0,0.3);
+  /* Radii / shadow — Beszel 0.8rem-scale + softer elevation */
+  --r-sm: 8px;
+  --r:    11px;
+  --r-lg: 13px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.14);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.14);
 
   /* Theme-variable surfaces, overridden in [data-theme="light"] below. */
   --header-bg:      rgba(13,17,23,0.85);
@@ -63,8 +75,8 @@
   --donut-pulse-charging-glow:    rgba(63,185,80,0.85);
   --donut-pulse-discharging-glow: rgba(210,153,34,0.85);
 
-  /* Type */
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", sans-serif;
+  /* Type — Inter (bundled), Beszel's UI face */
+  --font: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -74,16 +86,17 @@
  * from :root.
  */
 [data-theme="light"] {
-  --bg:        #f4f6fa;
-  --surface:   #ffffff;
-  --surface-2: #eef1f6;
-  --surface-3: #e1e6ee;
-  --border:    #d6dbe4;
-  --border-2:  #c2c9d5;
+  /* Surfaces/text/borders — Beszel :root (warm neutral, hue 30) */
+  --bg:        hsl(30 8% 98%);
+  --surface:   hsl(30 0% 100%);
+  --surface-2: hsl(240 4.76% 95.88%);
+  --surface-3: hsl(26 6% 94%);
+  --border:    hsl(30 8.11% 85.49%);
+  --border-2:  hsl(30 4.29% 72.55%);
 
-  --text:      #11161f;
-  --text-2:    #4d5868;
-  --text-3:    #7a8595;
+  --text:      hsl(30 0% 10%);
+  --text-2:    hsl(24 2.79% 35.1%);
+  --text-3:    hsl(30 3.97% 49.41%);
 
   /* Source/storage/load colors, deepen slightly so they read on white */
   --pv:        #b87800;
@@ -109,8 +122,8 @@
   --sky:       #2a6fc4;
   --violet:    #6f42c1;
 
-  --shadow:        0 2px 16px rgba(15,23,42,0.10);
-  --shadow-soft:   0 1px 4px rgba(15,23,42,0.06);
+  --shadow:        0 1px 3px rgba(20,20,30,0.08), 0 1px 2px rgba(20,20,30,0.05);
+  --shadow-soft:   0 1px 2px rgba(20,20,30,0.06);
 
   --header-bg:        rgba(255,255,255,0.85);
   --card-highlight:   linear-gradient(135deg, rgba(15,23,42,0.025), rgba(15,23,42,0) 60%);
@@ -2980,15 +2993,16 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: .9rem 1rem 1rem;
+  padding: 1.05rem 1.15rem 1.15rem;   /* airier, Beszel-style */
+  box-shadow: var(--shadow-soft);
 }
 .settings-block h3 {
   margin: 0 0 .55rem;
-  font-size: .78rem;
+  font-size: 1.02rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 .settings-row {
   display: flex; justify-content: space-between;
@@ -3770,11 +3784,11 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .alerts-sub-head:first-child { margin-top: 0; }
 .alerts-sub-head h4 {
   margin: 0;
-  font-size: .82rem;
+  font-size: .92rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--text-2);
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 .alerts-add-btn {
   font: inherit; font-size: .8rem; font-weight: 500;
@@ -4763,7 +4777,10 @@ html.in-wattpost-app .container {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: .75rem .85rem; color: var(--text); font: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
 .sec-nav-btn:hover { border-color: var(--border-2); }
-.sec-nav-ico { font-size: 1.05rem; line-height: 1; }
+.sec-nav-ico { display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; color: var(--text-2); flex-shrink: 0; }
+.sec-nav-ico svg { width: 17px; height: 17px; }
+.sec-nav-opt.is-active .sec-nav-ico { color: var(--accent); }
 .sec-nav-label { flex: 1; text-align: left; }
 .sec-nav-chev { color: var(--text-3); font-size: 1.1rem; }
 .sec-nav-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;

@@ -5042,14 +5042,15 @@ const SETTINGS_SUBROUTES = new Set([
 // Section dropdown (replaces the old menu-landing drill-down). Entering
 // Settings lands on DEFAULT_SETTINGS_SUB; the dropdown jumps between
 // sections. Order + labels + icons live here.
+// icon = key into _ICO (lucide line icons), rendered via _ico() at draw time.
 const SETTINGS_SECTIONS = [
-  { id: "devices",      label: "Devices",            icon: "🔌" },
-  { id: "alerts",       label: "Alerts",             icon: "🔔" },
-  { id: "integrations", label: "Integrations",       icon: "🧩" },
-  { id: "backup",       label: "Backup & restore",   icon: "💾" },
-  { id: "privacy",      label: "Privacy & sharing",  icon: "🔐" },
-  { id: "advanced",     label: "Advanced",           icon: "⚙️" },
-  { id: "about",        label: "About",              icon: "ℹ️" },
+  { id: "devices",      label: "Devices",            icon: "plug" },
+  { id: "alerts",       label: "Alerts",             icon: "bell" },
+  { id: "integrations", label: "Integrations",       icon: "puzzle" },
+  { id: "backup",       label: "Backup & restore",   icon: "drive" },
+  { id: "privacy",      label: "Privacy & sharing",  icon: "lock" },
+  { id: "advanced",     label: "Advanced",           icon: "sliders" },
+  { id: "about",        label: "About",              icon: "info" },
 ];
 const DEFAULT_SETTINGS_SUB = "devices";
 
@@ -5061,7 +5062,7 @@ function renderSettingsNav(sub) {
   const cur = SETTINGS_SECTIONS.find(s => s.id === sub) || SETTINGS_SECTIONS[0];
   host.innerHTML = `
     <button class="sec-nav-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
-      <span class="sec-nav-ico">${cur.icon}</span>
+      <span class="sec-nav-ico">${_ico(cur.icon)}</span>
       <span class="sec-nav-label">${escHtml(cur.label)}</span>
       <span class="sec-nav-chev" aria-hidden="true">⌄</span>
     </button>
@@ -5069,7 +5070,7 @@ function renderSettingsNav(sub) {
       ${SETTINGS_SECTIONS.map(s => `
         <a class="sec-nav-opt ${s.id === cur.id ? "is-active" : ""}" href="#/settings/${s.id}" role="option">
           <span class="sec-nav-check">${s.id === cur.id ? "✓" : ""}</span>
-          <span class="sec-nav-ico">${s.icon}</span>
+          <span class="sec-nav-ico">${_ico(s.icon)}</span>
           <span class="sec-nav-opt-label">${escHtml(s.label)}</span>
         </a>`).join("")}
     </div>`;
@@ -7397,6 +7398,14 @@ const _ICO = {
   sun:   `<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`,
   cloud: `<path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/>`,
   graph: `<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>`,
+  // lucide icons for the settings section nav (replacing emoji)
+  plug:  `<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>`,
+  bell:  `<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>`,
+  puzzle:`<path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 19.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682"/><path d="M2.61 8.61a2.414 2.414 0 0 0 0 3.414L4.293 13.7a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682"/>`,
+  drive: `<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>`,
+  lock:  `<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>`,
+  sliders:`<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>`,
+  info:  `<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>`,
 };
 function _ico(name) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${_ICO[name] || _ICO.send}</svg>`;
