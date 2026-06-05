@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=163" />
+  <link rel="stylesheet" href="/web/styles.css?v=164" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
        pin as the cloud Fleet map. Defer-loaded so it doesn't block
        paint of the hero. -->
@@ -747,20 +747,26 @@
          ROUTE: Settings (placeholder)
          ===================================================== -->
     <section class="route" data-route="settings">
-      <section class="panel placeholder-panel">
-        <div class="panel-header">
-          <h2>
-            <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
-            </svg>
-            Settings
-          </h2>
+      <div class="settings-wrap">
+        <!-- Settings landing = a menu list (cloud-style). #/settings shows
+             this; #/settings/<sub> shows the focused section view below.
+             Built + wired by renderSettingsMenu() in app.js. -->
+        <div id="settings-menu">
+          <h2 class="set-page-title">Settings</h2>
+          <div id="settings-menu-list" class="set-menu"></div>
         </div>
 
-        <!-- Section dropdown: you land on a section (DEFAULT_SETTINGS_SUB)
-             and switch between them here. Populated + wired by
-             renderSettingsNav() in app.js. -->
-        <div id="settings-section-nav" class="sec-nav"></div>
+        <!-- Focused section view: back link + heading + the section's cards
+             (the existing .settings-grid, now a single centred column). -->
+        <div id="settings-section" hidden>
+          <a class="set-back" href="#/settings" aria-label="Back to Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            Settings
+          </a>
+          <div class="set-section-head">
+            <h2 id="settings-section-title"></h2>
+            <p id="settings-section-sub" class="set-section-sub"></p>
+          </div>
 
         <div class="settings-grid">
           <!-- Session + system actions promoted to the top of the
@@ -1253,7 +1259,8 @@
             </div>
           </div>
         </div>
-      </section>
+        </div>
+      </div>
     </section>
 
     <!-- =====================================================
@@ -1295,6 +1302,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=250"></script>
+  <script src="/web/app.js?v=251"></script>
 </body>
 </html>

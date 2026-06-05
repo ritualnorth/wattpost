@@ -5173,17 +5173,34 @@ const SETTINGS_SUBROUTES = new Set([
 // sections. Order + labels + icons live here.
 // icon = key into _ICO (lucide line icons), rendered via _ico() at draw time.
 const SETTINGS_SECTIONS = [
-  { id: "devices",      label: "Devices",            icon: "plug" },
-  { id: "alerts",       label: "Alerts",             icon: "bell" },
-  { id: "integrations", label: "Integrations",       icon: "puzzle" },
-  { id: "backup",       label: "Backup & restore",   icon: "drive" },
-  { id: "privacy",      label: "Privacy & sharing",  icon: "lock" },
-  { id: "advanced",     label: "Advanced",           icon: "sliders" },
-  { id: "about",        label: "About",              icon: "info" },
+  { id: "devices",      label: "Devices",            icon: "plug",    sub: "Pair Renogy/Victron/BMS gear" },
+  { id: "alerts",       label: "Alerts",             icon: "bell",    sub: "Rules, transports, quiet hours" },
+  { id: "integrations", label: "Integrations",       icon: "puzzle",  sub: "Solcast, weather, MQTT, cloud" },
+  { id: "backup",       label: "Backup & restore",   icon: "drive",   sub: "Download, restore, schedule" },
+  { id: "privacy",      label: "Privacy & sharing",  icon: "lock",    sub: "Web password, location, telemetry" },
+  { id: "advanced",     label: "Advanced",           icon: "sliders", sub: "Appearance, polling, hotspot, logs" },
+  { id: "about",        label: "About",              icon: "info",    sub: "Version, updates, reset" },
 ];
 const DEFAULT_SETTINGS_SUB = "devices";
 
 let _secNavOutsideWired = false;
+
+// Settings landing menu (cloud-style): a list of section rows, each
+// linking to its focused #/settings/<sub> view.
+function renderSettingsMenu() {
+  const host = document.getElementById("settings-menu-list");
+  if (!host) return;
+  host.innerHTML = SETTINGS_SECTIONS.map(s => `
+    <a class="set-menu-row" href="#/settings/${s.id}">
+      <span class="set-menu-icon">${_ico(s.icon)}</span>
+      <span class="set-menu-body">
+        <span class="set-menu-title">${escHtml(s.label)}</span>
+        <span class="set-menu-sub">${escHtml(s.sub || "")}</span>
+      </span>
+      <svg class="set-menu-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+    </a>`).join("");
+}
+
 // Build/refresh the settings section dropdown for the active sub.
 function renderSettingsNav(sub) {
   const host = document.getElementById("settings-section-nav");
@@ -5293,14 +5310,28 @@ function setRoute(_unused) {
     requestAnimationFrame(() => { refreshEnergyOverview(); refreshChart(); refreshHeatmap(); });
   }
   if (route.name === "settings") {
-    // Reflect the sub-route onto the body so CSS shows only that section's
-    // blocks. No sub → land on the default section (the dropdown is the
-    // nav now, not a menu page).
-    const sub = route.sub || DEFAULT_SETTINGS_SUB;
-    document.body.dataset.routeSub = sub;
-    renderSettingsNav(sub);
-    renderSettings();
-    startDiagTimer();
+    // Cloud-style: #/settings shows a menu list; #/settings/<sub> opens a
+    // focused section view (back link + heading + that section's cards).
+    const menu = document.getElementById("settings-menu");
+    const section = document.getElementById("settings-section");
+    if (!route.sub) {
+      delete document.body.dataset.routeSub;
+      if (menu) menu.hidden = false;
+      if (section) section.hidden = true;
+      renderSettingsMenu();
+      stopDiagTimer();
+    } else {
+      document.body.dataset.routeSub = route.sub;
+      if (menu) menu.hidden = true;
+      if (section) section.hidden = false;
+      const meta = SETTINGS_SECTIONS.find(s => s.id === route.sub) || SETTINGS_SECTIONS[0];
+      const t = document.getElementById("settings-section-title");
+      const su = document.getElementById("settings-section-sub");
+      if (t) t.textContent = meta.label;
+      if (su) su.textContent = meta.sub || "";
+      renderSettings();
+      startDiagTimer();
+    }
   } else {
     delete document.body.dataset.routeSub;
     stopDiagTimer();
