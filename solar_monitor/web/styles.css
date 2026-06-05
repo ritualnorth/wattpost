@@ -4689,6 +4689,51 @@ html.in-wattpost-app .container {
 /* Form action buttons → .ar-btn proportions (the colours already match). */
 .alerts-form-actions .btn-action { border-radius: 8px; padding: .5rem .9rem; }
 
+/* ---- Inline key/value editors adopt the card idiom too ----
+   History & polling, Solar-aware charger pause and the WiFi hotspot are
+   always-open row forms (.hist-form / .sp-form), not pop-up editors. Give
+   each the same grouped-card surface the .ar-card lists use — same
+   surface/border/radius as .ar-card, the same surface-2 inset inputs as
+   .ar-field — and divide the rows so it reads as one tidy settings list
+   inside its section panel. */
+.hist-form, .sp-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 0 .9rem;
+  gap: 0;
+}
+.hist-form > .hist-row,
+.sp-form  > .hist-row {
+  padding: .72rem 0;
+  border-top: 1px solid var(--border);
+}
+.hist-form > .hist-row:first-child,
+.sp-form  > .hist-row:first-child { border-top: 0; }
+/* The actions row and any trailing read-only status rows sit in the same
+   card, separated by a divider rather than floating loose. */
+.hist-form > .hist-actions,
+.sp-form  > .hist-actions {
+  margin-top: 0;
+  padding: .72rem 0;
+  border-top: 1px solid var(--border);
+}
+.sp-form > .settings-row { padding: .55rem 0; border-top: 1px solid var(--border); }
+/* Inputs/selects match .ar-field exactly (surface-2 inset, 8px, accent
+   focus). Numeric width + alignment from the base rules are preserved;
+   checkboxes are excluded so they don't stretch to the field width. */
+.hist-input input:not([type="checkbox"]),
+.hist-input select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .42rem .55rem;
+}
+.hist-input input:not([type="checkbox"]):focus,
+.hist-input select:focus { outline: none; border-color: var(--accent); }
+.hist-input input[type="checkbox"] { width: 18px; height: 18px; }
+.hist-row > span:first-child { color: var(--text-2); }
+
 /* ---- Shared settings-card extensions ----
    .ar-card is the canonical card for every list item in Settings —
    alert rules, transports, quiet hours, integrations. These helpers
