@@ -4848,9 +4848,48 @@ html.in-wattpost-app .container {
 .dv-seg.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-soft); }
 .dv-seg:hover:not(.is-active) { color: var(--text); }
 
-.device-list { display: flex; flex-direction: column; background: var(--surface);
+.device-list { background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--r); overflow: hidden;
   box-shadow: var(--shadow-soft); }
+
+/* ---- Device list = real columned table (Beszel systems-table style) ---- */
+.dev-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.dev-table thead th {
+  text-align: left; font-size: .7rem; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  padding: .55rem .85rem; border-bottom: 1px solid var(--border); background: var(--surface-2);
+}
+.dev-table th.dt-num, .dev-table td.dt-num { text-align: right; font-variant-numeric: tabular-nums; }
+.dev-table th.dt-chev, .dev-table td.dt-chev { width: 30px; text-align: right; }
+.dev-table tbody tr { border-top: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+.dev-table tbody tr:hover { background: var(--surface-2); }
+.dev-table tbody tr.dev-row-silent { opacity: .5; }
+.dev-table td { padding: .62rem .85rem; color: var(--text); vertical-align: middle; white-space: nowrap; }
+.dev-table td.dt-name { font-weight: 500; }
+.dev-table td.dt-name .dev-row-ico { vertical-align: middle; margin-right: .5rem; }
+.dev-table td.dt-name .dev-row-ico svg { width: 17px; height: 17px; }
+.dt-soc-wrap { display: inline-flex; align-items: center; gap: .5rem; }
+.dt-soc-pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: .82rem; min-width: 30px; }
+.dt-u { color: var(--text-3); }
+.dt-na { color: var(--text-3); }
+.dev-table .dt-chev svg { width: 15px; height: 15px; color: var(--text-3); vertical-align: middle; }
+/* On narrow screens drop the secondary columns + chevron (the whole row
+   is tappable). table-layout:fixed + explicit widths guarantees the three
+   remaining columns (Device, SoC, Power) fit the card instead of the
+   nowrap content forcing an overflow that gets clipped. */
+@media (max-width: 680px) {
+  .dev-table .dt-sec, .dev-table .dt-chev { display: none; }
+  .dev-table { table-layout: fixed; }
+  .dev-table th, .dev-table td { padding: .55rem .55rem; overflow: hidden; }
+  .dev-table .dt-name { width: 46%; }
+  .dev-table .dt-soc  { width: 30%; }
+  .dev-table .dt-num  { width: 24%; }
+  .dev-table td.dt-name > span:last-child {
+    display: inline-block; max-width: 100%; overflow: hidden;
+    text-overflow: ellipsis; vertical-align: middle;
+  }
+  .dev-table .dev-row-soc { width: 40px; }
+}
 .dev-row { display: flex; align-items: center; gap: .65rem; padding: .62rem .8rem;
   border-top: 1px solid var(--border); color: var(--text); text-decoration: none; }
 .dev-row:first-child { border-top: 0; }

@@ -3640,49 +3640,87 @@ function renderDeviceViewToggle() {
     }));
 }
 
-// Primary right-hand metric for a list row: power if present, else voltage.
-function deviceRowMetric(l) {
-  if (l.power_w != null && !isNaN(+l.power_w)) return `${fmt.num(l.power_w)} W`;
-  if (l.pv_power_w != null && !isNaN(+l.pv_power_w)) return `${fmt.num(l.pv_power_w)} W`;
-  if (l.voltage_v != null && !isNaN(+l.voltage_v)) return `${fmt.num(l.voltage_v)} V`;
-  if (l.battery_voltage_v != null && !isNaN(+l.battery_voltage_v)) return `${fmt.num(l.battery_voltage_v)} V`;
-  return "";
+// Per-column accessors that normalise the differing field names across
+// device kinds (bank/smart_battery/charge_controller/ac_charger) so the
+// list table can show real columns. Smart batteries don't report soc_pct
+// or power_w directly, so derive them (SoC from remaining/capacity, power
+// from V×I) rather than leaving the columns blank.
+function devSoc(l) {
+  let s = l.soc_pct ?? l.battery_percentage;
+  if ((s == null || isNaN(+s)) && l.remaining_charge_ah != null && +l.capacity_ah)
+    s = (+l.remaining_charge_ah / +l.capacity_ah) * 100;
+  if ((s == null || isNaN(+s)) && l.remaining_ah != null && +l.capacity_ah)
+    s = (+l.remaining_ah / +l.capacity_ah) * 100;
+  return (s == null || isNaN(+s)) ? null : Math.max(0, Math.min(100, +s));
 }
+function devVolt(l) {
+  const v = l.voltage_v ?? l.battery_voltage_v;
+  return (v == null || isNaN(+v)) ? null : +v;
+}
+function devCurr(l) {
+  const a = l.current_a ?? l.battery_current_a;
+  return (a == null || isNaN(+a)) ? null : +a;
+}
+function devPower(l) {
+  if (l.power_w != null && !isNaN(+l.power_w)) return +l.power_w;
+  if (l.pv_power_w != null && !isNaN(+l.pv_power_w)) return +l.pv_power_w;
+  const v = devVolt(l), a = devCurr(l);
+  if (v != null && a != null) return v * a;
+  return null;
+}
+function devStatus(l) { return l.charging_state || l.mode || l.state || null; }
 
 function renderDeviceList() {
   const host = $("#device-cards");
-  host.innerHTML = "";
   const visible = [...devices].sort((a, b) =>
     a.kind === "bank" ? -1 : b.kind === "bank" ? 1 : 0);
-  for (const dev of visible) {
+
+  const numCell = (v, unit, cls = "") =>
+    `<td class="dt-num ${cls}">${v == null ? '<span class="dt-na">—</span>' : `${fmt.num(v)}<span class="dt-u">${unit}</span>`}</td>`;
+
+  const rows = visible.map(dev => {
     const l = dev.latest || {};
-    const row = document.createElement("a");
-    row.className = `dev-row kind-${dev.kind}`;
-    row.href = `#/device/${encodeURIComponent(dev.label)}`;
-
-    const socRaw = l.soc_pct ?? l.battery_percentage;
-    const hasSoc = socRaw != null && !isNaN(+socRaw);
-    let mid = "";
-    if (hasSoc) {
-      const pct = Math.max(0, Math.min(100, +socRaw));
-      const lvl = pct < 20 ? "lvl-low" : pct < 40 ? "lvl-mid" : "lvl-ok";
-      mid = `<span class="dev-row-soc"><span class="dev-row-soc-fill ${lvl}" style="width:${pct.toFixed(0)}%"></span></span>
-             <span class="dev-row-pct">${pct.toFixed(0)}%</span>`;
-    } else {
-      const status = l.charging_state || l.mode || l.state || "";
-      if (status) mid = `<span class="dev-row-status"><span class="dev-row-dot"></span>${escHtml(String(status))}</span>`;
-    }
+    const soc = devSoc(l);
+    const status = devStatus(l);
     const ageS = (typeof l.advertisement_age_s === "number") ? l.advertisement_age_s : null;
-    if (ageS != null && ageS > 60) row.classList.add("dev-row-silent");
+    const silent = ageS != null && ageS > 60;
+    let socCell = `<td class="dt-soc"><span class="dt-na">—</span></td>`;
+    if (soc != null) {
+      const lvl = soc < 20 ? "lvl-low" : soc < 40 ? "lvl-mid" : "lvl-ok";
+      socCell = `<td class="dt-soc"><span class="dt-soc-wrap">
+        <span class="dev-row-soc"><span class="dev-row-soc-fill ${lvl}" style="width:${soc.toFixed(0)}%"></span></span>
+        <span class="dt-soc-pct">${soc.toFixed(0)}%</span></span></td>`;
+    }
+    const statusCell = status
+      ? `<td class="dt-status dt-sec"><span class="dev-row-status"><span class="dev-row-dot"></span>${escHtml(String(status))}</span></td>`
+      : `<td class="dt-status dt-sec"><span class="dt-na">—</span></td>`;
+    return `<tr data-dev="${escHtml(dev.label)}" class="${silent ? "dev-row-silent" : ""}">
+      <td class="dt-name"><span class="dev-row-ico">${ICONS[KIND_ICON[dev.kind] || "unknown"] || ICONS.unknown}</span><span>${escHtml(dispName(dev))}</span></td>
+      ${socCell}
+      ${numCell(devPower(l), " W")}
+      ${numCell(devVolt(l), " V", "dt-sec")}
+      ${numCell(devCurr(l), " A", "dt-sec")}
+      ${statusCell}
+      <td class="dt-chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></td>
+    </tr>`;
+  }).join("");
 
-    row.innerHTML = `
-      <span class="dev-row-ico">${ICONS[KIND_ICON[dev.kind] || "unknown"] || ICONS.unknown}</span>
-      <span class="dev-row-name">${escHtml(dispName(dev))}</span>
-      <span class="dev-row-mid">${mid}</span>
-      <span class="dev-row-metric">${deviceRowMetric(l)}</span>
-      <svg class="dev-row-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>`;
-    host.appendChild(row);
-  }
+  host.innerHTML = `<table class="dev-table">
+    <thead><tr>
+      <th class="dt-name">Device</th>
+      <th class="dt-soc">SoC</th>
+      <th class="dt-num">Power</th>
+      <th class="dt-num dt-sec">Voltage</th>
+      <th class="dt-num dt-sec">Current</th>
+      <th class="dt-status dt-sec">Status</th>
+      <th class="dt-chev"></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  host.querySelectorAll("tr[data-dev]").forEach(tr =>
+    tr.addEventListener("click", () => {
+      location.hash = `#/device/${encodeURIComponent(tr.dataset.dev)}`;
+    }));
 }
 
 function renderDeviceCards() {
