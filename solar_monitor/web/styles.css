@@ -2541,7 +2541,12 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 
 /* Integrations panel (Settings → Integrations) */
 .integrations-block {
-  display: flex; flex-direction: column; gap: .55rem;
+  /* Tile cards across the full-width block on desktop; collapses to a
+     single column on mobile (minmax floor). */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: .7rem;
+  align-items: start;
 }
 .integration-row {
   display: flex; align-items: center; gap: .75rem;
@@ -2906,24 +2911,22 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 
 /* ---------------- settings page ---------------- */
 .settings-grid {
-  /* Flex-wrap + centre so a single-block subsection (Integrations,
-     Backup) sits as a centred column instead of one card pinned far
-     left with a sea of empty grid columns beside it. Multi-block
-     subsections (Privacy, Advanced) tile and centre. */
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
+  /* Fill the width like Beszel. auto-FIT (not auto-fill) collapses
+     empty tracks, so a single-block subsection (Integrations, Backup,
+     Devices) stretches to fill the row instead of leaving a card pinned
+     left beside empty columns. Multi-block subsections tile across. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 1rem;
-  max-width: 1180px;
   margin: .5rem auto 0;
+  max-width: 1300px;
 }
-.settings-grid > .settings-block { flex: 1 1 300px; max-width: 460px; }
-/* Wide blocks: rule list / log / danger get a readable centred column,
-   not the full 1180px. */
-.settings-block--alerts { flex-basis: 100%; max-width: 720px; }
+/* Blocks whose content is one wide stack (rule list, log, danger,
+   backup) take the full row. */
+.settings-block--alerts,
 .settings-block--diagnostics,
-.settings-block--danger { flex-basis: 100%; max-width: 100%; }
+.settings-block--danger,
+.settings-block--backup { grid-column: 1 / -1; }
 
 /* ───── Settings sub-page navigation (#328) ─────────────────────
    Menu landing on /#/settings; sub-pages on /#/settings/<section>.
@@ -3639,10 +3642,20 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 /* ---------------- settings → alerts ---------------- */
 .settings-block--alerts { grid-column: 1 / -1; }
 .alerts-list {
-  display: flex; flex-direction: column;
-  gap: .55rem;
+  /* Tile rule/transport/quiet cards across the full-width Alerts block
+     on desktop; sub-heads, templates, foot text and the open edit form
+     span the full row. Collapses to one column on mobile. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: .7rem;
+  align-items: start;
   margin-top: .25rem;
 }
+.alerts-list > .alerts-sub-head,
+.alerts-list > .alerts-templates,
+.alerts-list > .settings-foot,
+.alerts-list > .settings-empty,
+.alerts-list > .ar-card--edit { grid-column: 1 / -1; }
 .alerts-row {
   display: flex; align-items: center; justify-content: space-between;
   gap: .75rem;

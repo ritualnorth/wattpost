@@ -81,6 +81,15 @@ class BackupService:
             log.info("backup service: disabled in config; not starting loop")
             return
         self.backup_dir.mkdir(parents=True, exist_ok=True)
+        # Recover last-run state from the newest snapshot on disk. last_run_ts
+        # is otherwise in-memory only, so every daemon restart reported
+        # "Last run: never" even when backups had been running for days. Mirror
+        # next_run_ts()'s anchor (newest auto-snapshot mtime).
+        if self.last_run_ts is None:
+            snaps = list_auto_snapshots(self.backup_dir)
+            if snaps:
+                self.last_run_ts = int(snaps[-1].stat().st_mtime)
+                self.last_run_path = snaps[-1]
         self._stop.clear()
         self._task = asyncio.create_task(self._loop(), name="backup-scheduler")
         log.info(

@@ -214,6 +214,25 @@ def do_update(version: str | None = None) -> tuple[bool, str]:
             log.error("update: up failed rc=%d: %s", up.returncode, tail)
             return False, f"up failed: {tail}"
         log.info("update: done")
+        # Reclaim the now-dangling previous image so repeated updates don't
+        # fill the disk. The daemon container can't do this (no docker
+        # socket), so the updater sidecar prunes here — the follow-up
+        # flagged in disk_cleanup.py. Dangling-only (-f without -a) removes
+        # exactly the orphaned old image, never tagged or in-use ones.
+        # Best-effort: an otherwise-successful update must not fail on cleanup.
+        try:
+            pr = subprocess.run(
+                ["docker", "image", "prune", "-f"],
+                capture_output=True, text=True, timeout=120,
+            )
+            if pr.returncode == 0:
+                log.info("update: pruned dangling images: %s",
+                         (pr.stdout or "").strip().splitlines()[-1:] or "none")
+            else:
+                log.warning("update: image prune rc=%d: %s",
+                            pr.returncode, (pr.stderr or pr.stdout)[-200:])
+        except (subprocess.SubprocessError, OSError) as e:
+            log.warning("update: image prune skipped: %s", e)
         return True, "ok"
     finally:
         _lock.release()
