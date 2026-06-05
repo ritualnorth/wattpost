@@ -263,6 +263,15 @@ const fmt = {
     if (s < 3600) return Math.floor(s / 60) + "m ago";
     return Math.floor(s / 3600) + "h ago";
   },
+  // Future-aware relative time: "in 2h" for upcoming, "5m ago" for past.
+  // ago() assumes the past and prints "-61828s ago" for a future ts.
+  rel(unixTs) {
+    const d = unixTs - Math.floor(Date.now() / 1000);
+    const a = Math.abs(d);
+    const part = a < 60 ? `${a}s` : a < 3600 ? `${Math.floor(a / 60)}m`
+               : a < 86400 ? `${Math.floor(a / 3600)}h` : `${Math.floor(a / 86400)}d`;
+    return d >= 0 ? `in ${part}` : `${part} ago`;
+  },
   duration(hours) {
     if (hours == null || !isFinite(hours)) return "·";
     if (hours < 1)   return Math.round(hours * 60) + " m";
@@ -5986,7 +5995,7 @@ async function refreshBackupSchedule() {
     list.innerHTML = `<div class="settings-empty">No snapshots.</div>`;
     return;
   }
-  const next = s.next_run_ts ? fmt.ago(s.next_run_ts) : "·";
+  const next = s.next_run_ts ? fmt.rel(s.next_run_ts) : "·";
   const last = s.last_run_ts ? fmt.ago(s.last_run_ts) : "never";
   const intervalH = s.interval_hours;
   const intervalLabel = intervalH % 24 === 0

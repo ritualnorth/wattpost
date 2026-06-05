@@ -2906,11 +2906,24 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 
 /* ---------------- settings page ---------------- */
 .settings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  /* Flex-wrap + centre so a single-block subsection (Integrations,
+     Backup) sits as a centred column instead of one card pinned far
+     left with a sea of empty grid columns beside it. Multi-block
+     subsections (Privacy, Advanced) tile and centre. */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
   gap: 1rem;
-  margin-top: .5rem;
+  max-width: 1180px;
+  margin: .5rem auto 0;
 }
+.settings-grid > .settings-block { flex: 1 1 300px; max-width: 460px; }
+/* Wide blocks: rule list / log / danger get a readable centred column,
+   not the full 1180px. */
+.settings-block--alerts { flex-basis: 100%; max-width: 720px; }
+.settings-block--diagnostics,
+.settings-block--danger { flex-basis: 100%; max-width: 100%; }
 
 /* ───── Settings sub-page navigation (#328) ─────────────────────
    Menu landing on /#/settings; sub-pages on /#/settings/<section>.
@@ -4772,7 +4785,7 @@ html.in-wattpost-app .container {
 }
 
 /* ---- Settings section dropdown (replaces the menu drill-down) ---- */
-.sec-nav { position: relative; margin: 0 0 1rem; }
+.sec-nav { position: relative; margin: 0 auto 1rem; max-width: 1180px; }
 .sec-nav-btn { width: 100%; display: flex; align-items: center; gap: .6rem;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: .75rem .85rem; color: var(--text); font: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
