@@ -4658,6 +4658,23 @@ html.in-wattpost-app .container {
 .ar-form .alerts-form-status { font-size: .8rem; color: var(--text-3); }
 .ar-form .alerts-form-status.err { color: var(--red, #f85149); }
 
+/* ---- Shared settings-card extensions ----
+   .ar-card is the canonical card for every list item in Settings —
+   alert rules, transports, quiet hours, integrations. These helpers
+   give it status tags and a prose (non-mono) description so the same
+   card structure covers conditions (mono) AND prose with links/code. */
+.ar-tag--ok   { color: var(--green); border-color: rgba(63,185,80,.35); }
+.ar-tag--warn { color: var(--amber); border-color: rgba(210,153,34,.35); }
+.ar-desc--prose {
+  font-family: inherit; color: var(--text-2); font-size: .82rem; line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ar-desc--prose a { color: var(--accent); }
+.ar-desc--prose code {
+  font-family: var(--mono); font-size: .9em;
+  background: var(--surface-2); padding: 0 .25rem; border-radius: 4px;
+}
+
 /* ---- Settings section dropdown (replaces the menu drill-down) ---- */
 .sec-nav { position: relative; margin: 0 0 1rem; }
 .sec-nav-btn { width: 100%; display: flex; align-items: center; gap: .6rem;

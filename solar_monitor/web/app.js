@@ -6366,127 +6366,76 @@ function renderIntegrationsPanel() {
   const cloudConfigured    = (integrationsState.cloud || {}).configured;
   const mqttEnabled        = (integrationsState.mqtt || {}).enabled;
   const promEnabled        = (integrationsState.prometheus || {}).enabled;
-  host.innerHTML = `
-    <div class="integration-row" data-integration="solcast">
-      <div class="integration-row-main">
-        <div class="integration-row-head">
-          <span class="integration-row-name">Solcast PV forecast</span>
-          <span class="alerts-row-tag alerts-row-tag--${forecastConfigured ? "ok" : "warn"}">
-            ${forecastConfigured ? "configured" : "not set up"}
-          </span>
-        </div>
-        <div class="integration-row-sub">
-          ${forecastConfigured
-            ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "·"}…`
-            : `Sign up at <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">solcast.com</a> for a free hobbyist API key.`
-          }
+
+  // One card shape for every integration, mirroring the alert-rule /
+  // transport cards: icon chip + name + status tag in the header, a
+  // prose description, and the Configure/Edit action in the footer.
+  const intgCard = ({ id, name, ok, status, sub, action, attr }) => `
+    <div class="ar-card${ok ? " is-on" : ""}" data-integration="${id}">
+      <div class="ar-head">
+        <div class="ar-ico">${integrationIcon(id)}</div>
+        <div class="ar-head-body">
+          <div class="ar-title">${name}</div>
+          <div class="ar-desc ar-desc--prose">${sub}</div>
         </div>
       </div>
-      <div class="integration-row-actions">
-        <button class="alerts-add-btn" data-edit-forecast>
-          ${forecastConfigured ? "Edit" : "Configure"}
-        </button>
+      <div class="ar-meta">
+        <span class="ar-tag ar-tag--${ok ? "ok" : "warn"}">${status}</span>
       </div>
-    </div>
-    <div class="integration-row" data-integration="openmeteo">
-      <div class="integration-row-main">
-        <div class="integration-row-head">
-          <span class="integration-row-name">Open-Meteo weather</span>
-          <span class="alerts-row-tag alerts-row-tag--${weatherConfigured ? "ok" : "warn"}">
-            ${weatherConfigured ? "configured" : "not set up"}
-          </span>
-        </div>
-        <div class="integration-row-sub">
-          ${weatherConfigured
-            ? `Polling every ${wc.poll_minutes}m · ${wc.lat?.toFixed(3)}, ${wc.lon?.toFixed(3)}`
-            : `Current conditions (temp, cloud, sunrise/sunset). No API key. Free public service.`
-          }
-        </div>
-      </div>
-      <div class="integration-row-actions">
-        <button class="alerts-add-btn" data-edit-weather>
-          ${weatherConfigured ? "Edit" : "Configure"}
-        </button>
-      </div>
-    </div>
-    <div class="integration-row" data-integration="cloud">
-      <div class="integration-row-main">
-        <div class="integration-row-head">
-          <span class="integration-row-name">WattPost cloud</span>
-          <span class="alerts-row-tag alerts-row-tag--${cloudConfigured ? "ok" : "warn"}">
-            ${cloudConfigured ? "paired" : "not paired"}
-          </span>
-        </div>
-        <div class="integration-row-sub">
-          ${cloudConfigured
-            ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
-                // Used to display the raw CF Tunnel hostname here
-                // (abc123xyz0.wattpost.io). Removed because (a) the
-                // tunnel URL is for cloud → appliance plumbing, not
-                // for end-user navigation, customers should use the
-                // broker URL <slug>.wattpost.cloud from their cloud
-                // dashboard, and (b) surfacing it implied "you can
-                // share this link" which is exactly wrong (the tunnel
-                // requires an SSO session that only the cloud can
-                // mint; sharing the URL gets you a "Sign in via
-                // wattpost.cloud" page, not access). Keep the "no
-                // tunnel" warning since that IS actionable diagnostic.
-                integrationsState.cloud.tunnel_enabled === false
-                  ? ` · <span class="alerts-row-tag alerts-row-tag--warn">no tunnel. Re-pair to enable remote access</span>`
-                  : ""
-              }`
-            : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`
-          }
-        </div>
-      </div>
-      <div class="integration-row-actions">
-        <button class="alerts-add-btn" data-edit-cloud>
-          ${cloudConfigured ? "Edit" : "Pair"}
-        </button>
-      </div>
-    </div>
-    <div class="integration-row" data-integration="mqtt">
-      <div class="integration-row-main">
-        <div class="integration-row-head">
-          <span class="integration-row-name">MQTT export</span>
-          <span class="alerts-row-tag alerts-row-tag--${mqttEnabled ? "ok" : "warn"}">
-            ${mqttEnabled ? "enabled" : "not set up"}
-          </span>
-        </div>
-        <div class="integration-row-sub">
-          ${mqttEnabled
-            ? `Publishing to <code>${integrationsState.mqtt.host}:${integrationsState.mqtt.port}</code> under <code>${integrationsState.mqtt.topic_prefix}/</code>${integrationsState.mqtt.ha_discovery ? " · HA discovery on" : ""}`
-            : `Publish every poll snapshot to a local MQTT broker for Home Assistant, Node-RED, or your own subscribers. Local-LAN, no cloud.`
-          }
-        </div>
-      </div>
-      <div class="integration-row-actions">
-        <button class="alerts-add-btn" data-edit-mqtt>
-          ${mqttEnabled ? "Edit" : "Configure"}
-        </button>
-      </div>
-    </div>
-    <div class="integration-row" data-integration="prometheus">
-      <div class="integration-row-main">
-        <div class="integration-row-head">
-          <span class="integration-row-name">Prometheus / Grafana</span>
-          <span class="alerts-row-tag alerts-row-tag--${promEnabled ? "ok" : "warn"}">
-            ${promEnabled ? "enabled" : "not set up"}
-          </span>
-        </div>
-        <div class="integration-row-sub">
-          ${promEnabled
-            ? `Serving metrics at <code>${location.origin}/metrics</code> · prefix <code>${(integrationsState.prometheus.metric_prefix) || "wattpost"}</code>`
-            : `Expose a read-only <code>/metrics</code> endpoint for Grafana (via Prometheus). No credentials, local-LAN.`
-          }
-        </div>
-      </div>
-      <div class="integration-row-actions">
-        <button class="alerts-add-btn" data-edit-prometheus>
-          ${promEnabled ? "Edit" : "Configure"}
-        </button>
+      <div class="ar-foot">
+        <button class="ar-link" ${attr}>${action}</button>
       </div>
     </div>`;
+
+  host.innerHTML =
+    intgCard({
+      id: "solcast", name: "Solcast PV forecast", ok: forecastConfigured,
+      status: forecastConfigured ? "configured" : "not set up",
+      sub: forecastConfigured
+        ? `Polling every ${fc.poll_hours}h · resource ${fc.resource_id?.slice(0, 8) || "·"}…`
+        : `Sign up at <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">solcast.com</a> for a free hobbyist API key.`,
+      action: forecastConfigured ? "Edit" : "Configure", attr: "data-edit-forecast",
+    }) +
+    intgCard({
+      id: "openmeteo", name: "Open-Meteo weather", ok: weatherConfigured,
+      status: weatherConfigured ? "configured" : "not set up",
+      sub: weatherConfigured
+        ? `Polling every ${wc.poll_minutes}m · ${wc.lat?.toFixed(3)}, ${wc.lon?.toFixed(3)}`
+        : `Current conditions (temp, cloud, sunrise/sunset). No API key. Free public service.`,
+      action: weatherConfigured ? "Edit" : "Configure", attr: "data-edit-weather",
+    }) +
+    intgCard({
+      id: "cloud", name: "WattPost cloud", ok: cloudConfigured,
+      status: cloudConfigured ? "paired" : "not paired",
+      sub: cloudConfigured
+        ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
+            // Tunnel hostname deliberately not surfaced — it's cloud→appliance
+            // plumbing, not a shareable link (the tunnel needs an SSO session
+            // only the cloud can mint). Keep the "no tunnel" warning: it IS
+            // actionable diagnostic.
+            integrationsState.cloud.tunnel_enabled === false
+              ? ` · <span class="ar-tag ar-tag--warn">no tunnel. Re-pair to enable remote access</span>`
+              : ""
+          }`
+        : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`,
+      action: cloudConfigured ? "Edit" : "Pair", attr: "data-edit-cloud",
+    }) +
+    intgCard({
+      id: "mqtt", name: "MQTT export", ok: mqttEnabled,
+      status: mqttEnabled ? "enabled" : "not set up",
+      sub: mqttEnabled
+        ? `Publishing to <code>${integrationsState.mqtt.host}:${integrationsState.mqtt.port}</code> under <code>${integrationsState.mqtt.topic_prefix}/</code>${integrationsState.mqtt.ha_discovery ? " · HA discovery on" : ""}`
+        : `Publish every poll snapshot to a local MQTT broker for Home Assistant, Node-RED, or your own subscribers. Local-LAN, no cloud.`,
+      action: mqttEnabled ? "Edit" : "Configure", attr: "data-edit-mqtt",
+    }) +
+    intgCard({
+      id: "prometheus", name: "Prometheus / Grafana", ok: promEnabled,
+      status: promEnabled ? "enabled" : "not set up",
+      sub: promEnabled
+        ? `Serving metrics at <code>${location.origin}/metrics</code> · prefix <code>${(integrationsState.prometheus.metric_prefix) || "wattpost"}</code>`
+        : `Expose a read-only <code>/metrics</code> endpoint for Grafana (via Prometheus). No credentials, local-LAN.`,
+      action: promEnabled ? "Edit" : "Configure", attr: "data-edit-prometheus",
+    });
   $("[data-edit-forecast]")?.addEventListener("click", () => {
     integrationsState.editing = "forecast";
     renderIntegrationsPanel();
@@ -7438,6 +7387,34 @@ async function patchRule(r, changes) {
 }
 
 const _BELL_ICO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+const _MOON_ICO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;
+const _ICO = {
+  send:  `<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>`,
+  msg:   `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
+  link:  `<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>`,
+  mail:  `<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>`,
+  cast:  `<path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 20h.01"/><path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/>`,
+  sun:   `<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>`,
+  cloud: `<path d="M17.5 19a4.5 4.5 0 0 0 .5-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/>`,
+  graph: `<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>`,
+};
+function _ico(name) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${_ICO[name] || _ICO.send}</svg>`;
+}
+// Per-transport-type glyph for the card icon chip.
+function transportIcon(type) {
+  return _ico(({
+    ntfy: "send", discord_webhook: "msg", webhook: "link",
+    smtp: "mail", mqtt: "cast", pushover: "send",
+  })[type] || "send");
+}
+// Per-integration glyph for the card icon chip.
+function integrationIcon(id) {
+  return _ico(({
+    solcast: "sun", openmeteo: "cloud", cloud: "cloud",
+    mqtt: "cast", prometheus: "graph",
+  })[id] || "link");
+}
 
 // Beszel-style alert card: header (icon + name + condition + arm toggle);
 // when armed it reveals the threshold slider + number and a meta/action
@@ -7570,15 +7547,19 @@ function renderQuietHoursBlock() {
       <h4>Quiet hours</h4>
       <button class="alerts-add-btn" data-edit-quiet>${qh ? "Edit" : "Configure"}</button>
     </div>
-    <div class="alerts-row alerts-row--quiet">
-      <div class="alerts-row-main">
-        <div class="alerts-row-title">
-          <span class="alerts-row-name">${qh ? "Enabled" : "Disabled"}</span>
-          <span class="alerts-row-cond">${summary}</span>
+    <div class="ar-card${qh ? " is-on" : ""}">
+      <div class="ar-head">
+        <div class="ar-ico">${_MOON_ICO}</div>
+        <div class="ar-head-body">
+          <div class="ar-title">${qh ? "Enabled" : "Disabled"}</div>
+          <div class="ar-desc ar-desc--prose">${summary}</div>
         </div>
-        <div class="alerts-row-meta">
-          <span class="alerts-row-tag">alarm severity always pages through</span>
-        </div>
+      </div>
+      <div class="ar-meta">
+        <span class="ar-tag">alarm severity always pages through</span>
+      </div>
+      <div class="ar-foot">
+        <button class="ar-link" data-edit-quiet>${qh ? "Edit" : "Configure"}</button>
       </div>
     </div>`;
 }
@@ -7623,20 +7604,21 @@ function renderTransportRow(t) {
   const keyField = TRANSPORT_TYPES.find(x => x.value === t.type)?.keyField;
   const keyValue = keyField ? cfg[keyField] : "";
   const aliveTag = t.alive
-    ? `<span class="alerts-row-tag alerts-row-tag--ok">active</span>`
-    : `<span class="alerts-row-tag alerts-row-tag--warn">restart pending</span>`;
+    ? `<span class="ar-tag ar-tag--ok">active</span>`
+    : `<span class="ar-tag ar-tag--warn">restart pending</span>`;
   return `
-    <div class="alerts-row" data-transport="${t.id}">
-      <div class="alerts-row-main">
-        <div class="alerts-row-title">
-          <span class="alerts-row-name">${t.id}</span>
-          <span class="alerts-row-cond">${t.type}${keyValue ? ` · ${keyField}: ${keyValue}` : ""}</span>
+    <div class="ar-card is-on" data-transport="${t.id}">
+      <div class="ar-head">
+        <div class="ar-ico">${transportIcon(t.type)}</div>
+        <div class="ar-head-body">
+          <div class="ar-title">${escHtml(t.id)}</div>
+          <div class="ar-desc">${escHtml(t.type)}${keyValue ? ` · ${escHtml(keyField)}: ${escHtml(String(keyValue))}` : ""}</div>
         </div>
-        <div class="alerts-row-meta">${aliveTag}</div>
       </div>
-      <div class="alerts-row-action">
-        <button class="alerts-icon-btn" data-edit-transport="${t.id}" title="Edit">✎</button>
-        <button class="alerts-icon-btn alerts-icon-btn--danger" data-delete-transport="${t.id}" title="Delete">×</button>
+      <div class="ar-meta">${aliveTag}</div>
+      <div class="ar-foot">
+        <button class="ar-link" data-edit-transport="${t.id}">Edit</button>
+        <button class="ar-link ar-link--danger" data-delete-transport="${t.id}">Delete</button>
       </div>
     </div>`;
 }
