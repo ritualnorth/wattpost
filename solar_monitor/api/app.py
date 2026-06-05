@@ -333,16 +333,13 @@ async def last_poll_run(state: State) -> dict[str, Any]:
     }
 
 
-@get("/api/devices")
-async def list_devices(state: State) -> dict[str, Any]:
-    store: Store = state["store"]
-    devs = await store.list_devices()
-    latest = await store.get_latest()
-    # Join in the transport id from the live config so the dashboard
-    # can wire per-device delete buttons (which need transport +
-    # slave_id to address the row). device_meta doesn't carry it,
-    # so we look it up by (slave_id, label) match against config.
-    config = state.get("config")
+def _join_device_transport(config, devices: list[dict]) -> list[dict]:
+    """Join the config transport id onto each device dict (by label), so
+    the dashboard's per-device delete button has transport + slave_id to
+    address the config row. BOTH /api/devices and /api/snapshot need this
+    — the device cards render off whichever arrives, and a missing
+    transport blocks the delete button (#device-delete). Idempotent: a
+    device that already carries a transport is left alone."""
     by_label = {}
     if config is not None:
         for cfg_dev in getattr(config, "devices", []) or []:
@@ -350,14 +347,22 @@ async def list_devices(state: State) -> dict[str, Any]:
             if label:
                 by_label[label] = (cfg_dev.get("transport") if isinstance(cfg_dev, dict)
                                    else getattr(cfg_dev, "transport", None))
-    return {
-        "devices": [
-            {**d,
-             "transport": by_label.get(d["label"]),
-             "latest": latest.get(d["label"], {})}
-            for d in devs
-        ]
-    }
+    out = []
+    for d in devices:
+        if isinstance(d, dict) and d.get("transport") is None:
+            d = {**d, "transport": by_label.get(d.get("label"))}
+        out.append(d)
+    return out
+
+
+@get("/api/devices")
+async def list_devices(state: State) -> dict[str, Any]:
+    store: Store = state["store"]
+    devs = await store.list_devices()
+    latest = await store.get_latest()
+    config = state.get("config")
+    merged = [{**d, "latest": latest.get(d["label"], {})} for d in devs]
+    return {"devices": _join_device_transport(config, merged)}
 
 
 @post("/api/devices/{label:str}/display-name", status_code=200)
@@ -850,7 +855,14 @@ async def snapshot(state: State) -> dict[str, Any]:
     # the SPA's polling fallback so the hero and flow tiles can never
     # disagree about which poll cycle they're rendering (#162).
     scheduler: PollScheduler = state["scheduler"]
-    return await scheduler.build_snapshot()
+    snap = await scheduler.build_snapshot()
+    # The device cards usually render off this snapshot (not /api/devices),
+    # so join the transport here too — otherwise the per-device delete
+    # button has no transport to address and refuses ("couldn't find its
+    # transport").
+    if isinstance(snap, dict) and isinstance(snap.get("devices"), list):
+        snap["devices"] = _join_device_transport(state.get("config"), snap["devices"])
+    return snap
 
 
 @get("/metrics")
