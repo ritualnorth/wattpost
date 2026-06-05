@@ -4835,7 +4835,9 @@ html.in-wattpost-app .container {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dev-row-mid { display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0; }
 .dev-row-soc { width: 56px; height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
-.dev-row-soc-fill { height: 100%; border-radius: 99px; }
+/* span children are inline by default → width/height ignored; force block
+   so the inline-width fill actually paints (the card gauge uses a div). */
+.dev-row-soc-fill { display: block; height: 100%; border-radius: 99px; }
 .dev-row-soc-fill.lvl-ok  { background: var(--green); }
 .dev-row-soc-fill.lvl-mid { background: var(--amber); }
 .dev-row-soc-fill.lvl-low { background: var(--red, #f85149); }
