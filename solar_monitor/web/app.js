@@ -7390,52 +7390,58 @@ function renderRuleForm(r, transportIds) {
   const severity = r?.severity || "warn";
   const cooldownMin = Math.round((r?.cooldown_seconds ?? 1800) / 60);
   const ts = new Set(r?.transports || []);
+  const enabled = r ? (r.enabled !== false) : true;
+  const isCustom = !METRIC_SUGGESTIONS.some(m => m.value === metric);
   return `
-    <form class="alerts-form" data-form="rule" data-original-id="${id}">
-      <div class="alerts-form-grid">
-        <label>ID
-          <input type="text" name="id" value="${id}" pattern="[a-zA-Z0-9_\\-]+" required ${editing ? "readonly" : ""} />
+    <form class="ar-card ar-card--edit ar-form" data-form="rule" data-original-id="${id}">
+      <div class="ar-form-head">
+        <div class="ar-form-title">${editing ? "Edit rule" : "New rule"}</div>
+        <label class="ar-switch" title="Armed">
+          <input type="checkbox" name="enabled" ${enabled ? "checked" : ""}>
+          <span class="ar-track"></span>
         </label>
-        <label>Name
-          <input type="text" name="name" value="${name}" required />
-        </label>
-        <label>Metric
+      </div>
+      <div class="ar-form-grid">
+        <label class="ar-field"><span>Name</span>
+          <input type="text" name="name" value="${escHtml(name)}" required placeholder="Battery low"/></label>
+        <label class="ar-field"><span>Metric</span>
           <select name="metric">
             ${METRIC_SUGGESTIONS.map(m =>
-              `<option value="${m.value}" ${m.value === metric ? "selected" : ""}>${m.label} · ${m.value}</option>`).join("")}
-            <option value="__custom__" ${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : "selected"}>Custom…</option>
+              `<option value="${escHtml(m.value)}" ${m.value === metric ? "selected" : ""}>${escHtml(m.label)}</option>`).join("")}
+            <option value="__custom__" ${isCustom ? "selected" : ""}>Custom…</option>
           </select>
-          <input type="text" name="metric_custom" value="${METRIC_SUGGESTIONS.some(m => m.value === metric) ? "" : metric}" placeholder="e.g. devices.battery_0.cell_drift_v" />
-        </label>
-        <label>Op
+          <input type="text" name="metric_custom" class="ar-field-custom" value="${isCustom ? escHtml(metric) : ""}" placeholder="devices.battery_0.cell_drift_v" ${isCustom ? "" : "hidden"}/></label>
+        <label class="ar-field ar-field--sm"><span>Condition</span>
           <select name="op">
             ${Object.keys(ALERT_OP_LABEL).map(o =>
-              `<option value="${o}" ${o === op ? "selected" : ""}>${o} (${ALERT_OP_LABEL[o]})</option>`).join("")}
-          </select>
-        </label>
-        <label>Threshold
-          <input type="number" name="threshold" value="${threshold}" step="any" required />
-        </label>
-        <label>Severity
+              `<option value="${o}" ${o === op ? "selected" : ""}>${ALERT_OP_LABEL[o]}&nbsp;&nbsp;${o}</option>`).join("")}
+          </select></label>
+        <label class="ar-field ar-field--sm"><span>Threshold</span>
+          <input type="number" name="threshold" value="${threshold}" step="any" required/></label>
+        <label class="ar-field ar-field--sm"><span>Severity</span>
           <select name="severity">
             <option value="warn"  ${severity === "warn" ? "selected" : ""}>Warn</option>
             <option value="alarm" ${severity === "alarm" ? "selected" : ""}>Alarm</option>
-          </select>
-        </label>
-        <label>Cooldown (min)
-          <input type="number" name="cooldown_min" value="${cooldownMin}" min="0" step="1" required />
-        </label>
+          </select></label>
+        <label class="ar-field ar-field--sm"><span>Repeat ≤ (min)</span>
+          <input type="number" name="cooldown_min" value="${cooldownMin}" min="0" step="1" required/></label>
+        ${editing
+          ? `<input type="hidden" name="id" value="${escHtml(id)}"/>`
+          : `<label class="ar-field"><span>ID</span>
+               <input type="text" name="id" value="${escHtml(id)}" pattern="[a-zA-Z0-9_\\-]+" required placeholder="batt_low"/></label>`}
       </div>
-      <fieldset class="alerts-form-transports">
-        <legend>Send via</legend>
-        ${transportIds.length === 0
-          ? `<p class="settings-foot">No transports configured yet. Add one below first.</p>`
-          : transportIds.map(tid =>
-              `<label class="alerts-checkbox"><input type="checkbox" name="transport" value="${tid}" ${ts.has(tid) ? "checked" : ""}/>${tid}</label>`).join("")}
-      </fieldset>
-      <div class="alerts-form-actions">
-        <button type="submit" class="btn-action btn-action--primary">${editing ? "Save" : "Create rule"}</button>
-        <button type="button" class="btn-action" data-cancel-edit>Cancel</button>
+      <div class="ar-form-section">
+        <div class="ar-form-section-label">Send via</div>
+        <div class="ar-chips">
+          ${transportIds.length === 0
+            ? `<span class="ar-muted">No transports yet — add one below first.</span>`
+            : transportIds.map(tid =>
+                `<label class="ar-chip"><input type="checkbox" name="transport" value="${escHtml(tid)}" ${ts.has(tid) ? "checked" : ""}/>${escHtml(tid)}</label>`).join("")}
+        </div>
+      </div>
+      <div class="ar-form-actions">
+        <button type="submit" class="ar-btn ar-btn--primary">${editing ? "Save changes" : "Create rule"}</button>
+        <button type="button" class="ar-btn" data-cancel-edit>Cancel</button>
         <span class="alerts-form-status"></span>
       </div>
     </form>`;
@@ -7757,6 +7763,9 @@ async function submitRuleForm(form) {
     severity: form.elements["severity"].value,
     cooldown_seconds: parseInt(form.elements["cooldown_min"].value, 10) * 60,
     transports,
+    // Carry the Armed toggle so saving an edit can't silently re-arm a
+    // rule the user had disarmed (the payload's default is true).
+    enabled: form.elements["enabled"] ? form.elements["enabled"].checked : true,
   };
   const editing = !!form.dataset.originalId;
   const url = editing ? `/api/alerts/rules/${encodeURIComponent(payload.id)}` : "/api/alerts/rules";

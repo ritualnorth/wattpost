@@ -4622,3 +4622,33 @@ html.in-wattpost-app .container {
 .ar-link { background: none; border: 0; color: var(--text-2); font: inherit; font-size: .78rem; cursor: pointer; padding: 0; }
 .ar-link:hover { color: var(--text); }
 .ar-link--danger:hover { color: var(--red, #f85149); }
+
+/* ---- Alert-rule edit/add form (card idiom) ---- */
+.ar-card--edit { border-color: var(--accent); }
+.ar-form-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.ar-form-title { font-weight: 600; font-size: 1rem; color: var(--text); }
+.ar-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem .8rem; margin-top: .8rem; }
+.ar-field { display: flex; flex-direction: column; gap: .3rem; grid-column: span 2; min-width: 0; }
+.ar-field--sm { grid-column: span 1; }
+.ar-field > span { font-size: .78rem; color: var(--text-2); font-weight: 500; }
+.ar-field input, .ar-field select { background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: .5rem .6rem; color: var(--text); font: inherit; font-size: .9rem; width: 100%; }
+.ar-field input:focus, .ar-field select:focus { outline: none; border-color: var(--accent); }
+.ar-field-custom { margin-top: .4rem; }
+.ar-form-section { margin-top: .95rem; }
+.ar-form-section-label { font-size: .78rem; color: var(--text-2); font-weight: 500; margin-bottom: .45rem; }
+.ar-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.ar-chip { display: inline-flex; align-items: center; gap: .35rem; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 99px; padding: .3rem .6rem; font-size: .82rem;
+  color: var(--text-2); cursor: pointer; }
+.ar-chip:has(input:checked) { border-color: var(--accent); color: var(--text); background: rgba(88,166,255,.10); }
+.ar-chip input { accent-color: var(--accent); }
+.ar-muted { color: var(--text-3); font-size: .82rem; }
+.ar-form-actions { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; }
+.ar-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: .5rem .9rem; font: inherit; font-size: .88rem; font-weight: 500; cursor: pointer; }
+.ar-btn:hover { border-color: var(--border-2); }
+.ar-btn--primary { background: var(--accent); border-color: var(--accent); color: #0a0d12; }
+.ar-btn--primary:hover { filter: brightness(1.08); }
+.ar-form .alerts-form-status { font-size: .8rem; color: var(--text-3); }
+.ar-form .alerts-form-status.err { color: var(--red, #f85149); }
