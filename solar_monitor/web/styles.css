@@ -4658,6 +4658,37 @@ html.in-wattpost-app .container {
 .ar-form .alerts-form-status { font-size: .8rem; color: var(--text-3); }
 .ar-form .alerts-form-status.err { color: var(--red, #f85149); }
 
+/* ---- Legacy edit/add forms adopt the card-edit idiom ----
+   The transport, quiet-hours and all five integration forms still use the
+   pre-redesign .alerts-form markup. Rather than rewrite each one's fields
+   (and risk breaking the name=/wiring), lift the shared .alerts-form classes
+   to match .ar-card--edit / .ar-field so every Settings edit panel reads as
+   the same card the alert-rule editor does. Surface + radius + padding match
+   the card; fields get the inset .ar-field treatment; the accent border is
+   already there. */
+.alerts-form {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: .9rem 1rem;
+  gap: .8rem;
+}
+.alerts-form label {
+  font-size: .78rem; color: var(--text-2); font-weight: 500; gap: .3rem;
+}
+.alerts-form input,
+.alerts-form select {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: .5rem .6rem;
+  font-size: .9rem;
+  font-family: inherit;
+}
+.alerts-form input:focus,
+.alerts-form select:focus { outline: none; border-color: var(--accent); }
+.alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
+/* Form action buttons → .ar-btn proportions (the colours already match). */
+.alerts-form-actions .btn-action { border-radius: 8px; padding: .5rem .9rem; }
+
 /* ---- Shared settings-card extensions ----
    .ar-card is the canonical card for every list item in Settings —
    alert rules, transports, quiet hours, integrations. These helpers
