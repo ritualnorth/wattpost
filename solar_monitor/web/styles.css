@@ -2970,6 +2970,12 @@ body[data-route-sub="integrations"] .settings-grid > .settings-block:not([data-s
 body[data-route-sub="advanced"]     .settings-grid > .settings-block:not([data-subroute="advanced"])     { display: none; }
 body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-subroute="about"])        { display: none; }
 
+/* Solar-aware charger pause is hidden from prod until ready (#163). The
+   subroute rules above show data-subroute="alerts" blocks, so guarantee
+   this one stays hidden regardless. Remove the `hidden` attr in index.html
+   to bring it back. */
+#settings-solar-pause-block[hidden] { display: none !important; }
+
 .settings-block {
   background: var(--surface-2);
   border: 1px solid var(--border);

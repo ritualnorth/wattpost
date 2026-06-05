@@ -5475,7 +5475,7 @@ async function updateLocationShare(mode) {
 // reasonably auto-pause (not, say, a Renogy DC load output).
 async function refreshSolarPauseSettings() {
   const block = document.getElementById("settings-solar-pause-block");
-  if (!block) return;
+  if (!block || block.hidden) return;   // hidden from prod until ready (#163)
   let cfg, outputs;
   try {
     [cfg, outputs] = await Promise.all([
