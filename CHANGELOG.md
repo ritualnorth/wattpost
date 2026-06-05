@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.141-beta.1] - 2026-06-05
+
+Beta — the alert add/edit form now matches the new card styling (+ an Armed toggle).
+
 ## [0.1.140-beta.1] - 2026-06-04
 
 Beta — Settings → Alerts redesigned as cards with arm/disarm toggles + inline threshold sliders.
