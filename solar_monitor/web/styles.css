@@ -2146,13 +2146,16 @@ a.dev-card:hover .dev-card-foot {
 }
 a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .dev-card-sub { font-size: .76rem; color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
-.dev-card-row { display: flex; justify-content: space-between; align-items: baseline; gap: .75rem; padding: .2rem 0; font-size: .85rem; }
+/* align-items:flex-start (not baseline): a long value (e.g. a charger
+   model name) wraps to several lines, and baseline-aligning the
+   single-line label against it dropped the label down so it overlapped
+   the value. Top-aligning keeps the label pinned to the value's first
+   line; the value wraps cleanly below on its own side. */
+.dev-card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; padding: .2rem 0; font-size: .85rem; }
 .dev-card-row .k { color: var(--text-3); }
-/* Long string values (e.g. a charger model name) used to wrap back over
-   the label. Let the value shrink + wrap on its own side, right-aligned. */
 .dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text);
   min-width: 0; text-align: right; overflow-wrap: anywhere; }
-.dev-card-row .dev-card-row-left { flex-shrink: 1; }
+.dev-card-row .dev-card-row-left { flex-shrink: 0; }
 
 /* Lifetime stats strip on smart-battery cards */
 .dev-card-lifetime {
