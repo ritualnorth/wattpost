@@ -7382,33 +7382,36 @@ const METRIC_SUGGESTIONS = [
 // schema or thinks about op/threshold defaults. The "voltage" rules
 // assume a 12 V system; users on 24/48 V tweak the threshold once
 // the form opens.
+// `short` + `cond` drive the two-line template tile (name on top, the
+// threshold in mono underneath); `label` is the full description, kept
+// for the tile's tooltip/aria.
 const ALERT_TEMPLATES = [
   { id: "low_soc",
-    label: "Low SoC (< 30%)",
+    short: "Low SoC", cond: "< 30%", label: "Low SoC (< 30%)",
     rule: { name: "Low battery", metric: "bank.soc_pct", op: "lt",
             threshold: 30, severity: "warn", cooldown_seconds: 3600 } },
   { id: "critical_soc",
-    label: "Critical SoC (< 15%)",
+    short: "Critical SoC", cond: "< 15%", label: "Critical SoC (< 15%)",
     rule: { name: "Critical battery", metric: "bank.soc_pct", op: "lt",
             threshold: 15, severity: "alarm", cooldown_seconds: 900 } },
   { id: "low_v_12v",
-    label: "Low voltage (< 11.5 V, 12 V system)",
+    short: "Low voltage", cond: "< 11.5 V", label: "Low voltage (< 11.5 V, 12 V system)",
     rule: { name: "Low voltage", metric: "bank.meanV", op: "lt",
             threshold: 11.5, severity: "alarm", cooldown_seconds: 600 } },
   { id: "high_temp",
-    label: "Bank over-temp (> 50 °C)",
+    short: "Bank over-temp", cond: "> 50 °C", label: "Bank over-temp (> 50 °C)",
     rule: { name: "Battery over-temperature", metric: "devices.charge_controller.battery_temperature_c",
             op: "gt", threshold: 50, severity: "alarm", cooldown_seconds: 600 } },
   { id: "cell_drift_warn",
-    label: "Cell drift warning (> 100 mV)",
+    short: "Cell drift warn", cond: "> 100 mV", label: "Cell drift warning (> 100 mV)",
     rule: { name: "Cell drift warning", metric: "bank.worst_pack_drift_v",
             op: "gt", threshold: 0.10, severity: "warn", cooldown_seconds: 21600 } },
   { id: "cell_drift_alarm",
-    label: "Cell drift alarm (> 200 mV)",
+    short: "Cell drift alarm", cond: "> 200 mV", label: "Cell drift alarm (> 200 mV)",
     rule: { name: "Cell drift alarm", metric: "bank.worst_pack_drift_v",
             op: "gt", threshold: 0.20, severity: "alarm", cooldown_seconds: 3600 } },
   { id: "soc_disagreement",
-    label: "Shunt-vs-BMS disagree (>10 %)",
+    short: "Shunt vs BMS", cond: "> 10%", label: "Shunt-vs-BMS disagree (> 10%)",
     rule: { name: "Shunt/BMS SoC disagree", metric: "bank.source_disagreement.delta_pct",
             op: "gt", threshold: 10, severity: "warn", cooldown_seconds: 21600 } },
 ];
@@ -7458,10 +7461,15 @@ function renderAlertsPanel() {
   // already open so we don't clutter the editing flow.
   if (!(alertsState.editing?.type === "rule" && alertsState.editing.mode === "add")) {
     html += `<div class="alerts-templates">
-      <span class="settings-foot">Quick templates:</span>
-      ${ALERT_TEMPLATES.map(t => `
-        <button class="alerts-template-chip" data-alert-template="${t.id}">${escHtml(t.label)}</button>
-      `).join("")}
+      <span class="alerts-templates-head">Start from a template</span>
+      <div class="alerts-template-grid">
+        ${ALERT_TEMPLATES.map(t => `
+          <button class="alerts-template-chip" data-alert-template="${t.id}" title="${escHtml(t.label)}">
+            <span class="tmpl-name">${escHtml(t.short)}</span>
+            <span class="tmpl-cond">${escHtml(t.cond)}</span>
+          </button>
+        `).join("")}
+      </div>
     </div>`;
   }
 

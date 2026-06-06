@@ -4330,25 +4330,42 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
  * rule list with a "Quick templates:" label. Clicking pre-fills the
  * add-rule form so users don't have to learn the metric-path schema
  * or invent thresholds from scratch. */
-.alerts-templates {
-  display: flex; flex-wrap: wrap;
-  align-items: center; gap: .35rem;
-  margin: .35rem 0 .65rem;
+/* Quick-start templates: a tidy equal-width grid of two-line tiles
+   (name + condition) instead of a ragged row of variable-width pills. */
+.alerts-templates { margin: .35rem 0 1rem; }
+.alerts-templates-head {
+  display: block;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3); margin-bottom: .55rem;
 }
-.alerts-templates .settings-foot { margin-right: .15rem; }
+.alerts-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .5rem;
+}
+@media (min-width: 560px) {
+  .alerts-template-grid { grid-template-columns: repeat(3, 1fr); }
+}
 .alerts-template-chip {
-  font-size: .78rem;
-  padding: .25rem .55rem;
+  display: flex; flex-direction: column; align-items: flex-start; gap: .1rem;
+  min-width: 0; width: 100%;
+  text-align: left;
+  padding: .5rem .65rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text-2);
+  border-radius: 10px;
   cursor: pointer;
-  transition: background .15s, color .15s;
+  transition: background .15s, border-color .15s;
+}
+.alerts-template-chip .tmpl-name {
+  font-size: .82rem; font-weight: 500; color: var(--text); line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.alerts-template-chip .tmpl-cond {
+  font-size: .72rem; font-family: var(--mono); color: var(--text-3);
 }
 .alerts-template-chip:hover {
-  background: var(--surface-3);
-  color: var(--text);
+  background: var(--surface);
   border-color: var(--accent);
 }
 
