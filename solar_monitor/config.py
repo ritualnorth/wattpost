@@ -512,14 +512,24 @@ class KioskCfg(msgspec.Struct, kw_only=True):
 
 
 class WebCfg(msgspec.Struct, kw_only=True):
-    """Local web UI security toggles (cloud #15). Phase B will grow the
-    SSH + firewall toggles here."""
+    """Local web UI + host security toggles (cloud #15)."""
     # When True, anyone on the LAN can VIEW the dashboard + read the
     # public API endpoints without logging in (the legacy read-only-
     # public behaviour). Default False: login is required for the whole
     # appliance. Wall displays use a kiosk token regardless of this
     # flag. This is the explicit opt-out for a deliberately-public box.
     public_view: bool = False
+    # Inbound host firewall (nftables, Pi image only). On by default:
+    # default-deny INPUT, allowing only the dashboard, mDNS, DHCP, the
+    # hotspot's DHCP/DNS, and SSH-when-enabled. The master escape hatch
+    # if a rule ever misbehaves. No effect on Docker installs (the host
+    # owns its own firewall there).
+    firewall_enabled: bool = True
+    # SSH daemon. Off by default — the pi-gen image ships sshd disabled
+    # with no baked login user. Flipping this on enables sshd AND opens
+    # port 22 in the firewall; off disables + recloses it. You still
+    # need your own key/user (set in Raspberry Pi Imager) to log in.
+    ssh_enabled: bool = False
 
 
 class Config(msgspec.Struct, kw_only=True):

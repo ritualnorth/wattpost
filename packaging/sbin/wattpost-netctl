@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# wattpost-netctl — narrow, root-owned host-network control surface for the
+# (non-root) wattpost daemon. The daemon may invoke ONLY this script via a
+# locked-down sudoers rule, and ONLY with the fixed verbs below. The daemon
+# never supplies firewall rules — this script owns the ruleset — so a
+# compromised daemon can flip pre-defined switches but cannot author
+# arbitrary nft rules or run arbitrary commands as root.
+#
+#   wattpost-netctl status
+#   wattpost-netctl apply <firewall:on|off> <ssh:on|off>
+#
+# `apply` is idempotent: it reconciles sshd + the inbound firewall to the
+# requested state. Called on daemon boot and whenever the Settings toggles
+# change. Image-only (Pi); a no-op-ish fallback on hosts without nft/systemd.
+set -euo pipefail
+
+TABLE="wattpost"
+SSH_UNIT="ssh"
+
+die() { echo "wattpost-netctl: $*" >&2; exit 1; }
+
+# --- argument validation (strict; only on|off accepted) -------------------
+onoff() { case "${1:-}" in on|off) echo "$1";; *) die "expected on|off, got '${1:-}'";; esac; }
+
+ssh_is_active() { systemctl is-active --quiet "$SSH_UNIT" 2>/dev/null; }
+fw_is_loaded()  { nft list table inet "$TABLE" >/dev/null 2>&1; }
+
+apply_firewall() {
+  # $1 = on|off ; $2 = ssh on|off (whether to open port 22)
+  local fw="$1" ssh="$2"
+  command -v nft >/dev/null 2>&1 || { echo "nft not present; skipping firewall" >&2; return 0; }
+  if [ "$fw" = "off" ]; then
+    nft delete table inet "$TABLE" 2>/dev/null || true
+    return 0
+  fi
+  local ssh_rule=""
+  [ "$ssh" = "on" ] && ssh_rule='tcp dport 22 accept'
+  # Default-deny INPUT. OUTPUT is deliberately left wide open (the product's
+  # alerting/integration surface is user-defined outbound traffic). Ports for
+  # DNS/DHCP-server are allowed unconditionally — nothing listens on them
+  # unless the appliance is in hotspot/AP mode, so this is harmless otherwise
+  # and avoids brittle interface-name matching.
+  #
+  # add-then-delete makes this an ATOMIC REPLACE: nft -f otherwise APPENDS to
+  # an existing table, so re-applying would leave stale rules (e.g. port 22
+  # after toggling SSH off) and duplicate the rest. `add table` is idempotent
+  # (no error if absent), `delete table` then clears it, and the block below
+  # redefines from scratch — all in one atomic transaction.
+  nft -f - <<EOF
+add table inet ${TABLE}
+delete table inet ${TABLE}
+table inet ${TABLE} {
+  chain input {
+    type filter hook input priority filter; policy drop;
+    iif "lo" accept
+    ct state established,related accept
+    ct state invalid drop
+    meta l4proto icmp accept
+    meta l4proto ipv6-icmp accept
+    udp dport 5353 accept
+    udp dport 68 accept
+    udp dport { 53, 67 } accept
+    tcp dport 80 accept
+    ${ssh_rule}
+  }
+}
+EOF
+}
+
+apply_ssh() {
+  # $1 = on|off
+  command -v systemctl >/dev/null 2>&1 || { echo "systemctl not present; skipping ssh" >&2; return 0; }
+  if [ "$1" = "on" ]; then
+    systemctl enable --now "$SSH_UNIT" 2>/dev/null || true
+  else
+    systemctl disable --now "$SSH_UNIT" 2>/dev/null || true
+  fi
+}
+
+cmd_status() {
+  local s f
+  s=off; ssh_is_active && s=on
+  f=off; fw_is_loaded && f=on
+  echo "ssh=${s} firewall=${f}"
+}
+
+cmd_apply() {
+  local fw ssh
+  fw="$(onoff "${1:-}")"
+  ssh="$(onoff "${2:-}")"
+  # SSH first so the firewall opens 22 only once sshd is actually up.
+  apply_ssh "$ssh"
+  apply_firewall "$fw" "$ssh"
+  cmd_status
+}
+
+case "${1:-}" in
+  status) cmd_status ;;
+  apply)  shift; cmd_apply "$@" ;;
+  *) die "usage: wattpost-netctl status | apply <on|off> <on|off>" ;;
+esac

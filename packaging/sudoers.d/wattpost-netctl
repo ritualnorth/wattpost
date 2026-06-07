@@ -1,0 +1,9 @@
+# Lets the non-root `wattpost` daemon toggle SSH + the inbound firewall
+# through the fixed-verb helper ONLY — no other root access. The helper
+# owns the ruleset and validates its own args, so this grants the daemon
+# pre-defined switches, not arbitrary root.
+#
+# Installed to /etc/sudoers.d/wattpost-netctl, mode 0440, by install.sh
+# (which validates it with `visudo -c` before activating).
+Defaults!/usr/local/sbin/wattpost-netctl !requiretty
+wattpost ALL=(root) NOPASSWD: /usr/local/sbin/wattpost-netctl
