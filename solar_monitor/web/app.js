@@ -8304,6 +8304,73 @@ if (rotatePwBtn) {
     }
   });
 }
+
+// Kiosk display links (cloud #15). Mint a revocable, read-only kiosk
+// token, shown once as a full /kiosk?token=… URL; list + revoke the
+// existing ones. Lets off-grid wall displays in once login is mandatory.
+const _escHtmlMini = (s) => String(s).replace(/[<&>]/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[c]));
+async function loadKioskTokens() {
+  const host = document.getElementById("kiosk-token-list");
+  if (!host) return;
+  try {
+    const r = await fetch("/api/system/kiosk-tokens", { credentials: "include" });
+    if (!r.ok) { host.innerHTML = ""; return; }
+    const { tokens } = await r.json();
+    if (!tokens || !tokens.length) {
+      host.innerHTML = `<div class="kiosk-token-empty">No kiosk links yet.</div>`;
+      return;
+    }
+    host.innerHTML = tokens.map(t => `
+      <div class="kiosk-token-row">
+        <span class="kiosk-token-name">${_escHtmlMini(t.name || "Kiosk")}</span>
+        <button class="kiosk-token-revoke" type="button" data-id="${_escHtmlMini(t.id)}">Revoke</button>
+      </div>`).join("");
+    host.querySelectorAll(".kiosk-token-revoke").forEach(b =>
+      b.addEventListener("click", async () => {
+        if (!confirm("Revoke this kiosk link? The display using it will stop working.")) return;
+        try {
+          await fetch(`/api/system/kiosk-tokens/${encodeURIComponent(b.dataset.id)}`,
+                      { method: "DELETE", credentials: "include" });
+        } catch (_) {}
+        loadKioskTokens();
+      }));
+  } catch (_) { host.innerHTML = ""; }
+}
+const kioskCreateBtn = $("#kiosk-create-btn");
+if (kioskCreateBtn) {
+  kioskCreateBtn.addEventListener("click", async () => {
+    const name = prompt("Name this display (e.g. Cabin, Van screen):", "Kiosk");
+    if (name === null) return;
+    const out = document.getElementById("kiosk-create-result");
+    kioskCreateBtn.disabled = true;
+    try {
+      const r = await fetch("/api/system/kiosk-tokens", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const url = `${location.origin}${j.kiosk_path}`;
+      if (out) {
+        out.hidden = false;
+        out.innerHTML = `
+          <div class="rotate-pw-label">Kiosk link — open it on the display. Save it now:</div>
+          <code class="rotate-pw-code">${_escHtmlMini(url)}</code>
+          <button class="rotate-pw-copy" type="button">Copy</button>
+          <div class="rotate-pw-foot">Read-only, no login. Revoke any time below.</div>`;
+        out.querySelector(".rotate-pw-copy")?.addEventListener("click", () =>
+          navigator.clipboard?.writeText(url).catch(() => {}));
+      }
+      loadKioskTokens();
+    } catch (e) {
+      alert("Couldn't create the kiosk link:\n\n" + (e.message || e));
+    } finally {
+      kioskCreateBtn.disabled = false;
+    }
+  });
+  loadKioskTokens();
+}
 // #292, Make the SoC donut click into the bank detail page.
 // The bank device's label is the literal string "bank", set by
 // the aggregator. Clicking the donut routes to /#/device/bank

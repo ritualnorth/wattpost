@@ -1045,6 +1045,21 @@
             <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
           </div>
           <div class="settings-block" data-subroute="privacy">
+            <h3>Kiosk displays</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              A kiosk link opens a read-only, chrome-free wall-display
+              view that doesn't need a login. Create one per screen and
+              revoke it any time. The link is shown to you once &mdash;
+              save it then.
+            </p>
+            <button id="kiosk-create-btn" class="btn-action">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <span>Create kiosk link</span>
+            </button>
+            <div id="kiosk-create-result" class="rotate-pw-result" hidden></div>
+            <div id="kiosk-token-list" class="kiosk-token-list"></div>
+          </div>
+          <div class="settings-block" data-subroute="privacy">
             <h3>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Where this appliance shows up on the cloud fleet map &mdash; or whether it shows up at all.
