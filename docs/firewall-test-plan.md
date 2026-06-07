@@ -5,6 +5,23 @@ Pi image** (not Docker — the firewall is image-only). This is the last
 sign-off item before Phase B is done. Run it once per release that touches
 `netsec` / `wattpost-netctl` / the firewall rules.
 
+## Automated portion (no Pi needed)
+
+The helper's ruleset *logic* is covered by an automated test —
+`packaging/test/netctl-firewall-test.sh` — which runs `wattpost-netctl` in an
+**unprivileged user+net namespace** (no root, no Pi) and asserts: default-deny
+policy, the allowed ports, SSH-port gating, **atomic-replace idempotency**
+(re-apply doesn't duplicate or leak rules), SSH-off recloses port 22, status
+reporting, and teardown. Run it anywhere with `nft` + user namespaces:
+
+```bash
+packaging/test/netctl-firewall-test.sh
+```
+
+What it **can't** cover — and so still needs a real Pi — is the
+hardware/mode behaviour below: **WiFi-client** and **hotspot-AP** modes, and
+real **mDNS / `.local`** resolution. Run those manually.
+
 ## Setup
 
 - Flash the current image, boot, note the LAN IP (`hostname -I`).
