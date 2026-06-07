@@ -104,6 +104,13 @@ from .backup import (
 from ..backup import BackupService
 from .auth_oidc import auth_callback, auth_lan_login, oidc_available
 
+import logging
+# Module logger. Several handlers (patch_device_setting, _audit, the
+# settings-write path) referenced `log` without it ever being defined at
+# module scope — a latent NameError that only fired on their error/log
+# branches. Defining it here fixes all of them.
+log = logging.getLogger(__name__)
+
 
 def _web_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "web"
@@ -1054,10 +1061,71 @@ def login_page(request: Request, state: State) -> File | Response:
             ),
             media_type="text/html",
         )
+    # First run: the password is still the auto-generated one the user
+    # has never seen. Offer an in-browser "create your password" page
+    # instead of an "enter password" form they can't fill. `?signin=1`
+    # forces the normal form for the rare user who DID read the MOTD
+    # password and wants to use it.
+    qs = (request.scope.get("query_string", b"") or b"").decode("latin-1")
+    if _wa.is_first_run() and "signin=1" not in qs:
+        setup = _web_dir() / "login-setup.html"
+        if setup.exists():
+            return File(path=setup, media_type="text/html",
+                        content_disposition_type="inline")
     path = _web_dir() / "login.html"
     if not path.exists():
         raise NotFoundException("login.html missing")
     return File(path=path, media_type="text/html", content_disposition_type="inline")
+
+
+@post("/api/setup/first-run-password", status_code=200)
+async def first_run_password(data: dict, request: Request, state: State) -> Response:
+    """One-time, pre-auth endpoint: set the appliance's web password on
+    first run (while it's still the auto-generated one). Lets a LAN user
+    claim the box in-browser instead of fishing the random password out
+    of the MOTD / docker logs. Self-guards: only works while
+    is_first_run(), and never over the cloud tunnel (cloud users are
+    already authenticated by the broker and onboard via wattpost.cloud)."""
+    from .. import web_auth as _wa
+    if _wa.is_tunnel_origin(request.scope):
+        return Response(
+            {"ok": False, "detail": "set the password on the local network"},
+            status_code=403,
+        )
+    if not _wa.is_first_run():
+        return Response(
+            {"ok": False,
+             "detail": "already set up — sign in with your password"},
+            status_code=409,
+        )
+    pw = (data or {}).get("password") or ""
+    if not isinstance(pw, str) or len(pw) < 8:
+        return Response(
+            {"ok": False, "detail": "password must be at least 8 characters"},
+            status_code=400,
+        )
+    try:
+        _wa.set_user_web_password(pw)
+    except OSError as e:
+        log.exception("first-run password: hash write failed")
+        return Response(
+            {"ok": False, "detail": f"couldn't save the password: {e}"},
+            status_code=500,
+        )
+    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    await _audit(state, event_type="first_run_password_set", payload={"ip": client_ip})
+    # Log them straight in so they land in Settings, not a second prompt.
+    token = _wa.issue_session()
+    nxt = (data or {}).get("next") or "/"
+    if not isinstance(nxt, str) or not nxt.startswith("/") or nxt.startswith("//"):
+        nxt = "/"
+    resp = Response({"ok": True, "redirect": nxt})
+    resp.set_cookie(
+        key=_wa.SESSION_COOKIE_NAME, value=token,
+        max_age=_wa.SESSION_TTL_SECONDS, httponly=True,
+        samesite="lax", path="/", secure=False,
+    )
+    return resp
 
 
 @get("/sso", sync_to_thread=False)
@@ -1711,6 +1779,7 @@ def build_app(
             kiosk_index_mode,
             login_page,
             do_login,
+            first_run_password,
             do_logout,
             sso_redirect,
             # Identity v2 Phase 3 (#305), LAN OIDC login. Both

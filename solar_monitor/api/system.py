@@ -94,10 +94,10 @@ async def auth_status(request: Request, state: State) -> dict[str, Any]:
     # Cookie-based session (local password OR cloud SSO redirect).
     token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
     if not token:
-        return {"authed": False, "origin": None}
+        return {"authed": False, "origin": None, "first_run": _wa.is_first_run()}
     sess = _wa._session_record(token)
     if sess is None:
-        return {"authed": False, "origin": None}
+        return {"authed": False, "origin": None, "first_run": _wa.is_first_run()}
     return {
         "authed": True,
         "origin": sess.get("origin", "local"),
@@ -393,6 +393,9 @@ async def rotate_web_password() -> dict[str, Any]:
         _wa.PASSWORD_PLAINTEXT_PATH.write_text(new_pw + "\n", encoding="utf-8")
     except OSError:
         log.warning("web-password rotate: plaintext mirror write failed (non-fatal)")
+    # Rotating is an explicit user action → we're past first-run; drop
+    # the autogen marker so the onboarding prompt stops appearing.
+    _wa.clear_first_run_marker()
     log.info("web-password rotated via Settings UI")
     return {"ok": True, "password": new_pw}
 

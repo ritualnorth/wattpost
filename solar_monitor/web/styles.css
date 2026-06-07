@@ -4330,6 +4330,34 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
  * rule list with a "Quick templates:" label. Clicking pre-fills the
  * add-rule form so users don't have to learn the metric-path schema
  * or invent thresholds from scratch. */
+/* First-run discovery banner (top of page until the user sets a
+   password or dismisses it for the session). */
+.first-run-banner {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .85rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: .85rem; color: var(--text);
+}
+.first-run-banner .frb-ico { display: flex; color: var(--accent); }
+.first-run-banner .frb-ico svg { width: 16px; height: 16px; }
+.first-run-banner .frb-text { flex: 1 1 auto; min-width: 0; }
+.first-run-banner .frb-cta {
+  flex: 0 0 auto;
+  background: var(--accent); color: var(--bg);
+  padding: .3rem .7rem; border-radius: 7px;
+  text-decoration: none; font-weight: 600; font-size: .82rem;
+}
+.first-run-banner .frb-x {
+  flex: 0 0 auto;
+  background: none; border: none; color: var(--text-3);
+  font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 .2rem;
+}
+@media (max-width: 480px) {
+  .first-run-banner { flex-wrap: wrap; }
+  .first-run-banner .frb-text { flex-basis: 100%; }
+}
+
 /* Quick-start templates: a tidy equal-width grid of two-line tiles
    (name + condition) instead of a ragged row of variable-width pills. */
 .alerts-templates { margin: .35rem 0 1rem; }

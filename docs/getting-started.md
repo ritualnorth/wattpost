@@ -40,8 +40,11 @@ Then:
 6. Slot the SD card into the Pi, plug in your BT dongle, power on.
 7. After ~60 seconds, open `http://wattpost.local` from any browser
    on the same network. If `.local` doesn't resolve, look up the
-   Pi's IP and use that. (No login needed for the dashboard — the
-   username/password above is only for SSH / the console.)
+   Pi's IP and use that. Viewing the dashboard needs no login; the
+   first time you open **Settings**, the appliance asks you to **create
+   a dashboard password** (right there in the browser — no SSH needed).
+   That password gates Settings from then on. The SSH/console
+   username + password you set in Imager is separate.
 
 **No router, no screen, no WiFi set?** A headless Pi on a boat or in a
 van isn't stranded. If the Pi boots with **no network** — you didn't set

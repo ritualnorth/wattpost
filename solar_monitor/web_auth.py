@@ -57,6 +57,13 @@ PASSWORD_HASH_PATH      = _PASSWORD_DIR / "web-password.hash"
 # loss can't half-corrupt the file.
 SESSIONS_PATH           = _PASSWORD_DIR / "sessions.json"
 PASSWORD_PLAINTEXT_PATH = _PASSWORD_DIR / "web-password"
+# Written by ensure_first_boot_password() when it auto-generates the
+# initial password. Its presence means "the current password is the
+# untouched auto-generated one the user has never seen" → the login
+# page offers a one-time in-browser "create your password" step instead
+# of making them fish the random one out of the MOTD / docker logs.
+# Cleared the moment the user sets or rotates their own password.
+FIRST_RUN_MARKER_PATH   = _PASSWORD_DIR / "web-password.autogen"
 SESSION_COOKIE_NAME     = "wp_local_session"
 SESSION_TTL_SECONDS     = 60 * 60 * 24 * 30   # 30 days
 # Paths that don't need auth even on LAN. /kiosk is the wall-display
@@ -74,6 +81,10 @@ ANONYMOUS_PATH_PREFIXES = (
     "/manifest.webmanifest",
     "/service-worker.js",
     "/api/login",
+    # First-run "create your password" POST. Pre-auth by necessity (the
+    # box has an auto-generated password the user has never seen); the
+    # handler self-guards on is_first_run() + rejects tunnel origin.
+    "/api/setup/first-run-password",
     "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
     # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
@@ -195,6 +206,39 @@ def is_demo_mode() -> bool:
 
 def password_is_set() -> bool:
     return PASSWORD_HASH_PATH.is_file() and PASSWORD_HASH_PATH.stat().st_size > 0
+
+
+def is_first_run() -> bool:
+    """True when the web password is still the auto-generated first-boot
+    one (marker present) and we're not in demo mode. Drives the
+    in-browser 'create your password' onboarding so a LAN user can claim
+    the box without SSHing in to read the MOTD."""
+    if is_demo_mode():
+        return False
+    return FIRST_RUN_MARKER_PATH.is_file()
+
+
+def clear_first_run_marker() -> None:
+    """Drop the autogen marker — the current password is no longer the
+    untouched auto-generated one. Best-effort; idempotent."""
+    try:
+        FIRST_RUN_MARKER_PATH.unlink()
+    except OSError:
+        pass
+
+
+def set_user_web_password(plaintext: str) -> None:
+    """Persist a user-CHOSEN web password (the first-run flow): write the
+    hash, drop the autogen marker, and remove the plaintext mirror. A
+    secret the user picked themselves shouldn't sit on disk in the clear
+    the way the throwaway auto-generated one did (which we kept only so
+    the MOTD could surface it)."""
+    write_password_hash(plaintext)
+    clear_first_run_marker()
+    try:
+        PASSWORD_PLAINTEXT_PATH.unlink()
+    except OSError:
+        pass
 
 
 def verify_password(plaintext: str) -> bool:
@@ -511,6 +555,13 @@ def ensure_first_boot_password() -> str | None:
     # Docker installs can both show it. Best-effort.
     try:
         PASSWORD_PLAINTEXT_PATH.write_text(plaintext + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    # Mark this as the untouched auto-generated password so the login
+    # page offers the in-browser "create your password" step until the
+    # user picks their own (or rotates).
+    try:
+        FIRST_RUN_MARKER_PATH.write_text("auto-generated\n", encoding="utf-8")
     except OSError:
         pass
     log.warning("=" * 64)

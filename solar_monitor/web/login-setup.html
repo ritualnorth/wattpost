@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Set up · WattPost</title>
+  <meta name="theme-color" content="#0a0d12" id="meta-theme-color"/>
+  <script>
+    // Resolve theme before paint so the form doesn't flash light.
+    (function () {
+      try {
+        var pref = localStorage.getItem("wp-theme") || "system";
+        var resolved = pref === "system"
+          ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark")
+          : pref;
+        document.documentElement.setAttribute("data-theme", resolved);
+      } catch (_) { document.documentElement.setAttribute("data-theme", "dark"); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/web/styles.css?v=82"/>
+  <style>
+    /* Mirrors login.html's one-off layout — kept page-local so we don't
+     * touch the main app stylesheet for a single route. */
+    body.login-page { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 2rem; }
+    .login-card {
+      width: 100%; max-width: 380px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    }
+    [data-theme="light"] .login-card { box-shadow: 0 8px 32px rgba(15,23,42,0.08); }
+    .login-brand { display: flex; align-items: center; gap: .55rem; justify-content: center; margin-bottom: .5rem; color: var(--text); font-weight: 700; }
+    .login-card h1 { margin: 0 0 .25rem; font-size: 1.15rem; text-align: center; }
+    .login-card .sub { color: var(--text-2); font-size: .88rem; text-align: center; margin: 0 0 1.25rem; line-height: 1.5; }
+    .login-card label { display: block; font-size: .8rem; color: var(--text-2); margin: .85rem 0 .35rem; }
+    .login-card input {
+      width: 100%;
+      padding: .65rem .8rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit; font-size: .95rem;
+    }
+    .login-card input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .login-card button {
+      width: 100%; margin-top: 1.25rem;
+      padding: .7rem 1rem;
+      background: var(--accent); color: var(--bg);
+      border: none; border-radius: 8px;
+      font-family: inherit; font-size: .95rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .login-card button:disabled { opacity: .6; cursor: progress; }
+    .login-err { color: #f85149; font-size: .82rem; margin-top: .75rem; min-height: 1.1em; }
+    .login-foot { color: var(--text-2); font-size: .78rem; text-align: center; margin-top: 1.25rem; line-height: 1.5; }
+    .login-foot a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body class="login-page">
+  <form class="login-card" id="setup-form" autocomplete="on">
+    <div class="login-brand">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="3" width="20" height="12" rx="1"/>
+        <line x1="7" y1="15" x2="7" y2="22"/>
+        <line x1="17" y1="15" x2="17" y2="22"/>
+        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z" fill="currentColor" stroke="none"/>
+      </svg>
+      <span>WattPost</span>
+    </div>
+    <h1>Set up your appliance</h1>
+    <p class="sub">Choose a password to protect Settings. The dashboard stays viewable on your network without it.</p>
+
+    <label for="password">New password</label>
+    <input id="password" name="password" type="password" required minlength="8" autocomplete="new-password" autofocus placeholder="At least 8 characters"/>
+
+    <label for="confirm">Confirm password</label>
+    <input id="confirm" name="confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Type it again"/>
+
+    <button type="submit" id="submit">Set password &amp; continue</button>
+    <p class="login-err" id="err" aria-live="polite"></p>
+    <p class="login-foot">
+      Already have a password? <a href="/login?signin=1">Sign in instead</a>.
+    </p>
+  </form>
+  <script>
+    const form = document.getElementById("setup-form");
+    const err  = document.getElementById("err");
+    const btn  = document.getElementById("submit");
+    const params = new URLSearchParams(location.search);
+    const nxt = params.get("next") || "/";
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      err.textContent = "";
+      const pw = form.password.value;
+      const cf = form.confirm.value;
+      if (pw.length < 8) { err.textContent = "Use at least 8 characters."; return; }
+      if (pw !== cf)     { err.textContent = "The passwords don't match."; return; }
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/setup/first-run-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pw, next: nxt }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.ok) {
+          err.textContent = d.detail || `Setup failed (HTTP ${r.status})`;
+        } else {
+          location.href = d.redirect || "/";
+          return;
+        }
+      } catch (e) {
+        err.textContent = String(e);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

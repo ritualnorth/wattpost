@@ -5161,6 +5161,30 @@ function _setAuthState(authed, origin) {
 }
 window._setAuthState = _setAuthState;  // for wireHeaderAuth handoff
 
+// First-run discovery banner. When the appliance is still on its
+// auto-generated password (auth-status → first_run:true) and the
+// viewer isn't authed, nudge them to claim it in-browser so they never
+// have to fish the random password out of the MOTD / docker logs.
+// Dismissible for the session.
+let _firstRunBannerShown = false;
+function showFirstRunBanner() {
+  if (_firstRunBannerShown) return;
+  try { if (sessionStorage.getItem("wp-firstrun-dismissed") === "1") return; } catch (_) {}
+  _firstRunBannerShown = true;
+  const bar = document.createElement("div");
+  bar.className = "first-run-banner";
+  bar.innerHTML =
+    '<span class="frb-ico">' + (typeof _ico === "function" ? _ico("lock") : "") + '</span>' +
+    '<span class="frb-text">Secure this appliance — set a password to protect Settings.</span>' +
+    '<a class="frb-cta" href="/login?next=/%23/settings">Set password</a>' +
+    '<button class="frb-x" type="button" aria-label="Dismiss">&times;</button>';
+  bar.querySelector(".frb-x").addEventListener("click", () => {
+    try { sessionStorage.setItem("wp-firstrun-dismissed", "1"); } catch (_) {}
+    bar.remove();
+  });
+  document.body.insertBefore(bar, document.body.firstChild);
+}
+
 // Settings sub-routes (#328). Menu landing when sub is null; each
 // sub renders only its own block group via CSS on body[data-route-sub].
 const SETTINGS_SUBROUTES = new Set([
@@ -8339,6 +8363,7 @@ if (rotatePwBtn) {
       const authed = !!(data && data.authed);
       const origin = data && data.origin;
       if (typeof window._setAuthState === "function") window._setAuthState(authed, origin);
+      if (data && data.first_run && !authed) showFirstRunBanner();
       if (authed) {
         signoutBtn.dataset.origin = origin || "local";
         signoutBtn.hidden = false;

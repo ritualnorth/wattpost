@@ -1,23 +1,14 @@
 # Local web password
 
-The WattPost local dashboard (the page at `http://wattpost.local`) is **unauthenticated by default**. Anyone on your LAN can view + change config. Same trust model as Pi-hole, Home Assistant Yellow, Solar Assistant. Most off-grid users have a single trusted network, and the cloud tunnel is the strong-auth surface for remote access.
+**Viewing** the WattPost dashboard (the page at `http://wattpost.local`) needs no login — anyone on your LAN can see it, the same read-only trust model as Pi-hole, Home Assistant, Solar Assistant. **Changing anything (Settings)** requires a password.
 
-## When to set a local password
+On first boot the appliance generates a random password so the box is never wide open. The **first time you open Settings in the browser**, it prompts you to **create your own password** — no SSH required. That's the normal path for most people. (The cloud tunnel at `<slug>.wattpost.io` has its own strong auth and bypasses the local password.)
 
-You want one if:
+## Setting your password
 
-- Your LAN has guests you don't fully trust
-- You're on a shared / corporate / multi-tenant network
-- A nervous family member keeps hitting "Restart daemon" by accident
+The easy way: open **Settings** on the dashboard. On a fresh appliance you get a one-time **"Set up your appliance → create a password"** screen — pick one and you're in.
 
-You probably don't need one if:
-
-- It's your own home LAN
-- You access the dashboard primarily through the cloud tunnel (`<slug>.wattpost.io`), which has its own auth
-
-## Setting one
-
-On the Pi's console — or over SSH, if you enabled it — run `wattpost-config` → **Set / reset web password**. A random `wattpost-<5-hex>` password is generated, hashed (argon2), stored at `/etc/wattpost/web-password.hash`. The plaintext is also written to `/etc/wattpost/web-password` so the MOTD shows it on next login.
+If you'd rather do it from the Pi's console — or over SSH, if you enabled it — run `wattpost-config` → **Set / reset web password**. A random `wattpost-<5-hex>` password is generated, hashed (argon2), stored at `/etc/wattpost/web-password.hash`. The plaintext is also written to `/etc/wattpost/web-password` so the MOTD shows it on next login.
 
 ```
 $ wattpost-config
