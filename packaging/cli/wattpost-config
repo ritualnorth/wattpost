@@ -190,6 +190,40 @@ action_clear_local_password() {
     msg "Cleared" "Local password removed. Any LAN client can now access the dashboard. Set a new one any time via this menu."
 }
 
+action_firewall_off() {
+    # Recovery escape hatch for the inbound firewall (cloud #15, Phase B).
+    # If a firewall rule has locked you out of the dashboard, this turns it
+    # off durably (web.firewall_enabled: false) and restarts the daemon,
+    # which reconciles the host back to wide-open on the LAN. SSH is left as
+    # configured. The YAML edit is inlined (atomic, with a .bak) rather than
+    # importing the API layer, so it still works when the app is unhealthy.
+    needs_root || return 0
+    if ! confirm "Disable inbound firewall?" "Recovery switch. Turns the host firewall OFF and restarts the daemon, so the appliance is reachable on the LAN again.\n\nUse this if a firewall rule has locked you out of the dashboard. SSH stays as configured.\n\nContinue?"; then
+        return 0
+    fi
+    if ${SUDO} /opt/wattpost/venv/bin/python - "${CONFIG_FILE}" <<'PY'
+import sys, yaml, shutil
+from pathlib import Path
+p = Path(sys.argv[1])
+raw = (yaml.safe_load(p.read_text()) if p.exists() else {}) or {}
+web = raw.get("web")
+web = web if isinstance(web, dict) else {}
+web["firewall_enabled"] = False
+raw["web"] = web
+if p.exists():
+    shutil.copy2(p, p.with_suffix(p.suffix + ".bak"))
+tmp = p.with_suffix(p.suffix + ".tmp")
+tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+tmp.replace(p)
+PY
+    then
+        ${SUDO} systemctl restart wattpost
+        msg "Firewall disabled" "The inbound firewall is OFF and the daemon has restarted — the dashboard is reachable on the LAN again.\n\nRe-enable it any time from Settings → Security once you're back in."
+    else
+        msg "Couldn't disable firewall" "Editing ${CONFIG_FILE} failed. Manual fallback: set 'firewall_enabled: false' under the 'web:' section of ${CONFIG_FILE}, then run 'sudo systemctl restart wattpost'."
+    fi
+}
+
 action_pair_status() {
     if grep -qE '^  bearer_token:' "${CONFIG_FILE}" 2>/dev/null; then
         local label tunnel
@@ -305,6 +339,7 @@ main_menu() {
                 "9" "Check for updates" \
                 "11" "Slot status (#36 atomic-swap)" \
                 "12" "Roll back to previous slot" \
+                "13" "Disable firewall (recovery)" \
                 "10" "Reboot Pi" \
                 "0" "About WattPost" \
                 3>&1 1>&2 2>&3) || break
@@ -321,6 +356,7 @@ main_menu() {
                 10) action_reboot ;;
                 11) action_slot_status ;;
                 12) action_rollback ;;
+                13) action_firewall_off ;;
                 0) action_about ;;
             esac
         else
@@ -339,6 +375,7 @@ main_menu() {
             echo "  10) Reboot Pi"
             echo "  11) Slot status"
             echo "  12) Roll back to previous slot"
+            echo "  13) Disable firewall (recovery)"
             echo "  0) About"
             echo "  q) Quit"
             printf 'Choice: '
@@ -356,6 +393,7 @@ main_menu() {
                 10) action_reboot ;;
                 11) action_slot_status ;;
                 12) action_rollback ;;
+                13) action_firewall_off ;;
                 0) action_about ;;
                 q|Q) break ;;
             esac
@@ -372,6 +410,7 @@ case "${1:-}" in
     --pair-status)   action_pair_status ;;
     --update-check)  action_update_check ;;
     --about)         action_about ;;
+    --firewall-off)  action_firewall_off ;;
     "")              main_menu ;;
     *)
         cat <<EOF
@@ -385,6 +424,7 @@ With no option, opens the interactive menu.
   --pair-status   Show whether we're paired with the cloud
   --update-check  Ask the daemon if an update is available
   --about         Print version + hostname + URL
+  --firewall-off  Disable the inbound firewall + restart (recovery)
 EOF
         ;;
 esac

@@ -1,4 +1,9 @@
-# About the "Not Secure" warning
+# Security
+
+How the WattPost appliance is secured on your network, and what you can do
+to harden it further.
+
+## The "Not Secure" browser warning
 
 You'll see **"Not Secure"** in your browser's URL bar when you open
 WattPost via `http://<pi-ip>/` on the LAN. **This is normal and
@@ -115,3 +120,48 @@ small, **root-owned helper that understands only two fixed commands**
 locked-down sudo rule. The helper owns the ruleset; the app can only flip
 the predefined switches — so even a compromised dashboard can't author its
 own firewall rules or run arbitrary commands as root.
+
+> **Locked yourself out?** If a firewall rule ever blocks the dashboard,
+> get to the Pi's console (keyboard + screen, or SSH if it's on) and run
+> `sudo wattpost-config --firewall-off` — that disables the firewall and
+> restarts the daemon so the LAN can reach it again.
+
+## What's actually exposed on the LAN
+
+On your network the appliance listens on **one port (80)** for the
+dashboard and local API, plus mDNS so `wattpost.local` resolves. With login
+required by default, another device on the LAN can't read your data or
+change settings without the password (or a scoped, revocable kiosk token).
+SSH is closed unless you turn it on. Everything else inbound is dropped by
+the firewall.
+
+The one thing that doesn't change: **LAN traffic is plain HTTP**. On a
+network you don't fully trust, reach the appliance over the **cloud tunnel**
+(HTTPS) rather than its LAN IP, so your login isn't sent in the clear.
+
+## The real lateral-movement control: network segmentation
+
+The host firewall guards the *appliance's* own front door. It does **not**:
+
+- stop a compromised appliance from reaching the rest of your network, or
+- protect your other devices from each other.
+
+For that you want **network segmentation** — the single most effective
+thing you can do for any IoT device, WattPost included. Put the appliance
+(and your cameras, smart plugs, TVs and other IoT) on a **separate network
+from your trusted machines** (laptops, phones, NAS, work devices):
+
+- **Easy:** most home routers have a **"Guest" Wi-Fi network** — switch it
+  on and join the appliance to it. Guest networks are isolated from the
+  main LAN by default.
+- **Advanced:** a dedicated **IoT VLAN**, with rules that let the segment
+  reach the internet but **block it from initiating connections to your
+  trusted LAN**.
+
+Either way, if any device on that segment is ever compromised, it can't
+pivot to your laptop or NAS. A host firewall can't substitute for this —
+they solve different problems, and segmentation is the one that *contains*
+a breach. (Trade-off: with the appliance on an isolated segment, browse it
+via the cloud tunnel, or hop onto the same segment when you want local
+access — cross-segment LAN browsing is what the isolation deliberately
+blocks.)
