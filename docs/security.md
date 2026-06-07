@@ -67,3 +67,51 @@ If you'd rather skip the broker entirely, the appliance still binds
 `0.0.0.0:<port>` on your LAN, put it behind your own VPN / reverse
 proxy. See [Remote access](/docs/remote-access) for the unsupported
 options.
+
+## Host firewall & SSH (Pi appliance)
+
+The SD-card (Pi) appliance ships with two host-level hardening switches,
+both controlled from **Settings** (or `web.firewall_enabled` /
+`web.ssh_enabled` in the config file). They're **Pi-image only** — Docker
+installs skip them, because there Docker and the host already own the
+firewall.
+
+### Inbound firewall — on by default
+
+An nftables firewall guards the appliance with a **default-deny** policy on
+incoming connections. Only what the appliance actually needs is allowed in:
+
+- the dashboard (port 80),
+- mDNS, so `wattpost.local` keeps resolving,
+- DHCP, plus the hotspot's DHCP/DNS (harmless when the hotspot is off),
+- SSH (port 22) **only while SSH is enabled** (see below).
+
+Everything else arriving from the network is dropped. Outbound traffic is
+left open — that's how the appliance reaches the cloud, MQTT, ntfy and your
+other integrations. The toggle is also the master escape hatch: if a rule
+ever misbehaves, turn the firewall off in Settings and the appliance is
+back to wide-open on the LAN.
+
+### SSH — off by default
+
+The Pi image ships with **sshd disabled and no built-in login account** —
+there's no default password to guess. Turning **SSH on** in Settings both
+starts sshd and opens port 22 in the firewall; turning it off stops sshd
+and recloses the port. You still need your own user + SSH key (set in
+Raspberry Pi Imager when you flash the card) to actually log in.
+
+> **Heads-up if you install or update over SSH:** because SSH is off by
+> default, the appliance closes port 22 the next time the service starts,
+> which drops your session. If you rely on SSH, enable it first — set
+> `web.ssh_enabled: true` before installing, or use the Settings toggle
+> once you're in the dashboard. Locked out? Re-enable SSH from the
+> dashboard, or attach a keyboard + screen to the Pi.
+
+### How it stays safe
+
+The dashboard never touches the firewall or sshd directly. It calls a
+small, **root-owned helper that understands only two fixed commands**
+(`status`, and `apply <firewall on/off> <ssh on/off>`) through a
+locked-down sudo rule. The helper owns the ruleset; the app can only flip
+the predefined switches — so even a compromised dashboard can't author its
+own firewall rules or run arbitrary commands as root.

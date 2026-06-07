@@ -338,6 +338,50 @@ if [ -f "${SCRIPT_DIR}/systemd/wattpost-rollback.service" ]; then
         /etc/systemd/system/wattpost-rollback.service
 fi
 
+# ----- host network hardening: firewall + SSH control (cloud #15, Phase B) -----
+# A root-owned, fixed-verb helper + a narrow sudoers grant let the
+# unprivileged wattpost daemon reconcile the inbound nftables firewall
+# and sshd to the configured state (web.firewall_enabled / web.ssh_enabled).
+# The daemon applies this on every boot (cli.cmd_serve -> netsec.reconcile),
+# so this step just puts the helper, its sudoers rule, and nft in place;
+# the service restart at the end of install brings the ruleset up. Pi image
+# only — on Docker/dev the daemon no-ops (netsec.is_supported() is False).
+if [ -f "${SCRIPT_DIR}/sbin/wattpost-netctl" ]; then
+    step "installing host network control helper (firewall + SSH)"
+    install -d /usr/local/sbin
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/sbin/wattpost-netctl" /usr/local/sbin/wattpost-netctl
+
+    # nftables provides `nft`, the firewall backend the helper drives. The
+    # daemon re-applies the ruleset every boot, so we need the binary, not
+    # nftables.service persistence. Best-effort: a no-op firewall (helper
+    # skips it) is harmless until nft lands.
+    if ! command -v nft >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
+        apt-get update -qq || true
+        apt-get install -y nftables || warn "couldn't install nftables — firewall stays a no-op until it's present"
+    fi
+
+    # Separate sudoers fragment, validated before activating. Grants ONLY
+    # the fixed-verb helper (see packaging/sudoers.d/wattpost-netctl) — not
+    # arbitrary root.
+    NETCTL_SUDOERS="/etc/sudoers.d/wattpost-netctl"
+    install -m 0440 "${SCRIPT_DIR}/sudoers.d/wattpost-netctl" "${NETCTL_SUDOERS}.tmp"
+    if visudo -cf "${NETCTL_SUDOERS}.tmp" >/dev/null; then
+        install -m 0440 -o root -g root "${NETCTL_SUDOERS}.tmp" "${NETCTL_SUDOERS}"
+    else
+        warn "wattpost-netctl sudoers failed validation — firewall/SSH toggles will be inert"
+    fi
+    rm -f "${NETCTL_SUDOERS}.tmp"
+
+    # Lockout guard. SSH defaults OFF, so the daemon will disable sshd and
+    # close port 22 when it restarts at the end of this install. If you're
+    # installing over SSH and need it, enable SSH first or you'll be cut off.
+    if [ -n "${SSH_CONNECTION:-}" ]; then
+        warn "you're connected over SSH, and SSH is OFF by default — the firewall will close port 22 when the daemon restarts."
+        warn "to keep SSH: set web.ssh_enabled: true in ${CONFIG_FILE} before this finishes, or re-enable later from the local dashboard (Settings) / console."
+    fi
+fi
+
 # ----- cloudflared (optional, for cloud tunnel) -----
 # Install Cloudflare's cloudflared binary so the daemon can expose
 # the local dashboard at <slug>.wattpost.io once it's paired to the
