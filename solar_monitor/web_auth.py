@@ -74,7 +74,10 @@ SESSION_TTL_SECONDS     = 60 * 60 * 24 * 30   # 30 days
 # /api endpoints that the kiosk + dashboard polls need to work
 # anonymously when in read-only-public mode.
 ANONYMOUS_PATH_PREFIXES = (
-    "/kiosk",
+    # NB: /kiosk is NOT here. With login mandatory (cloud #15) a wall
+    # display authenticates with a kiosk token (?token= -> kiosk cookie,
+    # granted the read-only KIOSK allow-list by the middleware). Leaving
+    # /kiosk anonymous would re-open the exact public-view hole we closed.
     "/web/",
     # Prometheus scrape endpoint (#14). Scrapers don't carry a session;
     # it's read-only LAN telemetry (same data as /kiosk + /api/snapshot)

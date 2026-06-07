@@ -1327,6 +1327,9 @@ def manifest() -> File:
 KIOSK_BROKER_GET_PATHS = (
     "/kiosk", "/api/snapshot", "/api/devices", "/api/poll_run",
     "/api/today", "/api/energy/today", "/api/weather", "/api/kiosk/config",
+    # Live-update stream so a token'd LAN wall display gets real-time
+    # data, not just the polling fallback. Read-only SSE.
+    "/api/stream",
     "/web/", "/static/",
 )
 
@@ -1496,11 +1499,12 @@ def build_app(
     #   - everything else: needs a valid wp_local_session cookie
     #     → 401 (for /api/*) or redirect to /login (for HTML routes)
     from .. import web_auth as _web_auth
-    # Allow GETs on any path while we ship the strict default. This
-    # gives existing installs a soft landing, the password is set
-    # silently, the UI keeps loading, and writes start prompting for
-    # login. Operator can flip strict mode in Settings later.
-    _READONLY_PUBLIC = True
+    # Login is mandatory for the whole appliance by default (cloud #15).
+    # Anonymous LAN viewing only happens when the operator explicitly
+    # opts in via `web.public_view` (a deliberately-public box). Wall
+    # displays use a kiosk token regardless. Loopback + cloud-broker
+    # still bypass; the first-run flow makes sure a password exists.
+    _READONLY_PUBLIC = bool(getattr(config, "web", None) and config.web.public_view)
 
     class _LocalAuthMiddleware:
         def __init__(self, app):

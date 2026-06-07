@@ -587,15 +587,16 @@ function setStatus(cls, text) {
 }
 
 // ---------- api ----------
-// Kiosk-via-tunnel uses ?key=<token> bearer auth (see middleware in
-// solar_monitor/api/app.py). When the page was loaded at
-// /kiosk?key=<token>, every subsequent /api/* fetch needs to carry
-// that same key or the appliance will 401. Captured once at load
-// from window.location and re-applied to outgoing URLs.
+// Local kiosk auth (cloud #15). A wall display is opened at
+// /kiosk?token=<token>; the appliance middleware verifies the token on
+// each kiosk-scoped GET and grants the read-only kiosk allow-list. We
+// capture the token once at load and re-attach it to every outgoing
+// /api/* fetch (+ the SSE stream) so they keep authing. Accepts the
+// path-segment kiosk routes (/kiosk and /kiosk/<mode>).
 const KIOSK_KEY_PARAM = (() => {
   try {
-    if (window.location.pathname !== "/kiosk") return "";
-    return new URLSearchParams(window.location.search).get("key") || "";
+    if (!window.location.pathname.startsWith("/kiosk")) return "";
+    return new URLSearchParams(window.location.search).get("token") || "";
   } catch (_) { return ""; }
 })();
 
@@ -620,7 +621,7 @@ function _withKiosk(path) {
   // parties on absolute URLs). The appliance API is always relative.
   if (/^https?:/.test(path)) return path;
   const sep = path.includes("?") ? "&" : "?";
-  return `${path}${sep}key=${encodeURIComponent(KIOSK_KEY_PARAM)}`;
+  return `${path}${sep}token=${encodeURIComponent(KIOSK_KEY_PARAM)}`;
 }
 async function api(path) {
   const r = await fetch(_withKiosk(path));
@@ -876,7 +877,10 @@ function openStream() {
     return;
   }
   try {
-    eventStream = new EventSource("/api/stream");
+    // _withKiosk attaches the kiosk ?token= when in kiosk mode so a
+    // token'd wall display gets live updates; a no-op otherwise (the
+    // session cookie auths the stream for a normal logged-in dashboard).
+    eventStream = new EventSource(_withKiosk("/api/stream"));
   } catch (e) {
     console.warn("EventSource unavailable, falling back to polling", e);
     startPollingFallback();

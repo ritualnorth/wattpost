@@ -511,6 +511,17 @@ class KioskCfg(msgspec.Struct, kw_only=True):
     skin: str = "halo"       # active skin: halo | ember | command
 
 
+class WebCfg(msgspec.Struct, kw_only=True):
+    """Local web UI security toggles (cloud #15). Phase B will grow the
+    SSH + firewall toggles here."""
+    # When True, anyone on the LAN can VIEW the dashboard + read the
+    # public API endpoints without logging in (the legacy read-only-
+    # public behaviour). Default False: login is required for the whole
+    # appliance. Wall displays use a kiosk token regardless of this
+    # flag. This is the explicit opt-out for a deliberately-public box.
+    public_view: bool = False
+
+
 class Config(msgspec.Struct, kw_only=True):
     # SQLite storage path. Read by cli._resolve_db_path. v0.0.60 added
     # the read logic but I FORGOT to add the field here, so msgspec
@@ -546,6 +557,7 @@ class Config(msgspec.Struct, kw_only=True):
     mqtt_in: MqttInCfg | None = None     # optional, ingest from user's MQTT broker (#256)
     hotspot: HotspotCfg | None = None    # optional, appliance-as-WiFi-AP (Pillar 3, off by default)
     kiosk: KioskCfg | None = None        # optional, wall-display kiosk defaults (skin + default-on), appliance-side so they travel
+    web: WebCfg | None = None            # optional, local UI security toggles (cloud #15); login mandatory unless web.public_view
 
 
 # #258, default alert rules seeded on first boot. System-voltage-

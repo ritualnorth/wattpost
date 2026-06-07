@@ -254,7 +254,7 @@ _RESTORE_ALLOWED_TOPLEVEL = frozenset({
     # silently dropped the user's WiFi-AP/onboarding config and their
     # release-channel choice. Keep this in sync with Config's top-level
     # fields — tests/test_backup_selective_restore.py guards against drift.
-    "hotspot", "update", "kiosk",
+    "hotspot", "update", "kiosk", "web",
 })
 
 # Substring patterns matched (case-insensitive) against any dict key.
