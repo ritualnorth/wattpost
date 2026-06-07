@@ -313,6 +313,21 @@ class UpdateCfg(msgspec.Struct, kw_only=True):
     """
     channel: str = "stable"
 
+    # --- auto-apply (Phase C, cloud#15) ---
+    # Opt-in unattended apply of *signed* releases on `channel`. Default off:
+    # the box only surfaces the "update available" badge; a human applies. When
+    # on, the daemon applies a release only once it (a) is newer, (b) is on the
+    # configured channel, (c) verifies against the pinned release key
+    # (fail-closed, see update/release_verify.py), and (d) has "baked" for
+    # min_release_age_hours. Never gates security — the manual apply and the
+    # cloud remote-apply work regardless of this flag.
+    auto_apply: bool = False
+    # "Baked" cadence: how long a release must have been published before an
+    # auto-apply box on `stable` takes it. Paired/beta users get it sooner and
+    # act as the canary cohort, so a bad release surfaces before it reaches the
+    # unattended stable fleet. 0 = apply as soon as it's seen.
+    min_release_age_hours: int = 48
+
 
 class DiscoveryCfg(msgspec.Struct, kw_only=True):
     """Anonymous hardware-discovery telemetry (#129).
