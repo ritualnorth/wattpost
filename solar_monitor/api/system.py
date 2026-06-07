@@ -435,6 +435,79 @@ async def kiosk_tokens_revoke(tid: str) -> dict[str, Any]:
     return {"ok": True}
 
 
+# --------------------------------------------------------------------------
+# Host network security: inbound firewall + SSH toggles (cloud #15, Phase B).
+# Persist to config (web.*), apply live via the root helper (no-op off-Pi).
+# --------------------------------------------------------------------------
+
+class _NetToggle(msgspec.Struct, kw_only=True):
+    enabled: bool
+
+
+def _persist_web_key(config_path: str, key: str, value) -> None:
+    """Write a single web.<key> into config.yaml, preserving siblings.
+    Atomic .tmp-rename with a .bak, same shape as set_update_channel."""
+    import yaml as _yaml
+    import shutil as _shutil
+    from pathlib import Path as _Path
+    path = _Path(config_path)
+    raw = (_yaml.safe_load(path.read_text()) if path.exists() else {}) or {}
+    web = raw.get("web") or {}
+    if not isinstance(web, dict):
+        web = {}
+    web[key] = value
+    raw["web"] = web
+    if path.exists():
+        _shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
+    tmp.replace(path)
+
+
+def _netsec_state(state, *, firewall=None, ssh=None) -> dict[str, Any]:
+    """Apply firewall/ssh changes (None = leave as configured), persist,
+    and return the desired-vs-actual status."""
+    from .. import netsec as _ns
+    from ..config import WebCfg
+    config = state.get("config") if hasattr(state, "get") else state["config"]
+    config_path: str = state.get("config_path", "config.yaml")
+    web = (getattr(config, "web", None) or WebCfg()) if config is not None else WebCfg()
+    fw = web.firewall_enabled if firewall is None else bool(firewall)
+    sh = web.ssh_enabled if ssh is None else bool(ssh)
+    if config is not None:
+        config.web = WebCfg(public_view=web.public_view,
+                            firewall_enabled=fw, ssh_enabled=sh)
+    if firewall is not None:
+        _persist_web_key(config_path, "firewall_enabled", fw)
+    if ssh is not None:
+        _persist_web_key(config_path, "ssh_enabled", sh)
+    ok, detail = (_ns.apply(fw, sh) if (firewall is not None or ssh is not None)
+                  else (True, ""))
+    live = _ns.status()
+    return {
+        "ok": ok, "detail": detail, "supported": live["supported"],
+        "firewall": {"desired": fw, "actual": live["firewall"]},
+        "ssh": {"desired": sh, "actual": live["ssh"]},
+    }
+
+
+@get("/api/system/netsec")
+async def netsec_status(state: State) -> dict[str, Any]:
+    return _netsec_state(state)
+
+
+@post("/api/system/netsec/firewall")
+async def netsec_set_firewall(data: _NetToggle, state: State) -> dict[str, Any]:
+    log.info("firewall toggle -> %s", data.enabled)
+    return _netsec_state(state, firewall=data.enabled)
+
+
+@post("/api/system/netsec/ssh")
+async def netsec_set_ssh(data: _NetToggle, state: State) -> dict[str, Any]:
+    log.info("ssh toggle -> %s", data.enabled)
+    return _netsec_state(state, ssh=data.enabled)
+
+
 @post("/api/system/update/check", status_code=202)
 async def update_check_now(state: State) -> dict[str, Any]:
     """Force a one-off manifest fetch, Settings UI's "Check now"

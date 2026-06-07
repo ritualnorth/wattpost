@@ -8371,6 +8371,53 @@ if (kioskCreateBtn) {
   });
   loadKioskTokens();
 }
+
+// Network security toggles (cloud #15, Phase B). Firewall + SSH; Pi only.
+// Off-Pi the API reports supported:false — we still let the user set the
+// config (it applies once running on a Pi) and surface that clearly.
+async function loadNetsec() {
+  if (!document.getElementById("settings-netsec-block")) return;
+  try {
+    const r = await fetch("/api/system/netsec", { credentials: "include" });
+    if (!r.ok) return;
+    const j = await r.json();
+    const fw = document.getElementById("netsec-firewall-toggle");
+    const ssh = document.getElementById("netsec-ssh-toggle");
+    const uns = document.getElementById("netsec-unsupported");
+    if (fw) fw.checked = !!(j.firewall && j.firewall.desired);
+    if (ssh) ssh.checked = !!(j.ssh && j.ssh.desired);
+    if (uns) uns.hidden = !!j.supported;
+  } catch (_) {}
+}
+async function netsecSet(kind, enabled, el) {
+  const msg = document.getElementById("netsec-msg");
+  if (el) el.disabled = true;
+  if (msg) msg.textContent = "";
+  try {
+    const r = await fetch(`/api/system/netsec/${kind}`, {
+      method: "POST", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.detail || `HTTP ${r.status}`);
+    if (msg) msg.textContent = j.supported ? "Applied." : "Saved — applies when running on a Pi.";
+  } catch (e) {
+    if (msg) msg.textContent = "Couldn't update: " + (e.message || e);
+  } finally {
+    if (el) el.disabled = false;
+  }
+}
+const _nsFw = $("#netsec-firewall-toggle");
+const _nsSsh = $("#netsec-ssh-toggle");
+if (_nsFw) _nsFw.addEventListener("change", () => netsecSet("firewall", _nsFw.checked, _nsFw));
+if (_nsSsh) _nsSsh.addEventListener("change", () => {
+  if (_nsSsh.checked && !confirm("Enable SSH?\n\nThis starts the SSH server and opens port 22. You still need your own key or user (set in Raspberry Pi Imager) to log in — there's no default login.")) {
+    _nsSsh.checked = false; return;
+  }
+  netsecSet("ssh", _nsSsh.checked, _nsSsh);
+});
+if (_nsFw || _nsSsh) loadNetsec();
 // #292, Make the SoC donut click into the bank detail page.
 // The bank device's label is the literal string "bank", set by
 // the aggregator. Clicking the donut routes to /#/device/bank

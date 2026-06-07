@@ -121,6 +121,15 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # once the hash file exists this is a no-op.
     from . import web_auth as _wa
     _wa.ensure_first_boot_password()
+    # Reconcile the host firewall + sshd to the configured state (cloud #15).
+    # Best-effort and a no-op anywhere the root helper isn't installed (Docker,
+    # dev), so it never blocks startup.
+    try:
+        from . import netsec as _ns
+        _ns.reconcile(getattr(config, "web", None))
+    except Exception:
+        logging.getLogger("solar_monitor.cli").warning(
+            "netsec reconcile on boot failed (non-fatal)", exc_info=True)
     db_path = _resolve_db_path(args, config)
     app = build_app(
         config=config,

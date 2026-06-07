@@ -1086,6 +1086,26 @@
             </fieldset>
             <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
+          <div class="settings-block" id="settings-netsec-block" data-subroute="advanced">
+            <h3>Network security <span class="settings-foot" style="font-weight:normal">&middot; Pi only</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Host-level protection for the Pi image. Docker installs
+              manage their own firewall, so these don't apply there.
+            </p>
+            <p class="settings-foot" id="netsec-unsupported" hidden style="margin:.1rem 0 .55rem;color:var(--text-3)">
+              Not available on this install &mdash; changes are saved and
+              take effect when running on a Pi.
+            </p>
+            <label class="settings-row" style="cursor:pointer;align-items:flex-start;gap:.75rem">
+              <span><strong>Inbound firewall</strong><br/><span class="settings-foot">Default-deny: only the dashboard, local discovery (mDNS/DHCP), and &mdash; when enabled &mdash; SSH are reachable from the network. On by default.</span></span>
+              <input type="checkbox" id="netsec-firewall-toggle" style="margin-top:.3rem;flex:0 0 auto"/>
+            </label>
+            <label class="settings-row" style="cursor:pointer;align-items:flex-start;gap:.75rem">
+              <span><strong>SSH access</strong><br/><span class="settings-foot">Off by default. Enabling starts the SSH server and opens port&nbsp;22. You still need your own key or user (set in Raspberry&nbsp;Pi Imager) to log in &mdash; there's no default login.</span></span>
+              <input type="checkbox" id="netsec-ssh-toggle" style="margin-top:.3rem;flex:0 0 auto"/>
+            </label>
+            <p class="settings-foot" id="netsec-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
+          </div>
           <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
             <h3>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
