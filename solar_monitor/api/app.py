@@ -91,6 +91,7 @@ from .system import (
     update_state, update_check_now, set_update_channel, update_apply, update_log,
     slot_state, slot_rollback,
     release_changelog, appliance_branding, rotate_web_password,
+    kiosk_tokens_list, kiosk_tokens_create, kiosk_tokens_revoke,
     get_history_settings, patch_history_settings,
     reset_to_defaults,
 )
@@ -1128,6 +1129,30 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
     return resp
 
 
+@post("/api/kiosk/claim", status_code=200, sync_to_thread=False)
+def kiosk_claim(data: dict, request: Request) -> Response:
+    """Exchange a valid kiosk token for a read-only kiosk session cookie.
+    The wall display loads `/kiosk?token=<t>` and the SPA calls this once
+    per load. Self-guards: rejects tunnel origin (kiosk tokens are a LAN
+    credential) and only issues a cookie for a token that verifies."""
+    from .. import web_auth as _wa
+    if _wa.is_tunnel_origin(request.scope):
+        return Response({"ok": False, "detail": "kiosk tokens are local-only"},
+                        status_code=403)
+    tok = (data or {}).get("token") or ""
+    if not _wa.verify_kiosk_token(tok):
+        return Response({"ok": False, "detail": "invalid or revoked kiosk token"},
+                        status_code=401)
+    session = _wa.issue_session(origin="kiosk")
+    resp = Response({"ok": True})
+    resp.set_cookie(
+        key=_wa.SESSION_COOKIE_NAME, value=session,
+        max_age=_wa.SESSION_TTL_SECONDS, httponly=True,
+        samesite="lax", path="/", secure=False,
+    )
+    return resp
+
+
 @get("/sso", sync_to_thread=False)
 def sso_redirect(request: Request, state: State, token: str = "") -> Response:
     """Cloud→appliance SSO landing (#137). The cloud's dashboard
@@ -1210,15 +1235,31 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
                        "use wattpost.cloud and click Open"},
             status_code=403,
         )
+    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    # Brute-force backoff: per-source-IP, exponential after a few free
+    # tries. Loopback (the cloud-broker path) is exempt so the owner is
+    # never locked out via the tunnel.
+    loopback = _wa.is_loopback_source(request.scope)
+    if not loopback:
+        wait = _wa.login_locked_for(client_ip)
+        if wait > 0:
+            await _audit(state, event_type="login_throttled", payload={"ip": client_ip})
+            return Response(
+                {"ok": False, "detail": "too many attempts — try again shortly"},
+                status_code=429,
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
     pw = (data or {}).get("password") or ""
     if not _wa.verify_password(pw):
         # Record the failure with the client IP, useful for
         # detecting attempted brute force after the fact. Don't
         # include the attempted password (obvious anti-pattern).
-        client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+        if not loopback:
+            _wa.record_login_failure(client_ip)
         await _audit(state, event_type="login_failed", payload={"ip": client_ip})
         return Response({"ok": False, "detail": "wrong password"}, status_code=401)
-    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    if not loopback:
+        _wa.record_login_success(client_ip)
     await _audit(state, event_type="login_succeeded", payload={"ip": client_ip})
     token = _wa.issue_session()
     # Validate `next` to only allow same-origin relative paths.
@@ -1617,6 +1658,24 @@ def build_app(
                 if part.startswith(_web_auth.SESSION_COOKIE_NAME + "="):
                     token = part.split("=", 1)[1]
                     break
+            # Local kiosk credential (read-only wall displays, cloud #15).
+            # A kiosk-origin session cookie — or a valid ?token= on a
+            # kiosk-scoped GET to bootstrap the first load — grants the
+            # read-only KIOSK allow-list only, never writes, never tunnel.
+            if not tunnel and kiosk_scope_allows(method, path):
+                if _web_auth.session_origin(token) == "kiosk":
+                    await self.app(scope, receive, send)
+                    return
+                qs = scope.get("query_string", b"").decode("latin-1")
+                qtok = None
+                for part in qs.split("&"):
+                    if part.startswith("token="):
+                        from urllib.parse import unquote
+                        qtok = unquote(part[6:])
+                        break
+                if qtok and _web_auth.verify_kiosk_token(qtok):
+                    await self.app(scope, receive, send)
+                    return
             # Tunnel-origin requests require an SSO-issued session;
             # local-password sessions only grant LAN access. Keeps the
             # local password as a fallback while making cloud-login
@@ -1780,6 +1839,10 @@ def build_app(
             login_page,
             do_login,
             first_run_password,
+            kiosk_claim,
+            kiosk_tokens_list,
+            kiosk_tokens_create,
+            kiosk_tokens_revoke,
             do_logout,
             sso_redirect,
             # Identity v2 Phase 3 (#305), LAN OIDC login. Both

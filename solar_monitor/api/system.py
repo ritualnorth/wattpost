@@ -20,7 +20,7 @@ from typing import Any
 import httpx
 
 import msgspec
-from litestar import Request, get, patch, post
+from litestar import Request, delete, get, patch, post
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 from litestar.response import Response
@@ -398,6 +398,41 @@ async def rotate_web_password() -> dict[str, Any]:
     _wa.clear_first_run_marker()
     log.info("web-password rotated via Settings UI")
     return {"ok": True, "password": new_pw}
+
+
+# --------------------------------------------------------------------------
+# Local kiosk tokens (cloud #15). Admin-managed (these are gated by the
+# auth middleware); the minted plaintext is returned exactly once.
+# --------------------------------------------------------------------------
+
+@get("/api/system/kiosk-tokens")
+async def kiosk_tokens_list() -> dict[str, Any]:
+    from .. import web_auth as _wa
+    return {"tokens": _wa.list_kiosk_tokens()}
+
+
+@post("/api/system/kiosk-tokens", status_code=201)
+async def kiosk_tokens_create(data: dict) -> dict[str, Any]:
+    """Mint a kiosk token. Returns the plaintext + a ready-to-bookmark
+    `/kiosk?token=…` path ONCE; it's stored hashed and never shown again."""
+    from .. import web_auth as _wa
+    name = (data or {}).get("name") or ""
+    tid, plaintext = _wa.create_kiosk_token(name)
+    log.info("kiosk token minted (%s)", tid)
+    return {
+        "ok": True, "id": tid, "name": (name or "Kiosk").strip()[:60],
+        "token": plaintext,
+        "kiosk_path": f"/kiosk?token={plaintext}",
+    }
+
+
+@delete("/api/system/kiosk-tokens/{tid:str}", status_code=200)
+async def kiosk_tokens_revoke(tid: str) -> dict[str, Any]:
+    from .. import web_auth as _wa
+    if not _wa.revoke_kiosk_token(tid):
+        raise HTTPException(status_code=404, detail="unknown kiosk token")
+    log.info("kiosk token revoked (%s)", tid)
+    return {"ok": True}
 
 
 @post("/api/system/update/check", status_code=202)

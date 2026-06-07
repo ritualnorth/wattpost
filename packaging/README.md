@@ -60,8 +60,14 @@ zerofree zip dosfstools libcap2-bin rsync xz-utils kmod pigz` and the
 ability to `sudo`. Works on x86_64 Ubuntu/Debian; arm64 native is
 faster (no qemu emulation).
 
-Default credentials in the image:
-- SSH user: `wattpost` / `wattpost` — **change on first boot**.
+Image defaults:
+- **SSH: off**, and **no baked login user** — the pi-gen build ships no
+  default credential. To get shell access, enable SSH + set your own
+  user/key in Raspberry Pi Imager when you flash (or, soon, via the
+  in-dashboard SSH toggle).
+- Web dashboard: no default password either — you set it on first boot
+  (auto-generated floor + in-browser "create a password" on first
+  Settings visit).
 - Hostname: `wattpost.local` (mDNS).
 
 ## What's in the SD image (and the bare-metal install)

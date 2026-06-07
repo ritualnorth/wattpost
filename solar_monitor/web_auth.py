@@ -33,6 +33,9 @@ First-boot:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import os
 import secrets
@@ -85,6 +88,10 @@ ANONYMOUS_PATH_PREFIXES = (
     # box has an auto-generated password the user has never seen); the
     # handler self-guards on is_first_run() + rejects tunnel origin.
     "/api/setup/first-run-password",
+    # Kiosk-token claim: exchanges a valid ?token= for a read-only
+    # kiosk session cookie. Pre-auth by necessity (a wall display has
+    # no login); self-guards on verify_kiosk_token() + rejects tunnel.
+    "/api/kiosk/claim",
     "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
     # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
@@ -258,6 +265,120 @@ def verify_password(plaintext: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# --------------------------------------------------------------------------
+# Local kiosk tokens (#cloud-15, Phase A). A revocable, read-only credential
+# for off-grid wall displays, so they keep working once anonymous viewing is
+# gone. Stored hashed (the token is high-entropy random, so a fast SHA-256
+# is fine — no need for argon2's per-call cost on every kiosk poll). The
+# token is presented as `/kiosk?token=<plaintext>`; the SPA claims it once
+# per load into a kiosk-origin session cookie (see /api/kiosk/claim), and the
+# middleware then grants only the read-only KIOSK allow-list. Unlike the old
+# `?key=` bypass this is revocable, rotatable, scoped, and never stored in
+# the clear.
+KIOSK_TOKENS_PATH = _PASSWORD_DIR / "kiosk-tokens.json"
+
+
+def _kiosk_hash(plaintext: str) -> str:
+    return hashlib.sha256(plaintext.encode("utf-8")).hexdigest()
+
+
+def _load_kiosk_tokens() -> list[dict]:
+    try:
+        raw = json.loads(KIOSK_TOKENS_PATH.read_text(encoding="utf-8"))
+        return raw if isinstance(raw, list) else []
+    except (OSError, ValueError, TypeError):
+        return []
+
+
+def _save_kiosk_tokens(toks: list[dict]) -> None:
+    KIOSK_TOKENS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = KIOSK_TOKENS_PATH.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(toks), encoding="utf-8")
+    tmp.replace(KIOSK_TOKENS_PATH)
+
+
+def create_kiosk_token(name: str = "") -> tuple[str, str]:
+    """Mint a kiosk token. Returns (id, plaintext); the plaintext is shown
+    to the admin once and never stored in the clear."""
+    plaintext = secrets.token_urlsafe(24)
+    tid = secrets.token_hex(8)
+    toks = _load_kiosk_tokens()
+    toks.append({
+        "id": tid,
+        "name": (name or "Kiosk").strip()[:60],
+        "hash": _kiosk_hash(plaintext),
+        "created_at": time.time(),
+    })
+    _save_kiosk_tokens(toks)
+    return tid, plaintext
+
+
+def list_kiosk_tokens() -> list[dict]:
+    """Metadata only — never the hash."""
+    return [
+        {"id": t.get("id"), "name": t.get("name", ""),
+         "created_at": t.get("created_at")}
+        for t in _load_kiosk_tokens()
+    ]
+
+
+def revoke_kiosk_token(tid: str) -> bool:
+    toks = _load_kiosk_tokens()
+    kept = [t for t in toks if t.get("id") != tid]
+    if len(kept) == len(toks):
+        return False
+    _save_kiosk_tokens(kept)
+    return True
+
+
+def verify_kiosk_token(plaintext: str | None) -> bool:
+    if not plaintext:
+        return False
+    h = _kiosk_hash(plaintext)
+    for t in _load_kiosk_tokens():
+        if hmac.compare_digest(str(t.get("hash", "")), h):
+            return True
+    return False
+
+
+def session_origin(token: str | None) -> str | None:
+    """Origin tag of a live session ('local' | 'sso' | 'kiosk'), or None."""
+    rec = _session_record(token)
+    return None if rec is None else str(rec.get("origin", "local"))
+
+
+# --------------------------------------------------------------------------
+# Login brute-force backoff (cloud #15, Phase A). Per-source-IP, in-memory,
+# exponential. We back the SOURCE off rather than locking the account, so an
+# attacker can't lock the owner out by failing on purpose. Loopback (the
+# cloud-broker path) is exempted by the caller. Lost on restart — fine, the
+# window is short and an attacker gains nothing from a daemon bounce.
+_LOGIN_FAILS: dict[str, dict] = {}     # ip -> {"n": int, "until": epoch}
+_LOGIN_FREE_ATTEMPTS = 5               # tries before backoff starts
+_LOGIN_BACKOFF_CAP   = 300             # max lockout (seconds)
+
+
+def login_locked_for(ip: str) -> float:
+    """Seconds remaining until `ip` may try again (0.0 if not locked)."""
+    rec = _LOGIN_FAILS.get(ip)
+    if not rec:
+        return 0.0
+    rem = float(rec.get("until", 0.0)) - time.time()
+    return rem if rem > 0 else 0.0
+
+
+def record_login_failure(ip: str) -> None:
+    rec = _LOGIN_FAILS.setdefault(ip, {"n": 0, "until": 0.0})
+    rec["n"] = int(rec["n"]) + 1
+    if rec["n"] > _LOGIN_FREE_ATTEMPTS:
+        backoff = min(_LOGIN_BACKOFF_CAP, 2 ** (rec["n"] - _LOGIN_FREE_ATTEMPTS))
+        rec["until"] = time.time() + backoff
+
+
+def record_login_success(ip: str) -> None:
+    _LOGIN_FAILS.pop(ip, None)
 
 
 def issue_session(origin: str = "local") -> str:
