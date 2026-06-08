@@ -15,6 +15,7 @@ that transport is skipped this cycle and we try again next cycle.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -80,11 +81,19 @@ class Poller:
             # the daemon every time the dongle bounced.
             self._transports[t.id] = t
             try:
-                await t.open()
+                # Time-bound the initial open. A BLE peripheral that's out of
+                # range or held on its single connection elsewhere makes
+                # open() retry internally without returning — which hangs the
+                # whole daemon startup, because the web server doesn't bind
+                # until on_startup finishes (#34). Cap it; on timeout/failure
+                # we keep the registered transport and let _ensure_open
+                # reconnect with backoff on the poll loop. The poll path
+                # already tolerates an unavailable transport.
+                await asyncio.wait_for(t.open(), timeout=8.0)
             except Exception:
-                log.exception(
-                    "transport %s failed to open at startup, will "
-                    "retry on next poll",
+                log.warning(
+                    "transport %s didn't open within the startup window; "
+                    "registering it and retrying on the poll loop",
                     tcfg.get("id"),
                 )
                 # Schedule a retry. Initial backoff is short, we want
