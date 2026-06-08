@@ -491,6 +491,28 @@ if [ -f "${SCRIPT_DIR}/cli/wattpost-config" ]; then
     install -m 0755 "${SCRIPT_DIR}/cli/wattpost-config" /usr/local/bin/wattpost-config
 fi
 
+# ----- Pi 5 active-cooler fan curve -----
+# Enable temperature-based control of the official FAN-connector fan so the
+# appliance cools itself with zero user setup. Without this a Pi 5 + cooler
+# can ship with no automatic fan control (fan never spins, SoC runs hot).
+# Values are millidegrees-C : PWM speed (0-255), matching Raspberry Pi's own
+# defaults. Idempotent (guarded by the marker) and a no-op on non-Pi hosts /
+# Docker (no config.txt). Takes effect on the next boot.
+for FAN_CFG in /boot/firmware/config.txt /boot/config.txt; do
+    if [ -f "${FAN_CFG}" ] && ! grep -q 'wattpost-fan-curve' "${FAN_CFG}"; then
+        step "enabling Pi 5 fan curve in ${FAN_CFG}"
+        cat >> "${FAN_CFG}" <<'FANEOF'
+
+# wattpost-fan-curve: Pi 5 active-cooler temperature control (auto, variable speed)
+dtparam=fan_temp0=50000,fan_temp0_hyst=5000,fan_temp0_speed=75
+dtparam=fan_temp1=60000,fan_temp1_hyst=5000,fan_temp1_speed=125
+dtparam=fan_temp2=67500,fan_temp2_hyst=5000,fan_temp2_speed=175
+dtparam=fan_temp3=75000,fan_temp3_hyst=5000,fan_temp3_speed=250
+FANEOF
+        break
+    fi
+done
+
 # ----- systemd unit -----
 step "installing wattpost.service"
 install -m 0644 "${SCRIPT_DIR}/systemd/wattpost.service" "${SERVICE_DEST}"
