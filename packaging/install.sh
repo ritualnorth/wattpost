@@ -356,6 +356,33 @@ if [ -f "${SCRIPT_DIR}/systemd/wattpost-rollback.service" ]; then
         /etc/systemd/system/wattpost-rollback.service
 fi
 
+# ----- privileged helper daemon (#33) -----
+# A small root service, reached over a group-restricted Unix socket, performs
+# the fixed allow-list of privileged ops (firewall/SSH toggles, update,
+# rollback, captive-portal DNS drop-in) so the main daemon needs no sudo and
+# can run fully sandboxed. During migration the legacy sudoers grants below
+# stay in place; the daemon's helpers prefer the socket and fall back to sudo
+# when it's absent, so this is safe to ship before the call-sites all move.
+if [ -f "${SCRIPT_DIR}/sbin/wattpost-helperd" ]; then
+    step "installing privileged helper daemon (#33)"
+    install -d /usr/local/sbin
+    install -m 0755 -o root -g root \
+        "${SCRIPT_DIR}/sbin/wattpost-helperd" /usr/local/sbin/wattpost-helperd
+    # /run is tmpfs; tmpfiles.d recreates the socket dir on every boot before
+    # the socket unit activates.
+    if [ -f "${SCRIPT_DIR}/tmpfiles.d/wattpost.conf" ]; then
+        install -m 0644 -o root -g root \
+            "${SCRIPT_DIR}/tmpfiles.d/wattpost.conf" /etc/tmpfiles.d/wattpost.conf
+        systemd-tmpfiles --create /etc/tmpfiles.d/wattpost.conf 2>/dev/null || true
+    fi
+    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-helper.socket" \
+        /etc/systemd/system/wattpost-helper.socket
+    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-helper.service" \
+        /etc/systemd/system/wattpost-helper.service
+    systemctl daemon-reload
+    systemctl enable --now wattpost-helper.socket >/dev/null 2>&1 || true
+fi
+
 # ----- host network hardening: firewall + SSH control (cloud #15, Phase B) -----
 # A root-owned, fixed-verb helper + a narrow sudoers grant let the
 # unprivileged wattpost daemon reconcile the inbound nftables firewall

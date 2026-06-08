@@ -1,0 +1,31 @@
+# The WattPost privileged helper (#33). This service IS the privilege
+# boundary: it runs as root and performs the fixed allow-list of operations
+# the unprivileged daemon used to reach via sudo (firewall + SSH toggles,
+# update, rollback, captive-portal DNS drop-in). Keeping privilege here, in
+# a small auditable broker, is what lets wattpost.service drop sudo and run
+# fully sandboxed.
+#
+# Deliberately kept minimal. It must run nft/sshd toggles, swap the
+# /opt/wattpost slots, and write /etc/NetworkManager/dnsmasq-shared.d, so we
+# do NOT lock down the filesystem here the way we (re-)do on the daemon —
+# that would defeat its purpose. The protection model for the helper is its
+# tiny fixed surface and the group-restricted socket, not a sandbox.
+[Unit]
+Description=WattPost privileged helper (firewall/SSH/update/rollback/captive broker)
+Documentation=https://github.com/ritualnorth/wattpost
+Requires=wattpost-helper.socket
+After=wattpost-helper.socket
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/sbin/wattpost-helperd
+# Modest, non-breaking hardening only.
+ProtectHome=true
+NoNewPrivileges=false
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

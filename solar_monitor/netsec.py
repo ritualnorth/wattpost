@@ -16,19 +16,52 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from . import helper_client
+
 log = logging.getLogger(__name__)
 
 HELPER = "/usr/local/sbin/wattpost-netctl"
 
 
-def is_supported() -> bool:
-    """True only where we can actually drive the host: the helper exists and
-    sudo is present (the Pi image). False on Docker / dev so callers no-op."""
+def _legacy_supported() -> bool:
+    """The old sudo path: the helper script exists and sudo is present."""
     return Path(HELPER).exists() and shutil.which("sudo") is not None
 
 
+def is_supported() -> bool:
+    """True where we can actually drive the host — either via the privileged
+    helper daemon (#33) or the legacy sudo path. False on Docker / dev so
+    callers no-op."""
+    return helper_client.is_available() or _legacy_supported()
+
+
+def _via_helper(args: list[str]) -> tuple[bool, str]:
+    """Route a netctl verb to the privileged helper daemon over its socket."""
+    verb = args[0] if args else ""
+    if verb == "status":
+        r = helper_client.call("netctl_status")
+    elif verb == "apply":
+        # args == ["apply", "<fw on|off>", "<ssh on|off>"]
+        r = helper_client.call(
+            "netctl_apply", firewall=(args[1] == "on"), ssh=(args[2] == "on"),
+        )
+    else:
+        return False, f"unsupported verb: {verb}"
+    out = (r.get("out") or "").strip()
+    if r.get("ok"):
+        return True, out
+    err = (r.get("err") or out or "failed").strip()
+    log.warning("netsec %s via helper failed: %s", args, err)
+    return False, err
+
+
 def _run(args: list[str], timeout: float = 15.0) -> tuple[bool, str]:
-    if not is_supported():
+    # Prefer the privileged helper daemon; fall back to the legacy sudo path
+    # so installs that haven't shipped the helper yet keep working (#33
+    # migrates call-sites one at a time before sudo is removed).
+    if helper_client.is_available():
+        return _via_helper(args)
+    if not _legacy_supported():
         return False, "unsupported"
     try:
         r = subprocess.run(

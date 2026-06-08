@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+"""wattpost-helperd — privileged helper for the WattPost daemon (#33).
+
+Runs as **root**, socket-activated by systemd. Listens on a Unix socket
+(root:wattpost, mode 0660) and performs a FIXED allow-list of privileged
+operations on behalf of the unprivileged `wattpost` daemon. With this in
+place the daemon itself needs no sudo and no elevated capabilities, so it
+can run fully sandboxed (NoNewPrivileges=yes, dropped caps, read-only /etc).
+
+Wire protocol: one JSON request line in -> one JSON response line out, then
+the connection closes.
+
+    request   {"action": "<name>", "args": {...}}
+    response  {"ok": bool, "out": "...", "err": "..."}
+
+There is NO passthrough of arbitrary commands. Each action name maps to one
+fixed operation; arguments are type- and value-validated before use. The
+firewall/SSH/update/rollback operations re-exec the existing root-owned
+helper scripts directly (no sudo, since we are already root), so the
+audited nft / slot-swap logic stays the single source of truth.
+
+Why a long-lived socket helper rather than the old sudo path: sudo is
+setuid-root and forces NoNewPrivileges off in the calling service, which is
+mutually exclusive with the systemd hardening we want on the daemon. A
+separate root service reached over a group-restricted socket lets the big,
+internet-adjacent web daemon stay unprivileged while a small, auditable
+broker holds the privilege. See issue #33.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import socket
+import subprocess
+import sys
+
+log = logging.getLogger("wattpost-helperd")
+
+# Fixed paths to the root-owned operation scripts. The helper runs these
+# directly as root; it never builds a command line from request data.
+NETCTL = "/usr/local/sbin/wattpost-netctl"
+UPDATE = "/usr/local/bin/wattpost-update"
+ROLLBACK = "/usr/local/bin/wattpost-rollback"
+
+# Captive-portal DNS-hijack drop-in (Pillar 3b). Kept identical to the path
+# the daemon used to write itself; the helper now owns the write so the
+# daemon's /etc can be read-only.
+CAPTIVE_DIR = "/etc/NetworkManager/dnsmasq-shared.d"
+CAPTIVE_FILE = os.path.join(CAPTIVE_DIR, "wattpost-captive.conf")
+AP_GATEWAY = "10.42.0.1"
+CAPTIVE_BODY = (
+    "# WattPost captive portal — resolve all names to the AP so a\n"
+    "# joining device's OS connectivity check lands on the dashboard.\n"
+    "# Managed by wattpost-helperd; present only while a captive AP is up.\n"
+    f"address=/#/{AP_GATEWAY}\n"
+)
+
+SOCKET_PATH = "/run/wattpost/helper.sock"
+MAX_REQUEST = 4096  # a request is a tiny JSON object; cap to refuse abuse
+
+
+def _run(argv: list[str], timeout: float = 20.0) -> dict:
+    """Run a fixed root script. argv[0] is a constant from this file; only
+    the trailing verbs come from the (already validated) request."""
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        out = (r.stdout or "").strip()
+        err = (r.stderr or "").strip()
+        return {"ok": r.returncode == 0, "out": out,
+                "err": err if r.returncode != 0 else ""}
+    except Exception as e:  # timeout, missing binary, …
+        return {"ok": False, "out": "", "err": str(e)}
+
+
+# ---- actions -------------------------------------------------------------
+# Each handler takes the validated args dict and returns a response dict.
+
+def _act_netctl_status(_args: dict) -> dict:
+    return _run([NETCTL, "status"])
+
+
+def _act_netctl_apply(args: dict) -> dict:
+    fw = "on" if _req_bool(args, "firewall") else "off"
+    ssh = "on" if _req_bool(args, "ssh") else "off"
+    return _run([NETCTL, "apply", fw, ssh])
+
+
+def _act_update(args: dict) -> dict:
+    # Optional channel passthrough is itself an allow-listed enum, never raw.
+    chan = args.get("channel")
+    argv = [UPDATE]
+    if chan is not None:
+        if chan not in ("stable", "beta"):
+            return {"ok": False, "out": "", "err": "bad channel"}
+        argv += ["--channel", chan]
+    # wattpost-update backgrounds itself / logs to a file; don't block.
+    return _run(argv, timeout=10.0)
+
+
+def _act_rollback(_args: dict) -> dict:
+    return _run([ROLLBACK])
+
+
+def _act_captive(args: dict) -> dict:
+    op = args.get("op")
+    if op == "write":
+        try:
+            os.makedirs(CAPTIVE_DIR, exist_ok=True)
+            with open(CAPTIVE_FILE, "w") as f:
+                f.write(CAPTIVE_BODY)
+            return {"ok": True, "out": "armed", "err": ""}
+        except Exception as e:
+            return {"ok": False, "out": "", "err": str(e)}
+    if op == "remove":
+        try:
+            if os.path.exists(CAPTIVE_FILE):
+                os.remove(CAPTIVE_FILE)
+            return {"ok": True, "out": "disarmed", "err": ""}
+        except Exception as e:
+            return {"ok": False, "out": "", "err": str(e)}
+    return {"ok": False, "out": "", "err": "bad op"}
+
+
+ACTIONS = {
+    "netctl_status": _act_netctl_status,
+    "netctl_apply": _act_netctl_apply,
+    "update": _act_update,
+    "rollback": _act_rollback,
+    "captive": _act_captive,
+}
+
+
+def _req_bool(args: dict, key: str) -> bool:
+    v = args.get(key)
+    if not isinstance(v, bool):
+        raise ValueError(f"{key} must be a bool")
+    return v
+
+
+def handle(raw: bytes) -> dict:
+    try:
+        req = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return {"ok": False, "out": "", "err": "malformed request"}
+    if not isinstance(req, dict):
+        return {"ok": False, "out": "", "err": "request must be an object"}
+    action = req.get("action")
+    handler = ACTIONS.get(action)
+    if handler is None:
+        return {"ok": False, "out": "", "err": f"unknown action: {action!r}"}
+    args = req.get("args") or {}
+    if not isinstance(args, dict):
+        return {"ok": False, "out": "", "err": "args must be an object"}
+    try:
+        return handler(args)
+    except ValueError as e:
+        return {"ok": False, "out": "", "err": str(e)}
+    except Exception as e:  # never crash the helper on one bad request
+        log.warning("action %s errored: %s", action, e)
+        return {"ok": False, "out": "", "err": "internal error"}
+
+
+def _serve(srv: socket.socket) -> None:
+    while True:
+        try:
+            conn, _ = srv.accept()
+        except OSError:
+            continue
+        with conn:
+            try:
+                conn.settimeout(20.0)
+                buf = b""
+                while b"\n" not in buf and len(buf) < MAX_REQUEST:
+                    chunk = conn.recv(1024)
+                    if not chunk:
+                        break
+                    buf += chunk
+                line = buf.split(b"\n", 1)[0][:MAX_REQUEST]
+                resp = handle(line)
+                conn.sendall((json.dumps(resp) + "\n").encode("utf-8"))
+            except Exception as e:
+                log.warning("connection errored: %s", e)
+
+
+def _listen_socket() -> socket.socket:
+    """Use the systemd-passed socket (LISTEN_FDS) when socket-activated,
+    else bind the path ourselves so the helper also runs standalone."""
+    if os.environ.get("LISTEN_FDS") and os.environ.get("LISTEN_PID") == str(os.getpid()):
+        # systemd passes listening fds starting at 3.
+        return socket.socket(fileno=3)
+    os.makedirs(os.path.dirname(SOCKET_PATH), exist_ok=True)
+    if os.path.exists(SOCKET_PATH):
+        os.remove(SOCKET_PATH)
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.bind(SOCKET_PATH)
+    # root:wattpost 0660 — only root and the wattpost group can connect.
+    try:
+        import grp
+        gid = grp.getgrnam("wattpost").gr_gid
+        os.chown(SOCKET_PATH, 0, gid)
+    except Exception:
+        pass
+    os.chmod(SOCKET_PATH, 0o660)
+    s.listen(8)
+    return s
+
+
+def main() -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        stream=sys.stderr,
+    )
+    srv = _listen_socket()
+    log.info("wattpost-helperd ready (actions: %s)", ", ".join(sorted(ACTIONS)))
+    _serve(srv)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

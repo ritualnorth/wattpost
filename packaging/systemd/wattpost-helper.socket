@@ -1,0 +1,17 @@
+# Socket for the WattPost privileged helper (#33). systemd owns the socket
+# and sets its permissions, so only root and the `wattpost` group can
+# connect — that group restriction is the access control for the whole
+# helper. The daemon (wattpost-helper.service) is socket-activated from
+# here and inherits the listening fd.
+[Unit]
+Description=WattPost privileged-helper socket
+Documentation=https://github.com/ritualnorth/wattpost
+
+[Socket]
+ListenStream=/run/wattpost/helper.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=wattpost
+
+[Install]
+WantedBy=sockets.target
