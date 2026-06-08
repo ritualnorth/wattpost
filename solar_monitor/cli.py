@@ -143,6 +143,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
         port=args.port,
         log_level=args.log_level.lower(),
         access_log=False,
+        # Bound graceful shutdown. Without this uvicorn waits *forever* for
+        # in-flight connections to close on SIGTERM ("Waiting for connections
+        # to close"), so a single long-lived client (SSE/keepalive/broker
+        # tunnel) makes every restart hang until systemd SIGKILLs at
+        # TimeoutStopSec=15s. The hard kill then trips the start-limit on
+        # rapid restarts and fires a spurious auto-rollback. 5s gives real
+        # requests time to finish, then lingering connections are force-closed
+        # and the lifespan shutdown (scheduler/backup/store) runs — total well
+        # under the 15s window, so restarts are clean.
+        timeout_graceful_shutdown=5,
     )
     return 0
 
