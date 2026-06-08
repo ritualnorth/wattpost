@@ -107,7 +107,7 @@ echo "    staged $(du -sh "${SRC_STAGE_DIR}" | awk '{print $1}'), $(find "${SRC_
 # our stage builds on. SKIP_IMAGES on stages we don't ship.
 cat > "${PIGEN_DIR}/config" <<EOF
 IMG_NAME=wattpost
-RELEASE=trixie
+RELEASE=bookworm
 DEPLOY_COMPRESSION=xz
 LOCALE_DEFAULT=en_GB.UTF-8
 TIMEZONE_DEFAULT=Europe/London
