@@ -131,6 +131,13 @@ class HotspotService:
             # (no live reload / blip needed). Best-effort.
             if self.cfg.captive_portal:
                 self._write_captive_dropin()
+            # The WiFi radio may be soft-disabled in NetworkManager (separate
+            # from rfkill) — e.g. a fresh image where no client WiFi was ever
+            # configured. While it's off, wlan0 shows "unavailable" and the AP
+            # bring-up fails with "No suitable device found for this connection".
+            # Enable it first; best-effort (if it fails, the `up` below surfaces
+            # the real error).
+            await self._nmcli("radio", "wifi", "on")
             rc, _out, err = await self._nmcli(
                 "connection", "up", self.cfg.connection_name
             )
