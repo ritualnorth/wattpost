@@ -210,6 +210,17 @@ if [[ -d /etc/NetworkManager ]]; then
     mkdir -p "${NM_DNSMASQ_DIR}"
     chgrp "${APP_GROUP}" "${NM_DNSMASQ_DIR}" 2>/dev/null || true
     chmod 0775 "${NM_DNSMASQ_DIR}" 2>/dev/null || true
+
+    # Authorise the wattpost user to drive NetworkManager via polkit — needed
+    # for the daemon's nmcli to add + activate the hotspot AP connection
+    # (without it: "Insufficient privileges"). The dnsmasq drop-in perms above
+    # aren't enough; the connection add/activate is gated by polkit, not files.
+    if [ -f "${SCRIPT_DIR}/polkit/50-wattpost-networkmanager.rules" ] && [ -d /etc/polkit-1/rules.d ]; then
+        install -m 0644 -o root -g root \
+            "${SCRIPT_DIR}/polkit/50-wattpost-networkmanager.rules" \
+            /etc/polkit-1/rules.d/50-wattpost-networkmanager.rules
+        systemctl try-reload-or-restart polkit 2>/dev/null || true
+    fi
 fi
 
 # ----- venv -----

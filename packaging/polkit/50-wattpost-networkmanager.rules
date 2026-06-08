@@ -1,0 +1,14 @@
+// Let the non-root `wattpost` daemon manage NetworkManager so it can bring the
+// WiFi hotspot (appliance-as-AP) up and down via nmcli — adding, modifying and
+// activating the `wattpost-hotspot` connection. Without this, the daemon's
+// nmcli calls fail with "Insufficient privileges" and the hotspot toggle 502s.
+//
+// Scoped to the `wattpost` user and the NetworkManager action namespace only.
+// Installed to /etc/polkit-1/rules.d/ by packaging/install.sh (Pi image only;
+// Docker installs don't run NetworkManager).
+polkit.addRule(function(action, subject) {
+    if (subject.user === "wattpost" &&
+        action.id.indexOf("org.freedesktop.NetworkManager.") === 0) {
+        return polkit.Result.YES;
+    }
+});
