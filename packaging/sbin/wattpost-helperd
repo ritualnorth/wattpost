@@ -28,6 +28,7 @@ broker holds the privilege. See issue #33.
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
 import os
@@ -42,6 +43,12 @@ log = logging.getLogger("wattpost-helperd")
 NETCTL = "/usr/local/sbin/wattpost-netctl"
 UPDATE = "/usr/local/bin/wattpost-update"
 ROLLBACK = "/usr/local/bin/wattpost-rollback"
+
+# Shared slot-operation lock. wattpost-update and wattpost-rollback both
+# flock this for their whole run, so the two can never overlap and race the
+# /opt/wattpost symlink swap. We only *probe* it here (non-blocking) to give
+# the caller a clean "in progress" answer; the scripts hold it for real.
+SLOT_LOCK = "/run/wattpost-update.lock"
 
 # Captive-portal DNS-hijack drop-in (Pillar 3b). Kept identical to the path
 # the daemon used to write itself; the helper now owns the write so the
@@ -104,14 +111,36 @@ def _spawn_detached(argv: list[str]) -> dict:
         return {"ok": False, "out": "", "err": str(e)}
 
 
+def _slot_op_busy() -> bool:
+    """True if a slot operation (update or rollback) currently holds the
+    shared lock. Best-effort, non-blocking probe — the scripts enforce the
+    real mutual exclusion; this just lets us answer the caller cleanly."""
+    try:
+        f = open(SLOT_LOCK, "a")
+    except OSError:
+        return False
+    try:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        return False
+    except OSError:
+        return True
+    finally:
+        f.close()
+
+
 def _act_update(_args: dict) -> dict:
     # wattpost-update downloads + verifies + swaps slots + re-runs
     # install.sh; it can take minutes and restarts the daemon at the end.
     # Detach it (don't block the socket on it).
+    if _slot_op_busy():
+        return {"ok": False, "out": "", "err": "a slot operation is already in progress"}
     return _spawn_detached([UPDATE])
 
 
 def _act_rollback(_args: dict) -> dict:
+    if _slot_op_busy():
+        return {"ok": False, "out": "", "err": "a slot operation is already in progress"}
     return _spawn_detached([ROLLBACK])
 
 

@@ -38,6 +38,19 @@ if [ ! -L "${PREV_LINK}" ]; then
     fail "no previous slot recorded at ${PREV_LINK} — nothing to roll back to" 4
 fi
 
+# Serialise with wattpost-update via a SHARED lock (same path) so a rollback
+# can't race an in-flight update's symlink swap. Acquired BEFORE reading slot
+# state so CURRENT/previous are a consistent snapshot. A manual rollback fails
+# fast if a slot op is running; --auto (the OnFailure safety net) waits briefly
+# then proceeds, since it must eventually run to recover a crash-looping slot.
+LOCK=/run/wattpost-update.lock
+exec 200>"${LOCK}"
+if [ "${MODE}" = "--auto" ]; then
+    flock -w 60 200 || fail "timed out waiting for an in-progress slot operation" 11
+else
+    flock -n 200 || fail "another slot operation (update/rollback) is in progress; try again once it finishes" 11
+fi
+
 PREV_TARGET=$(readlink -f "${PREV_LINK}")
 CURRENT=$(readlink -f "${APP_ROOT}")
 

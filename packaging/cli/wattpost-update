@@ -56,13 +56,15 @@ PROBE_LOG=/var/log/wattpost-update-probe.log
 APP_USER=wattpost
 APP_GROUP=wattpost
 
-# Run only one update at a time. flock returns 1 on contention; we
-# fail fast rather than queueing because the user pressing Update Now
-# twice should see "already updating" rather than two parallel
-# tarballs racing.
+# Run only one slot operation at a time. This lock is SHARED with
+# wattpost-rollback (same path), so an update and a rollback can never
+# overlap and race the /opt/wattpost symlink swap. flock returns 1 on
+# contention; fail fast so a double "Update now" — or an update fired while
+# a rollback is mid-flip — sees "already in progress" rather than two ops
+# racing the symlink.
 exec 200>"${LOCK}"
 flock -n 200 || {
-    echo "$(date -Is) ERROR another update is already running" | tee -a "${LOG}" >&2
+    echo "$(date -Is) ERROR another slot operation is already running" | tee -a "${LOG}" >&2
     exit 11
 }
 
