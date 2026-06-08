@@ -772,15 +772,13 @@ class HistorySettingsPatch(msgspec.Struct):
     retention_hour_days:   int | None = None
 
 
-@get("/api/system/history_settings")
-async def get_history_settings(state: State) -> dict[str, Any]:
-    """Current poll cadence + per-tier retention windows.
-
-    Reads from the live scheduler + store (not from config.yaml on
-    disk), so values reflect any unsaved PATCH that hasn't been
-    persisted yet. The persisted (`saved_*`) fields show the
-    config.yaml state for comparison.
-    """
+def _history_settings_payload(state: State) -> dict[str, Any]:
+    """Build the history-settings response from the live scheduler + store
+    (so it reflects an unsaved PATCH) plus the persisted config values for
+    comparison. Plain helper — NOT a route handler — so both the GET handler
+    and patch_history_settings can return it directly. (patch_ used to do
+    `await get_history_settings(state)`, but that's a decorated @get handler
+    object, not a coroutine, so it raised TypeError and 500'd the PATCH.)"""
     scheduler = state["scheduler"]
     store = state["store"]
     config = state["config"]
@@ -805,6 +803,14 @@ async def get_history_settings(state: State) -> dict[str, Any]:
             "retention_hour_days":   365,
         },
     }
+
+
+@get("/api/system/history_settings")
+async def get_history_settings(state: State) -> dict[str, Any]:
+    """Current poll cadence + per-tier retention windows. Reads from the live
+    scheduler + store (so it reflects an unsaved PATCH); the `saved` fields
+    show the config.yaml state for comparison."""
+    return _history_settings_payload(state)
 
 
 @patch("/api/system/history_settings")
@@ -882,7 +888,7 @@ async def patch_history_settings(
     tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
     tmp.replace(path)
 
-    return await get_history_settings(state)
+    return _history_settings_payload(state)
 
 
 class ResetRequest(msgspec.Struct):
