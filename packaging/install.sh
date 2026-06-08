@@ -298,34 +298,17 @@ fi
 # their notes/password-manager forever, even though they'll never
 # need it — pure friction.
 
-# ----- sudoers fragment for the update + rollback helpers -----
-# The dashboard's "Update now" button + the OnFailure rollback unit
-# both need to invoke root-owned helpers from the unprivileged
-# wattpost daemon. Limited to two fixed scripts (no args) so the
-# escalation surface stays tight.
-step "granting wattpost user sudo access for the update helper"
-SUDOERS_FILE="/etc/sudoers.d/wattpost"
-cat > "${SUDOERS_FILE}.tmp" <<'SUDO'
-# Allow the wattpost daemon to fire the in-place upgrade helper from
-# the dashboard's "Update now" button (and from wattpost-config). The
-# helper itself is a fixed, trusted script — locked to no args so the
-# daemon can't pass a malicious source URL.
-wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-update
-# Allow rollback from the dashboard / wattpost-config — also a fixed
-# trusted script, no args (the --auto flag is only added by the
-# systemd OnFailure unit which doesn't go through sudo).
-wattpost ALL=(root) NOPASSWD: /usr/local/bin/wattpost-rollback
-SUDO
-# visudo -c validates syntax before we move it into /etc/sudoers.d/
-if visudo -cf "${SUDOERS_FILE}.tmp" >/dev/null; then
-    install -m 0440 "${SUDOERS_FILE}.tmp" "${SUDOERS_FILE}"
-fi
-rm -f "${SUDOERS_FILE}.tmp"
-# Tear down the old Tailscale sudoers fragment unconditionally — it
-# pre-dated the merged /etc/sudoers.d/wattpost file above and shipped
-# on every install up through v0.1.33. Removing it on each run of
-# install.sh is the migration path for existing appliances (which
-# the auto-updater re-runs anyway).
+# ----- privileged ops: no sudo grants (#33) -----
+# The wattpost daemon no longer escalates via sudo. The update / rollback
+# helpers and the firewall/SSH helper are invoked by the root helper daemon
+# (wattpost-helperd) over a group-restricted socket, and the daemon's unit is
+# fully sandboxed (NoNewPrivileges), so sudo wouldn't work for it anyway.
+# Remove any sudoers grants shipped by earlier versions — the auto-updater
+# re-runs install.sh, so this is the migration path for existing appliances.
+# (The helper *scripts* below are still installed; only the grants go.)
+step "removing legacy sudo grants (privileged ops moved to the helper, #33)"
+rm -f /etc/sudoers.d/wattpost
+rm -f /etc/sudoers.d/wattpost-netctl
 rm -f /etc/sudoers.d/wattpost-tailscale
 
 # Install the update helper. Root-owned, world-readable, world-
@@ -384,11 +367,11 @@ if [ -f "${SCRIPT_DIR}/sbin/wattpost-helperd" ]; then
 fi
 
 # ----- host network hardening: firewall + SSH control (cloud #15, Phase B) -----
-# A root-owned, fixed-verb helper + a narrow sudoers grant let the
-# unprivileged wattpost daemon reconcile the inbound nftables firewall
+# A root-owned, fixed-verb helper reconciles the inbound nftables firewall
 # and sshd to the configured state (web.firewall_enabled / web.ssh_enabled).
-# The daemon applies this on every boot (cli.cmd_serve -> netsec.reconcile),
-# so this step just puts the helper, its sudoers rule, and nft in place;
+# The unprivileged daemon drives it through wattpost-helperd over a socket
+# (#33) — no sudo. The daemon applies this on every boot (cli.cmd_serve ->
+# netsec.reconcile), so this step just puts the helper script + nft in place;
 # the service restart at the end of install brings the ruleset up. Pi image
 # only — on Docker/dev the daemon no-ops (netsec.is_supported() is False).
 if [ -f "${SCRIPT_DIR}/sbin/wattpost-netctl" ]; then
@@ -406,17 +389,10 @@ if [ -f "${SCRIPT_DIR}/sbin/wattpost-netctl" ]; then
         apt-get install -y nftables || warn "couldn't install nftables — firewall stays a no-op until it's present"
     fi
 
-    # Separate sudoers fragment, validated before activating. Grants ONLY
-    # the fixed-verb helper (see packaging/sudoers.d/wattpost-netctl) — not
-    # arbitrary root.
-    NETCTL_SUDOERS="/etc/sudoers.d/wattpost-netctl"
-    install -m 0440 "${SCRIPT_DIR}/sudoers.d/wattpost-netctl" "${NETCTL_SUDOERS}.tmp"
-    if visudo -cf "${NETCTL_SUDOERS}.tmp" >/dev/null; then
-        install -m 0440 -o root -g root "${NETCTL_SUDOERS}.tmp" "${NETCTL_SUDOERS}"
-    else
-        warn "wattpost-netctl sudoers failed validation — firewall/SSH toggles will be inert"
-    fi
-    rm -f "${NETCTL_SUDOERS}.tmp"
+    # No sudoers grant (#33): the daemon reaches this helper through
+    # wattpost-helperd, which runs it as root directly. Any legacy
+    # /etc/sudoers.d/wattpost-netctl grant is removed in the sudo-grants
+    # cleanup step earlier in this script.
 
     # Lockout guard. SSH defaults OFF, so the daemon will disable sshd and
     # close port 22 when it restarts at the end of this install. If you're

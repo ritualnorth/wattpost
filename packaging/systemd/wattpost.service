@@ -4,8 +4,8 @@ Documentation=https://github.com/ritualnorth/wattpost
 # Bluetooth must be up before we try to discover the BT-2 dongle.
 # network-online.target lets the cloud sync + ntfy / Discord / SMTP
 # transports reach the outside world on first poll.
-After=bluetooth.service network-online.target
-Wants=bluetooth.service network-online.target
+After=bluetooth.service network-online.target wattpost-helper.socket
+Wants=bluetooth.service network-online.target wattpost-helper.socket
 # Auto-rollback watchdog: fires when the StartLimit below is hit.
 OnFailure=wattpost-rollback.service
 
@@ -29,13 +29,14 @@ Environment=WATTPOST_PORT=80
 # User=wattpost. Docker / manual installs override WATTPOST_PORT to something
 # unprivileged via /etc/wattpost/port.env (installed by install.sh).
 #
-# CapabilityBoundingSet is deliberately NOT pinned to CAP_NET_BIND_SERVICE:
-# capping it there strips CAP_SETUID/SETGID from the daemon's children, so
-# `sudo` (setuid root) can't escalate ("unable to change to root gid") and the
-# firewall / SSH / update helpers all fail. Left at the default set so sudo
-# works; the proper fix is a root helper service off sudo (tracked separately).
+# CapabilityBoundingSet is now pinned to just CAP_NET_BIND_SERVICE. The daemon
+# no longer escalates — every privileged op goes to wattpost-helperd over a
+# socket (#33) — so it needs no other capability and we cap the set hard.
+# (This previously had to stay at the default set so `sudo` could keep
+# CAP_SETUID/SETGID; with sudo gone that constraint is lifted.)
 EnvironmentFile=-/etc/wattpost/port.env
 AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 ExecStart=/opt/wattpost/venv/bin/solar-monitor --log-level INFO serve \
     --config ${WATTPOST_CONFIG} \
@@ -61,34 +62,28 @@ TimeoutStopSec=15
 StartLimitIntervalSec=60
 StartLimitBurst=3
 
-# Hardening — minimum capabilities, read-only filesystem except for
-# the state + log paths we explicitly need.
-#
-# The daemon must invoke `sudo` for the root helpers the sudoers entries
-# pin: wattpost-update / wattpost-rollback (Update/Rollback buttons) and
-# wattpost-netctl (the firewall + SSH toggles, cloud#15). sudo is setuid
-# root, so it only works while NoNewPrivileges stays OFF.
-#
-# CAUTION (learned the hard way): NoNewPrivileges is forced ON *implicitly*
-# by several hardening directives — ProtectKernelTunables, ProtectKernelModules,
-# ProtectControlGroups, RestrictNamespaces, LockPersonality all imply it. We
-# had those set, so despite never setting NoNewPrivileges= explicitly, sudo was
-# silently blocked ("sudo: unable to change to root gid") — breaking the
-# firewall/SSH toggles on every install. They're removed here so sudo works.
-# The proper fix is to move the privileged ops off sudo into a root-run helper
-# service, letting the daemon keep full hardening (tracked separately). Until
-# then we keep only the directives that do NOT imply NoNewPrivileges:
+# Hardening — full sandbox. The daemon no longer escalates: the firewall +
+# SSH toggles, update, rollback, and the captive-portal DNS drop-in all go to
+# the root helper (wattpost-helperd) over a group-restricted socket (#33).
+# With sudo gone, the directives below — which all imply NoNewPrivileges and
+# so used to silently break sudo ("unable to change to root gid") — are safe
+# to re-arm. This is the payoff of the helper split: the largest attack
+# surface (the web daemon) can no longer reach root at all.
+NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-# config.yaml gets rewritten in place by the setup wizard + alerts
-# editor, so /etc/wattpost has to be writable too. The dnsmasq-shared.d
-# entry lets the daemon drop/remove its captive-portal DNS-hijack file
-# (install.sh group-owns the dir to wattpost, but ProtectSystem=strict
-# still binds it read-only without this). Leading `-` keeps the unit
-# starting on Docker installs where NetworkManager — and that dir —
-# don't exist.
-ReadWritePaths=/var/lib/wattpost /etc/wattpost -/etc/NetworkManager/dnsmasq-shared.d
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictSUIDSGID=true
+# Only the state + config paths the daemon itself writes. /etc/NetworkManager
+# is deliberately NOT here any more — the helper owns the captive drop-in, so
+# the daemon's /etc stays read-only apart from /etc/wattpost (config.yaml is
+# rewritten in place by the setup wizard + alerts editor).
+ReadWritePaths=/var/lib/wattpost /etc/wattpost
 
 # journald captures stdout/stderr; the in-memory ring buffer also keeps
 # the last 500 lines for Settings → Diagnostics.
