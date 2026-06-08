@@ -8,6 +8,24 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Security
+- **Privilege separation.** The daemon no longer uses `sudo`. Firewall/SSH
+  toggles, updates, rollbacks, and the captive-portal DNS file now go through
+  a small root-owned helper service over a group-restricted socket. The
+  daemon itself runs fully sandboxed (`NoNewPrivileges`, stripped
+  capabilities, read-only `/etc`), so a web-layer compromise can't reach root.
+
+### Fixed
+- Daemon restarts no longer hang ~15s and get force-killed — graceful
+  shutdown is now bounded, which also stops the spurious auto-rollbacks that
+  rapid restarts could trigger.
+- Update and rollback can no longer race the slot symlink (shared lock).
+- The hotspot AP now comes up on a box that's never had WiFi configured (the
+  WiFi radio is enabled first), and the captive-portal sign-in page no longer
+  hangs: Leaflet is vendored locally instead of pulled from a CDN, so the
+  dashboard is fully offline-first.
+- Network-security settings rows no longer overflow on narrow screens.
+
 ## [0.1.146-beta.1] - 2026-06-05
 
 Beta — device cards get per-metric icons + a SoC gauge (Beszel polish).

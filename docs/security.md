@@ -114,12 +114,21 @@ Raspberry Pi Imager when you flash the card) to actually log in.
 
 ### How it stays safe
 
-The dashboard never touches the firewall or sshd directly. It calls a
-small, **root-owned helper that understands only two fixed commands**
-(`status`, and `apply <firewall on/off> <ssh on/off>`) through a
-locked-down sudo rule. The helper owns the ruleset; the app can only flip
-the predefined switches — so even a compromised dashboard can't author its
-own firewall rules or run arbitrary commands as root.
+The dashboard never touches the firewall or sshd directly, and the daemon
+itself runs **fully unprivileged** — it has no `sudo` access and no elevated
+capabilities. Every privileged action (the firewall + SSH toggles, software
+updates, rollbacks, and the captive-portal DNS file) is sent to a small,
+**root-owned helper service** over a local Unix socket that only the
+`wattpost` group can open. The helper performs a **fixed allow-list** of
+operations with validated arguments — it never runs arbitrary commands — so
+even a fully compromised dashboard can only request one of those predefined
+actions, never a root shell.
+
+Because the daemon no longer needs to escalate, its systemd unit is locked
+down hard: `NoNewPrivileges`, a stripped capability set (just the one needed
+to bind port 80), and a read-only filesystem apart from its own state and
+config. The web layer — the largest attack surface — cannot reach root at
+all; that privilege lives only in the tiny, auditable helper.
 
 > **Locked yourself out?** If a firewall rule ever blocks the dashboard,
 > get to the Pi's console (keyboard + screen, or SSH if it's on) and run
