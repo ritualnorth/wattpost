@@ -81,9 +81,14 @@ StartLimitBurst=3
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/wattpost /etc/wattpost
 # config.yaml gets rewritten in place by the setup wizard + alerts
-# editor, so /etc/wattpost has to be writable too.
+# editor, so /etc/wattpost has to be writable too. The dnsmasq-shared.d
+# entry lets the daemon drop/remove its captive-portal DNS-hijack file
+# (install.sh group-owns the dir to wattpost, but ProtectSystem=strict
+# still binds it read-only without this). Leading `-` keeps the unit
+# starting on Docker installs where NetworkManager — and that dir —
+# don't exist.
+ReadWritePaths=/var/lib/wattpost /etc/wattpost -/etc/NetworkManager/dnsmasq-shared.d
 
 # journald captures stdout/stderr; the in-memory ring buffer also keeps
 # the last 500 lines for Settings → Diagnostics.
