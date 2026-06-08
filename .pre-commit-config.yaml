@@ -11,8 +11,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # Leave vendored third-party assets byte-identical to upstream.
       - id: trailing-whitespace
+        exclude: '^solar_monitor/web/vendor/'
       - id: end-of-file-fixer
+        exclude: '^solar_monitor/web/vendor/'
       - id: check-yaml
       - id: check-json
         exclude: '^mobile-app/android/app/google-services\.json\.example$'

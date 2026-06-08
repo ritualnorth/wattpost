@@ -78,17 +78,16 @@
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
   <link rel="stylesheet" href="/web/styles.css?v=168" />
-  <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Same SRI
-       pin as the cloud Fleet map. Defer-loaded so it doesn't block
-       paint of the hero. -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-        crossorigin=""/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-          crossorigin=""
-          defer></script>
+  <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
+       locally (web/vendor/leaflet/) rather than pulled from a CDN: the
+       appliance is offline-first, and a render-blocking CDN stylesheet
+       stalled the captive-portal sign-in page for ~10s when DNS is
+       hijacked to the AP. No SRI needed for a file we ship ourselves.
+       Verified byte-identical to the upstream 1.9.4 SRI pin at vendor
+       time. (Map *tiles* still need internet; the library no longer
+       does.) Script defer-loaded so it doesn't block paint. -->
+  <link rel="stylesheet" href="/web/vendor/leaflet/leaflet.css?v=1" />
+  <script src="/web/vendor/leaflet/leaflet.js?v=1" defer></script>
   <script>
     // Detect the WattPost mobile shell (sets a UA marker via
     // capacitor.config.ts.{ios,android}.appendUserAgent). When set,
