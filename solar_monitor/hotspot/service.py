@@ -30,6 +30,7 @@ import os
 import shutil
 
 from ..config import HotspotCfg
+from .. import helper_client
 
 log = logging.getLogger(__name__)
 
@@ -199,6 +200,21 @@ class HotspotService:
         on a non-packaged host) logs once and leaves captive inactive —
         the AP still works, clients just have to browse to the gateway
         IP by hand."""
+        # Prefer the privileged helper daemon (#33): it owns the write so
+        # the daemon's /etc can be read-only. Fall back to a direct write
+        # where the helper isn't installed yet (and /etc is still writable).
+        if helper_client.is_available():
+            r = helper_client.call("captive", op="write")
+            self._captive_active = bool(r.get("ok"))
+            if r.get("ok"):
+                log.info("hotspot: captive portal armed via helper (DNS → %s)", AP_GATEWAY)
+            else:
+                log.warning(
+                    "hotspot: captive arm via helper failed (%s). AP is up; "
+                    "clients reach the dashboard at http://%s",
+                    r.get("err"), AP_GATEWAY,
+                )
+            return
         content = (
             "# WattPost captive portal — resolve all names to the AP so a\n"
             "# joining device's OS connectivity check lands on the dashboard.\n"
@@ -223,6 +239,9 @@ class HotspotService:
     def _remove_captive_dropin(self) -> None:
         """Remove the catch-all drop-in. Idempotent; never raises."""
         self._captive_active = False
+        if helper_client.is_available():
+            helper_client.call("captive", op="remove")
+            return
         try:
             path = os.path.join(_DNSMASQ_SHARED_DIR, _CAPTIVE_DROPIN)
             if os.path.exists(path):

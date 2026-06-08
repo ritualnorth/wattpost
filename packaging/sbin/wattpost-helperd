@@ -86,20 +86,33 @@ def _act_netctl_apply(args: dict) -> dict:
     return _run([NETCTL, "apply", fw, ssh])
 
 
-def _act_update(args: dict) -> dict:
-    # Optional channel passthrough is itself an allow-listed enum, never raw.
-    chan = args.get("channel")
-    argv = [UPDATE]
-    if chan is not None:
-        if chan not in ("stable", "beta"):
-            return {"ok": False, "out": "", "err": "bad channel"}
-        argv += ["--channel", chan]
-    # wattpost-update backgrounds itself / logs to a file; don't block.
-    return _run(argv, timeout=10.0)
+def _spawn_detached(argv: list[str]) -> dict:
+    """Fire-and-forget a long-running root script. It logs to its own file
+    (the daemon polls that), so we don't wait on it. start_new_session
+    detaches it into its own process group, so it survives both this helper
+    and the daemon being restarted mid-update by install.sh."""
+    try:
+        subprocess.Popen(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return {"ok": True, "out": "started", "err": ""}
+    except Exception as e:
+        return {"ok": False, "out": "", "err": str(e)}
+
+
+def _act_update(_args: dict) -> dict:
+    # wattpost-update downloads + verifies + swaps slots + re-runs
+    # install.sh; it can take minutes and restarts the daemon at the end.
+    # Detach it (don't block the socket on it).
+    return _spawn_detached([UPDATE])
 
 
 def _act_rollback(_args: dict) -> dict:
-    return _run([ROLLBACK])
+    return _spawn_detached([ROLLBACK])
 
 
 def _act_captive(args: dict) -> dict:

@@ -25,6 +25,8 @@ from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 from litestar.response import Response
 
+from .. import helper_client
+
 log = logging.getLogger(__name__)
 
 
@@ -347,17 +349,28 @@ async def slot_rollback() -> dict[str, Any]:
                    "never been updated via wattpost-update, so there's "
                    "nothing to roll back to.",
         )
-    try:
-        await asyncio.create_subprocess_exec(
-            "/usr/bin/setsid", "sudo", "-n",
-            "/usr/local/bin/wattpost-rollback",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"could not start rollback: {e}")
+    # Prefer the privileged helper daemon (#33); it spawns the root
+    # rollback detached and survives our restart. Fall back to the legacy
+    # setsid+sudo path where the helper isn't installed yet.
+    if helper_client.is_available():
+        r = helper_client.call("rollback")
+        if not r.get("ok"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"could not start rollback: {r.get('err') or 'helper error'}",
+            )
+    else:
+        try:
+            await asyncio.create_subprocess_exec(
+                "/usr/bin/setsid", "sudo", "-n",
+                "/usr/local/bin/wattpost-rollback",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=f"could not start rollback: {e}")
     return {"ok": True, "log_path": "/var/log/wattpost-rollback.log"}
 
 
@@ -691,17 +704,28 @@ async def update_apply() -> dict[str, Any]:
     # SIGTERM'd by install.sh's `systemctl restart wattpost`. We don't
     # await the result, the caller gets a 202 immediately and polls
     # /api/system/update/log for progress.
-    try:
-        await asyncio.create_subprocess_exec(
-            "/usr/bin/setsid", "sudo", "-n",
-            "/usr/local/bin/wattpost-update",
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=500, detail=f"could not start updater: {e}")
+    # Prefer the privileged helper daemon (#33); it spawns the root updater
+    # detached so it outlives the daemon restart install.sh does at the end.
+    # Fall back to the legacy setsid+sudo path where the helper isn't present.
+    if helper_client.is_available():
+        r = helper_client.call("update")
+        if not r.get("ok"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"could not start updater: {r.get('err') or 'helper error'}",
+            )
+    else:
+        try:
+            await asyncio.create_subprocess_exec(
+                "/usr/bin/setsid", "sudo", "-n",
+                "/usr/local/bin/wattpost-update",
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=500, detail=f"could not start updater: {e}")
     return {
         "ok": True,
         "log_path": "/var/log/wattpost-update.log",
