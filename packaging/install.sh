@@ -232,15 +232,22 @@ find "${SOURCE}" -maxdepth 3 -name '*.egg-info' -type d \
 # a newer sdist exists. Native installs are unaffected (wheel still
 # chosen first by default).
 #
-# --force-reinstall --no-deps: pyproject.toml hardcodes version="0.0.1"
-# (the package metadata never bumps even when solar_monitor/__init__.py
-# does), so a plain `--upgrade` is a no-op when the upstream version
-# string didn't change — pip says "0.0.1 already installed". Force-
-# reinstall makes wattpost-update actually swap the venv contents.
-# --no-deps so we don't reinstall the entire dep tree on every update
-# (deps move on their own cadence; `pip install --upgrade` above
-# already bumped them if needed).
-"${APP_VENV}/bin/pip" install --prefer-binary --upgrade --force-reinstall --no-deps "${SOURCE}"
+# Two steps, because pyproject.toml hardcodes version="0.0.1" (the package
+# metadata never bumps even when solar_monitor/__init__.py does):
+#
+# 1. Resolve + install the dependency tree (uvicorn/litestar/bleak/...).
+#    On a FRESH install — the pi-gen image build, or a new manual install —
+#    this is the ONLY step that pulls the deps into the venv. Without it the
+#    daemon crash-loops on "ModuleNotFoundError: No module named 'uvicorn'"
+#    (the line 220 `pip install --upgrade pip wheel` only touches pip+wheel,
+#    NOT the app's deps). Idempotent: on an update, satisfied deps are
+#    skipped and only newer ones are pulled.
+"${APP_VENV}/bin/pip" install --prefer-binary --upgrade "${SOURCE}"
+# 2. Force-reinstall the package code only. Because the version string is
+#    frozen at 0.0.1, step 1 sees "already installed" and won't swap the
+#    code on an update; this forces the new code in without re-touching the
+#    (now-correct) dep tree — keeping wattpost-update fast.
+"${APP_VENV}/bin/pip" install --prefer-binary --force-reinstall --no-deps "${SOURCE}"
 
 # ----- config (only if not present — don't clobber the user's edits) -----
 if [[ ! -f "${CONFIG_FILE}" ]]; then
