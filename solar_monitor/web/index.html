@@ -889,6 +889,21 @@
             <div class="settings-row" style="margin-top:.65rem"><span>Last poll</span><span class="v" id="settings-last-poll">·</span></div>
             <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
+
+          <div class="settings-block" id="settings-devhealth-block" data-subroute="advanced">
+            <h3>Device health</h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Live host metrics for this appliance &mdash; the same data the
+              cloud sees in the heartbeat. Under-voltage / throttling here
+              usually means a sagging power supply.
+            </p>
+            <div class="settings-row"><span>SoC temperature</span><span class="v" id="dh-temp">·</span></div>
+            <div class="settings-row"><span>Power / throttle</span><span class="v" id="dh-throttle">·</span></div>
+            <div class="settings-row"><span>Disk used</span><span class="v" id="dh-disk">·</span></div>
+            <div class="settings-row"><span>Memory used</span><span class="v" id="dh-mem">·</span></div>
+            <div class="settings-row"><span>CPU load (1m)</span><span class="v" id="dh-load">·</span></div>
+            <div class="settings-row"><span>Uptime</span><span class="v" id="dh-uptime">·</span></div>
+          </div>
           <!-- Solar-aware charger pause hidden from prod until ready (#163).
                Re-enable by removing the `hidden` attribute below — the JS
                (refreshSolarPauseSettings) and CSS already key off it. -->
@@ -1336,6 +1351,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=252"></script>
+  <script src="/web/app.js?v=253"></script>
 </body>
 </html>

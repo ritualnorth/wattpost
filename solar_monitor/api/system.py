@@ -813,6 +813,16 @@ async def get_history_settings(state: State) -> dict[str, Any]:
     return _history_settings_payload(state)
 
 
+@get("/api/system/device-health")
+async def device_health() -> dict[str, Any]:
+    """Host device-health snapshot: SoC temperature + throttle/under-voltage,
+    disk, memory, CPU load, uptime, network. The same data the cloud heartbeat
+    ships (host_health), exposed locally so the dashboard — and curious
+    users / scripts — can see it without pairing to the cloud."""
+    from .. import host_health as _hh
+    return _hh.snapshot()
+
+
 @patch("/api/system/history_settings")
 async def patch_history_settings(
     data: HistorySettingsPatch, state: State,

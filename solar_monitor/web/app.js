@@ -5445,6 +5445,7 @@ function renderSettings() {
   refreshDiscoveryToggle();
   refreshLocalTelemetryToggle();  // #217, anonymous install ping (off by default)
   refreshHistorySettings();  // #172, editable poll interval + retention
+  refreshDeviceHealth();     // SoC temp / throttle / disk / mem / load / uptime
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
   refreshHotspotPanel();     // Pillar 3, appliance-as-WiFi-AP
@@ -5836,6 +5837,35 @@ function wireResetToDefaults() {
 // History & polling editor (#172). Pull current values, fill the form,
 // wire Save and Reset buttons. Values apply live; the Save → PATCH
 // also persists to config.yaml so a daemon restart doesn't revert.
+async function refreshDeviceHealth() {
+  let d;
+  try { d = await api("/api/system/device-health"); }
+  catch (e) { return; }
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  const soc = d.soc || {}, disk = d.disk || {}, mem = d.memory || {}, la = d.loadavg || {};
+  const fmtB = (b) => b == null ? "·"
+    : (b >= 1e9 ? (b / 1e9).toFixed(1) + " GB" : (b / 1e6).toFixed(0) + " MB");
+  set("#dh-temp", soc.temp_c != null ? soc.temp_c.toFixed(1) + " °C" : "n/a");
+  let pw = "normal";
+  if (soc.under_voltage_now)       pw = "⚠ under-voltage now";
+  else if (soc.throttled_now)      pw = "⚠ throttling now";
+  else if (soc.under_voltage_ever) pw = "under-voltage seen since boot";
+  else if (soc.throttled_ever)     pw = "throttled since boot";
+  else if (soc.temp_c == null)     pw = "n/a";
+  set("#dh-throttle", pw);
+  set("#dh-disk", disk.percent != null
+    ? disk.percent.toFixed(0) + "% · " + fmtB(disk.free_bytes) + " free" : "·");
+  set("#dh-mem", mem.percent != null
+    ? mem.percent.toFixed(0) + "% · " + fmtB(mem.used_bytes) + " of " + fmtB(mem.total_bytes) : "·");
+  set("#dh-load", la.load_1m != null
+    ? la.load_1m.toFixed(2) + (la.cpu_count ? " / " + la.cpu_count + " cores" : "") : "·");
+  const up = d.uptime_seconds;
+  if (up != null) {
+    const dd = Math.floor(up / 86400), hh = Math.floor((up % 86400) / 3600), mm = Math.floor((up % 3600) / 60);
+    set("#dh-uptime", dd > 0 ? `${dd}d ${hh}h` : (hh > 0 ? `${hh}h ${mm}m` : `${mm}m`));
+  }
+}
+
 async function refreshHistorySettings() {
   let data;
   try { data = await api("/api/system/history_settings"); }
