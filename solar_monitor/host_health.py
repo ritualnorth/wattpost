@@ -188,6 +188,42 @@ def _security_updates() -> dict[str, Any]:
     return out
 
 
+def _soc() -> dict[str, Any]:
+    """SoC temperature + firmware throttle state. Temperature comes from
+    the thermal zone (world-readable sysfs, works for any user); the
+    throttle bitmask comes from `vcgencmd get_throttled` (Pi firmware,
+    best-effort — absent on non-Pi / when the daemon user lacks vcio).
+
+    Lets the cloud surface an over-temp / under-voltage warning chip and
+    chart the appliance's running temperature on the device-health card.
+    Returns {} / partial where unavailable."""
+    out: dict[str, Any] = {}
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp") as f:
+            out["temp_c"] = round(int(f.read().strip()) / 1000.0, 1)
+    except (OSError, ValueError):
+        pass
+    # get_throttled bitmask: bit0 under-voltage now, bit1 arm-freq capped,
+    # bit2 currently throttled, bit3 soft temp limit; bits 16-19 = "has
+    # occurred since boot". We surface the actionable subset.
+    try:
+        import subprocess
+        r = subprocess.run(
+            ["vcgencmd", "get_throttled"],
+            capture_output=True, text=True, timeout=3,
+        )
+        raw = r.stdout.strip().split("=")[-1]
+        bits = int(raw, 16)
+        out["throttle_raw"]        = raw
+        out["under_voltage_now"]   = bool(bits & 0x1)
+        out["throttled_now"]       = bool(bits & 0x4)
+        out["under_voltage_ever"]  = bool(bits & 0x10000)
+        out["throttled_ever"]      = bool(bits & 0x40000)
+    except Exception:
+        pass
+    return out
+
+
 def snapshot() -> dict[str, Any]:
     """Single dict suitable for inclusion in heartbeat extras under
     the `host_health` key. Cheap (<5ms typical); safe to call once
@@ -199,5 +235,6 @@ def snapshot() -> dict[str, Any]:
         "disk":             _disk("/"),
         "memory":           _memory(),
         "loadavg":          _loadavg(),
+        "soc":              _soc(),
         "security_updates": _security_updates(),
     }

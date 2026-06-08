@@ -13,8 +13,10 @@ OnFailure=wattpost-rollback.service
 Type=simple
 User=wattpost
 Group=wattpost
-# bluetooth group gives access to BlueZ DBus without root.
-SupplementaryGroups=bluetooth
+# bluetooth group gives access to BlueZ DBus without root; video grants
+# /dev/vcio so `vcgencmd get_throttled` works — that's the SoC under-voltage
+# + throttle telemetry in host_health (valuable on off-grid/solar power).
+SupplementaryGroups=bluetooth video
 
 WorkingDirectory=/opt/wattpost
 Environment=PYTHONUNBUFFERED=1
