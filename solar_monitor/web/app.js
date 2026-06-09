@@ -1024,7 +1024,14 @@ function aggregateBank() {
     && isFresh(d)
     && d.latest && d.latest.battery_voltage_v != null
     && d.latest.soc_pct != null);
-  if (!shunt && batts.length === 0 && !inverter) { _frame.bank = null; return null; }
+  // Charge controller as the last-resort source: a controller-only rig
+  // (e.g. a Renogy Rover with no shunt/BMS) reports battery voltage + a
+  // rough SoC but no pack capacity. Mirrors the server-side fallback
+  // chain in storage/sqlite._compute_bank_aggregate.
+  const controller = devices.find(d => d.kind === "charge_controller"
+    && isFresh(d)
+    && d.latest && d.latest.battery_voltage_v != null);
+  if (!shunt && batts.length === 0 && !inverter && !controller) { _frame.bank = null; return null; }
 
   // ---------- Cell layer (always BMS-sourced) ----------
   let cellMin = null, cellMax = null, worstDrift = 0;
@@ -1102,8 +1109,25 @@ function aggregateBank() {
     };
   }
 
-  // ---------- Source pick (auto policy: shunt > BMS > inverter) ----------
-  const chosen = shuntView || bmsView || inverterView;
+  // Charge-controller view, last resort. Battery voltage + the
+  // controller's rough SoC; no capacity (a controller can't measure
+  // pack Ah), so totalCap/totalRem stay 0. Mirrors the server.
+  let controllerView = null;
+  if (controller) {
+    const l = controller.latest || {};
+    const v = +l.battery_voltage_v || 0;
+    const i = +l.battery_current_a || 0;
+    const soc = +l.battery_percentage || 0;
+    controllerView = {
+      source: "controller",
+      model: l.model || controller.label || "charge controller",
+      soc, meanV: v, sumI: i, netW: v * i, totalCap: 0, totalRem: 0,
+      timeToGoMinutes: null,
+    };
+  }
+
+  // ---------- Source pick (auto policy: shunt > BMS > inverter > controller) ----------
+  const chosen = shuntView || bmsView || inverterView || controllerView;
 
   // ---------- Disagreement diagnostic ----------
   let disagreement = null;
