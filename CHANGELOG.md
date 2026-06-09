@@ -8,6 +8,15 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- A device removed from config no longer leaves an undeletable "silent"
+  card. Device deletion is now keyed by the device label (the DB key on
+  the card) instead of `(transport, slave_id)`, so it also purges the
+  orphaned `device_meta`/`latest`/history rows and works for cards with
+  no transport (e.g. a reconfigured Victron advert device) and
+  non-Modbus devices with no slave_id. The earlier fix only handled
+  devices still present in config.
+
 ## [0.1.167] - 2026-06-09
 
 First stable release since 0.1.128. Promotes the beta line to the stable

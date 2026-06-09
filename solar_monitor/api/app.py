@@ -41,6 +41,7 @@ from .setup import (
     probe,
     add_device,
     delete_device,
+    delete_device_by_label,
 )
 from .alerts_admin import (
     create_rule, update_rule, delete_rule,
@@ -1830,6 +1831,7 @@ def build_app(
             probe,
             add_device,
             delete_device,
+            delete_device_by_label,
             list_outputs,
             toggle_output,
             confirm_output_safety,

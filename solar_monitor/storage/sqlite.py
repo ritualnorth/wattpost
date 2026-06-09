@@ -1080,6 +1080,42 @@ class Store:
                 })
         return rows
 
+    async def purge_device(self, device: str) -> int:
+        """Delete every row for `device` across all telemetry tables —
+        raw samples, every rollup, the `latest` snapshot, and
+        `device_meta`. Used to clear a device that's been removed from
+        config but lingers in the DB as a stale "silent" card (a config
+        delete stops polling but doesn't erase history; an orphaned card
+        with no config entry has no transport, so the old
+        config-keyed delete couldn't reach it).
+
+        Tables are discovered by introspection so a future rollup/aux
+        table with a `device` column is covered without editing here.
+        Returns the total number of rows removed (0 means the device
+        wasn't in the DB at all).
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        async with self._db.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ) as cur:
+            tables = [r[0] for r in await cur.fetchall()]
+        total = 0
+        for t in tables:
+            async with self._db.execute(f"PRAGMA table_info({t})") as cur:
+                cols = [r[1] for r in await cur.fetchall()]
+            if "device" not in cols:
+                continue
+            # Table names come from sqlite_master (not user input), safe to
+            # interpolate; the device value is parameterised.
+            res = await self._db.execute(
+                f"DELETE FROM {t} WHERE device = ?", (device,)
+            )
+            total += res.rowcount
+        await self._db.commit()
+        log.info("purged device %r from DB (%d rows across tables)", device, total)
+        return total
+
     async def set_device_display_name(self, device: str, name: str | None) -> None:
         """User-facing rename. Stores a display override in device_meta.
         Pass `None` (or empty string) to clear the override and fall

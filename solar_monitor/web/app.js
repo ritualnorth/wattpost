@@ -3512,19 +3512,19 @@ function efficiencyHeadline(data) {
 // which writes config.yaml + schedules a background hot-reload so
 // polling stops without the user having to restart the daemon.
 async function deleteDeviceFromList(label, slaveId, transport) {
-  if (!transport) {
-    alert(`Can't delete "${label}", couldn't find its transport. ` +
-          `Try Setup → Find my dongle to re-confirm the link.`);
+  // Delete is keyed by the device label (the DB key on the card), so a
+  // stale "silent" device with no transport — left behind when a device
+  // was removed from config — can still be cleared. transport + slaveId
+  // are passed when known so the config entry is removed too; without
+  // them we just purge the orphaned DB rows.
+  if (!confirm(`Remove "${label}"? Polling stops immediately and its history is cleared; the device itself keeps running, this just removes it from the dashboard. You can re-add it via Setup → Scan.`)) {
     return;
   }
-  if (!confirm(`Remove "${label}" (slave ${slaveId})? Polling stops immediately; the BMS keeps running, this just disconnects the dashboard. You can re-add it via Setup → Scan.`)) {
-    return;
-  }
+  const params = new URLSearchParams({ label });
+  if (transport) params.set("transport", transport);
+  if (Number.isInteger(slaveId)) params.set("slave_id", String(slaveId));
   try {
-    const r = await fetch(
-      `/api/setup/devices/${slaveId}?transport=${encodeURIComponent(transport)}`,
-      { method: "DELETE" },
-    );
+    const r = await fetch(`/api/setup/device?${params.toString()}`, { method: "DELETE" });
     if (!r.ok) {
       const d = await r.text();
       alert(`Couldn't remove device (HTTP ${r.status}). ${d.slice(0, 200)}`);

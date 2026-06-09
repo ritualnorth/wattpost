@@ -1658,6 +1658,70 @@ async def list_setup_transports(state: State) -> dict[str, Any]:
     return {"transports": out}
 
 
+@delete("/api/setup/device", status_code=200)
+async def delete_device_by_label(
+    state: State, label: str, transport: str = "", slave_id: int | None = None,
+) -> dict[str, Any]:
+    """Delete a device by its `label` (the DB key shown on the card).
+
+    Removes the matching config entry when `(transport, slave_id)` is
+    supplied AND present, and *always* purges the device's DB rows. This
+    is what clears a stale "silent" card that has no transport — a device
+    removed from config (or one that never had a config entry, e.g. a
+    Victron advert device that was reconfigured) leaves orphaned
+    `device_meta`/`latest` rows the old `(transport, slave_id)`-keyed
+    delete could never reach (#225 follow-up). Works for non-Modbus
+    devices too, since it doesn't require a slave_id in the path.
+
+    404 only when the device is in neither config nor the DB.
+    """
+    store = state["store"]
+    config_path: str = state.get("config_path", "config.yaml")
+    config_removed = 0
+
+    # 1. Config removal — only when we have the config coordinates and a
+    #    matching entry actually exists. A phantom (DB-only) device skips
+    #    this and goes straight to the DB purge below.
+    if transport and slave_id is not None:
+        path = Path(config_path)
+        raw = yaml.safe_load(path.read_text()) or {}
+        devices = raw.get("devices") or []
+        kept = [d for d in devices
+                if not (d.get("transport") == transport
+                        and int(d.get("slave_id", -1)) == slave_id)]
+        config_removed = len(devices) - len(kept)
+        if config_removed:
+            raw["devices"] = kept
+            backup = path.with_suffix(path.suffix + ".bak")
+            shutil.copy2(path, backup)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
+            tmp.replace(path)
+            log.info("setup: removed device %r (transport=%s slave=%s)",
+                     label, transport, slave_id)
+
+    # 2. DB purge — always, keyed by the label (the DB device key).
+    db_rows = await store.purge_device(label)
+
+    if not config_removed and not db_rows:
+        raise NotFoundException(
+            f"no device {label!r} found in config or database"
+        )
+
+    # Reload only when the running config actually changed.
+    if config_removed:
+        asyncio.create_task(_hot_reload_bg(state))
+
+    return {
+        "ok": True,
+        "label": label,
+        "config_removed": config_removed,
+        "db_rows_purged": db_rows,
+        "restart_required": False,
+        "reloaded": bool(config_removed),
+    }
+
+
 @delete("/api/setup/devices/{slave_id:int}", status_code=200)
 async def delete_device(
     slave_id: int, state: State, transport: str = "",
