@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.167] - 2026-06-09
+
+First stable release since 0.1.128. Promotes the beta line to the stable
+channel: privilege separation, the Renogy onboard-Bluetooth connect-retry
+fix, charge-controller bank/battery-panel support, the channel-aware
+in-place updater, kiosk skins, the remote-access consent flow, and the
+Settings redesign. The 0.1.128 → 0.1.167 upgrade path was verified
+end-to-end on both the Pi (slot update + privilege-sep migration) and
+Docker (image swap over a persisted volume).
+
 ### Security
 - **Privilege separation.** The daemon no longer uses `sudo`. Firewall/SSH
   toggles, updates, rollbacks, and the captive-portal DNS file now go through
