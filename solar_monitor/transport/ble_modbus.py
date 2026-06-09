@@ -55,7 +55,13 @@ _NOTIFY_CANDIDATES  = (
 )
 
 # How long to wait for the BT module to advertise during discovery.
-DEFAULT_DISCOVERY_TIMEOUT = 20.0
+# A free BT-2 advertises continuously, so find_device returns in a
+# second or three; the only time this cap is reached is when the
+# dongle is wedged (not advertising), where a shorter wait just lets
+# the retry loop clear stale state and try again sooner rather than
+# burning 20s per attempt. 10s keeps slow-advertising devices working
+# while roughly halving the worst-case time-to-connect.
+DEFAULT_DISCOVERY_TIMEOUT = 10.0
 
 
 class BleModbusTransport(Transport):
