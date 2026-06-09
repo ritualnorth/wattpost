@@ -849,7 +849,16 @@ class Store:
                          if d and (d.get("_kind") or "").startswith("inverter")
                          and d.get("battery_voltage_v") is not None
                          and d.get("soc_pct") is not None), None)
-        if shunt is None and not batts and inverter is None:
+        # Charge controller as the last-resort bank source. Its SoC is a
+        # crude voltage estimate and it can't measure pack capacity, but
+        # on a controller-only rig (very common for budget Renogy
+        # installs with no shunt or smart battery) it's the only source
+        # of battery voltage + SoC, so use it rather than leave the
+        # whole battery panel blank.
+        controller = next((d for d in devices.values()
+                           if d and d.get("_kind") == "charge_controller"
+                           and d.get("battery_voltage_v") is not None), None)
+        if shunt is None and not batts and inverter is None and controller is None:
             return None
 
         # --- Cell-level layer (always BMS-sourced when BMSes present) ---
@@ -954,23 +963,43 @@ class Store:
                 "soc_pct":      soc,
             }
 
-        # Pick the chosen source per policy. Auto-mode preference is
-        # shunt → BMS → inverter, first available wins.
+        # Charge-controller view: battery voltage + a rough SoC, and no
+        # Ah (a controller can't measure pack capacity). Last-resort
+        # source so a controller-only rig still shows SoC + voltage
+        # rather than a blank battery panel.
+        controller_view: dict[str, float] | None = None
+        if controller is not None:
+            cv = controller
+            v = float(cv.get("battery_voltage_v") or 0)
+            i = float(cv.get("battery_current_a") or 0)
+            controller_view = {
+                "voltage_v": v,
+                "current_a": i,
+                "power_w":   v * i,
+            }
+            soc = cv.get("battery_percentage")
+            if isinstance(soc, (int, float)):
+                controller_view["soc_pct"] = float(soc)
+
+        # Pick the chosen source per policy. Priority is
+        # shunt → BMS → inverter → charge-controller, first available
+        # wins; the controller is always last (crude voltage-based SoC).
         policy = getattr(self, "_bank_source", "auto")
-        chosen: dict[str, float] | None
-        chosen_label: str
         if policy == "shunt":
-            chosen = shunt_view or bms_view or inverter_view
-            chosen_label = ("shunt" if shunt_view else
-                            "bms" if bms_view else "inverter")
+            order = [("shunt", shunt_view), ("bms", bms_view),
+                     ("inverter", inverter_view), ("controller", controller_view)]
         elif policy == "bms":
-            chosen = bms_view or shunt_view or inverter_view
-            chosen_label = ("bms" if bms_view else
-                            "shunt" if shunt_view else "inverter")
+            order = [("bms", bms_view), ("shunt", shunt_view),
+                     ("inverter", inverter_view), ("controller", controller_view)]
         else:  # auto
-            chosen = shunt_view or bms_view or inverter_view
-            chosen_label = ("shunt" if shunt_view else
-                            "bms" if bms_view else "inverter")
+            order = [("shunt", shunt_view), ("bms", bms_view),
+                     ("inverter", inverter_view), ("controller", controller_view)]
+        chosen: dict[str, float] | None = None
+        chosen_label: str = ""
+        for _lbl, _view in order:
+            if _view:
+                chosen, chosen_label = _view, _lbl
+                break
         if chosen is None:
             return None
 
