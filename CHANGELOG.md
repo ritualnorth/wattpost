@@ -8,6 +8,11 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.168-beta.1] - 2026-06-09
+
+Beta — join a home WiFi from the dashboard (scan + connect), and stale
+"silent" device cards left by a removed device are now deletable.
+
 ### Added
 - **Join a WiFi network from the dashboard.** Settings → Advanced now has a
   WiFi panel that scans for nearby networks and connects the appliance to
