@@ -16,6 +16,11 @@ Versions follow [Semantic Versioning].
   capabilities, read-only `/etc`), so a web-layer compromise can't reach root.
 
 ### Fixed
+- Dashboard hero (SoC donut, voltage, net power) now fills on a
+  charge-controller-only rig. The client-side bank aggregation had the
+  same shunt/BMS/inverter-only blind spot as the server, so the hero
+  stayed blank even after the server fix; it now uses the controller as a
+  last-resort source too. Completes the battery-panel fix below.
 - The in-place updater now honours the box's release channel. It previously
   always pulled GitHub's "latest" (newest stable), so a box on the Beta
   channel silently downgraded to stable on every update. It now resolves the
