@@ -16,6 +16,7 @@ care which vendor a number came from.
 from __future__ import annotations
 
 import abc
+import asyncio
 from typing import Callable, Sequence
 
 import msgspec
@@ -98,6 +99,15 @@ class DeviceDriver(abc.ABC):
     #: e.g. "charge_controller", "smart_battery", "shunt"
     device_kind: str
 
+    #: Gap between consecutive register-section reads in the default
+    #: poll(). Firing FC03 reads back-to-back can overrun a flaky link
+    #: (notably Renogy BT over a Pi's onboard radio) and drop it
+    #: mid-frame; a small pause markedly improves read reliability
+    #: (cyrils/renogy-bt sleeps 0.5s between sections). Negligible
+    #: against a 60s poll cadence. Drivers on rock-solid wired buses
+    #: can override to 0.0.
+    inter_section_delay_s: float = 0.3
+
     def __init__(self, slave_id: int, label: str | None = None) -> None:
         self.slave_id = slave_id
         self.label = label or f"{self.vendor_id}.{self.device_kind}.{slave_id}"
@@ -128,7 +138,10 @@ class DeviceDriver(abc.ABC):
             "_label": self.label,
             "_slave_id": self.slave_id,
         }
-        for section in self.sections:
+        for i, section in enumerate(self.sections):
+            if i:
+                # Pace reads so a flaky BLE link isn't overrun mid-frame.
+                await asyncio.sleep(self.inter_section_delay_s)
             fc = section.function_code
             if fc == 4:
                 frame = build_read_input(self.slave_id, section.register, section.word_count)
