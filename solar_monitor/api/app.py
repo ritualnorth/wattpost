@@ -61,6 +61,7 @@ from .gps_admin import get_gps_status
 from .mqtt_in_admin import get_mqtt_in_status
 from .hotspot_admin import (
     get_hotspot_status, update_hotspot_config, hotspot_on, hotspot_off,
+    wifi_scan, wifi_join,
 )
 from .captive import (
     android_204, apple_detect, win_connecttest, win_ncsi, ubuntu_canonical,
@@ -1795,6 +1796,8 @@ def build_app(
             update_hotspot_config,
             hotspot_on,
             hotspot_off,
+            wifi_scan,
+            wifi_join,
             android_204,
             apple_detect,
             win_connecttest,

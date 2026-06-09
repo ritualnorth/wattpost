@@ -164,12 +164,153 @@ def _act_captive(args: dict) -> dict:
     return {"ok": False, "out": "", "err": "bad op"}
 
 
+# ---- WiFi station provisioning (scan + join a home network) -------------
+# So a box in AP mode (or freshly flashed without Imager WiFi) can be put
+# onto a real LAN from the dashboard. nmcli is the single source of truth
+# for the radio; we never shell out with a built string. The PSK is written
+# straight into a 0600 NM keyfile so it never appears in argv / ps / cmdline.
+NMCLI = "/usr/bin/nmcli"
+NM_CONN_DIR = "/etc/NetworkManager/system-connections"
+
+
+def _req_str(args: dict, key: str, maxlen: int, allow_empty: bool = False) -> str:
+    v = args.get(key)
+    if v is None and allow_empty:
+        return ""
+    if not isinstance(v, str):
+        raise ValueError(f"{key} must be a string")
+    if not allow_empty and not v:
+        raise ValueError(f"{key} must not be empty")
+    if len(v) > maxlen:
+        raise ValueError(f"{key} too long (max {maxlen})")
+    # Control chars (incl. newlines) would break the keyfile / nmcli; reject.
+    if any(ord(c) < 0x20 for c in v):
+        raise ValueError(f"{key} contains control characters")
+    return v
+
+
+def _unescape_nmcli(s: str) -> str:
+    """nmcli -t escapes ':' and '\\' in field values. Reverse it."""
+    out, i = [], 0
+    while i < len(s):
+        if s[i] == "\\" and i + 1 < len(s):
+            out.append(s[i + 1]); i += 2
+        else:
+            out.append(s[i]); i += 1
+    return "".join(out)
+
+
+def _act_wifi_scan(_args: dict) -> dict:
+    """List visible WiFi networks. Read-only. Uses NM's cached scan so it
+    still returns results while the radio is busy as an AP (a single radio
+    can't actively rescan and beacon at once); a no-AP box rescans live."""
+    # SIGNAL/SECURITY/IN-USE are colon-free; SSID goes last so any ':' in it
+    # (escaped by nmcli) can't shift the other columns.
+    r = subprocess.run(
+        [NMCLI, "-t", "-e", "yes", "-f", "SIGNAL,SECURITY,IN-USE,SSID",
+         "device", "wifi", "list"],
+        capture_output=True, text=True, timeout=20.0,
+    )
+    if r.returncode != 0:
+        return {"ok": False, "out": "", "err": (r.stderr or "nmcli failed").strip()}
+    best: dict[str, dict] = {}
+    for line in (r.stdout or "").splitlines():
+        # Split on unescaped colons only.
+        parts, cur, j = [], [], 0
+        while j < len(line):
+            if line[j] == "\\" and j + 1 < len(line):
+                cur.append(line[j:j + 2]); j += 2
+            elif line[j] == ":":
+                parts.append("".join(cur)); cur = []; j += 1
+            else:
+                cur.append(line[j]); j += 1
+        parts.append("".join(cur))
+        if len(parts) < 4:
+            continue
+        signal_s, security, in_use, ssid = parts[0], parts[1], parts[2], _unescape_nmcli(":".join(parts[3:]))
+        if not ssid:  # hidden / empty SSID
+            continue
+        try:
+            signal = int(signal_s)
+        except ValueError:
+            signal = 0
+        entry = {
+            "ssid": ssid,
+            "signal": signal,
+            "secure": bool(security and security != "--"),
+            "in_use": in_use.strip() == "*",
+        }
+        # Dedup on SSID, keep the strongest beacon.
+        if ssid not in best or signal > best[ssid]["signal"]:
+            best[ssid] = entry
+    networks = sorted(best.values(), key=lambda e: e["signal"], reverse=True)
+    return {"ok": True, "out": json.dumps(networks), "err": ""}
+
+
+def _act_wifi_join(args: dict) -> dict:
+    """Join a WiFi network by writing a 0600 NM keyfile (PSK stays out of
+    argv) and activating it. Returns ok once the connection is up."""
+    ssid = _req_str(args, "ssid", 32)
+    psk = _req_str(args, "psk", 63, allow_empty=True)
+    if psk and len(psk) < 8:
+        return {"ok": False, "out": "", "err": "WPA password must be 8–63 characters"}
+    # Stable, collision-resistant filename; the human id stays the SSID.
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in ssid)[:48]
+    path = os.path.join(NM_CONN_DIR, f"wattpost-wifi-{safe}.nmconnection")
+    sec = (
+        "\n[wifi-security]\nkey-mgmt=wpa-psk\npsk=%s\n" % psk
+    ) if psk else ""
+    body = (
+        "[connection]\n"
+        f"id={ssid}\n"
+        "type=wifi\n"
+        "autoconnect=true\n"
+        "[wifi]\n"
+        "mode=infrastructure\n"
+        f"ssid={ssid}\n"
+        f"{sec}"
+        "[ipv4]\nmethod=auto\n"
+        "[ipv6]\nmethod=auto\n"
+    )
+    try:
+        os.makedirs(NM_CONN_DIR, exist_ok=True)
+        # 0600 before write: NM ignores keyfiles that are group/world readable.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(body)
+    except Exception as e:
+        return {"ok": False, "out": "", "err": f"write keyfile: {e}"}
+    # Load the new file then activate it. `con up` blocks until associated
+    # (or DHCP) so a wrong PSK / out-of-range network surfaces as a failure.
+    load = subprocess.run([NMCLI, "connection", "load", path],
+                          capture_output=True, text=True, timeout=10.0)
+    if load.returncode != 0:
+        try: os.remove(path)
+        except OSError: pass
+        return {"ok": False, "out": "", "err": (load.stderr or "nmcli load failed").strip()}
+    up = subprocess.run([NMCLI, "connection", "up", "id", ssid],
+                        capture_output=True, text=True, timeout=45.0)
+    if up.returncode != 0:
+        # Don't leave a broken autoconnect profile retrying a bad password —
+        # drop it and report so the UI can say "check the password". Never
+        # echo the PSK back.
+        subprocess.run([NMCLI, "connection", "delete", "id", ssid],
+                       capture_output=True, text=True, timeout=10.0)
+        try: os.remove(path)
+        except OSError: pass
+        return {"ok": False, "out": "",
+                "err": (up.stderr or "couldn't connect — check the password").strip()}
+    return {"ok": True, "out": "connected", "err": ""}
+
+
 ACTIONS = {
     "netctl_status": _act_netctl_status,
     "netctl_apply": _act_netctl_apply,
     "update": _act_update,
     "rollback": _act_rollback,
     "captive": _act_captive,
+    "wifi_scan": _act_wifi_scan,
+    "wifi_join": _act_wifi_join,
 }
 
 

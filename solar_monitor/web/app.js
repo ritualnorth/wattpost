@@ -5473,6 +5473,7 @@ function renderSettings() {
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
   refreshHotspotPanel();     // Pillar 3, appliance-as-WiFi-AP
+  wireWifiPanel();           // join a home WiFi from the dashboard (scan + connect)
   wireResetToDefaults();     // #138, Danger zone
 }
 
@@ -5480,6 +5481,115 @@ function renderSettings() {
 // state, pre-fills the form, and wires Save (PUT config) + the manual
 // on/off buttons. Password field stays blank on load so we never echo
 // the stored passphrase; a blank Save keeps the existing one.
+// ---------- WiFi station provisioning (join a home network) ----------
+// Scan for nearby WiFi + join one so a box in AP mode (or flashed without
+// WiFi) can be put on the LAN from the dashboard. Backend:
+// /api/network/wifi/{scan,join} → wattpost-helperd nmcli (the PSK is written
+// to a 0600 NM keyfile host-side, never echoed back).
+function wireWifiPanel() {
+  if (!document.getElementById("settings-wifi-block")) return;
+  const scanBtn = document.getElementById("wifi-scan-btn");
+  if (scanBtn) scanBtn.onclick = scanWifiNetworks;
+  const joinBtn = document.getElementById("wifi-join-btn");
+  if (joinBtn) joinBtn.onclick = joinWifiNetwork;
+  const cancelBtn = document.getElementById("wifi-join-cancel");
+  if (cancelBtn) cancelBtn.onclick = () => {
+    const f = document.getElementById("wifi-join-form");
+    if (f) f.style.display = "none";
+  };
+}
+
+async function scanWifiNetworks() {
+  const msg = document.getElementById("wifi-scan-msg");
+  const btn = document.getElementById("wifi-scan-btn");
+  if (msg) { msg.style.color = ""; msg.textContent = "Scanning…"; }
+  if (btn) btn.disabled = true;
+  try {
+    const r = await api("/api/network/wifi/scan");
+    if (btn) btn.disabled = false;
+    if (!r.supported) {
+      // No host network control (Docker / dev) — hide the whole panel.
+      const blk = document.getElementById("settings-wifi-block");
+      if (blk) blk.style.display = "none";
+      return;
+    }
+    if (r.error) {
+      if (msg) { msg.style.color = "var(--red)"; msg.textContent = r.error; }
+    } else if (msg) {
+      const n = (r.networks || []).length;
+      msg.textContent = `${n} network${n === 1 ? "" : "s"} found`;
+    }
+    renderWifiList(r.networks || []);
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Scan failed: " + (e.message || e); }
+  }
+}
+
+function renderWifiList(networks) {
+  const list = document.getElementById("wifi-network-list");
+  if (!list) return;
+  list.innerHTML = "";
+  for (const n of networks) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.style.cssText = "display:flex;justify-content:space-between;align-items:center;" +
+      "width:100%;text-align:left;gap:.5rem;padding:.5rem .6rem;margin:.2rem 0;" +
+      "border:1px solid var(--border,#333);border-radius:8px;background:transparent;" +
+      "color:inherit;cursor:pointer;font:inherit";
+    const meta = `${n.signal}% ${n.secure ? "🔒" : ""}${n.in_use ? " · connected" : ""}`;
+    row.innerHTML =
+      `<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(n.ssid)}</span>` +
+      `<span class="settings-foot" style="flex:none">${escHtml(meta)}</span>`;
+    row.onclick = () => selectWifiNetwork(n);
+    list.appendChild(row);
+  }
+}
+
+function selectWifiNetwork(n) {
+  const form  = document.getElementById("wifi-join-form");
+  const ssidEl = document.getElementById("wifi-join-ssid");
+  const pskEl  = document.getElementById("wifi-join-psk");
+  if (ssidEl) ssidEl.value = n.ssid;
+  if (pskEl) {
+    pskEl.value = "";
+    pskEl.disabled = !n.secure;
+    pskEl.placeholder = n.secure ? "network password" : "open network — no password needed";
+  }
+  if (form) form.style.display = "";
+  if (n.secure && pskEl) pskEl.focus();
+}
+
+async function joinWifiNetwork() {
+  const msg  = document.getElementById("wifi-join-msg");
+  const ssid = (document.getElementById("wifi-join-ssid")?.value || "").trim();
+  const psk  = document.getElementById("wifi-join-psk")?.value || "";
+  if (!ssid) { if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Pick a network first."; } return; }
+  const body = { ssid };
+  if (psk) body.password = psk;
+  if (msg) { msg.style.color = ""; msg.textContent = `Connecting to "${ssid}"…`; }
+  const btn = document.getElementById("wifi-join-btn");
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(_withKiosk("/api/network/wifi/join"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (btn) btn.disabled = false;
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `HTTP ${r.status}`);
+    }
+    if (msg) { msg.style.color = ""; msg.textContent = `Connected to "${ssid}". This box is now on your LAN.`; }
+    const pskEl = document.getElementById("wifi-join-psk");
+    if (pskEl) pskEl.value = "";
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Couldn't connect: " + (e.message || e); }
+  }
+}
+
 async function refreshHotspotPanel() {
   const block = document.getElementById("settings-hotspot-block");
   if (!block) return;

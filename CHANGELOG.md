@@ -8,6 +8,15 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Added
+- **Join a WiFi network from the dashboard.** Settings → Advanced now has a
+  WiFi panel that scans for nearby networks and connects the appliance to
+  one, so a box in hotspot/AP mode (or flashed without WiFi) can be put on
+  the LAN without re-flashing or SSH. The scan and join run through
+  `wattpost-helperd` (nmcli); the password is written straight into a 0600
+  NetworkManager keyfile, so it never appears in a command line, process
+  list, or log. Hidden on installs with no host network control (Docker).
+
 ### Fixed
 - A device removed from config no longer leaves an undeletable "silent"
   card. Device deletion is now keyed by the device label (the DB key on

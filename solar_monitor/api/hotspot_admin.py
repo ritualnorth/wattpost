@@ -17,6 +17,7 @@ api/captive.py) are wired in separately.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -187,3 +188,65 @@ async def hotspot_off(state: State) -> dict[str, Any]:
     if not result.get("ok"):
         raise HTTPException(status_code=502, detail=str(result.get("error") or "deactivation failed"))
     return {"ok": True, **await svc.status()}
+
+
+# ---- WiFi station provisioning (join a home LAN) ------------------------
+# The inverse of the hotspot: scan for nearby networks and join one, so a
+# box in AP mode (or flashed without Imager WiFi) can be put on the LAN from
+# the dashboard. Privileged nmcli work runs in wattpost-helperd; here we
+# just validate, call the socket, and shape the response.
+
+
+class WifiJoinPayload(msgspec.Struct, kw_only=True):
+    ssid: str
+    # Omit / empty for an open network; WPA needs 8..63 chars.
+    password: str | None = None
+
+
+@get("/api/network/wifi/scan")
+async def wifi_scan() -> dict[str, Any]:
+    """List visible WiFi networks for the join picker. Returns
+    `supported: false` on installs with no host network control (Docker,
+    dev), so the UI can hide the panel rather than show an error."""
+    from .. import helper_client
+    if not helper_client.is_available():
+        return {"supported": False, "networks": [], "error": None}
+    r = helper_client.call("wifi_scan")
+    if not r.get("ok"):
+        # Surface the reason in-band (a 5xx detail would be masked) so the
+        # panel can say e.g. "can't scan while the hotspot is active".
+        return {"supported": True, "networks": [],
+                "error": (r.get("err") or "scan failed").strip()}
+    try:
+        networks = json.loads(r.get("out") or "[]")
+    except (ValueError, TypeError):
+        networks = []
+    return {"supported": True, "networks": networks, "error": None}
+
+
+@post("/api/network/wifi/join")
+async def wifi_join(data: WifiJoinPayload) -> dict[str, Any]:
+    """Join a WiFi network. The PSK goes to the helper, which writes it to a
+    0600 NM keyfile — it never lands in a command line or in our logs."""
+    from .. import helper_client
+    if not helper_client.is_available():
+        raise HTTPException(
+            status_code=400,
+            detail="WiFi join isn't available on this install (no host network control).",
+        )
+    ssid = (data.ssid or "").strip()
+    if not ssid or len(ssid) > 32:
+        raise HTTPException(status_code=400, detail="SSID must be 1–32 characters.")
+    psk = data.password or ""
+    if psk and not (8 <= len(psk) <= 63):
+        raise HTTPException(status_code=400, detail="WPA password must be 8–63 characters.")
+    r = helper_client.call("wifi_join", ssid=ssid, psk=psk)
+    if not r.get("ok"):
+        # 4xx so the actionable detail reaches the client (Litestar masks 5xx
+        # detail). The helper never echoes the PSK back.
+        raise HTTPException(
+            status_code=400,
+            detail=(r.get("err") or "Couldn't connect — check the password and try again.").strip(),
+        )
+    log.info("wifi: joined network ssid=%s (secured=%s)", ssid, bool(psk))
+    return {"ok": True, "ssid": ssid}

@@ -1120,6 +1120,39 @@
             </label>
             <p class="settings-foot" id="netsec-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
+          <div class="settings-block" id="settings-wifi-block" data-subroute="advanced">
+            <h3>Join a WiFi network <span class="settings-foot" style="font-weight:normal">&middot; put this box on your LAN</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Scan for nearby networks and connect this appliance to your
+              WiFi &mdash; handy when it's in hotspot mode or was flashed
+              without WiFi. Needs NetworkManager on the host (default on
+              Pi&nbsp;OS Bookworm).
+            </p>
+            <div class="hist-actions">
+              <button id="wifi-scan-btn" class="btn-action btn-action--primary" type="button">Scan for networks</button>
+              <span id="wifi-scan-msg" class="settings-foot hist-status"></span>
+            </div>
+            <div id="wifi-network-list" style="margin-top:.5rem"></div>
+            <div id="wifi-join-form" class="hist-form" style="display:none;margin-top:.55rem">
+              <label class="hist-row">
+                <span>Network (SSID)</span>
+                <span class="hist-input hist-input--text">
+                  <input id="wifi-join-ssid" type="text" maxlength="32" placeholder="network name"/>
+                </span>
+              </label>
+              <label class="hist-row">
+                <span>Password</span>
+                <span class="hist-input hist-input--text">
+                  <input id="wifi-join-psk" type="password" autocomplete="new-password" placeholder="leave blank for an open network"/>
+                </span>
+              </label>
+              <div class="hist-actions">
+                <button id="wifi-join-btn" class="btn-action btn-action--primary" type="button">Join</button>
+                <button id="wifi-join-cancel" class="btn-action" type="button">Cancel</button>
+                <span id="wifi-join-msg" class="settings-foot hist-status"></span>
+              </div>
+            </div>
+          </div>
           <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
             <h3>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
@@ -1351,6 +1384,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=255"></script>
+  <script src="/web/app.js?v=256"></script>
 </body>
 </html>
