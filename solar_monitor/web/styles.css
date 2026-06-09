@@ -2094,9 +2094,15 @@ body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after 
 .dev-card.kind-inverter          .dev-card-icon { color: var(--ac); }
 .dev-card.kind-dcdc_charger      .dev-card-icon { color: var(--grid); }
 .dev-card.kind-shunt             .dev-card-icon { color: var(--batt); }
-.dev-card-name { font-weight: 600; font-size: .92rem; }
+.dev-card-name {
+  font-weight: 600; font-size: .92rem;
+  /* Long raw labels (e.g. "renogy.charge_controller.16") must truncate
+     rather than overflow into the slave-id badge on the right. */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .dev-card-head-right {
   display: flex; align-items: center; gap: .5rem;
+  flex: none;            /* never shrink/overlap the badge; the name truncates instead */
   color: var(--text-3);
 }
 .dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
