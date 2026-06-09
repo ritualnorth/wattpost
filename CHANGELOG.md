@@ -16,6 +16,12 @@ Versions follow [Semantic Versioning].
   capabilities, read-only `/etc`), so a web-layer compromise can't reach root.
 
 ### Fixed
+- Renogy charge controllers now connect reliably over a Raspberry Pi's
+  onboard Bluetooth. These BT-1/BT-2 links succeed on only about one connect
+  attempt in six, so the driver now retries aggressively and clears stale
+  BlueZ state between tries instead of giving up after two attempts. Register
+  reads are paced so a flaky link is not overrun mid-frame. Verified streaming
+  a full Renogy Rover register map on bare onboard radio.
 - Daemon restarts no longer hang ~15s and get force-killed — graceful
   shutdown is now bounded, which also stops the spurious auto-rollbacks that
   rapid restarts could trigger.
