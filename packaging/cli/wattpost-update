@@ -37,13 +37,30 @@
 set -euo pipefail
 
 LOG=/var/log/wattpost-update.log
-# Source ships as a GitHub Release asset; releases/latest/download/<name>
-# is a permanent URL that 302-redirects to the newest release's asset.
-# Cache-buster query string is belt-and-braces against any CDN serving
-# a stale tarball/sha pair in the brief window after a publish (#224).
-# Override with WATTPOST_SOURCE_URL for a mirror or testing.
+# Resolve the source tarball for THIS box's configured release channel.
+# GitHub's releases/latest only ever points at the newest *stable*
+# (non-prerelease) release, so a beta box that uses it silently
+# DOWNGRADES to stable on every "Update". Ask the cloud manifest for the
+# configured channel's current release and use its versioned source_url.
+# Precedence:
+#   1. WATTPOST_SOURCE_URL  — explicit override (mirror / testing).
+#   2. cloud manifest source_url for the box's channel.
+#   3. releases/latest      — fallback when the manifest is unreachable,
+#                             so a cloud outage still updates (to stable,
+#                             the safe direction).
+# Cache-buster query string guards against a CDN serving a stale
+# tarball/sha pair in the brief window after a publish (#224).
 CB="?cb=$(date +%s)-$$"
-SRC_BASE="${WATTPOST_SOURCE_URL:-https://github.com/ritualnorth/wattpost/releases/latest/download/wattpost-source.tar.gz}"
+_LATEST_STABLE="https://github.com/ritualnorth/wattpost/releases/latest/download/wattpost-source.tar.gz"
+if [ -n "${WATTPOST_SOURCE_URL:-}" ]; then
+    SRC_BASE="${WATTPOST_SOURCE_URL}"
+else
+    CHANNEL="$(awk '/^update:/{f=1;next} f&&/^[^[:space:]]/{f=0} f&&/[[:space:]]channel:/{print $2; exit}' /etc/wattpost/config.yaml 2>/dev/null)"
+    [ -n "${CHANNEL}" ] || CHANNEL=stable
+    MANIFEST="$(curl -fsSL --connect-timeout 10 --max-time 20 "https://wattpost.cloud/api/releases/latest?channel=${CHANNEL}" 2>/dev/null || true)"
+    SRC_BASE="$(printf '%s' "${MANIFEST}" | grep -oE '"source_url"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed -E 's/.*"source_url"[[:space:]]*:[[:space:]]*"//; s/"$//')"
+    [ -n "${SRC_BASE}" ] || SRC_BASE="${_LATEST_STABLE}"
+fi
 SRC_URL="${SRC_BASE}${CB}"
 SHA_URL="${SRC_BASE}.sha256${CB}"
 APP_ROOT=/opt/wattpost
