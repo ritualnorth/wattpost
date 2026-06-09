@@ -16,6 +16,12 @@ Versions follow [Semantic Versioning].
   capabilities, read-only `/etc`), so a web-layer compromise can't reach root.
 
 ### Fixed
+- The dashboard battery panel (SoC, voltage, net power) now populates on a
+  charge-controller-only rig. The bank aggregate previously needed a shunt,
+  BMS, or hybrid inverter, so a setup with only a Renogy-style controller
+  left it blank. The controller is now a last-resort bank source: voltage
+  plus its rough SoC. Capacity/remaining Ah stay blank, which a controller
+  cannot measure without a shunt.
 - Renogy charge controllers now connect reliably over a Raspberry Pi's
   onboard Bluetooth. These BT-1/BT-2 links succeed on only about one connect
   attempt in six, so the driver now retries aggressively and clears stale
