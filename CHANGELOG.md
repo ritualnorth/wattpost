@@ -16,6 +16,11 @@ Versions follow [Semantic Versioning].
   capabilities, read-only `/etc`), so a web-layer compromise can't reach root.
 
 ### Fixed
+- The in-place updater now honours the box's release channel. It previously
+  always pulled GitHub's "latest" (newest stable), so a box on the Beta
+  channel silently downgraded to stable on every update. It now resolves the
+  source tarball for the configured channel from the cloud manifest, falling
+  back to latest-stable only if the manifest is unreachable.
 - The dashboard battery panel (SoC, voltage, net power) now populates on a
   charge-controller-only rig. The bank aggregate previously needed a shunt,
   BMS, or hybrid inverter, so a setup with only a Renogy-style controller
