@@ -520,6 +520,27 @@ systemctl daemon-reload
 systemctl enable wattpost.service >/dev/null
 systemctl restart wattpost.service
 
+# ----- mDNS hostname -----
+# Advertise the box as `wattpost.local` so it's reachable by name on the LAN
+# without knowing its IP — and on its own hotspot too, since avahi answers on
+# every interface, so a phone joined to the AP resolves wattpost.local ->
+# 10.42.0.1. Sets avahi's advertised name only; the system hostname is left
+# alone. Pi-style installs only (Docker hosts are reached by their own host
+# address, no mDNS needed).
+step "configuring mDNS (wattpost.local)"
+if ! command -v avahi-daemon >/dev/null 2>&1; then
+    apt-get install -y avahi-daemon || warn "couldn't install avahi-daemon — wattpost.local won't resolve"
+fi
+if [ -f /etc/avahi/avahi-daemon.conf ]; then
+    if grep -qE '^#*host-name=' /etc/avahi/avahi-daemon.conf; then
+        sed -i 's/^#*host-name=.*/host-name=wattpost/' /etc/avahi/avahi-daemon.conf
+    else
+        sed -i '/^\[server\]/a host-name=wattpost' /etc/avahi/avahi-daemon.conf
+    fi
+    systemctl enable avahi-daemon >/dev/null 2>&1 || true
+    systemctl restart avahi-daemon || warn "avahi restart failed — wattpost.local may not resolve until reboot"
+fi
+
 # ----- summary -----
 step "done"
 IP=$(hostname -I | awk '{print $1}')
@@ -533,7 +554,8 @@ cat <<EOF
 
 WattPost is running. Open the dashboard:
 
-    http://${IP:-<this-pi>}${PORT_SUFFIX}/
+    http://wattpost.local${PORT_SUFFIX}/        (works on any device on this network)
+    http://${IP:-<this-pi>}${PORT_SUFFIX}/        (by IP, if .local doesn't resolve)
 
 Useful commands:
     sudo systemctl status wattpost     # health
