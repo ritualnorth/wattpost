@@ -5518,6 +5518,11 @@ async function scanWifiNetworks() {
       if (blk) blk.style.display = "none";
       return;
     }
+    if (r.hotspot_active) {
+      // Single radio can't beacon the AP and scan at once — bounce it.
+      await scanWifiViaApBounce();
+      return;
+    }
     if (r.error) {
       if (msg) { msg.style.color = "var(--red)"; msg.textContent = r.error; }
     } else if (msg) {
@@ -5529,6 +5534,53 @@ async function scanWifiNetworks() {
     if (btn) btn.disabled = false;
     if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Scan failed: " + (e.message || e); }
   }
+}
+
+// AP-mode scan: the box is beaconing its own hotspot, which we're probably
+// connected through. Kick a background bounce (drop AP → scan → restore AP)
+// and poll for the result; the AP blips so our own polls fail briefly while
+// the device rejoins — tolerate that and keep trying.
+async function scanWifiViaApBounce() {
+  const msg = document.getElementById("wifi-scan-msg");
+  const btn = document.getElementById("wifi-scan-btn");
+  if (btn) btn.disabled = true;
+  if (msg) {
+    msg.style.color = "";
+    msg.textContent = "Switching the hotspot off for a few seconds to scan — "
+      + "your device should rejoin it automatically. Hold on…";
+  }
+  try {
+    const r = await fetch(_withKiosk("/api/network/wifi/scan/ap-bounce"), { method: "POST" });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      throw new Error(d.detail || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Couldn't start scan: " + (e.message || e); }
+    return;
+  }
+  const deadline = Date.now() + 45000;
+  while (Date.now() < deadline) {
+    await new Promise((res) => setTimeout(res, 3000));
+    let s;
+    try { s = await api("/api/network/wifi/scan/ap-bounce"); }
+    catch { continue; }  // AP down / device reconnecting — keep polling
+    if (s.state === "done" || s.state === "error") {
+      if (btn) btn.disabled = false;
+      if (s.state === "error") {
+        if (msg) { msg.style.color = "var(--red)"; msg.textContent = s.error || "Scan failed."; }
+      } else if (msg) {
+        const n = (s.networks || []).length;
+        msg.style.color = "";
+        msg.textContent = `${n} network${n === 1 ? "" : "s"} found`;
+      }
+      renderWifiList(s.networks || []);
+      return;
+    }
+  }
+  if (btn) btn.disabled = false;
+  if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Scan timed out — try again once you're back on the hotspot."; }
 }
 
 function renderWifiList(networks) {

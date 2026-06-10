@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -209,25 +210,131 @@ class WifiJoinPayload(msgspec.Struct, kw_only=True):
     dns: str | None = None
 
 
+async def _hotspot_active(state: State) -> bool:
+    """True when this box is currently beaconing its own AP. A single
+    radio can't beacon and scan at once, so when this is True a live scan
+    finds nothing and the client should use the bounce flow below."""
+    scheduler = state.get("scheduler") if hasattr(state, "get") else state["scheduler"]
+    svc = getattr(scheduler, "hotspot", None)
+    if svc is None:
+        return False
+    try:
+        return bool((await svc.status()).get("active"))
+    except Exception:
+        return False
+
+
 @get("/api/network/wifi/scan")
-async def wifi_scan() -> dict[str, Any]:
+async def wifi_scan(state: State) -> dict[str, Any]:
     """List visible WiFi networks for the join picker. Returns
     `supported: false` on installs with no host network control (Docker,
-    dev), so the UI can hide the panel rather than show an error."""
+    dev), so the UI can hide the panel rather than show an error.
+
+    `hotspot_active` tells the client whether the radio is busy as an AP;
+    if so a live scan can't run and the UI should offer the AP-bounce
+    scan (POST .../scan/ap-bounce) instead."""
     from .. import helper_client
     if not helper_client.is_available():
-        return {"supported": False, "networks": [], "error": None}
+        return {"supported": False, "networks": [], "error": None, "hotspot_active": False}
+    hotspot_active = await _hotspot_active(state)
+    if hotspot_active:
+        # Radio is beaconing the AP; a live scan would block ~3s and find
+        # nothing. Signal the client to use the bounce flow instead.
+        return {"supported": True, "networks": [], "error": None, "hotspot_active": True}
     r = helper_client.call("wifi_scan")
     if not r.get("ok"):
         # Surface the reason in-band (a 5xx detail would be masked) so the
         # panel can say e.g. "can't scan while the hotspot is active".
         return {"supported": True, "networks": [],
-                "error": (r.get("err") or "scan failed").strip()}
+                "error": (r.get("err") or "scan failed").strip(),
+                "hotspot_active": hotspot_active}
     try:
         networks = json.loads(r.get("out") or "[]")
     except (ValueError, TypeError):
         networks = []
-    return {"supported": True, "networks": networks, "error": None}
+    return {"supported": True, "networks": networks, "error": None,
+            "hotspot_active": hotspot_active}
+
+
+# --- AP-mode scan (single radio: drop AP → scan → restore AP) ------------
+# When the box is in hotspot mode the radio can't scan and beacon at once,
+# so a fresh scan means briefly tearing the AP down. The client that asked
+# is usually connected THROUGH that AP, so we can't just bounce it inside
+# the request (the response would never arrive). Instead: kick a background
+# bounce, return immediately, and let the client poll for the cached result
+# once its device has rejoined the AP. The AP restore is bulletproofed in a
+# finally — it's the box's only link on an off-grid site.
+_AP_SCAN: dict[str, Any] = {"state": "idle", "ts": 0.0, "networks": [], "error": None}
+
+
+async def _ap_bounce_scan(state: State) -> None:
+    from .. import helper_client
+    scheduler = state.get("scheduler") if hasattr(state, "get") else state["scheduler"]
+    svc = getattr(scheduler, "hotspot", None)
+    was_active = False
+    try:
+        if svc is not None:
+            try:
+                was_active = bool((await svc.status()).get("active"))
+            except Exception:
+                was_active = False
+        if was_active:
+            await svc.deactivate()
+            await asyncio.sleep(1.0)  # let NM release the radio
+        # helper_client.call blocks on a socket; keep it off the loop.
+        r = await asyncio.to_thread(helper_client.call, "wifi_scan")
+        if r.get("ok"):
+            try:
+                _AP_SCAN["networks"] = json.loads(r.get("out") or "[]")
+            except (ValueError, TypeError):
+                _AP_SCAN["networks"] = []
+            _AP_SCAN["error"] = None
+        else:
+            _AP_SCAN["error"] = (r.get("err") or "scan failed").strip()
+        _AP_SCAN["ts"] = time.time()
+    except Exception as e:
+        _AP_SCAN["error"] = str(e)
+        _AP_SCAN["ts"] = time.time()
+    finally:
+        if was_active and svc is not None:
+            try:
+                await svc.activate()
+            except Exception:
+                log.exception("wifi scan: FAILED to restore hotspot after bounce — "
+                              "box may be unreachable until the AP is brought back up")
+        _AP_SCAN["state"] = "error" if _AP_SCAN["error"] else "done"
+
+
+@post("/api/network/wifi/scan/ap-bounce", status_code=202)
+async def wifi_scan_ap_bounce(state: State) -> dict[str, Any]:
+    """Start a background AP-bounce scan. Returns immediately (202) while
+    the AP is still up so this response reaches a client connected through
+    it; the bounce then runs and the client polls the GET below."""
+    from .. import helper_client
+    if not helper_client.is_available():
+        raise HTTPException(
+            status_code=400,
+            detail="WiFi scan isn't available on this install (no host network control).",
+        )
+    if _AP_SCAN["state"] == "running":
+        return {"started": False, "state": "running"}
+    _AP_SCAN["state"] = "running"
+    _AP_SCAN["error"] = None
+    asyncio.create_task(_ap_bounce_scan(state))
+    return {"started": True, "state": "running"}
+
+
+@get("/api/network/wifi/scan/ap-bounce")
+async def wifi_scan_ap_bounce_status() -> dict[str, Any]:
+    """Poll the background AP-bounce scan. `state` is idle/running/done/
+    error; `networks` + `error` carry the result once done."""
+    age = int(time.time() - _AP_SCAN["ts"]) if _AP_SCAN["ts"] else None
+    return {
+        "state":    _AP_SCAN["state"],
+        "networks": _AP_SCAN["networks"],
+        "error":    _AP_SCAN["error"],
+        "age_s":    age,
+    }
 
 
 @post("/api/network/wifi/join")
