@@ -1262,7 +1262,10 @@ class CloudService:
             log.exception("cloud heartbeat: could not read bank state")
 
         # Free-form extras for the cloud dashboard to render later.
-        # Keep this concise, the cloud caps extras at 2 KiB.
+        # Keep this concise: the cloud caps extras at 8 KiB and the
+        # byte-budget trim at the end of this method sheds the biggest
+        # non-essential keys if we run over, so anything bulky added
+        # here is best-effort and may be dropped on a busy beat.
         extras: dict[str, Any] = {}
         # BLE adapter health (#244). Surfaces "wedged" Realtek dongles
         # to the cloud so users see "Bluetooth dongle not responding"
@@ -1343,16 +1346,29 @@ class CloudService:
 
         # Phase 8B (#310), appliance-signed audit log entries waiting
         # to sync to cloud. Cloud verifies signature + hash chain +
-        # ingests; ack list comes back in the heartbeat response so
-        # we can flip uploaded_at. Cap at 50 per heartbeat to keep
-        # extras under the 2KiB ceiling on busy-event days.
+        # ingests; ack list comes back in the heartbeat response so we
+        # can flip uploaded_at. The old fixed limit=50 was ~7.3 KB and
+        # blew the cloud's 8 KiB extras cap on a box with a backlog —
+        # 413'ing every heartbeat so the box never came online. Row
+        # size varies with event_payload, so a fixed *count* isn't
+        # enough; byte-bound the batch instead. It ships what fits and
+        # drains the backlog over successive beats. The _build_payload
+        # byte-budget trim below is the backstop.
         try:
             from .. import signed_audit as _sa
+            import json as _json
             store = self.scheduler.store
             if store is not None and store._db is not None:
                 pending = await _sa.fetch_pending(store._db, limit=50)
                 if pending:
-                    extras["signed_audit_pending"] = pending
+                    _budget, _size, _kept = 3500, 0, []
+                    for _e in pending:
+                        _s = len(_json.dumps(_e, separators=(",", ":")).encode("utf-8"))
+                        if _kept and _size + _s > _budget:
+                            break
+                        _kept.append(_e)
+                        _size += _s
+                    extras["signed_audit_pending"] = _kept
         except Exception:
             log.exception("signed_audit: fetch_pending failed")
 
@@ -1684,7 +1700,7 @@ class CloudService:
         # local SQLite kv table (the same cache the dashboard reads
         # from), so this is a cheap read, no third-party calls per
         # heartbeat. Keep the field set tight (~5 fields, ~100 bytes)
-        # so the 2 KiB extras cap isn't a concern.
+        # so the 8 KiB extras cap isn't a concern.
         try:
             store = getattr(self.scheduler, "store", None)
             if store is not None:
@@ -1739,6 +1755,53 @@ class CloudService:
         except Exception:
             log.warning("cloud heartbeat: forecast snapshot read failed",
                         exc_info=True)
+
+        # Keep extras under the cloud's cap. The core fields (soc_pct,
+        # net_w) plus the small routing/identity extras — local_port
+        # above all, since the cloud derives the tunnel proxy port from
+        # it — MUST get through so the box registers online and stays
+        # reachable. The bulky render-only enrichment is best-effort:
+        # shed the single biggest non-essential key, repeatedly, until
+        # we're under budget. Size-based (not a fixed key order) so it
+        # adapts to whatever is heavy on a given box — on a busy rig the
+        # signed-audit backlog dominated, on others it might be energy
+        # history or device snapshots. Without this a busy multi-device
+        # install overflows and the cloud 413s EVERY heartbeat — the box
+        # then looks permanently offline and its tunnel port never
+        # binds. Each shed key is re-sent next beat, so enrichment
+        # converges once the transient pressure passes. Budget sits a
+        # margin under the cloud's _EXTRAS_MAX_BYTES (8 KiB).
+        import json as _json
+        _EXTRAS_BUDGET = 7800
+        # Never shed these: small, and load-bearing for routing/identity.
+        _EXTRAS_KEEP = {
+            "local_port", "version", "deployment", "kiosk_token",
+            "kiosk_skin", "alert_count",
+        }
+
+        def _extras_bytes() -> int:
+            return len(_json.dumps(extras, separators=(",", ":")).encode("utf-8"))
+
+        def _ksize(_k: str) -> int:
+            return len(_json.dumps({_k: extras[_k]}, separators=(",", ":")).encode("utf-8"))
+
+        shed: list[str] = []
+        while _extras_bytes() > _EXTRAS_BUDGET:
+            cands = [k for k in extras if k not in _EXTRAS_KEEP]
+            if not cands:
+                break  # everything left is mandatory; let the cloud judge
+            biggest = max(cands, key=_ksize)
+            extras.pop(biggest, None)
+            shed.append(biggest)
+            if biggest == "recent_alerts":
+                # Never actually uploaded — clear the pending marker so
+                # heartbeat_once's post-2xx promotion doesn't advance the
+                # cursor past them (see _alerts_pending_ts there). They
+                # ship on the next heartbeat instead.
+                self._alerts_pending_ts = None
+        if shed:
+            log.warning("cloud heartbeat: extras over budget, shed %s (now %dB)",
+                        shed, _extras_bytes())
 
         return {
             "soc_pct": soc_pct,
