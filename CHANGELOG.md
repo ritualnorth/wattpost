@@ -8,6 +8,14 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Fixed
+- WiFi scan no longer reports "none found" on a box whose WiFi radio is
+  powered down (ethernet boxes, or a box that fell back to other
+  connectivity). The scan now powers the radio on and triggers an active
+  rescan before listing, instead of only reporting NetworkManager's cached
+  results. (Scanning is still limited while the radio is busy as an AP — a
+  single radio can't beacon and rescan at once; tracked separately.)
+
 ## [0.1.168-beta.1] - 2026-06-09
 
 Beta — join a home WiFi from the dashboard (scan + connect), and stale

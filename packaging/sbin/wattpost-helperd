@@ -35,6 +35,7 @@ import os
 import socket
 import subprocess
 import sys
+import time
 
 log = logging.getLogger("wattpost-helperd")
 
@@ -201,9 +202,22 @@ def _unescape_nmcli(s: str) -> str:
 
 
 def _act_wifi_scan(_args: dict) -> dict:
-    """List visible WiFi networks. Read-only. Uses NM's cached scan so it
-    still returns results while the radio is busy as an AP (a single radio
-    can't actively rescan and beacon at once); a no-AP box rescans live."""
+    """List visible WiFi networks for the join picker.
+
+    Powers the radio on first: an ethernet box (or a fresh box that fell
+    back to other connectivity) keeps wlan0 down, so a bare list finds
+    nothing — the user clicked "scan", so bringing the radio up is the
+    intent. Then an active rescan. While the radio is busy as an AP a single
+    radio can't rescan and beacon at once, so the rescan fails harmlessly and
+    we fall back to NM's cached results (see #3 for the AP-mode story)."""
+    # Bring the radio up if it's off. Idempotent; no-op when already on/AP.
+    subprocess.run([NMCLI, "radio", "wifi", "on"],
+                   capture_output=True, text=True, timeout=10.0)
+    # Best-effort active rescan. Fails (ignored) while AP-busy or rate-limited.
+    subprocess.run([NMCLI, "device", "wifi", "rescan"],
+                   capture_output=True, text=True, timeout=15.0)
+    # Give results a moment to populate before we read the list.
+    time.sleep(3.0)
     # SIGNAL/SECURITY/IN-USE are colon-free; SSID goes last so any ':' in it
     # (escaped by nmcli) can't shift the other columns.
     r = subprocess.run(
