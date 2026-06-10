@@ -69,6 +69,16 @@ def test_dns_accepts_comma_or_space():
         assert "dns=1.1.1.1;8.8.8.8;" in sec
 
 
+def test_split_nmcli_t_handles_escaped_colons():
+    # nmcli -t escapes ':' in values with a backslash; the splitter must only
+    # break on UNescaped colons (connection names can contain ':').
+    split = helperd._split_nmcli_t
+    assert split("Wired connection 1:802-3-ethernet:eth0") == \
+        ["Wired connection 1", "802-3-ethernet", "eth0"]
+    assert split(r"odd\:name:wifi:wlan0") == ["odd:name", "wifi", "wlan0"]
+    assert split("ipv4.method:auto") == ["ipv4.method", "auto"]
+
+
 @pytest.mark.parametrize("bad", [
     {"method": "manual", "address": "not-an-ip"},
     {"method": "manual", "address": "192.168.1.999"},

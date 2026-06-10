@@ -62,6 +62,7 @@ from .mqtt_in_admin import get_mqtt_in_status
 from .hotspot_admin import (
     get_hotspot_status, update_hotspot_config, hotspot_on, hotspot_off,
     wifi_scan, wifi_join, wifi_scan_ap_bounce, wifi_scan_ap_bounce_status,
+    network_status, network_set_ipv4,
 )
 from .captive import (
     android_204, apple_detect, win_connecttest, win_ncsi, ubuntu_canonical,
@@ -1800,6 +1801,8 @@ def build_app(
             wifi_join,
             wifi_scan_ap_bounce,
             wifi_scan_ap_bounce_status,
+            network_status,
+            network_set_ipv4,
             android_204,
             apple_detect,
             win_connecttest,

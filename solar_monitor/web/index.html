@@ -1120,6 +1120,18 @@
             </label>
             <p class="settings-foot" id="netsec-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
+          <div class="settings-block" id="settings-network-block" data-subroute="advanced">
+            <h3>Network address <span class="settings-foot" style="font-weight:normal">&middot; this box's IP</span></h3>
+            <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
+              Pin this box to a fixed (static) IP so it always lives at the
+              same address, or leave it on automatic (DHCP). After a change the
+              box may move address &mdash; reconnect at
+              <code>http://wattpost.local</code>. Needs NetworkManager on the
+              host (default on Pi&nbsp;OS Bookworm).
+            </p>
+            <div id="network-list"></div>
+            <span id="network-msg" class="settings-foot hist-status"></span>
+          </div>
           <div class="settings-block" id="settings-wifi-block" data-subroute="advanced">
             <h3>Join a WiFi network <span class="settings-foot" style="font-weight:normal">&middot; put this box on your LAN</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
@@ -1417,6 +1429,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=258"></script>
+  <script src="/web/app.js?v=259"></script>
 </body>
 </html>

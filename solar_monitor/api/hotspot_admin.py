@@ -337,6 +337,79 @@ async def wifi_scan_ap_bounce_status() -> dict[str, Any]:
     }
 
 
+# --- network address (set a static IP on the live connection) ------------
+# Distinct from joining a WiFi network: this pins the box's *current*
+# connection (ethernet, or already-joined WiFi) to a fixed address, or puts
+# it back on DHCP. Powers the Network panel.
+
+
+class NetIpv4Payload(msgspec.Struct, kw_only=True):
+    connection: str          # nmcli connection name (from /api/network/status)
+    method: str              # "auto" (DHCP) | "manual" (static)
+    address: str | None = None
+    prefix: int | None = None
+    gateway: str | None = None
+    dns: str | None = None   # comma/space-separated
+
+
+@get("/api/network/status")
+async def network_status() -> dict[str, Any]:
+    """Active network connections + their IPv4 config for the Network panel.
+    `supported: false` where there's no host network control (Docker/dev)."""
+    from .. import helper_client
+    if not helper_client.is_available():
+        return {"supported": False, "connections": [], "error": None}
+    r = helper_client.call("net_status")
+    if not r.get("ok"):
+        return {"supported": True, "connections": [],
+                "error": (r.get("err") or "couldn't read network status").strip()}
+    try:
+        conns = json.loads(r.get("out") or "[]")
+    except (ValueError, TypeError):
+        conns = []
+    return {"supported": True, "connections": conns, "error": None}
+
+
+@post("/api/network/ipv4")
+async def network_set_ipv4(data: NetIpv4Payload) -> dict[str, Any]:
+    """Set a connection's IPv4 to DHCP or a static address. Re-applying can
+    briefly move the box to a new address, so the reply points the user at
+    wattpost.local to reconnect."""
+    from .. import helper_client
+    if not helper_client.is_available():
+        raise HTTPException(
+            status_code=400,
+            detail="Network configuration isn't available on this install.",
+        )
+    if data.method not in ("auto", "manual"):
+        raise HTTPException(status_code=400, detail="method must be 'auto' or 'manual'")
+    if not (data.connection or "").strip():
+        raise HTTPException(status_code=400, detail="connection is required")
+    ipv4: dict[str, Any] = {"method": data.method}
+    if data.method == "manual":
+        if not (data.address or "").strip():
+            raise HTTPException(status_code=400, detail="a static IP address is required")
+        ipv4.update({
+            "address": data.address.strip(),
+            "prefix": data.prefix or 24,
+            "gateway": (data.gateway or "").strip(),
+            "dns": (data.dns or "").strip(),
+        })
+    r = helper_client.call("net_set_ipv4", connection=data.connection.strip(), ipv4=ipv4)
+    if not r.get("ok"):
+        # 4xx so the actionable detail (bad IP, etc.) reaches the client.
+        raise HTTPException(
+            status_code=400,
+            detail=(r.get("err") or "Couldn't apply network settings.").strip(),
+        )
+    log.info("network: set %s ipv4 method=%s", data.connection, data.method)
+    return {
+        "ok": True,
+        "applying": True,
+        "message": "Applying — if the address changed, reconnect at http://wattpost.local",
+    }
+
+
 @post("/api/network/wifi/join")
 async def wifi_join(data: WifiJoinPayload) -> dict[str, Any]:
     """Join a WiFi network. The PSK goes to the helper, which writes it to a

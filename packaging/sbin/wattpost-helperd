@@ -353,6 +353,121 @@ def _act_wifi_join(args: dict) -> dict:
     return {"ok": True, "out": "connected", "err": ""}
 
 
+# ---- network address config (set a static IP on the live connection) -----
+# The inverse-of-join case: a box already on the LAN (ethernet, or WiFi it
+# already joined) that the operator wants to pin to a fixed address — without
+# re-joining anything. nmcli is the single source of truth for the device.
+
+def _split_nmcli_t(line: str) -> list[str]:
+    """Split one `nmcli -t` line on unescaped colons."""
+    parts, cur, j = [], [], 0
+    while j < len(line):
+        if line[j] == "\\" and j + 1 < len(line):
+            cur.append(line[j + 1]); j += 2
+        elif line[j] == ":":
+            parts.append("".join(cur)); cur = []; j += 1
+        else:
+            cur.append(line[j]); j += 1
+    parts.append("".join(cur))
+    return parts
+
+
+def _act_net_status(_args: dict) -> dict:
+    """Active connections with their IPv4 config, for the Network panel.
+    Skips loopback and the appliance's own AP (you don't give the hotspot a
+    static LAN address)."""
+    r = subprocess.run(
+        [NMCLI, "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],
+        capture_output=True, text=True, timeout=15.0,
+    )
+    if r.returncode != 0:
+        return {"ok": False, "out": "", "err": (r.stderr or "nmcli failed").strip()}
+    conns = []
+    for line in (r.stdout or "").splitlines():
+        parts = _split_nmcli_t(line)
+        if len(parts) < 3:
+            continue
+        name, ctype, device = parts[0], parts[1], parts[2]
+        if device == "lo" or "loopback" in ctype:
+            continue
+        d = subprocess.run(
+            [NMCLI, "-t", "-f",
+             "ipv4.method,IP4.ADDRESS,IP4.GATEWAY,IP4.DNS,802-11-wireless.mode",
+             "connection", "show", name],
+            capture_output=True, text=True, timeout=15.0,
+        )
+        method = address = gateway = ""
+        dns, is_ap = [], False
+        for dl in (d.stdout or "").splitlines():
+            kv = _split_nmcli_t(dl)
+            if len(kv) < 2:
+                continue
+            key, val = kv[0], ":".join(kv[1:])
+            if key == "ipv4.method":
+                method = val
+            elif key.startswith("IP4.ADDRESS") and val and not address:
+                address = val                      # e.g. 192.168.1.166/24
+            elif key == "IP4.GATEWAY":
+                gateway = val
+            elif key.startswith("IP4.DNS") and val:
+                dns.append(val)
+            elif key == "802-11-wireless.mode" and val == "ap":
+                is_ap = True
+        if is_ap:
+            continue
+        conns.append({
+            "name": name, "type": ctype, "device": device,
+            "method": method or "auto", "address": address,
+            "gateway": gateway, "dns": dns,
+        })
+    return {"ok": True, "out": json.dumps(conns), "err": ""}
+
+
+def _act_net_set_ipv4(args: dict) -> dict:
+    """Set a connection's IPv4 to DHCP (auto) or a static address, then
+    re-apply it. Re-applying can briefly drop the link we're responding over
+    (the box may move to a new address), so we fire `up` detached and let the
+    caller tell the user to reconnect at wattpost.local. Validated before any
+    write."""
+    name = _req_str(args, "connection", 200)
+    ipv4 = args.get("ipv4")
+    if not isinstance(ipv4, dict):
+        return {"ok": False, "out": "", "err": "ipv4 object required"}
+    method = ipv4.get("method") or "auto"
+    if method == "auto":
+        mod = ["ipv4.method", "auto", "ipv4.addresses", "",
+               "ipv4.gateway", "", "ipv4.dns", ""]
+    elif method == "manual":
+        addr = str(ipv4.get("address", "")).strip()
+        gw = str(ipv4.get("gateway", "")).strip()
+        try:
+            prefix = int(ipv4.get("prefix", 24))
+        except (TypeError, ValueError):
+            return {"ok": False, "out": "", "err": "prefix must be a number"}
+        if not (1 <= prefix <= 32):
+            return {"ok": False, "out": "", "err": "prefix must be 1..32"}
+        try:
+            ipaddress.IPv4Address(addr)
+            if gw:
+                ipaddress.IPv4Address(gw)
+            dns_list = []
+            for d in str(ipv4.get("dns", "")).replace(",", " ").split():
+                ipaddress.IPv4Address(d)
+                dns_list.append(d)
+        except ValueError as e:
+            return {"ok": False, "out": "", "err": str(e)}
+        mod = ["ipv4.method", "manual", "ipv4.addresses", f"{addr}/{prefix}",
+               "ipv4.gateway", gw, "ipv4.dns", " ".join(dns_list)]
+    else:
+        return {"ok": False, "out": "", "err": "method must be auto or manual"}
+    m = subprocess.run([NMCLI, "connection", "modify", name] + mod,
+                       capture_output=True, text=True, timeout=15.0)
+    if m.returncode != 0:
+        return {"ok": False, "out": "", "err": (m.stderr or "nmcli modify failed").strip()}
+    # Re-apply detached — `up` may drop the connection this response rides on.
+    return _spawn_detached([NMCLI, "connection", "up", name])
+
+
 ACTIONS = {
     "netctl_status": _act_netctl_status,
     "netctl_apply": _act_netctl_apply,
@@ -361,6 +476,8 @@ ACTIONS = {
     "captive": _act_captive,
     "wifi_scan": _act_wifi_scan,
     "wifi_join": _act_wifi_join,
+    "net_status": _act_net_status,
+    "net_set_ipv4": _act_net_set_ipv4,
 }
 
 

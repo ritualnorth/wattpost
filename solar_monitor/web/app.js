@@ -5474,6 +5474,7 @@ function renderSettings() {
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
   refreshHotspotPanel();     // Pillar 3, appliance-as-WiFi-AP
   wireWifiPanel();           // join a home WiFi from the dashboard (scan + connect)
+  refreshNetworkPanel();     // set a static IP / DHCP on the live connection
   wireResetToDefaults();     // #138, Danger zone
 }
 
@@ -5484,6 +5485,102 @@ function renderSettings() {
 // ---------- WiFi station provisioning (join a home network) ----------
 // Scan for nearby WiFi + join one so a box in AP mode (or flashed without
 // WiFi) can be put on the LAN from the dashboard. Backend:
+// /api/network/{status,ipv4} → set a static IP (or DHCP) on the box's live
+// connection. Distinct from joining a WiFi network: this pins the address of
+// whatever the box is already on (ethernet / joined WiFi).
+async function refreshNetworkPanel() {
+  const blk = document.getElementById("settings-network-block");
+  const list = document.getElementById("network-list");
+  if (!blk || !list) return;
+  let r;
+  try { r = await api("/api/network/status"); }
+  catch { return; }
+  if (!r.supported) { blk.style.display = "none"; return; }   // Docker/dev
+  list.innerHTML = "";
+  const conns = r.connections || [];
+  if (conns.length === 0) {
+    list.innerHTML = '<p class="settings-foot">No active connections found.</p>';
+    return;
+  }
+  for (const c of conns) list.appendChild(renderNetworkConn(c));
+}
+
+function renderNetworkConn(c) {
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "border:1px solid var(--border,#333);border-radius:10px;" +
+    "padding:.6rem .7rem;margin:.4rem 0";
+  const isManual = c.method === "manual";
+  const addr = (c.address || "").split("/")[0];
+  const prefix = (c.address || "").split("/")[1] || "24";
+  wrap.innerHTML =
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">' +
+      `<div><strong>${escHtml(c.device || c.name)}</strong> ` +
+      `<span class="settings-foot">${escHtml(c.type || "")}</span><br/>` +
+      `<span class="settings-foot">${escHtml(c.address || "—")} &middot; ${isManual ? "Static" : "DHCP"}</span></div>` +
+      '<button class="btn-action net-edit" type="button">Edit</button>' +
+    "</div>" +
+    '<div class="net-form" style="display:none;margin-top:.5rem">' +
+      '<label class="hist-row"><span>Addressing</span><span class="hist-input">' +
+        '<select class="net-method"><option value="auto">Automatic (DHCP)</option>' +
+        '<option value="manual">Static IP</option></select></span></label>' +
+      '<div class="net-static" style="display:none">' +
+        '<label class="hist-row"><span>IP address</span><span class="hist-input hist-input--text"><input class="net-ip" type="text" inputmode="decimal" placeholder="192.168.1.50"/></span></label>' +
+        '<label class="hist-row"><span>Subnet prefix</span><span class="hist-input hist-input--text"><input class="net-prefix" type="number" min="1" max="32" placeholder="24"/></span></label>' +
+        '<label class="hist-row"><span>Gateway</span><span class="hist-input hist-input--text"><input class="net-gw" type="text" inputmode="decimal" placeholder="192.168.1.1"/></span></label>' +
+        '<label class="hist-row"><span>DNS</span><span class="hist-input hist-input--text"><input class="net-dns" type="text" placeholder="1.1.1.1, 8.8.8.8"/></span></label>' +
+      "</div>" +
+      '<div class="hist-actions">' +
+        '<button class="btn-action btn-action--primary net-save" type="button">Save</button>' +
+        '<button class="btn-action net-cancel" type="button">Cancel</button>' +
+      "</div>" +
+    "</div>";
+  const form = wrap.querySelector(".net-form");
+  const methodSel = wrap.querySelector(".net-method");
+  const staticBox = wrap.querySelector(".net-static");
+  methodSel.value = isManual ? "manual" : "auto";
+  staticBox.style.display = isManual ? "" : "none";
+  if (isManual) {
+    wrap.querySelector(".net-ip").value = addr;
+    wrap.querySelector(".net-prefix").value = prefix;
+    wrap.querySelector(".net-gw").value = c.gateway || "";
+    wrap.querySelector(".net-dns").value = (c.dns || []).join(", ");
+  }
+  wrap.querySelector(".net-edit").onclick = () => {
+    form.style.display = form.style.display === "none" ? "" : "none";
+  };
+  wrap.querySelector(".net-cancel").onclick = () => { form.style.display = "none"; };
+  methodSel.onchange = () => {
+    staticBox.style.display = methodSel.value === "manual" ? "" : "none";
+  };
+  wrap.querySelector(".net-save").onclick = () => saveNetworkConn(c.name, wrap);
+  return wrap;
+}
+
+async function saveNetworkConn(name, wrap) {
+  const msg = document.getElementById("network-msg");
+  const method = wrap.querySelector(".net-method").value;
+  const body = { connection: name, method };
+  if (method === "manual") {
+    const ip = (wrap.querySelector(".net-ip").value || "").trim();
+    if (!ip) { if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Enter an IP address."; } return; }
+    body.address = ip;
+    const p = (wrap.querySelector(".net-prefix").value || "").trim(); if (p) body.prefix = parseInt(p, 10);
+    const g = (wrap.querySelector(".net-gw").value || "").trim();     if (g) body.gateway = g;
+    const d = (wrap.querySelector(".net-dns").value || "").trim();    if (d) body.dns = d;
+  }
+  if (msg) { msg.style.color = ""; msg.textContent = "Applying…"; }
+  try {
+    const r = await fetch(_withKiosk("/api/network/ipv4"), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${r.status}`); }
+    const d = await r.json().catch(() => ({}));
+    if (msg) { msg.style.color = ""; msg.textContent = d.message || "Applied. Reconnect at http://wattpost.local"; }
+  } catch (e) {
+    if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Couldn't apply: " + (e.message || e); }
+  }
+}
+
 // /api/network/wifi/{scan,join} → wattpost-helperd nmcli (the PSK is written
 // to a 0600 NM keyfile host-side, never echoed back).
 function wireWifiPanel() {
