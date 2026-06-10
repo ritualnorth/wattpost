@@ -201,6 +201,12 @@ class WifiJoinPayload(msgspec.Struct, kw_only=True):
     ssid: str
     # Omit / empty for an open network; WPA needs 8..63 chars.
     password: str | None = None
+    # Optional static IPv4. Omit static_ip for DHCP. When set, prefix
+    # defaults to 24; gateway + dns (comma/space-separated) optional.
+    static_ip: str | None = None
+    prefix: int | None = None
+    gateway: str | None = None
+    dns: str | None = None
 
 
 @get("/api/network/wifi/scan")
@@ -240,7 +246,16 @@ async def wifi_join(data: WifiJoinPayload) -> dict[str, Any]:
     psk = data.password or ""
     if psk and not (8 <= len(psk) <= 63):
         raise HTTPException(status_code=400, detail="WPA password must be 8–63 characters.")
-    r = helper_client.call("wifi_join", ssid=ssid, psk=psk)
+    kwargs: dict[str, Any] = {"ssid": ssid, "psk": psk}
+    if data.static_ip:
+        kwargs["ipv4"] = {
+            "method": "manual",
+            "address": data.static_ip.strip(),
+            "prefix": data.prefix or 24,
+            "gateway": (data.gateway or "").strip(),
+            "dns": (data.dns or "").strip(),
+        }
+    r = helper_client.call("wifi_join", **kwargs)
     if not r.get("ok"):
         # 4xx so the actionable detail reaches the client (Litestar masks 5xx
         # detail). The helper never echoes the PSK back.
@@ -248,5 +263,5 @@ async def wifi_join(data: WifiJoinPayload) -> dict[str, Any]:
             status_code=400,
             detail=(r.get("err") or "Couldn't connect — check the password and try again.").strip(),
         )
-    log.info("wifi: joined network ssid=%s (secured=%s)", ssid, bool(psk))
+    log.info("wifi: joined network ssid=%s (secured=%s, static=%s)", ssid, bool(psk), bool(data.static_ip))
     return {"ok": True, "ssid": ssid}

@@ -29,6 +29,7 @@ broker holds the privilege. See issue #33.
 from __future__ import annotations
 
 import fcntl
+import ipaddress
 import json
 import logging
 import os
@@ -261,13 +262,48 @@ def _act_wifi_scan(_args: dict) -> dict:
     return {"ok": True, "out": json.dumps(networks), "err": ""}
 
 
+def _ipv4_section(args: dict) -> str:
+    """Build the NM keyfile [ipv4] block. Default DHCP; a static block when
+    args['ipv4'] = {method:'manual', address, prefix, gateway, dns}. Every
+    address is validated (ValueError → caller returns a clean error)."""
+    ipv4 = args.get("ipv4")
+    if not isinstance(ipv4, dict) or (ipv4.get("method") or "auto") != "manual":
+        return "[ipv4]\nmethod=auto\n"
+    addr = str(ipv4.get("address", "")).strip()
+    gw = str(ipv4.get("gateway", "")).strip()
+    try:
+        prefix = int(ipv4.get("prefix", 24))
+    except (TypeError, ValueError):
+        raise ValueError("ipv4.prefix must be a number")
+    if not (1 <= prefix <= 32):
+        raise ValueError("ipv4.prefix must be 1..32")
+    ipaddress.IPv4Address(addr)  # raises ValueError on bad IP
+    line = f"address1={addr}/{prefix}"
+    if gw:
+        ipaddress.IPv4Address(gw)
+        line += f",{gw}"
+    dns_list = []
+    for d in str(ipv4.get("dns", "")).replace(",", " ").split():
+        ipaddress.IPv4Address(d)
+        dns_list.append(d)
+    sec = f"[ipv4]\nmethod=manual\n{line}\n"
+    if dns_list:
+        sec += "dns=" + ";".join(dns_list) + ";\n"
+    return sec
+
+
 def _act_wifi_join(args: dict) -> dict:
     """Join a WiFi network by writing a 0600 NM keyfile (PSK stays out of
-    argv) and activating it. Returns ok once the connection is up."""
+    argv) and activating it. Optional static IPv4 via args['ipv4']. Returns
+    ok once the connection is up."""
     ssid = _req_str(args, "ssid", 32)
     psk = _req_str(args, "psk", 63, allow_empty=True)
     if psk and len(psk) < 8:
         return {"ok": False, "out": "", "err": "WPA password must be 8–63 characters"}
+    try:
+        ipv4_section = _ipv4_section(args)
+    except ValueError as e:
+        return {"ok": False, "out": "", "err": str(e)}
     # Stable, collision-resistant filename; the human id stays the SSID.
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in ssid)[:48]
     path = os.path.join(NM_CONN_DIR, f"wattpost-wifi-{safe}.nmconnection")
@@ -283,7 +319,7 @@ def _act_wifi_join(args: dict) -> dict:
         "mode=infrastructure\n"
         f"ssid={ssid}\n"
         f"{sec}"
-        "[ipv4]\nmethod=auto\n"
+        f"{ipv4_section}"
         "[ipv6]\nmethod=auto\n"
     )
     try:

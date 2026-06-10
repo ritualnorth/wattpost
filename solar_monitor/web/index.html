@@ -1146,6 +1146,39 @@
                   <input id="wifi-join-psk" type="password" autocomplete="new-password" placeholder="leave blank for an open network"/>
                 </span>
               </label>
+              <label class="hist-row">
+                <span>Static IP<br/><span class="settings-foot" style="font-weight:normal">Off = automatic (DHCP). Turn on to pin a fixed address so the box always lives at the same place on your LAN.</span></span>
+                <span class="hist-input">
+                  <input id="wifi-join-static-toggle" type="checkbox"/>
+                </span>
+              </label>
+              <!-- Static-IP fields: hidden until the toggle is on. -->
+              <div id="wifi-join-static" style="display:none">
+                <label class="hist-row">
+                  <span>IP address</span>
+                  <span class="hist-input hist-input--text">
+                    <input id="wifi-join-ip" type="text" inputmode="decimal" placeholder="192.168.1.50"/>
+                  </span>
+                </label>
+                <label class="hist-row">
+                  <span>Subnet prefix<br/><span class="settings-foot" style="font-weight:normal">CIDR bits. 24 = a 255.255.255.0 network.</span></span>
+                  <span class="hist-input hist-input--text">
+                    <input id="wifi-join-prefix" type="number" min="1" max="32" placeholder="24"/>
+                  </span>
+                </label>
+                <label class="hist-row">
+                  <span>Gateway</span>
+                  <span class="hist-input hist-input--text">
+                    <input id="wifi-join-gateway" type="text" inputmode="decimal" placeholder="192.168.1.1"/>
+                  </span>
+                </label>
+                <label class="hist-row">
+                  <span>DNS<br/><span class="settings-foot" style="font-weight:normal">One or more, comma-separated.</span></span>
+                  <span class="hist-input hist-input--text">
+                    <input id="wifi-join-dns" type="text" placeholder="1.1.1.1, 8.8.8.8"/>
+                  </span>
+                </label>
+              </div>
               <div class="hist-actions">
                 <button id="wifi-join-btn" class="btn-action btn-action--primary" type="button">Join</button>
                 <button id="wifi-join-cancel" class="btn-action" type="button">Cancel</button>
@@ -1384,6 +1417,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=256"></script>
+  <script src="/web/app.js?v=257"></script>
 </body>
 </html>

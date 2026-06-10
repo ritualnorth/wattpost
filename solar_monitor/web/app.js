@@ -5497,6 +5497,11 @@ function wireWifiPanel() {
     const f = document.getElementById("wifi-join-form");
     if (f) f.style.display = "none";
   };
+  const staticToggle = document.getElementById("wifi-join-static-toggle");
+  if (staticToggle) staticToggle.onchange = () => {
+    const box = document.getElementById("wifi-join-static");
+    if (box) box.style.display = staticToggle.checked ? "" : "none";
+  };
 }
 
 async function scanWifiNetworks() {
@@ -5556,6 +5561,11 @@ function selectWifiNetwork(n) {
     pskEl.disabled = !n.secure;
     pskEl.placeholder = n.secure ? "network password" : "open network — no password needed";
   }
+  // Reset addressing to DHCP for each fresh selection.
+  const staticToggle = document.getElementById("wifi-join-static-toggle");
+  const staticBox = document.getElementById("wifi-join-static");
+  if (staticToggle) staticToggle.checked = false;
+  if (staticBox) staticBox.style.display = "none";
   if (form) form.style.display = "";
   if (n.secure && pskEl) pskEl.focus();
 }
@@ -5567,6 +5577,19 @@ async function joinWifiNetwork() {
   if (!ssid) { if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Pick a network first."; } return; }
   const body = { ssid };
   if (psk) body.password = psk;
+  // Static IP (optional). Helper validates the addresses + returns a
+  // clean 400 on a bad one, so we only require the IP itself here.
+  if (document.getElementById("wifi-join-static-toggle")?.checked) {
+    const ip      = (document.getElementById("wifi-join-ip")?.value || "").trim();
+    const prefix  = (document.getElementById("wifi-join-prefix")?.value || "").trim();
+    const gateway = (document.getElementById("wifi-join-gateway")?.value || "").trim();
+    const dns     = (document.getElementById("wifi-join-dns")?.value || "").trim();
+    if (!ip) { if (msg) { msg.style.color = "var(--red)"; msg.textContent = "Enter a static IP address, or switch off Static IP."; } return; }
+    body.static_ip = ip;
+    if (prefix)  body.prefix = parseInt(prefix, 10);
+    if (gateway) body.gateway = gateway;
+    if (dns)     body.dns = dns;
+  }
   if (msg) { msg.style.color = ""; msg.textContent = `Connecting to "${ssid}"…`; }
   const btn = document.getElementById("wifi-join-btn");
   if (btn) btn.disabled = true;
