@@ -1848,6 +1848,12 @@ function _pfFmtW(w) {
   w = Math.round(w);
   return Math.abs(w) >= 1000 ? (w / 1000).toFixed(1) + " kW" : w + " W";
 }
+// Inner markup of one of our ICONS (the bit between <svg>…</svg>), for
+// embedding into the reactor's node discs.
+function _pfIconInner(key) {
+  const s = (typeof ICONS !== "undefined" && ICONS[key]) || "";
+  return s.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+}
 function buildFlowReactor(model, opts) {
   const animate = !(opts && opts.animate === false);
   const uid = "pf" + (++_pfUid);
@@ -1957,17 +1963,23 @@ function buildFlowReactor(model, opts) {
     "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.82" });
   t3.textContent = (battW > 0 ? "+" : "") + battW + " W"; svg.appendChild(t3);
 
-  function node(pt, label, valW, colorVar, dim) {
+  function node(pt, label, valW, colorVar, dim, iconKey) {
     const g = _pfEl("g", { class: "pf-node" + (dim ? " is-off" : "") });
     g.appendChild(_pfEl("circle", { cx: pt.x, cy: pt.y, r: "28", fill: "var(--pf-node-bg)", stroke: colorVar, "stroke-width": "1.6" }));
+    // icon disc (reuse our ICONS; 24×24 scaled to ~22, centred in the disc)
+    const ig = _pfEl("g", { transform: `translate(${(pt.x - 11).toFixed(1)} ${(pt.y - 11).toFixed(1)}) scale(0.92)`,
+      fill: "none", "stroke-width": "1.6", "stroke-linecap": "round", "stroke-linejoin": "round",
+      style: `color: ${colorVar}; stroke: ${colorVar}` });
+    ig.innerHTML = _pfIconInner(iconKey);
+    g.appendChild(ig);
     const lab = _pfEl("text", { x: pt.x, y: pt.y + 48, "text-anchor": "middle", "font-size": "13",
       fill: "var(--text-3)", "font-weight": "600" }); lab.textContent = label; g.appendChild(lab);
     const val = _pfEl("text", { x: pt.x, y: pt.y + 67, "text-anchor": "middle", "font-size": "17",
       "font-weight": "700", fill: colorVar }); val.textContent = _pfFmtW(valW); g.appendChild(val);
     return g;
   }
-  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn));
-  svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut));
+  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn, "sun"));
+  svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut, "plug"));
 
   const stage = document.createElement("div");
   stage.className = "pf-reactor-stage";
