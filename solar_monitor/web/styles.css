@@ -550,18 +550,30 @@ body.is-demo #settings-update-apply { display: none !important; }
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 @media (max-width: 640px) {
-  /* Phones: the primary nav drops to a fixed bottom tab bar — thumb-reachable
-   * and native-feeling in the Capacitor app, freeing the whole top of the
-   * screen for content. The brand, status pill and help button all stay
-   * hidden (status still surfaces as a dot on the Settings tab + in Settings).
+  /* Phones: an app-shell layout. The page is a fixed-height flex column
+   * (top bar, scrollable content, bottom tab bar) instead of a long scrolling
+   * document with the bars position:fixed over it. Mobile browsers anchor
+   * position:fixed to the LAYOUT viewport, but their auto-hiding URL bar
+   * changes the VISUAL viewport — so a fixed bottom bar detaches from the real
+   * bottom and content peeks below it as you scroll (it "floats"). Making the
+   * bars real flex rows of a 100dvh column, with only <main> scrolling, pins
+   * them to the actual top/bottom regardless of the URL bar. */
+  html { height: 100%; }
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;          /* fallback for browsers without dvh */
+    height: 100dvh;         /* tracks the visible area as the URL bar shows/hides */
+    overflow: hidden;       /* the page doesn't scroll; <main> does */
+  }
+
+  /* The primary nav is the bottom row — thumb-reachable, native-feeling. Brand,
+   * status pill + help stay hidden here (status surfaces on the Settings tab).
    * Each tab is an icon over a small label, the iOS/Android convention. */
   .app-nav {
-    position: fixed;
-    top: auto;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 41;
+    position: static;
+    order: 3;
+    flex: 0 0 auto;
     gap: 0;
     /* Bottom padding carries the home-indicator safe area so the tabs sit
        above the gesture bar on notched phones; 0 in desktop browsers. */
@@ -607,31 +619,30 @@ body.is-demo #settings-update-apply { display: none !important; }
      tinted pill background that suits the desktop segmented control. */
   .nav-tab.active { background: transparent; }
 
-  /* Mobile top bar (Immich pattern): brand left, health pill + help right.
-     Fixed so content scrolls under it; the base .app-header already carries
-     the blur/background/border + top safe-area padding. The brand's base
-     margin-right:auto pushes the pill + help to the right edge. */
+  /* Mobile top bar (Immich pattern): brand left, health pill + help right — the
+     top row of the shell. Base .app-header already carries the background /
+     border + top safe-area padding; the brand's margin-right:auto pushes the
+     pill + help to the right edge. */
   .app-header {
     display: flex;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: auto;
-    z-index: 41;
+    position: static;
+    order: 1;
+    flex: 0 0 auto;
     gap: .5rem;
-    /* Solid, matching the bottom bar — content shouldn't ghost through it. */
     background: var(--bg);
   }
 
-  /* Clear both fixed bars (top bar + bottom tab bar), incl. the notch and
-     home-indicator safe areas. `body main` outranks the global `main` padding
-     but not `body.kiosk-active main`, so kiosk stays chrome-free. The top
-     value gives a clear gap below the bar so the first panel isn't tucked
-     under it. */
+  /* Content is the only scrollable region, filling the space between the bars.
+     min-height:0 lets a flex child actually scroll instead of growing to fit.
+     `body main` outranks the global `main` padding but not the more specific
+     `body.kiosk-active main`, so kiosk stays chrome-free. */
   body main {
-    padding-top: calc(74px + env(safe-area-inset-top));
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    order: 2;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 }
 

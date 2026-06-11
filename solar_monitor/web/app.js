@@ -5743,7 +5743,10 @@ function setRoute(_unused) {
   if (route.name === "docs")  onEnterDocs(route.slug);
   if (route.name === "kiosk") onEnterKiosk();
   else if (document.body.classList.contains("kiosk-active")) onLeaveKiosk();
+  // Reset scroll on route change. On desktop the document scrolls; on mobile
+  // the app-shell makes <main> the scroll container, so reset that too.
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  document.querySelector("main")?.scrollTo({ top: 0 });
 }
 
 window.addEventListener("hashchange", () => setRoute(currentRouteName()));

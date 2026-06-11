@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.11] - 2026-06-11
+
+Beta — the mobile bottom bar stops floating during scroll.
+
+### Fixed
+- **Bottom bar anchored on mobile browsers.** The top + bottom bars were
+  position:fixed, which mobile browsers anchor to the layout viewport — so the
+  auto-hiding URL bar let the bottom bar detach from the real bottom and content
+  peek beneath it while scrolling. The phone layout is now an app-shell: a
+  `100dvh` flex column with the bars as real top/bottom rows and only the
+  content scrolling, so the bars stay pinned regardless of the URL bar.
+
 ## [0.1.169-beta.10] - 2026-06-11
 
 Beta — clearer sun-arc for the forecast day.
