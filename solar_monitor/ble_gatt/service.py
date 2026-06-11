@@ -23,8 +23,14 @@ from typing import Any, Callable
 
 log = logging.getLogger(__name__)
 
-WP_SVC_UUID        = "9a8b1e00-7761-7474-706f-737400000001"
-WP_STATUS_CHR_UUID = "9a8b1e00-7761-7474-706f-737400000002"
+WP_SVC_UUID         = "9a8b1e00-7761-7474-706f-737400000001"
+WP_STATUS_CHR_UUID  = "9a8b1e00-7761-7474-706f-737400000002"
+# Milestone 2: off-grid WiFi provisioning. Scan lists visible networks;
+# Join takes credentials. Join is encrypt-write so BlueZ forces an encrypted
+# link before it will accept a WiFi password (closes passive sniffing of the
+# PSK over the air); scan/status carry nothing secret.
+WP_WIFI_SCAN_CHR_UUID = "9a8b1e00-7761-7474-706f-737400000003"
+WP_WIFI_JOIN_CHR_UUID = "9a8b1e00-7761-7474-706f-737400000004"
 LOCAL_NAME = "WattPost"
 
 BLUEZ          = "org.bluez"
@@ -32,10 +38,12 @@ GATT_MANAGER   = "org.bluez.GattManager1"
 LE_ADV_MANAGER = "org.bluez.LEAdvertisingManager1"
 DBUS_OM_IFACE  = "org.freedesktop.DBus.ObjectManager"
 
-APP_ROOT  = "/com/wattpost/gatt"
-SVC_PATH  = APP_ROOT + "/service0"
-CHR_PATH  = SVC_PATH + "/char0"
-ADV_PATH  = "/com/wattpost/adv0"
+APP_ROOT      = "/com/wattpost/gatt"
+SVC_PATH      = APP_ROOT + "/service0"
+CHR_PATH      = SVC_PATH + "/char0"   # status (read/notify)
+CHR_SCAN_PATH = SVC_PATH + "/char1"   # wifi scan (write trigger, read/notify result)
+CHR_JOIN_PATH = SVC_PATH + "/char2"   # wifi join (encrypt-write creds, read/notify status)
+ADV_PATH      = "/com/wattpost/adv0"
 
 try:
     from dbus_fast import BusType, Variant, PropertyAccess
@@ -146,6 +154,197 @@ if _DBUS_OK:
             if self._notifying:
                 self.emit_properties_changed({"Value": self._value})
 
+    def _read_with_offset(value: bytes, options: "dict") -> bytes:
+        """Honour BlueZ's read offset (long reads come back in MTU chunks)."""
+        off = 0
+        try:
+            ov = options.get("offset") if options else None
+            if ov is not None:
+                off = int(ov.value if hasattr(ov, "value") else ov)
+        except Exception:
+            off = 0
+        return value[off:]
+
+    class _WifiScanCharacteristic(ServiceInterface):
+        """Write (any bytes) triggers a scan; read/notify returns the result
+        as JSON {state, networks, error}. The scan runs in the background so
+        the BLE write returns immediately — the phone learns the outcome via
+        a notification, not by blocking on the write."""
+
+        def __init__(self) -> None:
+            super().__init__("org.bluez.GattCharacteristic1")
+            self._notifying = False
+            self._state: dict[str, Any] = {"state": "idle", "networks": [], "error": None}
+            self._value = self._encode()
+
+        def _encode(self) -> bytes:
+            return json.dumps(self._state, separators=(",", ":")).encode("utf-8")
+
+        @dbus_property(access=PropertyAccess.READ)
+        def UUID(self) -> "s":
+            return WP_WIFI_SCAN_CHR_UUID
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Service(self) -> "o":
+            return SVC_PATH
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Flags(self) -> "as":
+            return ["read", "write", "write-without-response", "notify"]
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Descriptors(self) -> "ao":
+            return []
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Notifying(self) -> "b":
+            return self._notifying
+
+        @method()
+        def ReadValue(self, options: "a{sv}") -> "ay":  # noqa: N802
+            return _read_with_offset(self._value, options)
+
+        @method()
+        def WriteValue(self, value: "ay", options: "a{sv}"):  # noqa: N802
+            # Fire-and-forget: a live scan takes ~3s; don't block the write.
+            self._set({"state": "scanning", "networks": [], "error": None})
+            try:
+                asyncio.get_running_loop().create_task(self._run_scan())
+            except RuntimeError:
+                pass
+
+        @method()
+        def StartNotify(self):  # noqa: N802
+            self._notifying = True
+
+        @method()
+        def StopNotify(self):  # noqa: N802
+            self._notifying = False
+
+        def _set(self, state: dict[str, Any]) -> None:
+            self._state = state
+            self._value = self._encode()
+            if self._notifying:
+                self.emit_properties_changed({"Value": self._value})
+
+        async def _run_scan(self) -> None:
+            from .. import helper_client
+            try:
+                r = await asyncio.to_thread(helper_client.call, "wifi_scan")
+            except Exception as e:
+                self._set({"state": "error", "networks": [], "error": str(e)})
+                return
+            if not r.get("ok"):
+                self._set({"state": "error", "networks": [],
+                           "error": (r.get("err") or "scan failed").strip()})
+                return
+            try:
+                networks = json.loads(r.get("out") or "[]")
+            except (ValueError, TypeError):
+                networks = []
+            self._set({"state": "ok", "networks": networks, "error": None})
+
+    class _WifiJoinCharacteristic(ServiceInterface):
+        """encrypt-write the credentials as JSON {ssid, psk, ipv4?}; the join
+        runs in the background and progress comes back on read/notify as
+        {state: idle|joining|ok|error, error}. `encrypt-write` makes BlueZ
+        require an encrypted link before it accepts the write, so the WiFi
+        password isn't exposed to a passive sniffer in range."""
+
+        def __init__(self) -> None:
+            super().__init__("org.bluez.GattCharacteristic1")
+            self._notifying = False
+            self._state: dict[str, Any] = {"state": "idle", "error": None}
+            self._value = self._encode()
+
+        def _encode(self) -> bytes:
+            return json.dumps(self._state, separators=(",", ":")).encode("utf-8")
+
+        @dbus_property(access=PropertyAccess.READ)
+        def UUID(self) -> "s":
+            return WP_WIFI_JOIN_CHR_UUID
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Service(self) -> "o":
+            return SVC_PATH
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Flags(self) -> "as":
+            # encrypt-write (not plain write): writes require an encrypted link.
+            return ["read", "encrypt-write", "notify"]
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Descriptors(self) -> "ao":
+            return []
+
+        @dbus_property(access=PropertyAccess.READ)
+        def Notifying(self) -> "b":
+            return self._notifying
+
+        @method()
+        def ReadValue(self, options: "a{sv}") -> "ay":  # noqa: N802
+            return _read_with_offset(self._value, options)
+
+        @method()
+        def WriteValue(self, value: "ay", options: "a{sv}"):  # noqa: N802
+            try:
+                payload = json.loads(bytes(value).decode("utf-8"))
+            except Exception:
+                self._set({"state": "error", "error": "malformed credentials"})
+                return
+            ssid = (payload.get("ssid") or "").strip()
+            psk = payload.get("psk") or ""
+            if not ssid or len(ssid) > 32:
+                self._set({"state": "error", "error": "SSID must be 1–32 characters"})
+                return
+            if psk and not (8 <= len(psk) <= 63):
+                self._set({"state": "error", "error": "WPA password must be 8–63 characters"})
+                return
+            kwargs: dict[str, Any] = {"ssid": ssid, "psk": psk}
+            ipv4 = payload.get("ipv4")
+            if isinstance(ipv4, dict) and ipv4.get("address"):
+                kwargs["ipv4"] = {
+                    "method": "manual",
+                    "address": str(ipv4.get("address", "")).strip(),
+                    "prefix": int(ipv4.get("prefix") or 24),
+                    "gateway": str(ipv4.get("gateway", "")).strip(),
+                    "dns": str(ipv4.get("dns", "")).strip(),
+                }
+            self._set({"state": "joining", "error": None})
+            try:
+                asyncio.get_running_loop().create_task(self._run_join(kwargs))
+            except RuntimeError:
+                pass
+
+        @method()
+        def StartNotify(self):  # noqa: N802
+            self._notifying = True
+
+        @method()
+        def StopNotify(self):  # noqa: N802
+            self._notifying = False
+
+        def _set(self, state: dict[str, Any]) -> None:
+            self._state = state
+            self._value = self._encode()
+            if self._notifying:
+                self.emit_properties_changed({"Value": self._value})
+
+        async def _run_join(self, kwargs: dict[str, Any]) -> None:
+            from .. import helper_client
+            try:
+                r = await asyncio.to_thread(lambda: helper_client.call("wifi_join", **kwargs))
+            except Exception as e:
+                self._set({"state": "error", "error": str(e)})
+                return
+            if r.get("ok"):
+                # Box should now be on the LAN; the app re-finds it via mDNS
+                # (wattpost.local) and drops off BLE.
+                self._set({"state": "ok", "error": None})
+            else:
+                self._set({"state": "error",
+                           "error": (r.get("err") or "couldn't connect — check the password").strip()})
+
     class _Application(ServiceInterface):
         def __init__(self) -> None:
             super().__init__(DBUS_OM_IFACE)
@@ -167,6 +366,22 @@ if _DBUS_OK:
                         "Descriptors": Variant("ao", []),
                     }
                 },
+                CHR_SCAN_PATH: {
+                    "org.bluez.GattCharacteristic1": {
+                        "UUID": Variant("s", WP_WIFI_SCAN_CHR_UUID),
+                        "Service": Variant("o", SVC_PATH),
+                        "Flags": Variant("as", ["read", "write", "write-without-response", "notify"]),
+                        "Descriptors": Variant("ao", []),
+                    }
+                },
+                CHR_JOIN_PATH: {
+                    "org.bluez.GattCharacteristic1": {
+                        "UUID": Variant("s", WP_WIFI_JOIN_CHR_UUID),
+                        "Service": Variant("o", SVC_PATH),
+                        "Flags": Variant("as", ["read", "encrypt-write", "notify"]),
+                        "Descriptors": Variant("ao", []),
+                    }
+                },
             }
 
 
@@ -183,6 +398,8 @@ class BleGattService:
         self._notify_interval = notify_interval_s
         self._bus = None
         self._char = None
+        self._scan_char = None
+        self._join_char = None
         self._notify_task: asyncio.Task | None = None
         self._available = _DBUS_OK
         self._registered = False
@@ -200,10 +417,14 @@ class BleGattService:
 
         svc = _Service()
         self._char = _StatusCharacteristic(self._provider)
+        self._scan_char = _WifiScanCharacteristic()
+        self._join_char = _WifiJoinCharacteristic()
         app = _Application()
         adv = _Advertisement()
         self._bus.export(SVC_PATH, svc)
         self._bus.export(CHR_PATH, self._char)
+        self._bus.export(CHR_SCAN_PATH, self._scan_char)
+        self._bus.export(CHR_JOIN_PATH, self._join_char)
         self._bus.export(APP_ROOT, app)
         self._bus.export(ADV_PATH, adv)
 
