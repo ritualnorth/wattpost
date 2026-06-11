@@ -354,10 +354,8 @@ body.is-demo #settings-update-apply { display: none !important; }
    Desktop keeps the brand row (there's room). */
 @media (max-width: 640px) {
   .app-header { display: none; }
-  /* No safe-area top here: in the app the in-app-browser toolbar sits above
-     this, and in a mobile browser the URL bar does — so the inset would just
-     leave an empty grey band above the tabs. */
-  .app-nav { top: 0; padding-top: 0.4rem; }
+  /* The nav's sticky `top: 0` override lives just after the base .app-nav
+     rule below (source order), so it actually wins over its `top: 56px`. */
 }
 
 /* Settings-tab alert dot: surfaces a not-healthy system status at a glance
@@ -520,6 +518,10 @@ body.is-demo #settings-update-apply { display: none !important; }
   -webkit-overflow-scrolling: touch;
 }
 .app-nav::-webkit-scrollbar { display: none; }
+/* Phones hide the header, so the tabs must stick to the very top, not 56px
+   down where the header used to be — otherwise that offset shows as an empty
+   band above the tabs and the sticky bar floats over the scrolling content. */
+@media (max-width: 640px) { .app-nav { top: 0; } }
 .nav-tab {
   display: inline-flex; align-items: center; gap: .45rem;
   padding: .85rem 1rem .75rem;
