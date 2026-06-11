@@ -125,16 +125,21 @@ log "    active=${ACTIVE_NAME} → installing into inactive=${INACTIVE_NAME}"
 # machinery itself goes wrong. Best-effort: if snapshot fails we log
 # loudly but proceed; blocking updates on a snapshot wedge is worse
 # than letting an update proceed with no extra safety net.
-log "    taking pre-update snapshot..."
+# Snapshot the SAME database the daemon actually runs on. The service unit
+# sets WATTPOST_DB (absolute, e.g. /var/lib/wattpost/solar-monitor.db) and
+# serves with `--db ${WATTPOST_DB}`. The snapshot CLI otherwise defaults to the
+# RELATIVE "solar-monitor.db", which — run from the updater's cwd — either dies
+# (PermissionError: 'backups') OR, worse, silently creates and backs up an
+# EMPTY db, giving a false safety net. So pull the real path from the unit and
+# pass it explicitly; the backup dir is derived from it (its sibling backups/),
+# so an absolute --db fixes both the source and the destination (#269 fix).
+WP_DB="$(systemctl show wattpost.service -p Environment --value 2>/dev/null \
+    | tr ' ' '\n' | sed -n 's/^WATTPOST_DB=//p' | head -1)"
+[ -n "${WP_DB}" ] || WP_DB=/var/lib/wattpost/solar-monitor.db
+log "    taking pre-update snapshot (db: ${WP_DB})..."
 SNAP_PATH=""
-# Run from the daemon's WorkingDirectory (${APP_ROOT}, matching
-# wattpost.service) so a relative db_path in config.yaml — the default is the
-# bare "solar-monitor.db" — resolves to the SAME database the daemon uses, and
-# the sibling "backups/" dir lands in a slot the wattpost user owns. Without
-# the cd, the snapshot resolved ./solar-monitor.db + ./backups against the
-# updater's cwd and died with PermissionError: 'backups' (#269 follow-up).
-if ( cd "${APP_ROOT}" && sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
-        snapshot --config /etc/wattpost/config.yaml ) 2>&1 | tee -a "${LOG}" \
+if sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
+        snapshot --config /etc/wattpost/config.yaml --db "${WP_DB}" 2>&1 | tee -a "${LOG}" \
         | tail -1 > /tmp/wattpost-update-snap.$$; then
     SNAP_PATH=$(cat /tmp/wattpost-update-snap.$$)
     log "    pre-update snapshot ok: ${SNAP_PATH}"
