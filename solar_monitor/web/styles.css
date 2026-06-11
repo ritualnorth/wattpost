@@ -506,9 +506,9 @@ body.is-demo #settings-update-apply { display: none !important; }
   /* Side padding scales with the device safe area so the OS cutout doesn't
      draw over the tabs in the Capacitor WebView; env() is 0 in browsers. */
   padding:
-    .5rem
+    .7rem
     max(1.25rem, env(safe-area-inset-right))
-    .5rem
+    .7rem
     max(1.25rem, env(safe-area-inset-left));
   background: var(--header-bg);
   backdrop-filter: blur(12px);
