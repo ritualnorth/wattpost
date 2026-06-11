@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=186" />
+  <link rel="stylesheet" href="/web/styles.css?v=187" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -139,11 +139,40 @@
     Buttons that change state are disabled. <a href="https://wattpost.cloud/download">Get the real thing →</a>
   </div>
 
-  <!-- Status pill + help + status-legend now live inside the nav bar (right
-       side) so the bar matches the design: brand + tabs left, status + help
-       right. This empty header stays only because a few CSS rules still scope
-       to .app-header (kiosk / in-app shell hide it). -->
-  <header class="app-header"></header>
+  <!-- Mobile top bar (Immich pattern): brand left, health pill + help right.
+       Shown only on phones (CSS); desktop is the single .app-nav bar, and
+       kiosk hides it. The pill is #status-mobile, a second live pill that
+       setStatus drives alongside the desktop #status. The logo carries no
+       branding ids so it won't clash with the nav brand's white-label swap
+       (mobile white-label is a follow-up). -->
+  <header class="app-header">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+           aria-label="WattPost">
+        <rect x="2" y="3" width="20" height="12" rx="1"/>
+        <line x1="7" y1="15" x2="7" y2="22"/>
+        <line x1="17" y1="15" x2="17" y2="22"/>
+        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
+              fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="title">WattPost</span>
+    </div>
+    <button id="status-mobile" class="status" type="button" title="What does this mean? Tap for status guide">
+      <span class="dot"></span>
+      <span class="status-icon"></span>
+      <span class="text">connecting…</span>
+    </button>
+    <a class="help-btn" id="help-btn-mobile" href="#/docs"
+       aria-label="Open documentation" title="Help & documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
+        <line x1="12" y1="17" x2="12" y2="17.01"/>
+      </svg>
+    </a>
+  </header>
 
   <nav class="app-nav" aria-label="Primary">
     <!-- Brand lives in the nav so desktop is a single top bar (logo left,
@@ -1456,6 +1485,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=272"></script>
+  <script src="/web/app.js?v=273"></script>
 </body>
 </html>

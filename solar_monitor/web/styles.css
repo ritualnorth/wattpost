@@ -602,10 +602,29 @@ body.is-demo #settings-update-apply { display: none !important; }
   /* Active tab reads via accent icon + label (the native pattern); drop the
      tinted pill background that suits the desktop segmented control. */
   .nav-tab.active { background: transparent; }
-  /* Clear the fixed bar so the last of the content isn't hidden behind it.
-     `body main` outranks the global `main` padding-bottom but not the more
-     specific `body.kiosk-active main`, so kiosk stays chrome-free. */
-  body main { padding-bottom: calc(70px + env(safe-area-inset-bottom)); }
+
+  /* Mobile top bar (Immich pattern): brand left, health pill + help right.
+     Fixed so content scrolls under it; the base .app-header already carries
+     the blur/background/border + top safe-area padding. The brand's base
+     margin-right:auto pushes the pill + help to the right edge. */
+  .app-header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    z-index: 41;
+    gap: .5rem;
+  }
+
+  /* Clear both fixed bars (top bar + bottom tab bar), incl. the notch and
+     home-indicator safe areas. `body main` outranks the global `main` padding
+     but not `body.kiosk-active main`, so kiosk stays chrome-free. */
+  body main {
+    padding-top: calc(58px + env(safe-area-inset-top));
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
 }
 
 /* ---------------- help icon-button (topbar) ----------------

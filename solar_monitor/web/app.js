@@ -591,7 +591,8 @@ function setStatus(cls, text) {
     const iconHost = el.querySelector(".status-icon");
     if (iconHost) iconHost.innerHTML = STATUS_ICONS[cls] || "";
   };
-  apply(document.getElementById("status"));
+  apply(document.getElementById("status"));         // desktop nav pill
+  apply(document.getElementById("status-mobile"));  // mobile top-bar pill
   apply(document.getElementById("settings-status"));
   const tab = document.querySelector('.nav-tab[data-tab="settings"]');
   if (tab) {
@@ -9220,18 +9221,21 @@ if (diagRefreshBtn) diagRefreshBtn.addEventListener("click", refreshDiagLog);
 
 // Status pill legend popover, click the pill to open, click outside or
 // the close button to dismiss.
-const statusEl = $("#status");
+// Both the desktop nav pill (#status) and the mobile top-bar pill
+// (#status-mobile) open the same status-guide popover.
+const statusEls = [$("#status"), $("#status-mobile")].filter(Boolean);
 const legendEl = $("#status-legend");
-if (statusEl && legendEl) {
+if (statusEls.length && legendEl) {
   const close = () => { legendEl.hidden = true; };
   const open  = () => { legendEl.hidden = false; };
-  statusEl.addEventListener("click", (e) => {
+  statusEls.forEach((el) => el.addEventListener("click", (e) => {
     e.stopPropagation();
     legendEl.hidden ? open() : close();
-  });
+  }));
   legendEl.querySelector(".status-legend-close")?.addEventListener("click", close);
   document.addEventListener("click", (e) => {
-    if (!legendEl.hidden && !legendEl.contains(e.target) && e.target !== statusEl) {
+    const onAPill = statusEls.some((el) => el === e.target || el.contains(e.target));
+    if (!legendEl.hidden && !legendEl.contains(e.target) && !onAPill) {
       close();
     }
   });
