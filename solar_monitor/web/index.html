@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=181" />
+  <link rel="stylesheet" href="/web/styles.css?v=183" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -139,49 +139,11 @@
     Buttons that change state are disabled. <a href="https://wattpost.cloud/download">Get the real thing →</a>
   </div>
 
-  <header class="app-header">
-    <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
-      <span class="dot"></span>
-      <span class="status-icon"></span>
-      <span class="text">connecting…</span>
-    </button>
-    <!-- Help icon-button, small, sits in the topbar instead of a
-         floating FAB. Same destination (#/docs), less screen real-estate
-         eaten on mobile, no overlay clash with the dashboard tiles. -->
-    <a class="help-btn" id="help-btn" href="#/docs"
-       aria-label="Open documentation" title="Help & documentation">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
-        <line x1="12" y1="17" x2="12" y2="17.01"/>
-      </svg>
-    </a>
-    <!-- Sign-in / sign-out lived here briefly but moved inside Settings
-         (the only place you actually need them), clicking Settings on
-         an unauthed session bounces to /login automatically, so the
-         header button was redundant noise. Sign-out now lives inside
-         Settings → System. -->
-
-
-    <!-- Status legend popover, opens when the pill is tapped. -->
-    <div id="status-legend" class="status-legend" hidden>
-      <div class="status-legend-head">
-        <span>System status</span>
-        <button class="status-legend-close" type="button" aria-label="Close">×</button>
-      </div>
-      <ul class="status-legend-list">
-        <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet. Visit Settings → Setup and click "Find my dongle".</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Your Bluetooth connection is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes. Usually a brief BLE wobble; clears on the next cycle.</li>
-        <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
-        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes. Check Bluetooth power / range to the dongle.</li>
-        <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Visit Settings → System → Restart daemon.</li>
-      </ul>
-      <a class="status-legend-link" href="#/settings">Open Settings → Diagnostics for live logs</a>
-    </div>
-  </header>
+  <!-- Status pill + help + status-legend now live inside the nav bar (right
+       side) so the bar matches the design: brand + tabs left, status + help
+       right. This empty header stays only because a few CSS rules still scope
+       to .app-header (kiosk / in-app shell hide it). -->
+  <header class="app-header"></header>
 
   <nav class="app-nav" aria-label="Primary">
     <!-- Brand lives in the nav so desktop is a single top bar (logo left,
@@ -217,8 +179,42 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       <span>Settings</span>
     </a>
+    <!-- Status pill + help, right-aligned on the bar (desktop). Hidden on
+         phones, where the bar is just the tabs + status lives in Settings. -->
+    <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
+      <span class="dot"></span>
+      <span class="status-icon"></span>
+      <span class="text">connecting…</span>
+    </button>
+    <a class="help-btn" id="help-btn" href="#/docs"
+       aria-label="Open documentation" title="Help & documentation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/>
+        <line x1="12" y1="17" x2="12" y2="17.01"/>
+      </svg>
+    </a>
   </nav>
-
+  <!-- Status legend popover lives OUTSIDE the nav: it's position:fixed, and
+       the nav's backdrop-filter would otherwise become its containing block
+       and clip it. -->
+  <div id="status-legend" class="status-legend" hidden>
+      <div class="status-legend-head">
+        <span>System status</span>
+        <button class="status-legend-close" type="button" aria-label="Close">×</button>
+      </div>
+      <ul class="status-legend-list">
+        <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet. Visit Settings → Setup and click "Find my dongle".</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Your Bluetooth connection is configured but the dongle isn't reachable. Check the BT-2 is powered + in range; on Docker, check the passthrough.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes. Usually a brief BLE wobble; clears on the next cycle.</li>
+        <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply. Common after a daemon restart (BlueZ holds the BT-2 connection for ~60s).</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes. Check Bluetooth power / range to the dongle.</li>
+        <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Visit Settings → System → Restart daemon.</li>
+      </ul>
+      <a class="status-legend-link" href="#/settings">Open Settings → Diagnostics for live logs</a>
+    </div>
   <!-- Floating help button was previously here; lifted into the topbar
        as a small icon-button (above) so it doesn't eat screen real
        estate or compete with primary tiles on mobile. -->

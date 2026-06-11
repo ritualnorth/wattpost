@@ -520,7 +520,10 @@ body.is-demo #settings-update-apply { display: none !important; }
 .app-nav::-webkit-scrollbar { display: none; }
 /* Brand inside the nav: visible on desktop, hidden on phones where the tabs
    are the whole bar. nudge it a touch from the first tab. */
-.app-nav .brand { margin-right: auto; padding-right: .75rem; }
+.app-nav .brand { padding-right: .75rem; margin-right: 0; }
+/* Brand + tabs sit left together; the status pill (+ help) gets pushed to the
+   right of the bar — matches the design. */
+.app-nav #status { margin-left: auto; }
 .nav-tab {
   display: inline-flex; align-items: center; gap: .45rem;
   padding: .5rem .8rem;
@@ -554,6 +557,8 @@ body.is-demo #settings-update-apply { display: none !important; }
    */
   .app-nav { gap: .25rem; padding-left: .5rem; padding-right: .5rem; }
   .app-nav .brand { display: none; }
+  /* Phones: bar is just the tabs; status lives in Settings (+ the tab dot). */
+  .app-nav #status, .app-nav .help-btn { display: none; }
   .nav-tab {
     flex: 1 1 0;
     justify-content: center;
