@@ -1913,6 +1913,11 @@ function buildFlowReactor(model, opts) {
   const svg = _pfEl("svg", { class: "pf-reactor-svg", viewBox: `0 0 ${W} ${H}`,
     preserveAspectRatio: "xMidYMid meet", role: "img",
     "aria-label": `Power flow: ${stateLabel}, ${battW} watts, battery ${soc.toFixed(0)} percent` });
+  // Definite aspect-ratio so the browser computes the SVG's height from its
+  // width instead of the viewBox's intrinsic size. Without this, Safari blows
+  // the SVG up to a giant intrinsic size when it sits in a flex item (the
+  // mobile app-shell makes <main> a flex child) — "loaded massive on iOS".
+  svg.style.aspectRatio = `${W} / ${H}`;
 
   svg.appendChild(_pfEl("defs", null, [
     _pfEl("radialGradient", { id: `${uid}-amb` }, [

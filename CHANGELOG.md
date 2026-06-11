@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.13] - 2026-06-11
+
+Beta — fix the power-flow reactor rendering huge on iOS.
+
+### Fixed
+- **Reactor sized correctly on iOS Safari.** The reactor SVG relied on
+  `height: auto` from its viewBox; inside the mobile app-shell's flex `main`,
+  Safari/WebKit blows such an SVG up to a giant intrinsic size ("loaded
+  massive"). It now carries a definite `aspect-ratio` so height is computed from
+  width in every engine. `main` also gets `min-width: 0` + `overflow-x: hidden`
+  so a mis-sized child can't drag the layout past the viewport.
+
 ## [0.1.169-beta.12] - 2026-06-11
 
 Beta — fix the app-shell clipping the bottom bar on mobile browsers.

@@ -647,7 +647,12 @@ body.is-demo #settings-update-apply { display: none !important; }
     order: 2;
     flex: 1 1 auto;
     min-height: 0;
+    /* min-width:0 stops a flex item from growing to its widest content (a
+       blown-up SVG would otherwise drag main — and everything measuring
+       100% off it — past the viewport). overflow-x:hidden clips any residue. */
+    min-width: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
   }
