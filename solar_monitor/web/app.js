@@ -1718,6 +1718,11 @@ function buildFlowModel() {
   return model;
 }
 
+// Combined hero (#design): merge the donut hero into the reactor section.
+// Default on; the in-panel toggle flips it (wp-combined). Set the body class
+// at load so the hero is hidden via CSS without a flash.
+try { document.body.classList.toggle("combined-flow", localStorage.getItem("wp-combined") !== "0"); } catch (_) {}
+
 function renderFlow(targetHost) {
   // v2 Power-flow tile: SVG with animated particles along curves,
   // icon-only nodes at the perimeter, watts as labels *outside* the
@@ -1769,6 +1774,11 @@ function renderFlow(targetHost) {
     // 3-item breakdown instead of the battery bar — the reactor core already
     // shows SoC + state + watts, so the old bar was a duplicate.
     host.appendChild(buildFlowLegend(model, battNetW));
+    // Combined hero: when merged, the donut hero is hidden (CSS) and the
+    // leftover stats sit here under the reactor. Toggle flips combined/split.
+    const combined = document.body.classList.contains("combined-flow");
+    if (combined) host.appendChild(buildCombinedStats());
+    _renderCombinedToggle(host, combined);
   } else {
     host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
     if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
@@ -2020,6 +2030,53 @@ function buildFlowLegend(model, battW) {
   else                  wrap.appendChild(item("var(--text-3)", "Battery", 0));
   wrap.appendChild(item("var(--pf-load-2)", "Loads", loadTotal));
   return wrap;
+}
+
+// Combined hero: the stat boxes that sit under the reactor when the hero +
+// power-flow are merged into one section. Reads the values the hero already
+// computed (one tick old at most — imperceptible) so we don't duplicate the
+// formatting logic.
+function buildCombinedStats() {
+  const g = (id) => (document.getElementById(id)?.textContent || "·").trim();
+  const row = document.createElement("div");
+  row.className = "pf-statrow";
+  const box = (k, valId, unit, sub, withBar) => {
+    const b = document.createElement("div"); b.className = "pf-statbox";
+    const kk = document.createElement("div"); kk.className = "pf-statk"; kk.textContent = k; b.appendChild(kk);
+    const vv = document.createElement("div"); vv.className = "pf-statv"; vv.textContent = g(valId);
+    if (unit) { const u = document.createElement("span"); u.className = "pf-statu"; u.textContent = unit; vv.appendChild(u); }
+    b.appendChild(vv);
+    if (sub) { const ss = document.createElement("div"); ss.className = "pf-stats"; ss.textContent = sub; b.appendChild(ss); }
+    if (withBar) {
+      const bar = document.createElement("div"); bar.className = "pf-statbar";
+      const tile = document.getElementById("bank-time-tile");
+      if (tile) ["charging", "discharging", "idle"].forEach((c) => { if (tile.classList.contains(c)) bar.classList.add(c); });
+      const i = document.createElement("i");
+      const soc = parseFloat(g("bank-soc")) || 0;
+      i.style.width = Math.max(3, Math.min(100, soc)) + "%";
+      bar.appendChild(i); b.appendChild(bar);
+    }
+    return b;
+  };
+  row.appendChild(box("Remaining", "bank-time", "", g("bank-time-sub"), true));
+  row.appendChild(box("Voltage", "bank-voltage", "V", ""));
+  row.appendChild(box("Remaining", "bank-remaining", "Ah", "of " + g("bank-capacity") + " Ah usable"));
+  row.appendChild(box("Bank", "bank-meta", "", ""));
+  return row;
+}
+// Temporary split/merge toggle while we evaluate the combined hero.
+function _renderCombinedToggle(host, combined) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pf-style-toggle";
+  btn.textContent = combined ? "Split view" : "Merge view";
+  btn.addEventListener("click", () => {
+    const next = !combined;
+    localStorage.setItem("wp-combined", next ? "1" : "0");
+    document.body.classList.toggle("combined-flow", next);
+    renderFlow();
+  });
+  host.appendChild(btn);
 }
 
 function buildFlowSvgV2(model, opts) {

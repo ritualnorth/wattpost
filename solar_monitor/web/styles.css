@@ -5127,3 +5127,32 @@ html.in-wattpost-app .container {
   transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
 #bank-time-tile.charging    #bank-time-bar { background: linear-gradient(90deg, #2ea043, #6ff09a); }
 #bank-time-tile.discharging #bank-time-bar { background: linear-gradient(90deg, #e8497f, #ff95b6); }
+
+/* ===== Combined hero (#design): reactor + stat boxes as one section ===== */
+body.combined-flow .hero-v2 { display: none; }
+body.combined-flow #flow-panel .panel-header { display: none; }
+.pf-statrow {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px;
+}
+@media (max-width: 700px) { .pf-statrow { grid-template-columns: repeat(2, 1fr); } }
+.pf-statbox {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+}
+.pf-statk { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
+.pf-statv { font-size: 26px; font-weight: 680; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.pf-statu { font-size: .5em; color: var(--text-3); margin-left: 3px; font-weight: 600; }
+.pf-stats { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+.pf-statbar { margin-top: 10px; height: 6px; border-radius: 4px; background: rgba(127,127,127,.16); overflow: hidden; }
+.pf-statbar i { display: block; height: 100%; border-radius: 4px; width: 0;
+  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+.pf-statbar.charging    i { background: linear-gradient(90deg, #2ea043, #6ff09a); }
+.pf-statbar.discharging i { background: linear-gradient(90deg, #e8497f, #ff95b6); }
+/* split/merge evaluation toggle (re-added) */
+.pf-style-toggle {
+  position: absolute; top: 4px; right: 4px; z-index: 3;
+  font-size: 11px; font-weight: 600; color: var(--text-3); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.pf-style-toggle:hover { color: var(--text); border-color: var(--border-2); background: var(--surface-3); }
