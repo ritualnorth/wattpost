@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.10] - 2026-06-11
+
+Beta — clearer sun-arc for the forecast day.
+
+### Changed
+- **Tomorrow's arc reads as a forecast.** When the Today tile flips to
+  "Tomorrow" after sunset, its arc now draws as a light dashed curve over a dim
+  fill — no bright apex (which looked like a sun disc sitting on the arc) and no
+  sun marker (there's no "now" on a future day). Today's live arc keeps the
+  solid fill + the sun riding it at the current time.
+- **Arc labels its day.** A small "Today" / "Tomorrow" caption sits on the arc
+  so it's never ambiguous which day's curve you're looking at.
+
 ## [0.1.169-beta.9] - 2026-06-11
 
 Beta — mobile dashboard polish.

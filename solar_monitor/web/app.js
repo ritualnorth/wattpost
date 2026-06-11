@@ -3385,7 +3385,7 @@ function renderToday() {
         foot.hidden = false;
         footText.textContent = `Today (final): PV ${pvActualStr} · Load ${loadStr}`;
       }
-      drawTodaySpark(s.tomorrowPoints, null, spark);
+      drawTodaySpark(s.tomorrowPoints, null, spark, "Tomorrow");
     } else {
       if (headline) headline.textContent = "Today";
       const kEl = document.getElementById("today-hero-k");
@@ -3430,7 +3430,7 @@ function renderToday() {
       } else if (foot) {
         foot.hidden = true;
       }
-      drawTodaySpark(s.todayPoints, Math.floor(Date.now() / 1000), spark);
+      drawTodaySpark(s.todayPoints, Math.floor(Date.now() / 1000), spark, "Today");
     }
   });
 }
@@ -3471,7 +3471,7 @@ let _spkUid = 0;  // unique gradient/filter ids when >1 sparkline is on the page
 // the still-to-come forecast continuing as a faint dashed arc, and the sun
 // itself riding the curve at "now". When nowTs is null (sleep mode showing
 // tomorrow) the whole arc is bright with no sun marker.
-function drawTodaySpark(points, nowTs, host) {
+function drawTodaySpark(points, nowTs, host, label) {
   host = host || $("#today-spark");
   if (!host || !points || !points.length) { if (host) host.innerHTML = ""; return; }
   const W = host.clientWidth || 600;
@@ -3483,27 +3483,49 @@ function drawTodaySpark(points, nowTs, host) {
   const yOf = (w)  => H - padB - (w / maxW) * (H - padT - padB);
   const base = H - padB;
   const allPts = points.map(p => [xOf(p.ts), yOf(p.w)]);
+  const g = "s" + (++_spkUid);
+  // Faint top-left caption naming the day, so the arc is never mistaken for the
+  // other one (today's harvest vs tomorrow's forecast share this component).
+  const cap = label
+    ? `<text x="${padX}" y="14" font-size="10.5" font-weight="700" letter-spacing="0.6" fill="var(--text-3)">${String(label).toUpperCase()}</text>`
+    : "";
+  const horizon = `<line x1="${padX}" y1="${(base + 0.5).toFixed(1)}" x2="${W - padX}" y2="${(base + 0.5).toFixed(1)}" stroke="rgba(125,133,144,0.25)" stroke-width="1"/>`;
 
-  const nowX = nowTs == null ? null : Math.min(Math.max(xOf(nowTs), padX), W - padX);
-  const sunY = nowX == null ? null : _spkYAt(allPts, nowX);
-
-  // Split the curve at "now". Both halves are anchored to the exact arc point
-  // at nowX so the realized fill and the dashed forecast meet cleanly.
-  let pastPts, futPts;
+  // No "now" → the whole day is still a forecast (the Tomorrow tile). Draw it
+  // as a light dashed curve over a DIM fill: no bright apex (which reads as a
+  // sun sitting on the arc) and no sun marker (there's no current time on a
+  // future day).
   if (nowTs == null) {
-    pastPts = allPts; futPts = [];
-  } else {
-    pastPts = points.filter(p => p.ts <= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
-    futPts  = points.filter(p => p.ts >= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
-    pastPts.push([nowX, sunY]);
-    futPts.unshift([nowX, sunY]);
+    const line = _spkSmooth(allPts);
+    const area = `${line} L${(W - padX).toFixed(2)},${base} L${padX},${base} Z`;
+    host.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+      <defs>
+        <linearGradient id="fill${g}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="rgba(210,153,34,0.14)"/>
+          <stop offset="100%" stop-color="rgba(210,153,34,0)"/>
+        </linearGradient>
+      </defs>
+      ${cap}
+      <path d="${area}" fill="url(#fill${g})"/>
+      <path d="${line}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5" opacity="0.75"/>
+      ${horizon}
+    </svg>`;
+    return;
   }
 
+  // Today: realized harvest up to "now" (solid + glowing fill), the rest of the
+  // day dashed, and the sun riding the curve at the current time.
+  const nowX = Math.min(Math.max(xOf(nowTs), padX), W - padX);
+  const sunY = _spkYAt(allPts, nowX);
+  const pastPts = points.filter(p => p.ts <= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
+  const futPts  = points.filter(p => p.ts >= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
+  pastPts.push([nowX, sunY]);
+  futPts.unshift([nowX, sunY]);
   const pastLine = _spkSmooth(pastPts);
   const futLine  = _spkSmooth(futPts);
   const lastX = (pastPts[pastPts.length - 1] || [padX, base])[0];
   const realArea = `${pastLine} L${lastX.toFixed(2)},${base} L${padX},${base} Z`;
-  const g = "s" + (++_spkUid);
 
   host.innerHTML = `
   <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
@@ -3523,15 +3545,15 @@ function drawTodaySpark(points, nowTs, host) {
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
+    ${cap}
     <path d="${realArea}" fill="url(#fill${g})"/>
     <path d="${pastLine}" fill="none" stroke="#f0b429" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
     ${futPts.length > 1 ? `<path d="${futLine}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5" opacity="0.5"/>` : ""}
-    <line x1="${padX}" y1="${(base + 0.5).toFixed(1)}" x2="${W - padX}" y2="${(base + 0.5).toFixed(1)}" stroke="rgba(125,133,144,0.25)" stroke-width="1"/>
-    ${nowTs == null ? "" : `
+    ${horizon}
     <g filter="url(#glow${g})">
       <circle cx="${nowX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="9" fill="url(#sun${g})"/>
       <circle cx="${nowX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="9" fill="none" stroke="rgba(255,244,214,0.9)" stroke-width="1"/>
-    </g>`}
+    </g>
   </svg>`;
 }
 
