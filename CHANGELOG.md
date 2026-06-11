@@ -8,6 +8,17 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.6] - 2026-06-11
+
+Beta — mobile nav moves to a bottom tab bar.
+
+### Changed
+- **Bottom tab bar on phones.** The primary nav drops to a fixed bottom bar
+  (icon over label, the native pattern) instead of a top strip — thumb-reachable
+  and it frees the whole top of the screen for content. The brand, status pill
+  and help button stay off the bar on mobile; system status still surfaces as a
+  dot on the Settings tab.
+
 ## [0.1.169-beta.5] - 2026-06-11
 
 Beta — the Today graph becomes the sun's arc.
