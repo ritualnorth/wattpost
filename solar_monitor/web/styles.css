@@ -5148,11 +5148,8 @@ body.combined-flow #flow-panel .panel-header { display: none; }
   transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
 .pf-statbar.charging    i { background: linear-gradient(90deg, #2ea043, #6ff09a); }
 .pf-statbar.discharging i { background: linear-gradient(90deg, #e8497f, #ff95b6); }
-/* split/merge evaluation toggle (re-added) */
-.pf-style-toggle {
-  position: absolute; top: 4px; right: 4px; z-index: 3;
-  font-size: 11px; font-weight: 600; color: var(--text-3); background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 7px; padding: 5px 9px; cursor: pointer;
-  transition: color .15s, border-color .15s, background .15s;
-}
-.pf-style-toggle:hover { color: var(--text); border-color: var(--border-2); background: var(--surface-3); }
+/* Reactor + combined-stat numbers use the dashboard's mono/tabular figures
+   (the % was rendering in the default sans, looking off vs the old donut). */
+.pf-reactor-svg text { font-family: var(--font); }
+.pf-reactor-svg .pf-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.pf-statv { font-family: var(--mono); }

@@ -1774,11 +1774,10 @@ function renderFlow(targetHost) {
     // 3-item breakdown instead of the battery bar — the reactor core already
     // shows SoC + state + watts, so the old bar was a duplicate.
     host.appendChild(buildFlowLegend(model, battNetW));
-    // Combined hero: when merged, the donut hero is hidden (CSS) and the
-    // leftover stats sit here under the reactor. Toggle flips combined/split.
-    const combined = document.body.classList.contains("combined-flow");
-    if (combined) host.appendChild(buildCombinedStats());
-    _renderCombinedToggle(host, combined);
+    // Combined hero: when merged (default), the donut hero is hidden (CSS) and
+    // the leftover stats sit here under the reactor. Hidden localStorage
+    // `wp-combined=0` fallback splits them back if ever needed.
+    if (document.body.classList.contains("combined-flow")) host.appendChild(buildCombinedStats());
   } else {
     host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
     if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
@@ -1969,7 +1968,7 @@ function buildFlowReactor(model, opts) {
   svg.appendChild(core);
 
   const t1 = _pfEl("text", { x: C.x, y: C.y - 6, "text-anchor": "middle", "font-size": (R * 0.5).toFixed(0),
-    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.92" });
+    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.92", class: "pf-num" });
   t1.textContent = soc.toFixed(0);
   const u = _pfEl("tspan", { "font-size": (R * 0.24).toFixed(0), dy: "-2" }); u.textContent = "%"; t1.appendChild(u);
   svg.appendChild(t1);
@@ -1977,7 +1976,7 @@ function buildFlowReactor(model, opts) {
     "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.62", "letter-spacing": "0.08em" });
   t2.textContent = stateLabel; svg.appendChild(t2);
   const t3 = _pfEl("text", { x: C.x, y: C.y + R * 0.46, "text-anchor": "middle", "font-size": (R * 0.15).toFixed(0),
-    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.82" });
+    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.82", class: "pf-num" });
   t3.textContent = (battW > 0 ? "+" : "") + battW + " W"; svg.appendChild(t3);
 
   function node(pt, label, valW, colorVar, dim, iconKey, above) {
@@ -1995,7 +1994,7 @@ function buildFlowReactor(model, opts) {
     const lab = _pfEl("text", { x: pt.x, y: pt.y + ly, "text-anchor": "middle", "font-size": "13",
       fill: "var(--text-3)", "font-weight": "600" }); lab.textContent = label; g.appendChild(lab);
     const val = _pfEl("text", { x: pt.x, y: pt.y + vy, "text-anchor": "middle", "font-size": "17",
-      "font-weight": "700", fill: colorVar }); val.textContent = _pfFmtW(valW); g.appendChild(val);
+      "font-weight": "700", fill: colorVar, class: "pf-num" }); val.textContent = _pfFmtW(valW); g.appendChild(val);
     return g;
   }
   svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn, "sun", vertical));
@@ -2064,21 +2063,6 @@ function buildCombinedStats() {
   row.appendChild(box("Bank", "bank-meta", "", ""));
   return row;
 }
-// Temporary split/merge toggle while we evaluate the combined hero.
-function _renderCombinedToggle(host, combined) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "pf-style-toggle";
-  btn.textContent = combined ? "Split view" : "Merge view";
-  btn.addEventListener("click", () => {
-    const next = !combined;
-    localStorage.setItem("wp-combined", next ? "1" : "0");
-    document.body.classList.toggle("combined-flow", next);
-    renderFlow();
-  });
-  host.appendChild(btn);
-}
-
 function buildFlowSvgV2(model, opts) {
   const { showBattInSvg, battNetW } = opts;
 
