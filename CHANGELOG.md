@@ -8,6 +8,29 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.2] - 2026-06-11
+
+Beta — dashboard top-bar redesign and an updater fix that keeps the
+privileged helper in step with the app after an update.
+
+### Changed
+- **One top bar.** The dashboard header and the tab row collapsed into a
+  single bar: on a wide screen the logo sits on the left with the tabs
+  grouped on the right; on a phone it's just the tabs. System status and the
+  help link moved into Settings — a coloured dot on the Settings tab now
+  flags a not-healthy system at a glance. Tabs gained a segmented-pill
+  active state.
+
+### Fixed
+- **Updates now refresh the privileged helper.** An in-place update swapped
+  the app but left the root helper daemon — and the network/rollback/config
+  helpers and their units — frozen at install time, so a release that
+  changed the helper failed privileged actions (e.g. the Network panel
+  reporting "unknown action") until `install.sh` was re-run by hand. The
+  updater now reconciles them from the new release on every slot swap, via
+  the same install path the first-time installer uses so the two can't
+  drift. Existing boxes pick this up from the update *after* this one.
+
 ## [0.1.169-beta.1] - 2026-06-11
 
 Beta — network address control (static IP / DHCP, mDNS, scan-from-AP) and a
