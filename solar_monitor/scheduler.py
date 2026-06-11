@@ -239,12 +239,27 @@ class PollScheduler:
         # bottom-but-one rung of the app's local-first connection ladder. The
         # provisioning characteristics bridge to the privileged helper's
         # wifi_scan/wifi_join, so only stand it up where that backend exists (a
-        # Pi install with the helper). It also no-ops without dbus_fast/BlueZ,
-        # but gating on the helper keeps non-Pi boxes off the air entirely.
+        # Pi install with the helper). It also no-ops without dbus_fast/BlueZ.
+        #
+        # Single radio: advertising as a peripheral contends with central-role
+        # polling — on a box already polling a BLE device, bringing the
+        # peripheral up turns clean poll timeouts into org.bluez InProgress
+        # errors. So only advertise when no BLE transport owns the radio, which
+        # is exactly the fresh/unprovisioned box that needs Bluetooth setup.
+        # (This doubles as the security window: a provisioned box isn't on the
+        # air.) A box that polls a BLE device AND wants to re-provision over
+        # Bluetooth needs a pause-polling-for-setup window — a later follow-up;
+        # for now it uses the setup AP / captive portal.
         self._ble_gatt: BleGattService | None = None
         try:
             from . import helper_client
-            if helper_client.is_available():
+            if not helper_client.is_available():
+                pass  # not a Pi install with the helper backend
+            elif self._ble_radio_in_use():
+                log.info("ble_gatt: a BLE transport owns this radio; peripheral "
+                         "left off to avoid single-radio contention (use the "
+                         "setup AP for WiFi changes)")
+            else:
                 self._ble_gatt = BleGattService(self._ble_status)
         except Exception:
             log.exception("ble_gatt service failed to initialise")
@@ -405,6 +420,16 @@ class PollScheduler:
             # to tag the AC charger tile in the flow strip.
             "solar_pause": self._last_solar_pause,
         }
+
+    def _ble_radio_in_use(self) -> bool:
+        """True if a configured transport polls over the Bluetooth radio, so
+        the BLE GATT peripheral must stay off to avoid contending for it. All
+        BLE central transports are named ble_*; hub_bt is the Bluetooth hub."""
+        for t in (self.config.transports or []):
+            ty = str(t.get("type", ""))
+            if ty.startswith("ble_") or ty == "hub_bt":
+                return True
+        return False
 
     def _ble_status(self) -> dict[str, Any]:
         """Status snapshot for the BLE Status characteristic. Sync + in-memory
