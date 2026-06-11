@@ -33,6 +33,7 @@ import ipaddress
 import json
 import logging
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -96,10 +97,37 @@ def _act_netctl_apply(args: dict) -> dict:
 
 
 def _spawn_detached(argv: list[str]) -> dict:
-    """Fire-and-forget a long-running root script. It logs to its own file
-    (the daemon polls that), so we don't wait on it. start_new_session
-    detaches it into its own process group, so it survives both this helper
-    and the daemon being restarted mid-update by install.sh."""
+    """Fire-and-forget a long-running root script in its OWN systemd unit so
+    it survives restarts of *both* services it touches.
+
+    A plain Popen child — even with start_new_session — stays in this helper's
+    cgroup (wattpost-helper.service). The updater's privileged helper-sync does
+    `systemctl try-restart wattpost-helper.service` to pick up a new helper
+    binary, and systemd's default KillMode=control-group then kills everything
+    in that cgroup — INCLUDING the updater — before it can run its final
+    `systemctl restart wattpost.service`. Result: new code swapped in on disk
+    but the old daemon still running (#stuck "update ready"). start_new_session
+    only changes the session/process-group, not the cgroup, so it doesn't help.
+
+    systemd-run --collect puts the script in a transient unit with its own
+    cgroup, owned by PID 1, so restarting wattpost-helper.service (mid-update)
+    and wattpost.service (the updater's own final step) both leave it running.
+    Fall back to a detached Popen where systemd-run isn't on PATH."""
+    sdr = shutil.which("systemd-run")
+    if sdr:
+        unit = os.path.basename(argv[0])  # e.g. "wattpost-update" / "wattpost-rollback"
+        try:
+            # --collect reaps the transient unit when it exits (so the name is
+            # free for the next run); --no-block returns immediately.
+            subprocess.Popen(
+                [sdr, "--collect", "--quiet", "--no-block", "--unit", unit, "--", *argv],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            return {"ok": True, "out": "started", "err": ""}
+        except Exception:
+            pass  # fall through to the plain-Popen path
     try:
         subprocess.Popen(
             argv,

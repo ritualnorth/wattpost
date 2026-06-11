@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.8] - 2026-06-11
+
+Beta — fix an in-place update leaving the old daemon running.
+
+### Fixed
+- **Update now completes the daemon restart.** The privileged helper-sync
+  restarts `wattpost-helper.service` to pick up a new helper binary, but the
+  updater ran as a child of that service — so the restart cgroup-killed the
+  updater before it could restart the daemon, swapping new code onto disk while
+  the old daemon kept running (stuck "update ready", new UI / old version). The
+  helper-sync now defers that restart onto a short transient timer so the
+  updater finishes first, and `wattpost-helperd` launches the updater in its own
+  transient unit so neither service restart can kill it.
+
 ## [0.1.169-beta.7] - 2026-06-11
 
 Beta — mobile gets a top bar to go with the bottom tabs.

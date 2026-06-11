@@ -117,11 +117,30 @@ wp_sync_privileged() {
     # Socket-activated helper: keep the listener enabled + armed...
     systemctl enable wattpost-helper.socket >/dev/null 2>&1 || true
     systemctl start  wattpost-helper.socket >/dev/null 2>&1 || true
-    # ...then swap the running helper binary. try-restart is a no-op when the
-    # service is stopped (don't force-start an idle helper — it's socket-
-    # activated on demand) and re-execs the new binary when it's up. This is
-    # the line that actually fixes the stale-helper-after-update bug.
-    systemctl try-restart wattpost-helper.service >/dev/null 2>&1 || true
+    # ...then swap the running helper binary so the new code goes live.
+    #
+    # CAREFUL: the updater that sources this lib is (on an older helperd spawn)
+    # a child of wattpost-helper.service, so it lives in THAT service's cgroup.
+    # A direct `systemctl try-restart wattpost-helper.service` here would
+    # cgroup-kill the updater mid-flight — before it runs its own `systemctl
+    # restart wattpost.service` — leaving the new code swapped in on disk but
+    # the OLD daemon still running (the "stuck on update ready" bug). So DETACH
+    # the helper restart onto a short transient timer: the updater finishes its
+    # daemon restart + post-swap health gate first (~30s), then the helper
+    # re-execs to the new binary at +90s (or sooner via socket activation).
+    # try-restart is a no-op when the service is stopped, so an idle helper is
+    # left alone. A newer helperd spawns the updater in its own cgroup, which
+    # makes this defer belt-and-braces — but it's what lets the very update
+    # carrying the fix complete on an old helperd.
+    if command -v systemd-run >/dev/null 2>&1; then
+        # No --unit (auto-named, --collect reaps it) so a lingering name can't
+        # make this fail and fall back to a synchronous, updater-killing restart.
+        systemd-run --collect --quiet --on-active=90s \
+            systemctl try-restart wattpost-helper.service >/dev/null 2>&1 || true
+    else
+        # No systemd → no cgroup kill to worry about; restart inline.
+        systemctl try-restart wattpost-helper.service >/dev/null 2>&1 || true
+    fi
 
     return 0
 }
