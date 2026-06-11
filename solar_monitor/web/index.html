@@ -1087,6 +1087,15 @@
               revoke it any time. The link is shown to you once &mdash;
               save it then.
             </p>
+            <label class="kiosk-skin-row" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;font-size:.85rem;color:var(--text-2)">
+              Theme for this link:
+              <select id="kiosk-skin" class="kiosk-skin-select">
+                <option value="">Appliance default</option>
+                <option value="halo">Halo</option>
+                <option value="ember">Ember</option>
+                <option value="command">Command</option>
+              </select>
+            </label>
             <button id="kiosk-create-btn" class="btn-action">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               <span>Create kiosk link</span>
@@ -1450,6 +1459,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=261"></script>
+  <script src="/web/app.js?v=262"></script>
 </body>
 </html>

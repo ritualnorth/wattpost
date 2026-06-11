@@ -8704,11 +8704,15 @@ async function loadKioskTokens() {
       host.innerHTML = `<div class="kiosk-token-empty">No kiosk links yet.</div>`;
       return;
     }
-    host.innerHTML = tokens.map(t => `
+    const _skinLabel = (s) => ({ halo: "Halo", ember: "Ember", command: "Command" }[s] || "");
+    host.innerHTML = tokens.map(t => {
+      const sk = _skinLabel((t.skin || "").toLowerCase());
+      return `
       <div class="kiosk-token-row">
-        <span class="kiosk-token-name">${_escHtmlMini(t.name || "Kiosk")}</span>
+        <span class="kiosk-token-name">${_escHtmlMini(t.name || "Kiosk")}${sk ? ` <span class="kiosk-token-skin" style="color:var(--text-3)">· ${_escHtmlMini(sk)}</span>` : ""}</span>
         <button class="kiosk-token-revoke" type="button" data-id="${_escHtmlMini(t.id)}">Revoke</button>
-      </div>`).join("");
+      </div>`;
+    }).join("");
     host.querySelectorAll(".kiosk-token-revoke").forEach(b =>
       b.addEventListener("click", async () => {
         if (!confirm("Revoke this kiosk link? The display using it will stop working.")) return;
@@ -8725,13 +8729,17 @@ if (kioskCreateBtn) {
   kioskCreateBtn.addEventListener("click", async () => {
     const name = prompt("Name this display (e.g. Cabin, Van screen):", "Kiosk");
     if (name === null) return;
+    // Theme picked for THIS link (empty = appliance default). Bound to the
+    // token so each wall display can run a different skin off the one box.
+    const skin = document.getElementById("kiosk-skin")?.value || "";
+    const skinLabel = { halo: "Halo", ember: "Ember", command: "Command" }[skin] || "Appliance default";
     const out = document.getElementById("kiosk-create-result");
     kioskCreateBtn.disabled = true;
     try {
       const r = await fetch("/api/system/kiosk-tokens", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, skin }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
@@ -8739,7 +8747,7 @@ if (kioskCreateBtn) {
       if (out) {
         out.hidden = false;
         out.innerHTML = `
-          <div class="rotate-pw-label">Kiosk link — open it on the display. Save it now:</div>
+          <div class="rotate-pw-label">Kiosk link (${_escHtmlMini(skinLabel)}) — open it on the display. Save it now:</div>
           <code class="rotate-pw-code">${_escHtmlMini(url)}</code>
           <button class="rotate-pw-copy" type="button">Copy</button>
           <div class="rotate-pw-foot">Read-only, no login. Revoke any time below.</div>`;

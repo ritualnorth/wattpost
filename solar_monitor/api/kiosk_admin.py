@@ -18,7 +18,7 @@ import logging
 from typing import Any
 
 import msgspec
-from litestar import get, patch
+from litestar import get, patch, Request
 from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 
@@ -35,12 +35,22 @@ def _cfg(config) -> KioskCfg:
 
 
 @get("/api/kiosk/config")
-async def get_kiosk_config(state: State) -> dict[str, Any]:
-    """Appliance kiosk defaults: {default: bool, skin: str}."""
+async def get_kiosk_config(state: State, request: Request) -> dict[str, Any]:
+    """Appliance kiosk defaults: {default: bool, skin: str}.
+
+    When the request carries a kiosk link token (?token=…) that pins a theme,
+    that link's skin wins — so each wall display can run a different skin off
+    the one box. Otherwise the appliance-wide default applies."""
     k = _cfg(state["config"])
     skin = (k.skin or "halo").lower()
     if skin not in _VALID_SKINS:
         skin = "halo"
+    tok = request.query_params.get("token")
+    if tok:
+        from .. import web_auth as _wa
+        link_skin = (_wa.kiosk_token_skin(tok) or "").lower()
+        if link_skin in _VALID_SKINS:
+            skin = link_skin
     return {"default": bool(k.default), "skin": skin}
 
 

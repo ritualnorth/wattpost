@@ -427,13 +427,20 @@ async def kiosk_tokens_list() -> dict[str, Any]:
 @post("/api/system/kiosk-tokens", status_code=201)
 async def kiosk_tokens_create(data: dict) -> dict[str, Any]:
     """Mint a kiosk token. Returns the plaintext + a ready-to-bookmark
-    `/kiosk?token=…` path ONCE; it's stored hashed and never shown again."""
+    `/kiosk?token=…` path ONCE; it's stored hashed and never shown again.
+    An optional `skin` pins this link to a kiosk theme so each wall display
+    can differ; omitted = the appliance-wide default applies at render."""
     from .. import web_auth as _wa
+    from .kiosk_admin import _VALID_SKINS
     name = (data or {}).get("name") or ""
-    tid, plaintext = _wa.create_kiosk_token(name)
-    log.info("kiosk token minted (%s)", tid)
+    skin = ((data or {}).get("skin") or "").strip().lower()
+    if skin and skin not in _VALID_SKINS:
+        raise HTTPException(status_code=400, detail=f"skin must be one of {_VALID_SKINS}")
+    tid, plaintext = _wa.create_kiosk_token(name, skin)
+    log.info("kiosk token minted (%s, skin=%s)", tid, skin or "default")
     return {
         "ok": True, "id": tid, "name": (name or "Kiosk").strip()[:60],
+        "skin": skin,
         "token": plaintext,
         "kiosk_path": f"/kiosk?token={plaintext}",
     }

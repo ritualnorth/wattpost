@@ -302,9 +302,11 @@ def _save_kiosk_tokens(toks: list[dict]) -> None:
     tmp.replace(KIOSK_TOKENS_PATH)
 
 
-def create_kiosk_token(name: str = "") -> tuple[str, str]:
+def create_kiosk_token(name: str = "", skin: str = "") -> tuple[str, str]:
     """Mint a kiosk token. Returns (id, plaintext); the plaintext is shown
-    to the admin once and never stored in the clear."""
+    to the admin once and never stored in the clear. `skin` binds a kiosk
+    theme to this link so each wall display can differ; empty = fall back to
+    the appliance-wide default at render time."""
     plaintext = secrets.token_urlsafe(24)
     tid = secrets.token_hex(8)
     toks = _load_kiosk_tokens()
@@ -312,6 +314,7 @@ def create_kiosk_token(name: str = "") -> tuple[str, str]:
         "id": tid,
         "name": (name or "Kiosk").strip()[:60],
         "hash": _kiosk_hash(plaintext),
+        "skin": (skin or "").strip().lower()[:20],
         "created_at": time.time(),
     })
     _save_kiosk_tokens(toks)
@@ -322,9 +325,21 @@ def list_kiosk_tokens() -> list[dict]:
     """Metadata only — never the hash."""
     return [
         {"id": t.get("id"), "name": t.get("name", ""),
-         "created_at": t.get("created_at")}
+         "skin": t.get("skin", ""), "created_at": t.get("created_at")}
         for t in _load_kiosk_tokens()
     ]
+
+
+def kiosk_token_skin(plaintext: str | None) -> str | None:
+    """The theme bound to this kiosk token, or None if the token is unknown
+    or pinned to no specific skin (render falls back to the global default)."""
+    if not plaintext:
+        return None
+    h = _kiosk_hash(plaintext)
+    for t in _load_kiosk_tokens():
+        if hmac.compare_digest(str(t.get("hash", "")), h):
+            return (t.get("skin") or "") or None
+    return None
 
 
 def revoke_kiosk_token(tid: str) -> bool:
