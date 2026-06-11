@@ -1761,10 +1761,13 @@ function renderFlow(targetHost) {
   const reactorOn = localStorage.getItem("wp-flow-reactor") !== "0";
   if (reactorOn) {
     host.appendChild(buildFlowReactor(model, { battNetW }));
+    // 3-item breakdown instead of the battery bar — the reactor core already
+    // shows SoC + state + watts, so the old bar was a duplicate.
+    host.appendChild(buildFlowLegend(model, battNetW));
   } else {
     host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
+    if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
   }
-  if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
   _renderFlowToggle(host, reactorOn);
 
   const parts = [];
@@ -1862,8 +1865,10 @@ function buildFlowReactor(model, opts) {
   const stateLabel = charging ? "CHARGING" : discharging ? "DISCHARGING" : "HOLDING";
 
   const vertical = (window.innerWidth || 1000) < 640;
-  const W = vertical ? 380 : 960, H = vertical ? 470 : 360;
-  const C = { x: W / 2, y: vertical ? H * 0.50 : H * 0.52 };
+  // H tall enough that the ambient glow + widest ripple (≈R+88) fit inside
+  // the viewBox, so they don't bleed past the panel onto whatever's below.
+  const W = vertical ? 380 : 960, H = vertical ? 470 : 440;
+  const C = { x: W / 2, y: H * 0.50 };
   const R = vertical ? Math.min(W * 0.26, 112) : Math.min(H * 0.36, 130);
   const S = vertical ? { x: W / 2, y: H * 0.13 } : { x: W * 0.15, y: H * 0.50 };
   const L = vertical ? { x: W / 2, y: H * 0.87 } : { x: W * 0.85, y: H * 0.50 };
@@ -1982,6 +1987,31 @@ function _renderFlowToggle(host, reactorOn) {
     renderFlow();
   });
   host.appendChild(btn);
+}
+
+// Slim 3-item flow breakdown shown under the reactor — Solar / battery
+// in-or-out / Loads. Replaces the old battery summary bar, which duplicated
+// the SoC + state + watts the reactor core already shows.
+function buildFlowLegend(model, battW) {
+  const solar     = (model.sources || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  const loadTotal = (model.loads   || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  const wrap = document.createElement("div");
+  wrap.className = "pf-legend";
+  const item = (colorVar, label, w) => {
+    const lg = document.createElement("span"); lg.className = "pf-lg";
+    const sw = document.createElement("span"); sw.className = "pf-sw"; sw.style.background = colorVar;
+    lg.appendChild(sw);
+    lg.appendChild(document.createTextNode(" " + label + " "));
+    const b = document.createElement("b"); b.textContent = _pfFmtW(w);
+    lg.appendChild(b);
+    return lg;
+  };
+  wrap.appendChild(item("var(--pf-solar)", "Solar", solar));
+  if (battW > 5)        wrap.appendChild(item("var(--pf-charge)", "Into battery", battW));
+  else if (battW < -5)  wrap.appendChild(item("var(--pf-discharge)", "From battery", -battW));
+  else                  wrap.appendChild(item("var(--text-3)", "Battery", 0));
+  wrap.appendChild(item("var(--pf-load-2)", "Loads", loadTotal));
+  return wrap;
 }
 
 function buildFlowSvgV2(model, opts) {
