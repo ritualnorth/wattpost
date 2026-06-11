@@ -263,6 +263,32 @@ log "    swapped: ${APP_ROOT} → ${INACTIVE_TARGET}"
 # Record the previous slot for Slice 3's rollback CLI.
 ln -sfn "${PREV_TARGET}" "${SLOTS_DIR}/previous"
 
+# ----- sync host-level privileged helpers from the new slot -----
+# The swap only moves the symlink + venv. The root-owned helpers that live
+# OUTSIDE the slot (wattpost-helperd + its socket/service units, netctl, the
+# rollback watchdog, the admin CLIs) were historically left frozen at whatever
+# install.sh last wrote — so a release that changed the helper shipped a stale
+# binary until a manual install.sh re-run, surfacing as "unknown action: …".
+# Reconcile them now from the freshly-swapped source, via the SAME library
+# install.sh uses so the two paths can't drift. Best-effort by contract: the
+# slot already passed its health probe, so a sync hiccup warns but must never
+# abort or roll back a healthy daemon. Sourced from the new slot so a fixed
+# sync ships and applies on the very update that carries it.
+PRIV_SYNC_LIB="${INACTIVE_TARGET}/src/packaging/lib/wattpost-privileged-sync.sh"
+if [ -f "${PRIV_SYNC_LIB}" ]; then
+    log "    syncing privileged helpers..."
+    WP_SYNC_LOG=log
+    # shellcheck source=/dev/null
+    if . "${PRIV_SYNC_LIB}"; then
+        wp_sync_privileged "${INACTIVE_TARGET}/src/packaging" \
+            || log "    WARN: privileged-helper sync reported a problem (daemon is healthy; see log above)"
+    else
+        log "    WARN: could not source privileged-sync lib — host helpers not refreshed this update"
+    fi
+else
+    log "    note: no privileged-sync lib in this release — host helpers left as-is (older source?)"
+fi
+
 # ----- restart daemon -----
 log "    restarting wattpost.service..."
 systemctl restart wattpost.service

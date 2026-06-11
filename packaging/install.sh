@@ -311,59 +311,35 @@ rm -f /etc/sudoers.d/wattpost
 rm -f /etc/sudoers.d/wattpost-netctl
 rm -f /etc/sudoers.d/wattpost-tailscale
 
-# Install the update helper. Root-owned, world-readable, world-
-# executable — sudoers takes care of who can actually run it.
-step "installing wattpost-update helper"
-if [ -f "${SCRIPT_DIR}/cli/wattpost-update" ]; then
-    install -m 0755 -o root -g root \
-        "${SCRIPT_DIR}/cli/wattpost-update" /usr/local/bin/wattpost-update
-    # Pre-create the log file with permissions that let the wattpost
-    # daemon read it back via /api/system/update/log. The helper runs
-    # as root and writes to it; the daemon (group wattpost) reads.
-    touch /var/log/wattpost-update.log
-    chgrp wattpost /var/log/wattpost-update.log
-    chmod 0644 /var/log/wattpost-update.log
-fi
+# Pre-create the root-written, group-readable log files the daemon reads back
+# via /api/system/update/log + /api/system/rollback/log. The helpers (root)
+# write them; the daemon (group wattpost) reads. The helper *binaries* + units
+# themselves are installed by the shared privileged-sync library below.
+step "preparing update/rollback log files"
+for _wp_log in /var/log/wattpost-update.log /var/log/wattpost-rollback.log; do
+    touch "${_wp_log}"
+    chgrp wattpost "${_wp_log}"
+    chmod 0644 "${_wp_log}"
+done
 
-# Install the rollback helper + its OnFailure systemd unit (#36 Slice 3).
-step "installing wattpost-rollback helper + OnFailure watchdog"
-if [ -f "${SCRIPT_DIR}/cli/wattpost-rollback" ]; then
-    install -m 0755 -o root -g root \
-        "${SCRIPT_DIR}/cli/wattpost-rollback" /usr/local/bin/wattpost-rollback
-    touch /var/log/wattpost-rollback.log
-    chgrp wattpost /var/log/wattpost-rollback.log
-    chmod 0644 /var/log/wattpost-rollback.log
-fi
-if [ -f "${SCRIPT_DIR}/systemd/wattpost-rollback.service" ]; then
-    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-rollback.service" \
-        /etc/systemd/system/wattpost-rollback.service
-fi
-
-# ----- privileged helper daemon (#33) -----
-# A small root service, reached over a group-restricted Unix socket, performs
+# ----- privileged host surface (#33): single source of truth -----
+# Install the root-owned helpers that live OUTSIDE the slot — the privileged
+# helper daemon + its socket/service units, the network-control helper, the
+# tmpfiles entry, the rollback watchdog, and the admin CLIs (update, rollback,
+# config) — via the shared library. wattpost-update sources the SAME library
+# after a slot swap, so a fresh install and an in-place update can never drift.
+# That drift is exactly what used to leave updated appliances on a stale
+# wattpost-helperd ("unknown action: net_status").
+#
+# A small root service reached over a group-restricted Unix socket performs
 # the fixed allow-list of privileged ops (firewall/SSH toggles, update,
 # rollback, captive-portal DNS drop-in) so the main daemon needs no sudo and
-# can run fully sandboxed. During migration the legacy sudoers grants below
-# stay in place; the daemon's helpers prefer the socket and fall back to sudo
-# when it's absent, so this is safe to ship before the call-sites all move.
-if [ -f "${SCRIPT_DIR}/sbin/wattpost-helperd" ]; then
-    step "installing privileged helper daemon (#33)"
-    install -d /usr/local/sbin
-    install -m 0755 -o root -g root \
-        "${SCRIPT_DIR}/sbin/wattpost-helperd" /usr/local/sbin/wattpost-helperd
-    # /run is tmpfs; tmpfiles.d recreates the socket dir on every boot before
-    # the socket unit activates.
-    if [ -f "${SCRIPT_DIR}/tmpfiles.d/wattpost.conf" ]; then
-        install -m 0644 -o root -g root \
-            "${SCRIPT_DIR}/tmpfiles.d/wattpost.conf" /etc/tmpfiles.d/wattpost.conf
-        systemd-tmpfiles --create /etc/tmpfiles.d/wattpost.conf 2>/dev/null || true
-    fi
-    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-helper.socket" \
-        /etc/systemd/system/wattpost-helper.socket
-    install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-helper.service" \
-        /etc/systemd/system/wattpost-helper.service
-    systemctl daemon-reload
-    systemctl enable --now wattpost-helper.socket >/dev/null 2>&1 || true
+# can run fully sandboxed.
+if [ -f "${SCRIPT_DIR}/lib/wattpost-privileged-sync.sh" ]; then
+    step "installing privileged helpers (daemon, units, CLIs)"
+    # shellcheck source=/dev/null
+    . "${SCRIPT_DIR}/lib/wattpost-privileged-sync.sh"
+    wp_sync_privileged "${SCRIPT_DIR}"
 fi
 
 # ----- host network hardening: firewall + SSH control (cloud #15, Phase B) -----
@@ -375,10 +351,10 @@ fi
 # the service restart at the end of install brings the ruleset up. Pi image
 # only — on Docker/dev the daemon no-ops (netsec.is_supported() is False).
 if [ -f "${SCRIPT_DIR}/sbin/wattpost-netctl" ]; then
-    step "installing host network control helper (firewall + SSH)"
-    install -d /usr/local/sbin
-    install -m 0755 -o root -g root \
-        "${SCRIPT_DIR}/sbin/wattpost-netctl" /usr/local/sbin/wattpost-netctl
+    # wattpost-netctl itself is installed by wp_sync_privileged above; this
+    # block just ensures its nftables backend is present and warns about the
+    # SSH-off default before the daemon restart closes port 22.
+    step "configuring host network control (firewall backend + SSH guard)"
 
     # nftables provides `nft`, the firewall backend the helper drives. The
     # daemon re-applies the ruleset every boot, so we need the binary, not
@@ -481,15 +457,8 @@ if [ -d "${SCRIPT_DIR}/motd" ] && [ -d /etc/update-motd.d ]; then
     install -m 0755 "${SCRIPT_DIR}/motd/10-wattpost" /etc/update-motd.d/10-wattpost
 fi
 
-# ----- wattpost-config CLI -----
-# The raspi-config-style menu for "I just SSH'd in, now what?" — wraps
-# the most common admin actions (logs, restart, port change, pair
-# status). Installed at /usr/local/bin so it's on root's $PATH without
-# editing /etc/profile.
-step "installing wattpost-config CLI"
-if [ -f "${SCRIPT_DIR}/cli/wattpost-config" ]; then
-    install -m 0755 "${SCRIPT_DIR}/cli/wattpost-config" /usr/local/bin/wattpost-config
-fi
+# wattpost-config (the raspi-config-style "I just SSH'd in, now what?" admin
+# menu) is installed by wp_sync_privileged above, alongside the other CLIs.
 
 # ----- Pi 5 active-cooler fan curve -----
 # Enable temperature-based control of the official FAN-connector fan so the
