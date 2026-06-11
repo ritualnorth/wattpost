@@ -2444,7 +2444,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-size: .95rem;
   margin-top: .15rem;
 }
-.today-spark { min-height: 64px; }
+.today-spark { min-height: 104px; }
 .today-spark svg { display: block; width: 100%; }
 
 /* One-line Tomorrow preview at the bottom of the Today tile. Reads

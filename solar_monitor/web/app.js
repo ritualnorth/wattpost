@@ -3434,50 +3434,100 @@ function _fmtHm(ts) {
   return new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-// Today's sparkline: pre-now points draw solid (the curve as Solcast
-// originally forecast it), post-now points draw dashed + faded so the
-// "still to come" portion is visually distinct from history. A faint
-// vertical line marks "now". When nowTs is null the curve is rendered
-// uniformly bright, used by sleep mode for tomorrow.
+// Catmull-Rom -> cubic bezier: turns the PV sample points into one flowing
+// curve instead of jagged segments, so the day reads as the sun's arc.
+// `pts` is an array of [x, y] pixel pairs.
+function _spkSmooth(pts) {
+  if (pts.length < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : "";
+  let d = `M${pts[0][0].toFixed(2)},${pts[0][1].toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C${c1x.toFixed(2)},${c1y.toFixed(2)} ${c2x.toFixed(2)},${c2y.toFixed(2)} ${p2[0].toFixed(2)},${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+// Linear-interpolate the curve's y at a given x, so the sun disc can sit
+// exactly on the arc at "now".
+function _spkYAt(pts, x) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    if (x >= pts[i][0] && x <= pts[i + 1][0]) {
+      const t = (x - pts[i][0]) / ((pts[i + 1][0] - pts[i][0]) || 1);
+      return pts[i][1] + t * (pts[i + 1][1] - pts[i][1]);
+    }
+  }
+  return pts[pts.length - 1][1];
+}
+let _spkUid = 0;  // unique gradient/filter ids when >1 sparkline is on the page
+
+// Today's sparkline, drawn as the sun's arc: a smooth gold curve from sunrise
+// to sunset with a glowing fill under the energy actually harvested so far,
+// the still-to-come forecast continuing as a faint dashed arc, and the sun
+// itself riding the curve at "now". When nowTs is null (sleep mode showing
+// tomorrow) the whole arc is bright with no sun marker.
 function drawTodaySpark(points, nowTs, host) {
   host = host || $("#today-spark");
   if (!host || !points || !points.length) { if (host) host.innerHTML = ""; return; }
   const W = host.clientWidth || 600;
-  const H = 64;
-  const padX = 8, padY = 6;
+  const H = 104, padX = 10, padT = 22, padB = 16;
   const maxW = Math.max(...points.map(p => p.w), 1);
   const t0 = points[0].ts, tN = points[points.length - 1].ts;
   const span = Math.max(1, tN - t0);
-  const xOf = (ts) => padX + ((ts - t0) / span) * (W - 2*padX);
-  const yOf = (w)  => H - padY - (w / maxW) * (H - 2*padY);
+  const xOf = (ts) => padX + ((ts - t0) / span) * (W - 2 * padX);
+  const yOf = (w)  => H - padB - (w / maxW) * (H - padT - padB);
+  const base = H - padB;
+  const allPts = points.map(p => [xOf(p.ts), yOf(p.w)]);
 
+  const nowX = nowTs == null ? null : Math.min(Math.max(xOf(nowTs), padX), W - padX);
+  const sunY = nowX == null ? null : _spkYAt(allPts, nowX);
+
+  // Split the curve at "now". Both halves are anchored to the exact arc point
+  // at nowX so the realized fill and the dashed forecast meet cleanly.
+  let pastPts, futPts;
   if (nowTs == null) {
-    const pts = points.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
-    const area = `M${padX},${H - padY} L ${pts} L ${W - padX},${H - padY} Z`;
-    host.innerHTML = `
-      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
-        <path d="${area}" fill="rgba(210,153,34,0.18)"/>
-        <polyline points="${pts}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>
-      </svg>`;
-    return;
+    pastPts = allPts; futPts = [];
+  } else {
+    pastPts = points.filter(p => p.ts <= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
+    futPts  = points.filter(p => p.ts >= nowTs).map(p => [xOf(p.ts), yOf(p.w)]);
+    pastPts.push([nowX, sunY]);
+    futPts.unshift([nowX, sunY]);
   }
 
-  const past   = points.filter(p => p.ts <= nowTs);
-  const future = points.filter(p => p.ts >= nowTs);
-  const pastStr   = past.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
-  const futureStr = future.map(p => `${xOf(p.ts).toFixed(1)},${yOf(p.w).toFixed(1)}`).join(" ");
-  const nowX = Math.min(Math.max(xOf(nowTs), padX), W - padX);
-  // Area only under the past, emphasises what has actually happened.
-  const pastArea = past.length
-    ? `<path d="M${xOf(past[0].ts).toFixed(1)},${H - padY} L ${pastStr} L ${nowX.toFixed(1)},${H - padY} Z" fill="rgba(210,153,34,0.18)"/>`
-    : "";
+  const pastLine = _spkSmooth(pastPts);
+  const futLine  = _spkSmooth(futPts);
+  const lastX = (pastPts[pastPts.length - 1] || [padX, base])[0];
+  const realArea = `${pastLine} L${lastX.toFixed(2)},${base} L${padX},${base} Z`;
+  const g = "s" + (++_spkUid);
+
   host.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" width="100%" height="${H}">
-      ${pastArea}
-      ${past.length   ? `<polyline points="${pastStr}"   fill="none" stroke="#d29922" stroke-width="1.8" stroke-linejoin="round"/>` : ""}
-      ${future.length ? `<polyline points="${futureStr}" fill="none" stroke="#d29922" stroke-width="1.6" stroke-linejoin="round" stroke-dasharray="3 3" opacity="0.55"/>` : ""}
-      <line x1="${nowX.toFixed(1)}" y1="${padY}" x2="${nowX.toFixed(1)}" y2="${H - padY}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="2 2" opacity="0.5"/>
-    </svg>`;
+  <svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">
+    <defs>
+      <linearGradient id="fill${g}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%"   stop-color="rgba(245,180,40,0.42)"/>
+        <stop offset="55%"  stop-color="rgba(210,153,34,0.16)"/>
+        <stop offset="100%" stop-color="rgba(210,153,34,0)"/>
+      </linearGradient>
+      <radialGradient id="sun${g}" cx="50%" cy="50%" r="50%">
+        <stop offset="0%"   stop-color="#fff4d6"/>
+        <stop offset="45%"  stop-color="#ffd166"/>
+        <stop offset="100%" stop-color="#f5a623"/>
+      </radialGradient>
+      <filter id="glow${g}" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="4.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <path d="${realArea}" fill="url(#fill${g})"/>
+    <path d="${pastLine}" fill="none" stroke="#f0b429" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    ${futPts.length > 1 ? `<path d="${futLine}" fill="none" stroke="#d29922" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5" opacity="0.5"/>` : ""}
+    <line x1="${padX}" y1="${(base + 0.5).toFixed(1)}" x2="${W - padX}" y2="${(base + 0.5).toFixed(1)}" stroke="rgba(125,133,144,0.25)" stroke-width="1"/>
+    ${nowTs == null ? "" : `
+    <g filter="url(#glow${g})">
+      <circle cx="${nowX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="9" fill="url(#sun${g})"/>
+      <circle cx="${nowX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="9" fill="none" stroke="rgba(255,244,214,0.9)" stroke-width="1"/>
+    </g>`}
+  </svg>`;
 }
 
 // ---------- ALERTS ----------
