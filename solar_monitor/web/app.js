@@ -1768,7 +1768,6 @@ function renderFlow(targetHost) {
     host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
     if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
   }
-  _renderFlowToggle(host, reactorOn);
 
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
@@ -1871,13 +1870,16 @@ function buildFlowReactor(model, opts) {
   const stateLabel = charging ? "CHARGING" : discharging ? "DISCHARGING" : "HOLDING";
 
   const vertical = (window.innerWidth || 1000) < 640;
-  // H tall enough that the ambient glow + widest ripple (≈R+88) fit inside
-  // the viewBox, so they don't bleed past the panel onto whatever's below.
-  const W = vertical ? 380 : 960, H = vertical ? 470 : 440;
+  // H tall enough that the ambient glow + widest ripple fit inside the viewBox
+  // (no bleed past the panel). Vertical (phone) gets extra height + a smaller
+  // core + tighter ripples so the Solar/Loads nodes and their labels clear the
+  // core and don't crowd the panel edges.
+  const W = vertical ? 380 : 960, H = vertical ? 560 : 440;
   const C = { x: W / 2, y: H * 0.50 };
-  const R = vertical ? Math.min(W * 0.26, 112) : Math.min(H * 0.36, 130);
-  const S = vertical ? { x: W / 2, y: H * 0.13 } : { x: W * 0.15, y: H * 0.50 };
-  const L = vertical ? { x: W / 2, y: H * 0.87 } : { x: W * 0.85, y: H * 0.50 };
+  const R = vertical ? 96 : Math.min(H * 0.36, 130);
+  const ripMax = vertical ? 48 : 80;
+  const S = vertical ? { x: W / 2, y: 100 }     : { x: W * 0.15, y: H * 0.50 };
+  const L = vertical ? { x: W / 2, y: H - 100 } : { x: W * 0.85, y: H * 0.50 };
   const maxFlow = Math.max(solar, loadTotal, Math.abs(battW), 120);
   const showIn = solar > 4, showOut = loadTotal > 4;
   const unit = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
@@ -1886,7 +1888,7 @@ function buildFlowReactor(model, opts) {
   const inA = _pfArc({ x: S.x + uS.x * INSET, y: S.y + uS.y * INSET }, { x: C.x - uS.x * (R + 6), y: C.y - uS.y * (R + 6) }, vertical ? 34 : 30);
   const uL = unit(C, L);
   const outA = _pfArc({ x: C.x + uL.x * (R + 6), y: C.y + uL.y * (R + 6) }, { x: L.x - uL.x * INSET, y: L.y - uL.y * INSET }, vertical ? -34 : 30);
-  const rip = charging ? { from: R + 6, to: R + 80 } : discharging ? { from: R + 80, to: R + 6 } : { from: R + 10, to: R + 50 };
+  const rip = charging ? { from: R + 6, to: R + ripMax } : discharging ? { from: R + ripMax, to: R + 6 } : { from: R + 10, to: R + Math.min(50, ripMax) };
   const cometCount = (p) => Math.max(1, Math.min(6, Math.round(p / maxFlow * 5) + 1));
   const cometDur   = (p) => (1.9 - (p / maxFlow) * 0.9).toFixed(2);
 
@@ -1963,7 +1965,7 @@ function buildFlowReactor(model, opts) {
     "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.82" });
   t3.textContent = (battW > 0 ? "+" : "") + battW + " W"; svg.appendChild(t3);
 
-  function node(pt, label, valW, colorVar, dim, iconKey) {
+  function node(pt, label, valW, colorVar, dim, iconKey, above) {
     const g = _pfEl("g", { class: "pf-node" + (dim ? " is-off" : "") });
     g.appendChild(_pfEl("circle", { cx: pt.x, cy: pt.y, r: "28", fill: "var(--pf-node-bg)", stroke: colorVar, "stroke-width": "1.6" }));
     // icon disc (reuse our ICONS; 24×24 scaled to ~22, centred in the disc)
@@ -1972,33 +1974,22 @@ function buildFlowReactor(model, opts) {
       style: `color: ${colorVar}; stroke: ${colorVar}` });
     ig.innerHTML = _pfIconInner(iconKey);
     g.appendChild(ig);
-    const lab = _pfEl("text", { x: pt.x, y: pt.y + 48, "text-anchor": "middle", "font-size": "13",
+    // Labels below the disc by default; above it when `above` (the top node on
+    // the vertical/phone layout) so they sit away from the core, not over it.
+    const ly = above ? -48 : 48, vy = above ? -68 : 67;
+    const lab = _pfEl("text", { x: pt.x, y: pt.y + ly, "text-anchor": "middle", "font-size": "13",
       fill: "var(--text-3)", "font-weight": "600" }); lab.textContent = label; g.appendChild(lab);
-    const val = _pfEl("text", { x: pt.x, y: pt.y + 67, "text-anchor": "middle", "font-size": "17",
+    const val = _pfEl("text", { x: pt.x, y: pt.y + vy, "text-anchor": "middle", "font-size": "17",
       "font-weight": "700", fill: colorVar }); val.textContent = _pfFmtW(valW); g.appendChild(val);
     return g;
   }
-  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn, "sun"));
-  svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut, "plug"));
+  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn, "sun", vertical));
+  svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut, "house", false));
 
   const stage = document.createElement("div");
   stage.className = "pf-reactor-stage";
   stage.appendChild(svg);
   return stage;
-}
-
-// Small toggle to flip reactor <-> classic flow live (for comparing).
-function _renderFlowToggle(host, reactorOn) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "pf-style-toggle";
-  btn.textContent = reactorOn ? "Classic view" : "Reactor view";
-  btn.title = "Switch power-flow style";
-  btn.addEventListener("click", () => {
-    localStorage.setItem("wp-flow-reactor", reactorOn ? "0" : "1");
-    renderFlow();
-  });
-  host.appendChild(btn);
 }
 
 // Slim 3-item flow breakdown shown under the reactor — Solar / battery
