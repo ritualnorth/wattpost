@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.9] - 2026-06-11
+
+Beta — mobile dashboard polish.
+
+### Fixed
+- **Bank stat box fits its content.** A long battery-model name (e.g.
+  `3× RBT100LFP12S`) overflowed the box at the big tabular size; it now uses a
+  smaller wrapping treatment so the model name stays inside the box.
+- **Top/bottom bars are anchored, not floating.** The fixed top and bottom bars
+  are now solid instead of translucent, so content no longer ghosts through
+  them while scrolling, and the first panel gets a clear gap below the top bar
+  instead of tucking under it.
+
 ## [0.1.169-beta.8] - 2026-06-11
 
 Beta — fix an in-place update leaving the old daemon running.

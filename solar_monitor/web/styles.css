@@ -573,6 +573,10 @@ body.is-demo #settings-update-apply { display: none !important; }
     border-bottom: none;
     border-top: 1px solid var(--border);
     overflow-x: hidden;
+    /* Solid (not the translucent --header-bg): a see-through blurred bar reads
+       as "floating" over the content scrolling beneath it. Opaque + the top
+       border anchors it to the bottom edge like a native tab bar. */
+    background: var(--bg);
   }
   .app-nav .brand { display: none; }
   /* Bar is just the tabs; status lives in Settings (+ the Settings-tab dot). */
@@ -616,14 +620,18 @@ body.is-demo #settings-update-apply { display: none !important; }
     bottom: auto;
     z-index: 41;
     gap: .5rem;
+    /* Solid, matching the bottom bar — content shouldn't ghost through it. */
+    background: var(--bg);
   }
 
   /* Clear both fixed bars (top bar + bottom tab bar), incl. the notch and
      home-indicator safe areas. `body main` outranks the global `main` padding
-     but not `body.kiosk-active main`, so kiosk stays chrome-free. */
+     but not `body.kiosk-active main`, so kiosk stays chrome-free. The top
+     value gives a clear gap below the bar so the first panel isn't tucked
+     under it. */
   body main {
-    padding-top: calc(58px + env(safe-area-inset-top));
-    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+    padding-top: calc(74px + env(safe-area-inset-top));
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
   }
 }
 
@@ -5210,3 +5218,14 @@ body.combined-flow #flow-panel .panel-header { display: none; }
 .pf-reactor-svg text { font-family: var(--font); }
 .pf-reactor-svg .pf-num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .pf-statv { font-family: var(--mono); }
+/* Text-valued stat box (the Bank model string) — not a number, so step down
+   from the big tabular figure and let a long model name wrap inside the box
+   instead of spilling past its right edge. */
+.pf-statbox--text .pf-statv {
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}

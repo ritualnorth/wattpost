@@ -2043,8 +2043,12 @@ function buildCombinedStats() {
   const g = (id) => (document.getElementById(id)?.textContent || "·").trim();
   const row = document.createElement("div");
   row.className = "pf-statrow";
-  const box = (k, valId, unit, sub, withBar) => {
+  const box = (k, valId, unit, sub, withBar, isText) => {
     const b = document.createElement("div"); b.className = "pf-statbox";
+    // Text values (e.g. the battery model on the Bank box) aren't numbers —
+    // they overflow the box at the big tabular size, so flag them for a
+    // smaller, wrapping treatment.
+    if (isText) b.classList.add("pf-statbox--text");
     const kk = document.createElement("div"); kk.className = "pf-statk"; kk.textContent = k; b.appendChild(kk);
     const vv = document.createElement("div"); vv.className = "pf-statv"; vv.textContent = g(valId);
     if (unit) { const u = document.createElement("span"); u.className = "pf-statu"; u.textContent = unit; vv.appendChild(u); }
@@ -2064,7 +2068,7 @@ function buildCombinedStats() {
   row.appendChild(box("Remaining", "bank-time", "", g("bank-time-sub"), true));
   row.appendChild(box("Voltage", "bank-voltage", "V", ""));
   row.appendChild(box("Remaining", "bank-remaining", "Ah", "of " + g("bank-capacity") + " Ah usable"));
-  row.appendChild(box("Bank", "bank-meta", "", ""));
+  row.appendChild(box("Bank", "bank-meta", "", "", false, true));
   return row;
 }
 function buildFlowSvgV2(model, opts) {
