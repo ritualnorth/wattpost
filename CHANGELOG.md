@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.4] - 2026-06-11
+
+Beta — the dashboard top bar and hero finish the redesign.
+
+### Changed
+- **Power flow and hero are one panel.** The hero's headline stats now live in
+  boxes along the bottom of the reactor instead of a separate block above it.
+- **Top bar reworked.** Brand on the left, the page tabs beside it, and the
+  connection status pill + help on the right — one bar, no separate header. The
+  bar sits a touch taller.
+
+### Fixed
+- **Status pill updates again.** When status moved into Settings the pill on the
+  bar stopped being written to and sat on "connecting…" forever; it now tracks
+  the live state (Healthy / Comms slow / Stale / …) alongside the Settings row.
+
 ## [0.1.169-beta.3] - 2026-06-11
 
 Beta — a redesigned power flow + hero, and a batch of appliance fixes.
