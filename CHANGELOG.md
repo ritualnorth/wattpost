@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.5] - 2026-06-11
+
+Beta — the Today graph becomes the sun's arc.
+
+### Changed
+- **Today graph drawn as the sun's arc.** The harvested-today sparkline is now
+  a smooth curve from sunrise to sunset: a glowing fill under the energy banked
+  so far, the forecast continuing as a faint dashed arc, and the sun itself
+  riding the curve at the current time.
+
 ## [0.1.169-beta.4] - 2026-06-11
 
 Beta — the dashboard top bar and hero finish the redesign.
