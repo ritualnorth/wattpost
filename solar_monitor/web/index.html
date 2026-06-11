@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=173" />
+  <link rel="stylesheet" href="/web/styles.css?v=174" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -140,23 +140,6 @@
   </div>
 
   <header class="app-header">
-    <div class="brand" id="app-brand">
-      <!-- White-label users on Installer tier replace the SVG with
-           their own logo URL + the title with brand_name. Default
-           WattPost mark stays as-is for everyone else. JS swaps via
-           /api/branding on page load. -->
-      <svg class="logo" id="app-brand-logo-default" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-           aria-label="WattPost">
-        <rect x="2" y="3" width="20" height="12" rx="1"/>
-        <line x1="7" y1="15" x2="7" y2="22"/>
-        <line x1="17" y1="15" x2="17" y2="22"/>
-        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
-              fill="currentColor" stroke="none"/>
-      </svg>
-      <img class="logo" id="app-brand-logo-custom" alt="" hidden />
-      <span class="title" id="app-brand-title">WattPost</span>
-    </div>
     <button id="status" class="status" type="button" title="What does this mean? Tap for status guide">
       <span class="dot"></span>
       <span class="status-icon"></span>
@@ -201,6 +184,23 @@
   </header>
 
   <nav class="app-nav" aria-label="Primary">
+    <!-- Brand lives in the nav so desktop is a single top bar (logo left,
+         tabs right). Hidden on phones, where the tabs are the whole bar.
+         White-label users on Installer tier swap the SVG/title via
+         /api/branding (JS) — ids unchanged from when this sat in <header>. -->
+    <div class="brand" id="app-brand">
+      <svg class="logo" id="app-brand-logo-default" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+           aria-label="WattPost">
+        <rect x="2" y="3" width="20" height="12" rx="1"/>
+        <line x1="7" y1="15" x2="7" y2="22"/>
+        <line x1="17" y1="15" x2="17" y2="22"/>
+        <path d="M13 5 L8 10 L11 10 L9 13 L15 8 L12 8 Z"
+              fill="currentColor" stroke="none"/>
+      </svg>
+      <img class="logo" id="app-brand-logo-custom" alt="" hidden />
+      <span class="title" id="app-brand-title">WattPost</span>
+    </div>
     <a class="nav-tab" data-tab="dashboard" href="#/">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>
       <span>Dashboard</span>

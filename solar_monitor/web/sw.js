@@ -18,7 +18,7 @@
 // the inner cache-busters (?v=NN) don't help if the cached index.html
 // itself is what's stale. Suffix corresponds to the current app.js
 // version so future-me can see at a glance what's pinned.
-const CACHE_VERSION = 'wattpost-v157-app260-css173';
+const CACHE_VERSION = 'wattpost-v158-app260-css174';
 const SHELL = [
   '/',
   '/web/styles.css',

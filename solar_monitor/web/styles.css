@@ -327,7 +327,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   -webkit-backdrop-filter: blur(12px);
 }
 .brand { display: flex; align-items: center; gap: .5rem; min-width: 0; margin-right: auto; }
-.brand .logo { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
+.brand .logo { width: 24px; height: 24px; color: var(--accent); flex-shrink: 0; }
 .brand .title {
   font-weight: 600;
   font-size: 0.95rem;
@@ -343,32 +343,24 @@ body.is-demo #settings-update-apply { display: none !important; }
   /* Very narrow: hide the wordmark, just show the logo icon */
   .brand .title { display: none; }
 }
-/* System status + help moved into Settings ("System status" block) so the
-   top bar is just brand + tabs. Hide them in the header everywhere; the live
-   status now drives a dot on the Settings tab (below) instead. */
-.app-header #status,
-.app-header .help-btn { display: none; }
-
-/* Phones: with status/help gone the header is just the brand — drop the whole
-   header and let the nav tabs be the top bar (lifts the menu up, no clutter).
-   Desktop keeps the brand row (there's room). */
-@media (max-width: 640px) {
-  .app-header { display: none; }
-  /* The nav's sticky `top: 0` override lives just after the base .app-nav
-     rule below (source order), so it actually wins over its `top: 56px`. */
-}
+/* System status + help moved into Settings ("System status" block), and the
+   brand now lives inside the nav (one top bar: logo + tabs). The old header
+   is empty chrome — drop it on every width. The status pill / help button /
+   status-legend popover still exist in the DOM (hidden) so the JS that wires
+   them stays harmless; the live status now drives a dot on the Settings tab. */
+.app-header { display: none; }
 
 /* Settings-tab alert dot: surfaces a not-healthy system status at a glance
-   now the status pill isn't in the header. */
+   now the status pill isn't in the header. Sits top-right of the pill. */
 .nav-tab { position: relative; }
 .nav-tab.nav-alert-warn::after,
 .nav-tab.nav-alert-err::after {
   content: "";
   position: absolute;
-  top: 0.4rem;
-  right: 0.55rem;
-  width: 7px;
-  height: 7px;
+  top: 0.3rem;
+  right: 0.45rem;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
 }
 .nav-tab.nav-alert-warn::after { background: var(--amber); }
@@ -502,63 +494,71 @@ body.is-demo #settings-update-apply { display: none !important; }
 
 /* ---------------- nav (tabs) ---------------- */
 .app-nav {
+  /* The single top bar now the header's gone: brand on the left (desktop),
+     tabs grouped to the right via the brand's margin-right:auto. Sticks to
+     the very top. */
   position: sticky;
-  top: 56px;  /* below the header */
-  /* Above .sec-nav (20) + open menu (30); just under .app-header (41)
-     so the tabs stay layered correctly while clipping scroll content. */
-  z-index: 40;
+  top: 0;
+  z-index: 41;
   display: flex;
-  gap: 0;
-  padding: 0 1.5rem;
+  align-items: center;
+  gap: .25rem;
+  /* Side padding scales with the device safe area so the OS cutout doesn't
+     draw over the tabs in the Capacitor WebView; env() is 0 in browsers. */
+  padding:
+    .5rem
+    max(1.25rem, env(safe-area-inset-right))
+    .5rem
+    max(1.25rem, env(safe-area-inset-left));
   background: var(--header-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
 .app-nav::-webkit-scrollbar { display: none; }
-/* Phones hide the header, so the tabs must stick to the very top, not 56px
-   down where the header used to be — otherwise that offset shows as an empty
-   band above the tabs and the sticky bar floats over the scrolling content. */
-@media (max-width: 640px) { .app-nav { top: 0; } }
+/* Brand inside the nav: visible on desktop, hidden on phones where the tabs
+   are the whole bar. nudge it a touch from the first tab. */
+.app-nav .brand { margin-right: auto; padding-right: .75rem; }
 .nav-tab {
   display: inline-flex; align-items: center; gap: .45rem;
-  padding: .85rem 1rem .75rem;
+  padding: .5rem .8rem;
+  border-radius: 9px;
   color: var(--text-3);
   text-decoration: none;
   font-size: .88rem;
   font-weight: 500;
-  border-bottom: 2px solid transparent;
   white-space: nowrap;
-  transition: color 0.18s, border-color 0.18s;
+  transition: color .15s, background .15s;
 }
 .nav-tab svg {
   width: 16px; height: 16px;
   flex-shrink: 0;
 }
-.nav-tab:hover { color: var(--text-2); }
+.nav-tab:hover { color: var(--text); background: var(--surface-2); }
 .nav-tab.active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  font-weight: 600;
+  /* Soft accent-tinted pill — replaces the old underline, reads as a modern
+     segmented control. Falls back to the flat surface tint where color-mix
+     isn't supported. */
+  background: var(--surface-2);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-@media (max-width: 600px) {
-  /* Equal-width tabs across the full viewport on phones, no horizontal
-   * scroll, no edge-flush tabs, no truncated labels.
-   *
-   * Icons are hidden at this breakpoint so the longest label
-   * ("Dashboard") fits its 25% share without ellipsis. The active tab
-   * remains obvious via its blue underline + text colour.
+@media (max-width: 640px) {
+  /* Phones: brand hidden, tabs become an equal-width segmented bar across the
+   * full viewport, no horizontal scroll, no truncated labels. Icons are
+   * dropped so the longest label ("Dashboard") fits its 25% share. The active
+   * tab stays obvious via its tinted pill + accent text.
    */
-  .app-nav {
-    padding: 0 .5rem;
-    gap: 0;
-  }
+  .app-nav { gap: .25rem; padding-left: .5rem; padding-right: .5rem; }
+  .app-nav .brand { display: none; }
   .nav-tab {
     flex: 1 1 0;
     justify-content: center;
     gap: 0;
-    padding: .85rem .35rem .7rem;
+    padding: .6rem .35rem;
     font-size: .85rem;
     min-width: 0;
   }
