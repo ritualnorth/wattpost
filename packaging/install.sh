@@ -84,6 +84,30 @@ if ! getent group bluetooth >/dev/null; then
 fi
 usermod -a -G bluetooth "${APP_USER}"
 
+# BlueZ controller auto-power. The daemon polls BLE gear (Renogy, BMS, shunts)
+# through bleak, which needs a *powered* controller — if it's powered off
+# every poll fails with POWERED_OFF and the device shows OFFLINE. BlueZ does
+# not reliably power the controller after a reboot or a `bluetooth` restart
+# unless `[Policy] AutoEnable=true` is set, and it ships commented out. Make it
+# explicit so a box always polls its solar gear across reboots. Pi/Debian only
+# (skipped where BlueZ isn't installed, e.g. Docker — BLE no-ops there anyway).
+BT_CONF=/etc/bluetooth/main.conf
+if [ -f "${BT_CONF}" ]; then
+    step "ensuring BlueZ AutoEnable=true (BLE polling survives reboots)"
+    if grep -q '^\[Policy\]' "${BT_CONF}"; then
+        if grep -qiE '^#?\s*AutoEnable' "${BT_CONF}"; then
+            sed -i -E 's/^#?\s*AutoEnable.*/AutoEnable=true/I' "${BT_CONF}"
+        else
+            sed -i '/^\[Policy\]/a AutoEnable=true' "${BT_CONF}"
+        fi
+    else
+        printf '\n[Policy]\nAutoEnable=true\n' >> "${BT_CONF}"
+    fi
+    # Power it on now too (best-effort; don't restart bluetooth.service — that
+    # would briefly drop any in-flight BLE poll on a live re-run).
+    command -v bluetoothctl >/dev/null 2>&1 && bluetoothctl power on >/dev/null 2>&1 || true
+fi
+
 # Serial access for a USB GPS (NMEA over /dev/ttyACM*/ttyUSB*, group
 # 'dialout') and USB-RS485 charge controllers. Without this the daemon
 # can't open the receiver / controller.
