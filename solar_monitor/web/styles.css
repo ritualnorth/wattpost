@@ -5084,3 +5084,39 @@ html.in-wattpost-app .container {
 [data-route-sub="backup"] .settings-block--backup > h3,
 [data-route-sub="integrations"] .settings-block[data-subroute="integrations"] > h3,
 [data-route-sub="devices"] .settings-block--cta > h3 { display: none; }
+
+/* ===================== Reactor power flow (#design) =====================
+ * The Core-reactor power-flow viz. Flow colours are shared across themes
+ * (saturated, read on light + dark); only the faint guide lines adapt.
+ * Animations are SVG/SMIL (built in app.js buildFlowReactor) so this is
+ * just colour + layout. Toggled against the classic flow via .pf-style-toggle.
+ */
+:root {
+  --pf-solar:#f5c542;     --pf-solar-2:#ffd968;
+  --pf-charge:#45d178;    --pf-charge-2:#6ff09a;
+  --pf-load:#9d8dff;      --pf-load-2:#bcb0ff;
+  --pf-discharge:#ff6f9d; --pf-discharge-2:#ff95b6;
+  --pf-critical:#ff6b63;  --pf-critical-2:#ff9a94;
+  --pf-hold:#58a6ff;      --pf-hold-2:#9cc7ff;
+  --pf-orbit:      rgba(255,255,255,.05);
+  --pf-ring-track: rgba(255,255,255,.08);
+  --pf-node-bg:    var(--surface-2);
+}
+[data-theme="light"] {
+  --pf-orbit:      rgba(20,30,50,.08);
+  --pf-ring-track: rgba(20,30,50,.12);
+}
+.flow { position: relative; }
+.pf-reactor-stage { width: 100%; }
+.pf-reactor-svg   { width: 100%; height: auto; display: block; overflow: visible; }
+.pf-comet { will-change: transform, opacity; }
+.pf-node.is-off { opacity: .45; }
+.pf-style-toggle {
+  position: absolute; top: 4px; right: 4px; z-index: 3;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-3); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 5px 9px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.pf-style-toggle:hover { color: var(--text); border-color: var(--border-2); background: var(--surface-3); }

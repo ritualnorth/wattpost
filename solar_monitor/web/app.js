@@ -1758,8 +1758,14 @@ function renderFlow(targetHost) {
     return;
   }
 
-  host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
+  const reactorOn = localStorage.getItem("wp-flow-reactor") !== "0";
+  if (reactorOn) {
+    host.appendChild(buildFlowReactor(model, { battNetW }));
+  } else {
+    host.appendChild(buildFlowSvgV2(model, { showBattInSvg, battNetW }));
+  }
   if (model.bank) host.appendChild(buildBatCard(model.bank, battNetW));
+  _renderFlowToggle(host, reactorOn);
 
   const parts = [];
   if (hasSources) parts.push(`${model.sources.length} source${model.sources.length === 1 ? "" : "s"} · ${totalSourceW.toFixed(0)} W in`);
@@ -1805,6 +1811,178 @@ const FLOW_COLOR = {
   neutral:   "#6c7689",
   silent:    "#6c7689",
 };
+
+// ===================== Reactor power flow (#design) =====================
+// The battery as a pulsing core: solar feeds in from one side, loads draw
+// from the other; comet density/speed + ripple direction + core glow track
+// live watts. SVG + SMIL only (no canvas) so it stays light on the Pi and on
+// phone battery. Ported from the "Core" power-flow concept. Toggled
+// against the classic flow via the button in the panel header
+// (localStorage wp-flow-reactor; default on).
+const _PF_NS = "http://www.w3.org/2000/svg";
+let _pfUid = 0;
+function _pfEl(tag, attrs, kids) {
+  const e = document.createElementNS(_PF_NS, tag);
+  if (attrs) for (const k in attrs) if (attrs[k] != null) e.setAttribute(k, String(attrs[k]));
+  if (kids) for (const c of kids) if (c) e.appendChild(c);
+  return e;
+}
+function _pfAnim(attr, dur, vals, begin, keyTimes) {
+  const a = { attributeName: attr, dur, repeatCount: "indefinite", values: vals };
+  if (begin) a.begin = begin;
+  if (keyTimes) a.keyTimes = keyTimes;
+  return _pfEl("animate", a);
+}
+function _pfArc(a, b, bow) {
+  const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1;
+  const nx = -dy / l, ny = dx / l;
+  const c1x = a.x + dx * 0.32 + nx * bow, c1y = a.y + dy * 0.32 + ny * bow;
+  const c2x = a.x + dx * 0.68 + nx * bow, c2y = a.y + dy * 0.68 + ny * bow;
+  return `M ${a.x.toFixed(1)} ${a.y.toFixed(1)} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} `
+       + `${c2x.toFixed(1)} ${c2y.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+}
+function _pfFmtW(w) {
+  w = Math.round(w);
+  return Math.abs(w) >= 1000 ? (w / 1000).toFixed(1) + " kW" : w + " W";
+}
+function buildFlowReactor(model, opts) {
+  const animate = !(opts && opts.animate === false);
+  const uid = "pf" + (++_pfUid);
+  const solar     = (model.sources || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  const loadTotal = (model.loads   || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  const battW = Math.round((opts && opts.battNetW) || model.batteryNetW || 0);
+  const soc = model.bank ? Math.max(0, Math.min(100, +model.bank.soc || 0)) : 0;
+  const DB = 5;
+  const charging = battW > DB, discharging = battW < -DB;
+  const critical = discharging && soc <= 12;
+  const kind = charging ? "charge" : critical ? "crit" : discharging ? "discharge" : "hold";
+  const cv = { charge: ["--pf-charge", "--pf-charge-2"], discharge: ["--pf-discharge", "--pf-discharge-2"],
+               crit: ["--pf-critical", "--pf-critical-2"], hold: ["--pf-hold", "--pf-hold-2"] }[kind];
+  const sc = `var(${cv[0]})`, sc2 = `var(${cv[1]})`;
+  const stateLabel = charging ? "CHARGING" : discharging ? "DISCHARGING" : "HOLDING";
+
+  const vertical = (window.innerWidth || 1000) < 640;
+  const W = vertical ? 380 : 960, H = vertical ? 470 : 360;
+  const C = { x: W / 2, y: vertical ? H * 0.50 : H * 0.52 };
+  const R = vertical ? Math.min(W * 0.26, 112) : Math.min(H * 0.36, 130);
+  const S = vertical ? { x: W / 2, y: H * 0.13 } : { x: W * 0.15, y: H * 0.50 };
+  const L = vertical ? { x: W / 2, y: H * 0.87 } : { x: W * 0.85, y: H * 0.50 };
+  const maxFlow = Math.max(solar, loadTotal, Math.abs(battW), 120);
+  const showIn = solar > 4, showOut = loadTotal > 4;
+  const unit = (a, b) => { const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1; return { x: dx / l, y: dy / l }; };
+  const INSET = 34;
+  const uS = unit(S, C);
+  const inA = _pfArc({ x: S.x + uS.x * INSET, y: S.y + uS.y * INSET }, { x: C.x - uS.x * (R + 6), y: C.y - uS.y * (R + 6) }, vertical ? 34 : 30);
+  const uL = unit(C, L);
+  const outA = _pfArc({ x: C.x + uL.x * (R + 6), y: C.y + uL.y * (R + 6) }, { x: L.x - uL.x * INSET, y: L.y - uL.y * INSET }, vertical ? -34 : 30);
+  const rip = charging ? { from: R + 6, to: R + 80 } : discharging ? { from: R + 80, to: R + 6 } : { from: R + 10, to: R + 50 };
+  const cometCount = (p) => Math.max(1, Math.min(6, Math.round(p / maxFlow * 5) + 1));
+  const cometDur   = (p) => (1.9 - (p / maxFlow) * 0.9).toFixed(2);
+
+  const svg = _pfEl("svg", { class: "pf-reactor-svg", viewBox: `0 0 ${W} ${H}`,
+    preserveAspectRatio: "xMidYMid meet", role: "img",
+    "aria-label": `Power flow: ${stateLabel}, ${battW} watts, battery ${soc.toFixed(0)} percent` });
+
+  svg.appendChild(_pfEl("defs", null, [
+    _pfEl("radialGradient", { id: `${uid}-amb` }, [
+      _pfEl("stop", { offset: "0%",   "stop-color": sc2, "stop-opacity": "0.55" }),
+      _pfEl("stop", { offset: "45%",  "stop-color": sc,  "stop-opacity": "0.28" }),
+      _pfEl("stop", { offset: "100%", "stop-color": sc,  "stop-opacity": "0" }),
+    ]),
+    _pfEl("radialGradient", { id: `${uid}-disc` }, [
+      _pfEl("stop", { offset: "0%",   "stop-color": "#fff", "stop-opacity": "0.95" }),
+      _pfEl("stop", { offset: "42%",  "stop-color": sc2,    "stop-opacity": "0.92" }),
+      _pfEl("stop", { offset: "100%", "stop-color": sc,     "stop-opacity": "0.62" }),
+    ]),
+  ]));
+
+  const amb = _pfEl("circle", { cx: C.x, cy: C.y, r: R + 88, fill: `url(#${uid}-amb)` });
+  if (animate) amb.appendChild(_pfAnim("opacity", "3.4s", "0.42;0.7;0.42"));
+  svg.appendChild(amb);
+
+  if (animate) for (let i = 0; i < 3; i++) {
+    const c = _pfEl("circle", { cx: C.x, cy: C.y, fill: "none", stroke: sc, "stroke-width": "1.5" });
+    const b = `-${(i * 1.06).toFixed(2)}s`;
+    c.appendChild(_pfAnim("r", "3.2s", `${rip.from};${rip.to}`, b));
+    c.appendChild(_pfAnim("opacity", "3.2s", "0.45;0", b));
+    svg.appendChild(c);
+  }
+  svg.appendChild(_pfEl("circle", { cx: C.x, cy: C.y, r: R + 30, fill: "none",
+    stroke: "var(--pf-orbit)", "stroke-width": "1", "stroke-dasharray": "2 8" }));
+
+  function comets(path, n, dur, r, fillVar, fadeVals) {
+    for (let i = 0; i < n; i++) {
+      const b = `-${((i / n) * dur).toFixed(2)}s`;
+      const dot = _pfEl("circle", { r, fill: fillVar, class: "pf-comet",
+        style: `filter: drop-shadow(0 0 5px ${fillVar.replace(/-2\)$/, ")")})` });
+      dot.appendChild(_pfEl("animateMotion", { dur: `${dur}s`, begin: b, repeatCount: "indefinite", path }));
+      dot.appendChild(_pfAnim("opacity", `${dur}s`, fadeVals, b, "0;0.18;0.82;1"));
+      svg.appendChild(dot);
+    }
+  }
+  if (showIn) {
+    svg.appendChild(_pfEl("path", { d: inA, fill: "none", stroke: "var(--pf-solar)", "stroke-width": "2", opacity: "0.16" }));
+    if (animate) comets(inA, cometCount(solar), +cometDur(solar), "3.4", "var(--pf-solar-2)", "0;1;1;0.2");
+  }
+  if (showOut) {
+    svg.appendChild(_pfEl("path", { d: outA, fill: "none", stroke: "var(--pf-load)", "stroke-width": "2", opacity: "0.16" }));
+    if (animate) comets(outA, cometCount(loadTotal), +cometDur(loadTotal), "3.2", "var(--pf-load-2)", "0.2;1;1;0");
+  }
+
+  svg.appendChild(_pfEl("circle", { cx: C.x, cy: C.y, r: R, fill: "none", stroke: "var(--pf-ring-track)", "stroke-width": "9" }));
+  svg.appendChild(_pfEl("circle", { cx: C.x, cy: C.y, r: R, fill: "none", stroke: sc, "stroke-width": "9",
+    pathLength: "100", "stroke-dasharray": `${soc} 100`, "stroke-linecap": "round",
+    transform: `rotate(-90 ${C.x} ${C.y})`, class: "pf-soc-arc",
+    style: `filter: drop-shadow(0 0 8px ${sc}); transition: stroke-dasharray .9s cubic-bezier(.4,0,.2,1)` }));
+
+  const core = _pfEl("circle", { cx: C.x, cy: C.y, r: R - 18, fill: `url(#${uid}-disc)`, opacity: "0.92" });
+  if (animate) { core.appendChild(_pfAnim("r", "2.6s", `${R - 20};${R - 14};${R - 20}`));
+                 core.appendChild(_pfAnim("opacity", "2.6s", "0.84;0.98;0.84")); }
+  svg.appendChild(core);
+
+  const t1 = _pfEl("text", { x: C.x, y: C.y - 6, "text-anchor": "middle", "font-size": (R * 0.5).toFixed(0),
+    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.92" });
+  t1.textContent = soc.toFixed(0);
+  const u = _pfEl("tspan", { "font-size": (R * 0.24).toFixed(0), dy: "-2" }); u.textContent = "%"; t1.appendChild(u);
+  svg.appendChild(t1);
+  const t2 = _pfEl("text", { x: C.x, y: C.y + R * 0.26, "text-anchor": "middle", "font-size": (R * 0.14).toFixed(0),
+    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.62", "letter-spacing": "0.08em" });
+  t2.textContent = stateLabel; svg.appendChild(t2);
+  const t3 = _pfEl("text", { x: C.x, y: C.y + R * 0.46, "text-anchor": "middle", "font-size": (R * 0.15).toFixed(0),
+    "font-weight": "700", fill: "#0a0d12", "fill-opacity": "0.82" });
+  t3.textContent = (battW > 0 ? "+" : "") + battW + " W"; svg.appendChild(t3);
+
+  function node(pt, label, valW, colorVar, dim) {
+    const g = _pfEl("g", { class: "pf-node" + (dim ? " is-off" : "") });
+    g.appendChild(_pfEl("circle", { cx: pt.x, cy: pt.y, r: "28", fill: "var(--pf-node-bg)", stroke: colorVar, "stroke-width": "1.6" }));
+    const lab = _pfEl("text", { x: pt.x, y: pt.y + 48, "text-anchor": "middle", "font-size": "13",
+      fill: "var(--text-3)", "font-weight": "600" }); lab.textContent = label; g.appendChild(lab);
+    const val = _pfEl("text", { x: pt.x, y: pt.y + 67, "text-anchor": "middle", "font-size": "17",
+      "font-weight": "700", fill: colorVar }); val.textContent = _pfFmtW(valW); g.appendChild(val);
+    return g;
+  }
+  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn));
+  svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut));
+
+  const stage = document.createElement("div");
+  stage.className = "pf-reactor-stage";
+  stage.appendChild(svg);
+  return stage;
+}
+
+// Small toggle to flip reactor <-> classic flow live (for comparing).
+function _renderFlowToggle(host, reactorOn) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pf-style-toggle";
+  btn.textContent = reactorOn ? "Classic view" : "Reactor view";
+  btn.title = "Switch power-flow style";
+  btn.addEventListener("click", () => {
+    localStorage.setItem("wp-flow-reactor", reactorOn ? "0" : "1");
+    renderFlow();
+  });
+  host.appendChild(btn);
+}
 
 function buildFlowSvgV2(model, opts) {
   const { showBattInSvg, battNetW } = opts;
