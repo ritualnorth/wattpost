@@ -77,7 +77,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=169" />
+  <link rel="stylesheet" href="/web/styles.css?v=172" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -774,6 +774,27 @@
                out" up here means you don't accidentally walk away
                from an authed session on a shared tablet. -->
           <div class="settings-block" data-subroute="about">
+            <h3>System status</h3>
+            <button id="settings-status" class="status" type="button" style="margin:0 0 .55rem">
+              <span class="dot"></span>
+              <span class="status-icon"></span>
+              <span class="text">connecting…</span>
+            </button>
+            <ul class="status-legend-list">
+              <li><span class="status-legend-pill status-legend-pill--ok">Healthy</span> Latest poll succeeded and every device responded.</li>
+              <li><span class="status-legend-pill status-legend-pill--warn">Setup needed</span> No Bluetooth connection configured yet. Visit Settings → Setup and click "Find my dongle".</li>
+              <li><span class="status-legend-pill status-legend-pill--warn">BLE not connected</span> Configured but the dongle isn't reachable. Check the BT-2 is powered + in range.</li>
+              <li><span class="status-legend-pill status-legend-pill--warn">Comms slow</span> No successful poll in 2+ minutes. Usually a brief BLE wobble; clears next cycle.</li>
+              <li><span class="status-legend-pill status-legend-pill--warn">X errors</span> Last poll completed but some devices didn't reply.</li>
+              <li><span class="status-legend-pill status-legend-pill--err">Stale</span> No successful poll for 5+ minutes. Check Bluetooth power / range.</li>
+              <li><span class="status-legend-pill status-legend-pill--err">Offline</span> Scheduler isn't running. Restart the daemon below.</li>
+            </ul>
+            <a class="btn-action" href="#/docs" style="margin-top:.2rem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 5.8 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>
+              <span>Help &amp; documentation</span>
+            </a>
+          </div>
+          <div class="settings-block" data-subroute="about">
             <h3>Session &amp; system</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Restart the daemon to apply pending changes (new transports,
@@ -1429,6 +1450,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=259"></script>
+  <script src="/web/app.js?v=260"></script>
 </body>
 </html>

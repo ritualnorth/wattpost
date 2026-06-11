@@ -578,12 +578,24 @@ document.addEventListener("visibilitychange", () => {
 
 // ---------- status header ----------
 function setStatus(cls, text) {
-  const el = $("#status");
-  el.classList.remove("ok", "warn", "err");
-  if (cls) el.classList.add(cls);
-  el.querySelector(".text").textContent = text;
-  const iconHost = el.querySelector(".status-icon");
-  if (iconHost) iconHost.innerHTML = STATUS_ICONS[cls] || "";
+  // Status lives in Settings now (the header is just the tabs). Update the
+  // Settings status row, and badge the Settings tab with a colour dot when
+  // something needs attention so problems still surface at a glance.
+  const el = document.getElementById("settings-status");
+  if (el) {
+    el.classList.remove("ok", "warn", "err");
+    if (cls) el.classList.add(cls);
+    const t = el.querySelector(".text");
+    if (t) t.textContent = text;
+    const iconHost = el.querySelector(".status-icon");
+    if (iconHost) iconHost.innerHTML = STATUS_ICONS[cls] || "";
+  }
+  const tab = document.querySelector('.nav-tab[data-tab="settings"]');
+  if (tab) {
+    tab.classList.remove("nav-alert-warn", "nav-alert-err");
+    if (cls === "warn") tab.classList.add("nav-alert-warn");
+    else if (cls === "err") tab.classList.add("nav-alert-err");
+  }
 }
 
 // ---------- api ----------

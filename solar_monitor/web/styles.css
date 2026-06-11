@@ -343,6 +343,38 @@ body.is-demo #settings-update-apply { display: none !important; }
   /* Very narrow: hide the wordmark, just show the logo icon */
   .brand .title { display: none; }
 }
+/* System status + help moved into Settings ("System status" block) so the
+   top bar is just brand + tabs. Hide them in the header everywhere; the live
+   status now drives a dot on the Settings tab (below) instead. */
+.app-header #status,
+.app-header .help-btn { display: none; }
+
+/* Phones: with status/help gone the header is just the brand — drop the whole
+   header and let the nav tabs be the top bar (lifts the menu up, no clutter).
+   Desktop keeps the brand row (there's room). */
+@media (max-width: 640px) {
+  .app-header { display: none; }
+  /* No safe-area top here: in the app the in-app-browser toolbar sits above
+     this, and in a mobile browser the URL bar does — so the inset would just
+     leave an empty grey band above the tabs. */
+  .app-nav { top: 0; padding-top: 0.4rem; }
+}
+
+/* Settings-tab alert dot: surfaces a not-healthy system status at a glance
+   now the status pill isn't in the header. */
+.nav-tab { position: relative; }
+.nav-tab.nav-alert-warn::after,
+.nav-tab.nav-alert-err::after {
+  content: "";
+  position: absolute;
+  top: 0.4rem;
+  right: 0.55rem;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.nav-tab.nav-alert-warn::after { background: var(--amber); }
+.nav-tab.nav-alert-err::after  { background: var(--red); }
 
 .status {
   display: inline-flex; align-items: center; gap: .55rem;
