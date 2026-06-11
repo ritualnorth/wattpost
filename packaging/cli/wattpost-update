@@ -127,8 +127,14 @@ log "    active=${ACTIVE_NAME} → installing into inactive=${INACTIVE_NAME}"
 # than letting an update proceed with no extra safety net.
 log "    taking pre-update snapshot..."
 SNAP_PATH=""
-if sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
-        snapshot --config /etc/wattpost/config.yaml 2>&1 | tee -a "${LOG}" \
+# Run from the daemon's WorkingDirectory (${APP_ROOT}, matching
+# wattpost.service) so a relative db_path in config.yaml — the default is the
+# bare "solar-monitor.db" — resolves to the SAME database the daemon uses, and
+# the sibling "backups/" dir lands in a slot the wattpost user owns. Without
+# the cd, the snapshot resolved ./solar-monitor.db + ./backups against the
+# updater's cwd and died with PermissionError: 'backups' (#269 follow-up).
+if ( cd "${APP_ROOT}" && sudo -u "${APP_USER}" -n "${APP_ROOT}/venv/bin/solar-monitor" \
+        snapshot --config /etc/wattpost/config.yaml ) 2>&1 | tee -a "${LOG}" \
         | tail -1 > /tmp/wattpost-update-snap.$$; then
     SNAP_PATH=$(cat /tmp/wattpost-update-snap.$$)
     log "    pre-update snapshot ok: ${SNAP_PATH}"
