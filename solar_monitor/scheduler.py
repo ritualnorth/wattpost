@@ -20,7 +20,6 @@ from .gps import GpsService
 from .mqtt_in import MqttInService
 from .tunnel import TunnelService
 from .hotspot import HotspotService, AutoHandoffMonitor
-from .ble_gatt import BleGattService
 from .update import UpdateChecker
 from .config import Config, HotspotCfg
 from .export import EXPORTERS, Exporter
@@ -235,35 +234,6 @@ class PollScheduler:
             except Exception:
                 log.exception("hotspot auto-handoff failed to initialise")
 
-        # BLE GATT peripheral (#4): off-grid setup + status over Bluetooth, the
-        # bottom-but-one rung of the app's local-first connection ladder. The
-        # provisioning characteristics bridge to the privileged helper's
-        # wifi_scan/wifi_join, so only stand it up where that backend exists (a
-        # Pi install with the helper). It also no-ops without dbus_fast/BlueZ.
-        #
-        # Single radio: advertising as a peripheral contends with central-role
-        # polling — on a box already polling a BLE device, bringing the
-        # peripheral up turns clean poll timeouts into org.bluez InProgress
-        # errors. So only advertise when no BLE transport owns the radio, which
-        # is exactly the fresh/unprovisioned box that needs Bluetooth setup.
-        # (This doubles as the security window: a provisioned box isn't on the
-        # air.) A box that polls a BLE device AND wants to re-provision over
-        # Bluetooth needs a pause-polling-for-setup window — a later follow-up;
-        # for now it uses the setup AP / captive portal.
-        self._ble_gatt: BleGattService | None = None
-        try:
-            from . import helper_client
-            if not helper_client.is_available():
-                pass  # not a Pi install with the helper backend
-            elif self._ble_radio_in_use():
-                log.info("ble_gatt: a BLE transport owns this radio; peripheral "
-                         "left off to avoid single-radio contention (use the "
-                         "setup AP for WiFi changes)")
-            else:
-                self._ble_gatt = BleGattService(self._ble_status)
-        except Exception:
-            log.exception("ble_gatt service failed to initialise")
-
         # USB GPS (#125). Optional; off entirely when config.gps is
         # absent. On significant movement we mutate the weather +
         # forecast cfg in-memory and trigger one-shot re-fetches so
@@ -421,31 +391,6 @@ class PollScheduler:
             "solar_pause": self._last_solar_pause,
         }
 
-    def _ble_radio_in_use(self) -> bool:
-        """True if a configured transport polls over the Bluetooth radio, so
-        the BLE GATT peripheral must stay off to avoid contending for it. All
-        BLE central transports are named ble_*; hub_bt is the Bluetooth hub."""
-        for t in (self.config.transports or []):
-            ty = str(t.get("type", ""))
-            if ty.startswith("ble_") or ty == "hub_bt":
-                return True
-        return False
-
-    def _ble_status(self) -> dict[str, Any]:
-        """Status snapshot for the BLE Status characteristic. Sync + in-memory
-        only (it's read from the GATT dispatch path, not an async handler), so
-        it reports liveness + the last poll outcome rather than touching the
-        store. Headline numbers are surfaced best-effort: a key the last poll
-        result didn't carry is simply omitted."""
-        running = self._task is not None and not self._task.done()
-        out: dict[str, Any] = {"alive": True, "scheduler_running": running}
-        r = self._last_result
-        if isinstance(r, dict):
-            for k in ("ts", "soc_pct", "power_w", "alerts"):
-                if k in r:
-                    out[k] = r[k]
-        return out
-
     async def start(self) -> None:
         if self._task is not None and not self._task.done():
             return
@@ -503,8 +448,6 @@ class PollScheduler:
             await self._hotspot.start()
         if self._hotspot_handoff is not None:
             await self._hotspot_handoff.start()
-        if self._ble_gatt is not None:
-            await self._ble_gatt.start()
         if self._updater is not None:
             await self._updater.start()
 
@@ -568,8 +511,6 @@ class PollScheduler:
             await self._hotspot_handoff.stop()
         if self._hotspot is not None:
             await self._hotspot.stop()
-        if self._ble_gatt is not None:
-            await self._ble_gatt.stop()
         if self._updater is not None:
             await self._updater.stop()
 
