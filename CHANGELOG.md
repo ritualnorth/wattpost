@@ -8,6 +8,34 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.3] - 2026-06-11
+
+Beta — a redesigned power flow + hero, and a batch of appliance fixes.
+
+### Added
+- **Per-link kiosk themes.** Pick a theme (Halo / Ember / Command) when you
+  create a kiosk link, so each wall display can run its own skin off one box.
+
+### Changed
+- **New power-flow visualisation.** The sparse node graph is replaced by a
+  "reactor" — the battery as a glowing core, solar feeding in from one side,
+  loads drawing from the other, with motion that tracks live watts. Reads in
+  light + dark and reflows for phones.
+- **Hero matches the power flow.** State colours are now unified across the
+  dashboard — gold is reserved for solar and battery-discharge reads pink (it
+  used to be gold on the SoC ring). The Remaining tile gained a runway bar.
+
+### Fixed
+- **Copy buttons work on the box.** The "Copy" buttons for the kiosk link and
+  the rotated local password did nothing over plain http on the LAN; they now
+  copy with a fallback, so a half-copied kiosk token can't silently fail.
+- **Pre-update snapshot backs up the real database** before an update, instead
+  of failing — or, worse, snapshotting an empty file.
+- **A slot swap can't leave a stale dashboard** — web assets follow the live
+  slot rather than a path fixed at daemon startup.
+- **Bluetooth survives reboots.** The installer enables BlueZ AutoEnable, so a
+  box always re-powers its controller and keeps polling BLE gear after a reboot.
+
 ## [0.1.169-beta.2] - 2026-06-11
 
 Beta — dashboard top-bar redesign and an updater fix that keeps the
