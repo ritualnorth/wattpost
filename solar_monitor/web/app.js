@@ -8641,9 +8641,8 @@ if (rotatePwBtn) {
             Also written to <code>/etc/wattpost/web-password</code>
             inside the container (host bind-mount on Docker installs).
           </div>`;
-        out.querySelector(".rotate-pw-copy")?.addEventListener("click", () => {
-          navigator.clipboard?.writeText(j.password).catch(() => {});
-        });
+        out.querySelector(".rotate-pw-copy")?.addEventListener("click", (e) =>
+          copyToClipboard(j.password, e.currentTarget));
       }
     } catch (e) {
       alert("Couldn't rotate the password:\n\n" + (e.message || e));
@@ -8656,6 +8655,43 @@ if (rotatePwBtn) {
 // Kiosk display links (cloud #15). Mint a revocable, read-only kiosk
 // token, shown once as a full /kiosk?token=… URL; list + revoke the
 // existing ones. Lets off-grid wall displays in once login is mandatory.
+// Copy-to-clipboard that works on the appliance's plain-http LAN origin.
+// navigator.clipboard is gated to secure contexts (https / localhost), so on
+// http://<lan-ip> it's undefined and a naive writeText silently no-ops — which
+// is why the Copy buttons did nothing on the box (and people then hand-copied
+// a long kiosk token, missed a character, and the link 302'd). Fall back to a
+// hidden-textarea + execCommand('copy'), and give the button visual feedback.
+function _legacyCopy(text) {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-1000px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) { return false; }
+}
+function copyToClipboard(text, btn) {
+  const flash = (msg) => {
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = msg;
+    setTimeout(() => { btn.textContent = orig; }, 1600);
+  };
+  const ok = () => flash("Copied");
+  const fail = () => flash("Press ⌘/Ctrl+C");
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(ok, () => { _legacyCopy(text) ? ok() : fail(); });
+    return;
+  }
+  _legacyCopy(text) ? ok() : fail();
+}
 const _escHtmlMini = (s) => String(s).replace(/[<&>]/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[c]));
 async function loadKioskTokens() {
   const host = document.getElementById("kiosk-token-list");
@@ -8707,8 +8743,8 @@ if (kioskCreateBtn) {
           <code class="rotate-pw-code">${_escHtmlMini(url)}</code>
           <button class="rotate-pw-copy" type="button">Copy</button>
           <div class="rotate-pw-foot">Read-only, no login. Revoke any time below.</div>`;
-        out.querySelector(".rotate-pw-copy")?.addEventListener("click", () =>
-          navigator.clipboard?.writeText(url).catch(() => {}));
+        out.querySelector(".rotate-pw-copy")?.addEventListener("click", (e) =>
+          copyToClipboard(url, e.currentTarget));
       }
       loadKioskTokens();
     } catch (e) {
