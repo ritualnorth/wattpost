@@ -8,13 +8,37 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.1] - 2026-06-11
+
+Beta — network address control (static IP / DHCP, mDNS, scan-from-AP) and a
+heartbeat-size fix that keeps busy boxes online.
+
+### Added
+- **Set the box's IP from the dashboard.** Settings → Advanced → Network
+  lists the appliance's active connections and switches each between
+  automatic (DHCP) and a static IP, including the connection it's already on
+  (ethernet, or WiFi it already joined) — not only when joining a new
+  network. After an address change, reconnect at `http://wattpost.local`.
+- **`wattpost.local`.** The appliance advertises itself over mDNS, so it's
+  reachable by a stable name on the LAN and over its own hotspot without
+  knowing its IP address.
+- **Static IP when joining WiFi.** The WiFi-join flow gained an optional
+  static-IP block (address, subnet prefix, gateway, DNS).
+
 ### Fixed
 - WiFi scan no longer reports "none found" on a box whose WiFi radio is
-  powered down (ethernet boxes, or a box that fell back to other
-  connectivity). The scan now powers the radio on and triggers an active
-  rescan before listing, instead of only reporting NetworkManager's cached
-  results. (Scanning is still limited while the radio is busy as an AP — a
-  single radio can't beacon and rescan at once; tracked separately.)
+  powered down. The scan powers the radio on and triggers an active rescan
+  before listing, instead of returning only NetworkManager's cached results.
+- **Scanning while in hotspot mode.** A box serving its own AP can now scan
+  for WiFi: it briefly drops the AP, scans on the freed radio, then brings
+  the AP back (the device rejoins on its own). A single radio still can't
+  beacon and scan at once, so this is a short bounce rather than a live scan.
+- **Heartbeat stays within the cloud's size limit.** A busy multi-device box,
+  or one catching up after being offline, could exceed the cloud's heartbeat
+  cap, which rejected the whole heartbeat — so the box looked offline and
+  remote access could route to the wrong appliance. The appliance now keeps
+  the heartbeat in budget (trimming the largest non-essential fields and
+  uploading the signed-audit backlog in smaller batches).
 
 ## [0.1.168-beta.1] - 2026-06-09
 
