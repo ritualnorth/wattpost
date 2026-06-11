@@ -118,7 +118,17 @@ log = logging.getLogger(__name__)
 
 
 def _web_dir() -> Path:
-    return Path(__file__).resolve().parent.parent / "web"
+    # Deliberately NOT .resolve(): on the Pi the daemon runs from the
+    # /opt/wattpost symlink, so __file__ is /opt/wattpost/venv/.../app.py.
+    # .resolve() would canonicalise that symlink down to the concrete slot
+    # the daemon imported from (/opt/wattpost-slots/<x>), pinning the web
+    # directory — and the static-files router caches it at startup — to that
+    # slot. After an atomic slot swap the symlink moves but the resolved path
+    # doesn't, so /web/* keeps serving the OLD slot's assets until a restart
+    # (stale dashboard). Leaving the symlink unresolved means the OS follows
+    # the live symlink on every file open, so a swap is reflected immediately.
+    # No-op on Docker/dev where there's no slot symlink in the path.
+    return Path(__file__).parent.parent / "web"
 
 
 @get("/api/health", sync_to_thread=False)
