@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.12] - 2026-06-11
+
+Beta — fix the app-shell clipping the bottom bar on mobile browsers.
+
+### Fixed
+- **Bottom tab bar no longer clipped.** The mobile app-shell set the body to
+  `100dvh`, but the base `min-height: 100vh` (the URL-bar-hidden height) won out
+  and made the body taller than the visible area, pushing the bottom bar past
+  the fold where `overflow: hidden` clipped it. The shell now pins `min-height`
+  to the same dynamic height. Verified on the Android emulator: top + bottom
+  bars stay pinned across scroll, only the content scrolls.
+
 ## [0.1.169-beta.11] - 2026-06-11
 
 Beta — the mobile bottom bar stops floating during scroll.

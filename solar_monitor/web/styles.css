@@ -564,6 +564,13 @@ body.is-demo #settings-update-apply { display: none !important; }
     flex-direction: column;
     height: 100vh;          /* fallback for browsers without dvh */
     height: 100dvh;         /* tracks the visible area as the URL bar shows/hides */
+    /* MUST override the base `min-height: 100vh`. 100vh is the LARGE viewport
+       (URL-bar-hidden) height, so it would force the body taller than the
+       visible area while the URL bar is showing — pushing the bottom bar past
+       the fold where overflow:hidden clips it. Pin min-height to the same
+       dynamic height as height so the shell is exactly the visible area. */
+    min-height: 100vh;
+    min-height: 100dvh;
     overflow: hidden;       /* the page doesn't scroll; <main> does */
   }
 
