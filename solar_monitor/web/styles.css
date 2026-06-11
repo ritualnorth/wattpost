@@ -73,7 +73,7 @@
   --body-bg-glow-2: rgba(63,185,80,0.04);
   --donut-pulse-stroke:           #ffffff;
   --donut-pulse-charging-glow:    rgba(63,185,80,0.85);
-  --donut-pulse-discharging-glow: rgba(210,153,34,0.85);
+  --donut-pulse-discharging-glow: rgba(255,111,157,0.85);
 
   /* Type — Inter (bundled), Beszel's UI face */
   --font: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
@@ -139,10 +139,10 @@
      lighter than the ring stroke. */
   --donut-pulse-stroke:           #ffffff;
   --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
-  --donut-pulse-discharging-glow: rgba(154,103,0,0.7);
+  --donut-pulse-discharging-glow: rgba(255,111,157,0.6);
 }
 [data-theme="light"] .donut-state.charging .donut-pulse    { stroke: #5dd373; }
-[data-theme="light"] .donut-state.discharging .donut-pulse { stroke: #f1b73a; }
+[data-theme="light"] .donut-state.discharging .donut-pulse { stroke: #ff6f9d; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -677,7 +677,7 @@ main {
    under a `-k-` prefix so the two SVGs don't share defs. */
 .donut-state.charging    .donut-arc { stroke: url(#g-soc-charging);    filter: drop-shadow(0 0 10px rgba(86,211,100,0.50)); }
 .donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  rgba(88,166,255,0.35)); }
-.donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(240,200,73,0.50)); }
+.donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(255,111,157,0.50)); }
 .donut-state.critical    .donut-arc { stroke: url(#g-soc-critical);    filter: drop-shadow(0 0 12px rgba(255,123,114,0.65)); }
 .kiosk-donut.donut-state.charging    .donut-arc { stroke: url(#g-soc-k-charging); }
 .kiosk-donut.donut-state.holding     .donut-arc { stroke: url(#g-soc-k-holding); }
@@ -708,8 +708,8 @@ main {
 .donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.55); }
 .donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
 .donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.50); }
-.donut-state.discharging .donut-head      { fill: #f0c849; stroke: #ffffff; }
-.donut-state.discharging .donut-head-glow { fill: rgba(240,200,73,0.55); }
+.donut-state.discharging .donut-head      { fill: #ff6f9d; stroke: #ffffff; }
+.donut-state.discharging .donut-head-glow { fill: rgba(255,111,157,0.55); }
 .donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
 .donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.65); animation-duration: 900ms; }
 /* Decouple the leading-edge dot + halo colour from the arc colour
@@ -778,9 +778,9 @@ main {
   border-bottom: 7px solid currentColor;
 }
 .donut-state.discharging .donut-flow {
-  color: var(--amber);
-  border-color: rgba(210,153,34,0.45);
-  background: rgba(210,153,34,0.08);
+  color: #ff6f9d;
+  border-color: rgba(255,111,157,0.45);
+  background: rgba(255,111,157,0.08);
 }
 .donut-state.discharging .donut-flow-arrow::before {
   content: "";
@@ -890,7 +890,7 @@ main {
 
 /* Net power color cues */
 #bank-power-tile.charging .hero-stat-val { color: var(--green); }
-#bank-power-tile.discharging .hero-stat-val { color: var(--amber); }
+#bank-power-tile.discharging .hero-stat-val { color: #ff6f9d; }
 #bank-power-tile.idle .hero-stat-val { color: var(--text-2); }
 
 .meta-k {
@@ -5120,3 +5120,10 @@ html.in-wattpost-app .container {
 .pf-lg { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
 .pf-sw { width: 18px; height: 4px; border-radius: 2px; flex: none; }
 .pf-lg b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* Runway feature bar (hero) — SoC fill, state-coloured to match the donut + reactor */
+.hero-runway-bar { margin-top: 10px; height: 6px; border-radius: 4px; background: rgba(127,127,127,.16); overflow: hidden; }
+.hero-runway-bar i { display: block; height: 100%; border-radius: 4px; width: 0;
+  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+#bank-time-tile.charging    #bank-time-bar { background: linear-gradient(90deg, #2ea043, #6ff09a); }
+#bank-time-tile.discharging #bank-time-bar { background: linear-gradient(90deg, #e8497f, #ff95b6); }

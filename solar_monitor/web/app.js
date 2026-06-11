@@ -1344,6 +1344,11 @@ function renderHero() {
   const rem = computeRemaining(bank);
   $("#bank-time").textContent = rem.primary;
   $("#bank-time-sub").textContent = rem.secondary;
+  // Runway feature tile: state-coloured SoC fill bar (matches the donut/flow).
+  const timeTile = $("#bank-time-tile");
+  if (timeTile) { timeTile.classList.remove("charging", "discharging", "idle"); timeTile.classList.add(powerState); }
+  const timeBar = $("#bank-time-bar");
+  if (timeBar) timeBar.style.width = Math.max(3, Math.min(100, +bank.soc || 0)) + "%";
   // The forecast-aware line is populated by refreshRuntimeForecast()
   // on its own cadence, render here just keeps the existing values.
 
