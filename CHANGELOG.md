@@ -8,6 +8,16 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.7] - 2026-06-11
+
+Beta — mobile gets a top bar to go with the bottom tabs.
+
+### Changed
+- **Mobile top bar.** Phones now show a fixed top bar with the brand on the
+  left and the health pill + help on the right (alongside the bottom tab bar
+  added in beta.6) — the brand and "is it healthy?" sit where you glance, the
+  navigation where your thumb is.
+
 ## [0.1.169-beta.6] - 2026-06-11
 
 Beta — mobile nav moves to a bottom tab bar.
