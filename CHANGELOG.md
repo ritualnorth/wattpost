@@ -8,6 +8,18 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.169-beta.14] - 2026-06-11
+
+Beta — fix the whole mobile dashboard rendering oversized.
+
+### Fixed
+- **Mobile content sized to the viewport.** The base `main { margin: 0 auto }`
+  (desktop centering) broke the app-shell's flex-column stretch: auto horizontal
+  margins sized `main` to its widest content (~775px) instead of the screen, so
+  it overflowed and everything measuring 100% off it rendered huge ("whole home
+  page massive"). `main` is now pinned to the viewport width on phones. Verified
+  on the live box: main 775px → 390px, no overflow, reactor back to a sane size.
+
 ## [0.1.169-beta.13] - 2026-06-11
 
 Beta — fix the power-flow reactor rendering huge on iOS.

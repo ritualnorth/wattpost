@@ -647,10 +647,15 @@ body.is-demo #settings-update-apply { display: none !important; }
     order: 2;
     flex: 1 1 auto;
     min-height: 0;
-    /* min-width:0 stops a flex item from growing to its widest content (a
-       blown-up SVG would otherwise drag main — and everything measuring
-       100% off it — past the viewport). overflow-x:hidden clips any residue. */
     min-width: 0;
+    /* CRITICAL: the base `main { margin: 0 auto; max-width: 1280px }` (desktop
+       centering) breaks flex-column stretch — auto horizontal margins make a
+       flex item size to its MAX-CONTENT (~775px of the widest panel) instead of
+       the viewport width, so main overflowed and everything measuring 100% off
+       it rendered huge ("whole page massive on iOS"). Pin it to the viewport. */
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
