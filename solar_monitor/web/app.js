@@ -10772,6 +10772,39 @@ const KIND_LABEL = {
 
 function wizKnownKey(transport, slaveId) { return `${transport}::${slaveId}`; }
 
+// Always-on discovery: show what the appliance can already see over
+// Bluetooth (Victron / sensors / Renogy BT) without the user scanning,
+// so adding is a recognition step, not a hunt. Informational + nudges
+// to "Find my devices" (the existing add flow handles the actual pairing
+// incl. the Victron key). Best-effort: a fetch failure just renders
+// nothing.
+async function wizRenderNearby() {
+  const host = document.getElementById("wiz-nearby");
+  if (!host) return;
+  let devs = [];
+  try { const r = await api("/api/setup/discovered"); devs = (r && r.devices) || []; }
+  catch (_) { host.innerHTML = ""; return; }
+  if (!devs.length) { host.innerHTML = ""; return; }
+  const LABEL = { victron: "Victron", renogy: "Renogy BT", mopeka: "Mopeka tank sensor",
+                  govee: "Govee sensor", ruuvi: "RuuviTag" };
+  const rows = devs.map(d => {
+    const v = LABEL[d.vendor] || d.vendor || "device";
+    const nm = d.name ? ` · ${escHtml(d.name)}` : "";
+    const rssi = d.rssi != null ? `${d.rssi} dBm` : "";
+    return `<div class="wiz-nearby-row" style="display:flex;justify-content:space-between;gap:.6rem;padding:.35rem 0;border-top:1px solid var(--border)">
+      <span><strong>${escHtml(v)}</strong>${nm}</span>
+      <span class="settings-foot" style="white-space:nowrap">${escHtml(rssi)}</span></div>`;
+  }).join("");
+  host.innerHTML = `<div class="wiz-nearby-card" style="margin:0 0 1rem;padding:.8rem 1rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
+    <div style="font-weight:600;display:flex;align-items:center;gap:.4rem">
+      <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0M8.5 16.05a6 6 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>
+      Seen nearby
+    </div>
+    <p class="settings-foot" style="margin:.3rem 0 .5rem">WattPost can already see these over Bluetooth. Tap <strong>Find my devices</strong> below to add one.</p>
+    ${rows}
+  </div>`;
+}
+
 async function wizLoadTransports() {
   const host = $("#wiz-transports");
   try {
@@ -10784,6 +10817,7 @@ async function wizLoadTransports() {
       host.innerHTML = `<div class="wiz-empty">
         <p><strong>Let's find your gear.</strong></p>
         <p>Plug in your gear, then scan. WattPost checks Bluetooth for your devices — Renogy dongles (BT-2), and Victron / JK BMS / sensors that broadcast on their own. Nothing to choose; just scan.</p>
+        <div id="wiz-nearby"></div>
         <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
           <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -10807,9 +10841,10 @@ async function wizLoadTransports() {
       </div>`;
       document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
       document.getElementById("wiz-find-usb-btn")?.addEventListener("click", wizFindUsb);
+      wizRenderNearby();
       return;
     }
-    host.innerHTML = transports.map(t => {
+    host.innerHTML = '<div id="wiz-nearby"></div>' + transports.map(t => {
       // Serial transports carry `port` (/dev/ttyUSB0); BLE carry
       // `address` (MAC). Either reads as the transport's identity.
       const addr = t.address || t.port || '';
@@ -10902,6 +10937,7 @@ async function wizLoadTransports() {
     if (transports.length === 1 && !wizState.transport) {
       selectTransport(transports[0].id);
     }
+    wizRenderNearby();
   } catch (e) {
     host.innerHTML = `<div class="wiz-empty">Could not load transports: ${e.message}</div>`;
   }
