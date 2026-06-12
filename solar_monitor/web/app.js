@@ -10817,7 +10817,7 @@ async function wizLoadTransports() {
       <div class="wiz-add-another">
         <button class="btn-action wiz-add-another-btn" id="wiz-add-another-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>Add another connection</span>
+          <span>Add another connection (Bluetooth or USB)</span>
         </button>
         <div class="wiz-add-another-panel" id="wiz-add-another-panel" hidden>
           <p class="settings-foot" style="margin:.5rem 0">

@@ -746,15 +746,15 @@
               , kept that word in IDs/CSS/APIs but the UX shows
                plain English). -->
           <div class="wiz-step">
-            <div class="wiz-step-head"><span class="wiz-num">1</span><span>Your Bluetooth connection</span></div>
-            <p class="wiz-help">The dongle or adapter your solar gear is plugged into. Pick one to scan it for devices.</p>
+            <div class="wiz-step-head"><span class="wiz-num">1</span><span>Your connection</span></div>
+            <p class="wiz-help">The Bluetooth dongle or USB-RS485 adapter your solar gear talks through. Pick one to scan it for devices.</p>
             <div id="wiz-transports" class="wiz-transports"><div class="wiz-empty">Loading…</div></div>
           </div>
 
           <!-- Step 2, scan -->
           <div class="wiz-step" id="wiz-step-scan" hidden>
             <div class="wiz-step-head"><span class="wiz-num">2</span><span>Find your devices</span></div>
-            <p class="wiz-help">Sweeps the standard Renogy slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection. The live poller stays running. Scanning just shares the link.</p>
+            <p class="wiz-help">Sweeps the common Modbus slave IDs (1, 16, 32-36, 48-55, 96-97) on the selected connection — that's how Renogy-style charge controllers, shunts and batteries are found. Victron and other Bluetooth-broadcast devices are picked up automatically in the background and don't need this sweep. The live poller keeps running; scanning just shares the link.</p>
             <div class="wiz-controls">
               <button id="wiz-scan-btn" class="btn-action btn-action--primary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1492,6 +1492,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=279"></script>
+  <script src="/web/app.js?v=280"></script>
 </body>
 </html>
