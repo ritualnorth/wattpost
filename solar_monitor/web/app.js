@@ -10782,26 +10782,28 @@ async function wizLoadTransports() {
     wizState.knownKeys = new Set(devices.map(d => wizKnownKey(d.transport, d.slave_id)));
     if (!transports.length) {
       host.innerHTML = `<div class="wiz-empty">
-        <p><strong>First time? Let's connect your gear.</strong></p>
-        <p>How is your charger / battery / shunt wired to the Pi? Most people use a Bluetooth dongle (Renogy BT-2). Choose one to start scanning:</p>
+        <p><strong>Let's find your gear.</strong></p>
+        <p>Plug in your gear, then scan. WattPost checks Bluetooth for your devices — Renogy dongles (BT-2), and Victron / JK BMS / sensors that broadcast on their own. Nothing to choose; just scan.</p>
         <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
           <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M7 17L17 7M12 2v20M7 7l5-5 5 5M7 17l5 5 5-5"/></svg>
-            <span>Bluetooth (e.g. Renogy BT-2)</span>
-          </button>
-          <button id="wiz-find-usb-btn" class="btn-action">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="2.5" r="1.5"/><path d="M12 4v18"/><path d="M8 9h8"/><path d="M8 9l-2 4 2 4h8l2-4-2-4"/></svg>
-            <span>Wired (USB-RS485 adapter)</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <span>Find my devices</span>
           </button>
           <span id="wiz-find-status" class="wiz-status"></span>
         </div>
-        <p class="settings-foot" style="margin:.4rem 0 0">
-          Wired uses a USB-to-RS485 dongle (~£10, FTDI / CH340 chip) on the Pi, with Cat5 to your charger's RJ45 port. That port is RS-485, NOT Ethernet, so it doesn't plug into the Pi's network jack.
-        </p>
-        <p class="settings-foot" style="margin:.4rem 0 0">
-          Victron and JK BMS devices broadcast over Bluetooth on their own. No dongle needed. Pick Bluetooth above and the wizard will find them.
-        </p>
         <div id="wiz-find-results" class="wiz-results"></div>
+        <details class="wiz-advanced" style="margin-top:.8rem">
+          <summary style="cursor:pointer;color:var(--text-2);font-size:.85rem">Wired (USB-RS485) or advanced setup</summary>
+          <p class="settings-foot" style="margin:.5rem 0">
+            A USB-to-RS485 dongle (~£10, FTDI / CH340) on the Pi, with Cat5 to your charger's RJ45 comms port. That port is RS-485, NOT Ethernet — it doesn't go in the Pi's network jack.
+          </p>
+          <div class="wiz-controls">
+            <button id="wiz-find-usb-btn" class="btn-action">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="2.5" r="1.5"/><path d="M12 4v18"/><path d="M8 9h8"/><path d="M8 9l-2 4 2 4h8l2-4-2-4"/></svg>
+              <span>Scan USB ports</span>
+            </button>
+          </div>
+        </details>
       </div>`;
       document.getElementById("wiz-find-dongle-btn")?.addEventListener("click", wizFindDongle);
       document.getElementById("wiz-find-usb-btn")?.addEventListener("click", wizFindUsb);
@@ -10836,29 +10838,24 @@ async function wizLoadTransports() {
       </div>`;
     }).join("") + `
       <div class="wiz-add-another">
-        <button class="btn-action wiz-add-another-btn" id="wiz-add-another-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span>Add another connection (Bluetooth or USB)</span>
+        <button class="btn-action btn-action--primary" id="wiz-find-dongle-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Find more devices</span>
         </button>
-        <div class="wiz-add-another-panel" id="wiz-add-another-panel" hidden>
+        <span id="wiz-find-status" class="wiz-status"></span>
+        <div id="wiz-find-results" class="wiz-results"></div>
+        <details class="wiz-advanced" style="margin-top:.7rem">
+          <summary style="cursor:pointer;color:var(--text-2);font-size:.85rem">Wired (USB-RS485) or advanced setup</summary>
           <p class="settings-foot" style="margin:.5rem 0">
-            Bluetooth + USB-RS485 can run side by side on the same Pi ·
-            e.g. a Renogy BT-2 for the MPPT and a USB dongle for a
-            JK BMS. Pick the connection type for the next adapter:
+            Bluetooth and USB-RS485 run side by side — e.g. a Renogy BT-2 for the MPPT and a USB dongle for a wired BMS.
           </p>
-          <div class="wiz-controls" style="flex-wrap:wrap;gap:.5rem">
-            <button id="wiz-find-dongle-btn" class="btn-action btn-action--primary">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10M7 17L17 7M12 2v20M7 7l5-5 5 5M7 17l5 5 5-5"/></svg>
-              <span>Bluetooth</span>
-            </button>
+          <div class="wiz-controls">
             <button id="wiz-find-usb-btn" class="btn-action">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="2.5" r="1.5"/><path d="M12 4v18"/><path d="M8 9h8"/><path d="M8 9l-2 4 2 4h8l2-4-2-4"/></svg>
-              <span>Wired (USB-RS485)</span>
+              <span>Scan USB ports</span>
             </button>
-            <span id="wiz-find-status" class="wiz-status"></span>
           </div>
-          <div id="wiz-find-results" class="wiz-results"></div>
-        </div>
+        </details>
       </div>`;
     // Wire the collapsible "Add another" panel, same two scan
     // buttons reuse wizFindDongle / wizFindUsb so the BLE+USB
