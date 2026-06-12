@@ -573,6 +573,22 @@ class CloudService:
             log.warning("cloud command missing id: %r", cmd)
             return
 
+        # A command is one-shot per daemon lifetime. The cloud re-sends any
+        # command that hasn't reached a terminal state on EVERY heartbeat,
+        # so without this an update/backup that doesn't self-terminate gets
+        # re-dispatched every ~5 min — re-spawning wattpost-update and
+        # re-PATCHing `applying`, which resets the cloud's reconcile
+        # watchdog so it never times out (observed: an update wedged
+        # "applying" for 20+ min in a tight loop). Dispatch each cmd_id at
+        # most once per process; after a real update the daemon restarts
+        # with a fresh set and the update no-op guard catches the success.
+        if not hasattr(self, "_dispatched_cmds"):
+            self._dispatched_cmds = set()
+        if cmd_id in self._dispatched_cmds:
+            log.debug("cloud command %d already dispatched this session; skipping", cmd_id)
+            return
+        self._dispatched_cmds.add(cmd_id)
+
         if kind == "backup_now":
             await self._dispatch_backup_now(cmd_id)
             return
