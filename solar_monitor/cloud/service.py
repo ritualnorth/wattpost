@@ -22,6 +22,41 @@ from ..config import CloudCfg
 log = logging.getLogger(__name__)
 
 
+def _tried_cmds_path() -> str:
+    """Where we persist already-attempted update/rollback cmd_ids, so a
+    doomed op doesn't re-spawn on every daemon restart. Lives beside the
+    DB (a ReadWritePaths dir for the sandboxed daemon)."""
+    import os
+    db = os.environ.get("WATTPOST_DB", "")
+    base = os.path.dirname(db) if db else "/var/lib/wattpost"
+    return os.path.join(base, "cloud_tried_cmds.json")
+
+
+def _load_tried_cmds() -> set:
+    import json
+    try:
+        with open(_tried_cmds_path()) as f:
+            return {int(x) for x in json.load(f)}
+    except Exception:
+        return set()
+
+
+def _mark_tried_cmd(cmd_id: int) -> None:
+    import json
+    import os
+    try:
+        s = _load_tried_cmds()
+        s.add(int(cmd_id))
+        s = set(sorted(s)[-200:])  # cap growth; old ids never recur
+        p = _tried_cmds_path()
+        tmp = p + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(sorted(s), f)
+        os.replace(tmp, p)
+    except Exception:
+        pass
+
+
 class CloudService:
     def __init__(self, config_or_cfg, scheduler) -> None:
         """Accepts either a Config (preferred) or a bare CloudCfg
@@ -588,6 +623,32 @@ class CloudService:
             log.debug("cloud command %d already dispatched this session; skipping", cmd_id)
             return
         self._dispatched_cmds.add(cmd_id)
+
+        # Cross-restart guard for the spawning kinds. The per-process set
+        # above stops re-dispatch within ONE daemon lifetime, but
+        # wattpost-update / wattpost-rollback RESTART the daemon — so each
+        # fresh process would dispatch once more, re-PATCH `applying`, and
+        # reset the cloud's 10-min watchdog. A doomed op (e.g. a rollback
+        # with no previous slot, or an update that can't reach target on a
+        # dev install) thus loops across restarts forever. Persist tried
+        # cmd_ids: if we already attempted this one in a prior process and
+        # still aren't at its target, give up (mark failed) instead of
+        # re-spawning.
+        if kind in ("update", "rollback", "pin_image_tag"):
+            if cmd_id in _load_tried_cmds():
+                tv = (cmd.get("target_version") or "").strip()
+                from .. import __version__ as _running_v
+                if tv and tv == _running_v:
+                    await self._patch_command_status(cmd_id, "picked_up")
+                    await self._patch_command_status(cmd_id, "success")
+                else:
+                    await self._patch_command_status(
+                        cmd_id, "failed",
+                        error="not re-attempting after a restart — the "
+                              "previous attempt didn't reach the target "
+                              "version (see the update log).")
+                return
+            _mark_tried_cmd(cmd_id)
 
         if kind == "backup_now":
             await self._dispatch_backup_now(cmd_id)
