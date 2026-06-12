@@ -44,6 +44,14 @@ RUN apt-get update \
         network-manager iw \
  && rm -rf /var/lib/apt/lists/*
 
+# Prefer IPv4 for outbound. With network_mode:host the container sees the
+# host's IPv6 address, and many home routers advertise IPv6 without
+# routing it — RFC 6724 then makes glibc prefer the dead v6 path, so the
+# daemon's httpx calls (cloud pairing, heartbeat, updates) time out with a
+# bare "could not reach". Pin IPv4 ahead of IPv6 in the resolver; v6-only
+# destinations still use v6. Mirrors packaging/install.sh on the Pi image.
+RUN echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
+
 # cloudflared — Cloudflare Tunnel client. Used by the paired-cloud
 # flow to expose this appliance's dashboard at <slug>.wattpost.io
 # without the user having to port-forward or run a reverse proxy.

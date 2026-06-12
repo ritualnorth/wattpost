@@ -534,6 +534,21 @@ if [ -f /etc/avahi/avahi-daemon.conf ]; then
     systemctl restart avahi-daemon || warn "avahi restart failed — wattpost.local may not resolve until reboot"
 fi
 
+# ----- prefer IPv4 for outbound -----
+# Many home routers hand out a global IPv6 address via SLAAC but don't
+# actually route IPv6 to the internet. RFC 6724 then makes glibc prefer
+# IPv6, so the daemon's outbound calls (cloud pairing, heartbeat, update
+# checks via httpx) try the dead IPv6 path and time out — pairing fails
+# with a bare "could not reach https://wattpost.cloud:". curl masks it
+# with Happy-Eyeballs IPv4 fallback; httpx has none. Pin IPv4 ahead of
+# IPv6 in the resolver so dual-stack hosts use the working path. v6-only
+# destinations still go over v6 (this changes preference, not capability).
+# Idempotent.
+step "preferring IPv4 for outbound (broken-IPv6 networks)"
+if ! grep -q '^precedence ::ffff:0:0/96' /etc/gai.conf 2>/dev/null; then
+    echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
+fi
+
 # ----- summary -----
 step "done"
 IP=$(hostname -I | awk '{print $1}')
