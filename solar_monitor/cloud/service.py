@@ -82,14 +82,25 @@ class CloudService:
             log.info("cloud: no bearer_token configured, skipping heartbeat loop")
             return
         self._stop.clear()
-        # Identity v2 (#303), fire-and-forget keypair upgrade check.
-        # If the appliance has an ed25519 keypair on disk but the cloud
-        # doesn't know about it (or no keypair at all), generate +
-        # upload. Idempotent; safe to run on every boot. Doesn't
-        # block heartbeat startup, failure here logs and moves on,
-        # since v1 bearer-token auth still works during the transition.
-        asyncio.create_task(self._identity_v2_upgrade_bg(),
-                            name="identity-v2-upgrade")
+        # Identity v2 (#303): register/confirm the appliance's ed25519
+        # keypair with the cloud BEFORE the first heartbeat. Heartbeats
+        # are signed and the cloud rejects any whose fingerprint it
+        # doesn't yet know ("heartbeat signature fingerprint unknown" →
+        # 401), so a beat sent before registration completes fails and
+        # the box shows offline until the next 5-min cycle / a restart.
+        # That raced on a fresh pair: this await closes the window so a
+        # freshly-paired box goes online on its very first beat. Bounded
+        # so a cloud/network hiccup can't wedge heartbeat startup — on a
+        # timeout we start anyway (a later run / restart re-registers).
+        # Idempotent: on an already-registered box it's a fast status GET.
+        try:
+            await asyncio.wait_for(self._identity_v2_upgrade_bg(), timeout=20)
+        except asyncio.TimeoutError:
+            log.warning("identity v2: registration slow (>20s); "
+                        "starting heartbeat loop anyway")
+        except Exception:
+            log.exception("identity v2: registration raised; "
+                          "starting heartbeat loop anyway")
         self._task = asyncio.create_task(self._loop(), name="cloud-heartbeat")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
