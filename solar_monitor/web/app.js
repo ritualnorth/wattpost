@@ -1890,7 +1890,13 @@ function buildFlowReactor(model, opts) {
   // (the breakdown below itemises Solar vs AC charger separately).
   const pvW = (model.sources || []).filter(x => (x.color || "pv") === "pv")
                 .reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
-  const inLabel = (solar - pvW) > 1 ? "Power in" : "Solar";
+  const mixedIn = (solar - pvW) > 1;
+  const inLabel = mixedIn ? "Power in" : "Solar";
+  // Sun only when it really is all PV. Mixed input (solar + an AC charger /
+  // DC-DC) gets a neutral bolt + colour so the node doesn't imply "solar"
+  // — the breakdown underneath still itemises Solar vs AC separately.
+  const inIcon  = mixedIn ? "bolt" : "sun";
+  const inColor = mixedIn ? "var(--pf-grid, var(--accent, #58a6ff))" : "var(--pf-solar)";
   const battW = Math.round((opts && opts.battNetW) || model.batteryNetW || 0);
   const soc = model.bank ? Math.max(0, Math.min(100, +model.bank.soc || 0)) : 0;
   const DB = 5;
@@ -2021,7 +2027,7 @@ function buildFlowReactor(model, opts) {
       "font-weight": "700", fill: colorVar, class: "pf-num" }); val.textContent = _pfFmtW(valW); g.appendChild(val);
     return g;
   }
-  svg.appendChild(node(S, inLabel, solar, "var(--pf-solar)", !showIn, "sun", vertical));
+  svg.appendChild(node(S, inLabel, solar, inColor, !showIn, inIcon, vertical));
   svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut, "house", false));
 
   const stage = document.createElement("div");
