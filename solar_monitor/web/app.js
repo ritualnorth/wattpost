@@ -5829,6 +5829,7 @@ function renderSettings() {
   refreshDeviceHealth();     // SoC temp / throttle / disk / mem / load / uptime
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
+  refreshGpsControl();       // #125, USB GPS enable/disable
   refreshHotspotPanel();     // Pillar 3, appliance-as-WiFi-AP
   wireWifiPanel();           // join a home WiFi from the dashboard (scan + connect)
   refreshNetworkPanel();     // set a static IP / DHCP on the live connection
@@ -6278,7 +6279,7 @@ async function refreshLocationPanel() {
       }
       _scheduleLocationReacquirePoll();  // watch it lock in real time
     } else {
-      currentEl.textContent = "No location source yet — add a USB GPS (set `gps.port`, e.g. /dev/ttyACM0) or a static `forecast.lat`/`lon`.";
+      currentEl.textContent = "No location source yet — enable a USB GPS receiver below, or set a static forecast lat/lon.";
       _stopLocationReacquirePoll();
     }
   }
@@ -6319,6 +6320,67 @@ async function updateLocationShare(mode) {
   } catch (e) {
     if (msgEl) { msgEl.style.color = "var(--red)"; msgEl.textContent = "Save failed: " + e.message; }
   }
+}
+
+// GPS receiver control (#125). Lives inside the Location settings block.
+// When a receiver is enabled we show live acquisition status + a Disable
+// button; when it's off we scan /api/setup/usb_scan for NMEA receivers and
+// offer a one-tap Enable. Enabling writes the `gps:` block via the same
+// hot-reloading config path the wizard uses — no daemon restart, no YAML.
+async function refreshGpsControl() {
+  const body = document.getElementById("settings-gps-body");
+  if (!body) return;
+  let cfg = null;
+  try { cfg = await api("/api/gps/config"); } catch (_) { body.textContent = "Couldn't load GPS status."; return; }
+  if (cfg && cfg.configured) {
+    let g = null;
+    try { g = await api("/api/gps"); } catch (_) {}
+    let status = "starting…";
+    if (g && g.configured) {
+      if (g.has_fix) status = "fix acquired";
+      else if (g.acquiring || (g.satellites_in_view || 0) > 0) status = `acquiring (${g.satellites_in_view || 0} sat in view)`;
+      else status = "searching — needs a clear view of the sky";
+    }
+    body.innerHTML = `<div class="settings-row" style="align-items:center;gap:.5rem">
+      <span>Enabled on <code>${_escHtmlMini(cfg.port)}</code> · ${_escHtmlMini(status)}</span>
+      <button class="btn-action" id="gps-disable" type="button">Disable</button></div>`;
+    const db = document.getElementById("gps-disable");
+    if (db) db.onclick = () => setGps(false);
+    return;
+  }
+  body.textContent = "Scanning for a USB GPS…";
+  let adapters = [];
+  try { const r = await api("/api/setup/usb_scan"); adapters = (r.adapters || []).filter(a => a.protocol === "nmea_gps"); } catch (_) {}
+  if (!adapters.length) {
+    body.innerHTML = `No USB GPS detected. Plug one in (e.g. a u-blox VK-162) and it appears here within a few seconds. <a href="#" id="gps-rescan">Rescan</a>.`;
+    const rs = document.getElementById("gps-rescan");
+    if (rs) rs.onclick = (e) => { e.preventDefault(); refreshGpsControl(); };
+    return;
+  }
+  body.innerHTML = adapters.map(a => `<div class="settings-row" style="align-items:center;gap:.5rem">
+      <span>${_escHtmlMini(a.product || a.port)} <code>${_escHtmlMini(a.port)}</code></span>
+      <button class="btn-action btn-action--primary" type="button" data-gps-enable="${_escHtmlMini(a.port)}">Enable</button></div>`).join("");
+  body.querySelectorAll("[data-gps-enable]").forEach(b => b.onclick = () => setGps(true, b.dataset.gpsEnable));
+}
+
+async function setGps(enabled, port) {
+  const body = document.getElementById("settings-gps-body");
+  if (body) body.textContent = enabled ? "Enabling…" : "Disabling…";
+  try {
+    const r = await fetch(_withKiosk("/api/gps/config"), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(enabled ? { enabled: true, port: port, baudrate: 9600 } : { enabled: false }),
+    });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `HTTP ${r.status}`); }
+  } catch (e) {
+    if (body) body.innerHTML = `<span style="color:var(--red)">Couldn't ${enabled ? "enable" : "disable"} GPS: ${_escHtmlMini(e.message || String(e))}</span>`;
+    return;
+  }
+  // Hot-reload swaps the scheduler asynchronously; give it a beat before re-reading.
+  await new Promise(r => setTimeout(r, 1800));
+  await refreshGpsControl();
+  if (typeof refreshLocationPanel === "function") refreshLocationPanel();
 }
 
 // Solar-pause panel (#163). Pulls /api/outputs/solar_pause for the live
@@ -9072,6 +9134,23 @@ async function loadKioskTokens() {
 const kioskCreateBtn = $("#kiosk-create-btn");
 if (kioskCreateBtn) {
   kioskCreateBtn.addEventListener("click", async () => {
+    // Kiosk tokens are appliance-local: the Pi verifies them against its
+    // own token store. A link only works on an origin that reaches the
+    // appliance directly (the LAN). When this page is loaded through the
+    // cloud broker (<slug>.wattpost.cloud), location.origin is the broker
+    // — a token link there points at the cloud, which can't verify it and
+    // bounces to /login. So don't mint a dead link; send them to the cloud
+    // dashboard, which has its own shareable kiosk system (/k/<short>).
+    if (location.hostname.endsWith(".wattpost.cloud")) {
+      const out = document.getElementById("kiosk-create-result");
+      if (out) {
+        out.hidden = false;
+        out.innerHTML = `
+          <div class="rotate-pw-label">Local-network kiosk links can't be created over the cloud.</div>
+          <div class="rotate-pw-foot">You're connected to this appliance through wattpost.cloud right now, so a link made here would point at the cloud and won't open. Two options: open this dashboard on the appliance's local network address to create a LAN kiosk link, or create a kiosk that works anywhere from the <a href="https://wattpost.cloud/app" target="_blank" rel="noopener">cloud dashboard</a>.</div>`;
+      }
+      return;
+    }
     const name = prompt("Name this display (e.g. Cabin, Van screen):", "Kiosk");
     if (name === null) return;
     // Theme picked for THIS link (empty = appliance default). Bound to the
@@ -9095,7 +9174,7 @@ if (kioskCreateBtn) {
           <div class="rotate-pw-label">Kiosk link (${_escHtmlMini(skinLabel)}) — open it on the display. Save it now:</div>
           <code class="rotate-pw-code">${_escHtmlMini(url)}</code>
           <button class="rotate-pw-copy" type="button">Copy</button>
-          <div class="rotate-pw-foot">Read-only, no login. Revoke any time below.</div>`;
+          <div class="rotate-pw-foot">Read-only, no login. Works on your local network only. Revoke any time below.</div>`;
         out.querySelector(".rotate-pw-copy")?.addEventListener("click", (e) =>
           copyToClipboard(url, e.currentTarget));
       }
@@ -11635,12 +11714,14 @@ async function wizFindUsb() {
                 </button>`;
     } else if (proto === "nmea_gps") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--gps">NMEA GPS</span>`;
-      // GPS receiver path lands with #125. Until then we surface the
-      // detection but block the wrong action, adding a GPS as a
-      // Modbus transport would just sit there failing every poll.
-      action = `<button class="btn-action" disabled
-                  title="GPS support is on the roadmap (#125). Coming soon">
-                  GPS support coming soon
+      // Wire the GPS path directly: a port emitting NMEA only makes
+      // sense as the location receiver. Enabling it writes the `gps:`
+      // block and hot-reloads (location stays opt-in — this is the
+      // explicit opt-in action).
+      action = `<button class="btn-action btn-action--primary"
+                  data-use-gps-port="${escHtml(a.port)}"
+                  data-use-gps-label="${escHtml(a.product || a.port)}">
+                  Use as GPS
                 </button>`;
     } else if (proto === "busy") {
       badge = `<span class="wiz-vendor-hint wiz-vendor-hint--warn">port busy</span>`;
@@ -11667,6 +11748,11 @@ async function wizFindUsb() {
   list.querySelectorAll("[data-use-vedirect-port]").forEach(b => {
     b.addEventListener("click", () => wizAddVeDirectFromPort(
       b.dataset.useVedirectPort, b.dataset.useVedirectLabel,
+    ));
+  });
+  list.querySelectorAll("[data-use-gps-port]").forEach(b => {
+    b.addEventListener("click", () => wizEnableGpsFromPort(
+      b.dataset.useGpsPort, b.dataset.useGpsLabel,
     ));
   });
 }
@@ -11709,6 +11795,34 @@ async function wizAddVeDirectFromPort(port, label) {
   } else {
     stat.textContent = `Added ${res.label} (id: ${res.id}). Restart the daemon to start polling.`;
   }
+  await new Promise(r => setTimeout(r, 1500));
+  await wizLoadTransports();
+}
+
+// GPS enable flow (#125). The USB-scan sniff already confirmed this
+// port is emitting NMEA. Write the `gps:` block via /api/gps/config;
+// the daemon hot-reloads and the receiver starts acquiring. Location
+// sharing stays whatever the privacy toggle says — this only turns on
+// the local receiver.
+async function wizEnableGpsFromPort(port, label) {
+  const stat = document.getElementById("wiz-find-status");
+  stat.textContent = `Enabling GPS on ${port}…`;
+  try {
+    const r = await fetch("/api/gps/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true, port: port, baudrate: 9600 }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${r.status}`);
+    }
+  } catch (e) {
+    stat.textContent = "";
+    alert("Couldn't enable GPS: " + (e.message || String(e)));
+    return;
+  }
+  stat.textContent = `GPS enabled on ${port}. Acquiring a fix — give the antenna a clear view of the sky.`;
   await new Promise(r => setTimeout(r, 1500));
   await wizLoadTransports();
 }

@@ -1106,12 +1106,15 @@
             <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
           </div>
           <div class="settings-block" data-subroute="privacy">
-            <h3>Kiosk displays</h3>
+            <h3>Kiosk displays <span class="pill" style="font-size:.7rem;vertical-align:middle">Local network</span></h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               A kiosk link opens a read-only, chrome-free wall-display
               view that doesn't need a login. Create one per screen and
               revoke it any time. The link is shown to you once &mdash;
               save it then.
+              <br/><strong>These links work on your local network only.</strong>
+              For a kiosk that's reachable from anywhere, create one in the
+              cloud dashboard at wattpost.cloud.
             </p>
             <label class="kiosk-skin-row" style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;font-size:.85rem;color:var(--text-2)">
               Theme for this link:
@@ -1138,6 +1141,10 @@
             <div id="settings-location-current" class="settings-row">
               <span>Current</span>
               <span class="v" id="settings-location-current-v">·</span>
+            </div>
+            <div id="settings-gps" style="margin:.55rem 0 .2rem">
+              <div class="settings-foot" style="font-weight:600;margin-bottom:.3rem">GPS receiver</div>
+              <div id="settings-gps-body" class="settings-foot">Checking for a USB GPS…</div>
             </div>
             <fieldset class="settings-share-fieldset" style="border:0;padding:0;margin:.5rem 0 0">
               <legend class="settings-foot" style="padding:0;margin-bottom:.35rem">Share with cloud</legend>
@@ -1485,6 +1492,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=277"></script>
+  <script src="/web/app.js?v=278"></script>
 </body>
 </html>

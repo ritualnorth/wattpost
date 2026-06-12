@@ -57,7 +57,7 @@ from .weather_admin import (
     test_weather_fetch, weather_config_view,
 )
 from .weather_history import weather_history
-from .gps_admin import get_gps_status
+from .gps_admin import get_gps_status, get_gps_config, update_gps_config
 from .mqtt_in_admin import get_mqtt_in_status
 from .hotspot_admin import (
     get_hotspot_status, update_hotspot_config, hotspot_on, hotspot_off,
@@ -1802,6 +1802,8 @@ def build_app(
             get_forecast_accuracy,
             get_current_weather,
             get_gps_status,
+            get_gps_config,
+            update_gps_config,
             get_mqtt_in_status,
             get_hotspot_status,
             update_hotspot_config,
