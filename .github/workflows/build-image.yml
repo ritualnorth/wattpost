@@ -99,6 +99,40 @@ jobs:
           echo "checksum=$IMG.sha256" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$IMG")" >> "$GITHUB_OUTPUT"
 
+      # Guard against shipping an image that built but has no WattPost on
+      # it — the v0.1.167 regression, where pi-gen exported the lite base
+      # captured before stage-wattpost ran. Mount the produced rootfs and
+      # assert the install actually landed. Fails the build (and so blocks
+      # the release attach below) if anything's missing.
+      - name: Verify image contains WattPost
+        run: |
+          set -euo pipefail
+          IMG='${{ steps.locate.outputs.image }}'
+          WORK=$(mktemp -d)
+          echo "==> decompressing $IMG"
+          xz -dc "$IMG" > "$WORK/check.img"
+          LOOP=$(sudo losetup --show -fP "$WORK/check.img")
+          MNT=$(mktemp -d)
+          cleanup() { sudo umount "$MNT" 2>/dev/null || true; sudo losetup -d "$LOOP" 2>/dev/null || true; rm -rf "$WORK"; }
+          trap cleanup EXIT
+          # pi-gen layout: p1 = boot/firmware (FAT), p2 = rootfs (ext4).
+          sudo mount "${LOOP}p2" "$MNT"
+          echo "==> asserting WattPost install on the rootfs"
+          fail=0
+          for p in \
+            /opt/wattpost/venv/bin/solar-monitor \
+            /etc/systemd/system/wattpost.service \
+            /etc/systemd/system/multi-user.target.wants/wattpost.service \
+            /etc/wattpost/port.env ; do
+            if sudo test -e "$MNT$p"; then echo "  OK       $p"; else echo "  MISSING  $p"; fail=1; fi
+          done
+          if sudo grep -q '^wattpost:' "$MNT/etc/passwd"; then echo "  OK       wattpost system user"; else echo "  MISSING  wattpost system user"; fail=1; fi
+          if [ "$fail" != 0 ]; then
+            echo "::error::Built SD image is missing the WattPost install — refusing to publish (the lite-base export regression). Check stage-wattpost/EXPORT_IMAGE."
+            exit 1
+          fi
+          echo "==> image verified: WattPost is installed."
+
       # NB: we don't upload-artifact the .img.xz — at ~570 MB per build
       # × 14 d retention it blew through the 2 GB free artefact tier in
       # ~3-4 builds. The image is attached to the GitHub Release below;
