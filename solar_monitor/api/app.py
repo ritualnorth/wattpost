@@ -29,6 +29,7 @@ from ..scheduler import PollScheduler
 from ..storage import Store
 from .setup import (
     ble_status,
+    discovered,
     ble_scan,
     ble_diagnose,
     usb_scan,
@@ -1839,6 +1840,7 @@ def build_app(
             get_prometheus_config,
             update_prometheus_config,
             ble_status,
+            discovered,
             ble_scan,
             ble_diagnose,
             usb_scan,

@@ -156,6 +156,16 @@ class _SharedVictronScanner:
         # to distinguish "wedged dongle" from "no Victron devices in
         # range".
         self._last_any_advert_at = time.monotonic()
+        # Always-on discovery: drop a classified row in the shared registry
+        # for ANY recognised broadcast device (Victron / sensors / Renogy
+        # BT), so the setup UI can offer in-range gear without the user
+        # configuring a transport first. Best-effort; never perturbs the
+        # Victron decode path below.
+        try:
+            from . import ble_discovery as _disc
+            _disc.record(device, ad_data)
+        except Exception:
+            pass
         # Cheap fast-path filter first, most advertisements on a
         # crowded RF environment have nothing to do with Victron.
         mfr = getattr(ad_data, "manufacturer_data", None) or {}

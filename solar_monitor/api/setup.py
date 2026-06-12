@@ -201,6 +201,16 @@ def _clean_ascii(b: bytes) -> str:
     return re.sub(r"\s+", " ", text)
 
 
+@get("/api/setup/discovered")
+async def discovered() -> dict[str, Any]:
+    """Broadcast devices the always-on advert scanner has heard recently
+    (Victron / sensors / Renogy BT), classified by vendor. The setup UI
+    offers these as add-candidates without the user first configuring a
+    transport — no add-a-connection-then-scan dance."""
+    from ..transport import ble_discovery
+    return {"devices": ble_discovery.snapshot()}
+
+
 @get("/api/setup/ble_status")
 async def ble_status() -> dict[str, Any]:
     """List BLE adapters visible to the daemon. Used by the Setup
