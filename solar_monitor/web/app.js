@@ -659,7 +659,15 @@ async function api(path) {
 // ---------- kiosk skin view-model + render (kiosk-skins.js) ----------
 // Which skin is active. Per-device (localStorage) so a wall tablet and a
 // van screen on the same box can differ. Default Halo.
+const _VALID_SKINS = ["halo", "ember", "command"];
 function activeSkinId() {
+  // A ?skin= on the URL wins for this display only — that's how a cloud
+  // kiosk share pins its look (the /k/<token> exchange redirects to
+  // /kiosk?skin=command). Non-secret, so it's fine to carry in the URL.
+  try {
+    const q = (new URLSearchParams(window.location.search).get("skin") || "").toLowerCase();
+    if (_VALID_SKINS.indexOf(q) !== -1) return q;
+  } catch (e) {}
   if (APPLIANCE_KIOSK && APPLIANCE_KIOSK.skin) return APPLIANCE_KIOSK.skin;
   try { return localStorage.getItem(KIOSK_SKIN_KEY) || "halo"; }
   catch (e) { return "halo"; }
