@@ -119,13 +119,29 @@ jobs:
           sudo mount "${LOOP}p2" "$MNT"
           echo "==> asserting WattPost install on the rootfs"
           fail=0
+          # /opt/wattpost is a symlink to the active slot (/opt/wattpost-slots/a),
+          # and systemd enable symlinks are absolute too. Following them with a
+          # bare `test -e "$MNT$p"` resolves the absolute target against the CI
+          # HOST root, not the mounted image — a false negative. Resolve the
+          # app root inside $MNT, and check the enable link as a symlink (-L)
+          # rather than following it.
+          approot="/opt/wattpost"
+          if sudo test -L "$MNT/opt/wattpost"; then
+            approot="$(sudo readlink "$MNT/opt/wattpost")"   # e.g. /opt/wattpost-slots/a
+          fi
           for p in \
-            /opt/wattpost/venv/bin/solar-monitor \
+            "${approot}/venv/bin/solar-monitor" \
             /etc/systemd/system/wattpost.service \
-            /etc/systemd/system/multi-user.target.wants/wattpost.service \
             /etc/wattpost/port.env ; do
             if sudo test -e "$MNT$p"; then echo "  OK       $p"; else echo "  MISSING  $p"; fail=1; fi
           done
+          # Enable symlink: assert it EXISTS as a link (don't follow its
+          # absolute target against the host root).
+          if sudo test -L "$MNT/etc/systemd/system/multi-user.target.wants/wattpost.service"; then
+            echo "  OK       wattpost.service enabled (multi-user.target.wants)"
+          else
+            echo "  MISSING  wattpost.service enable symlink"; fail=1
+          fi
           if sudo grep -q '^wattpost:' "$MNT/etc/passwd"; then echo "  OK       wattpost system user"; else echo "  MISSING  wattpost system user"; fail=1; fi
           if [ "$fail" != 0 ]; then
             echo "::error::Built SD image is missing the WattPost install — refusing to publish (the lite-base export regression). Check stage-wattpost/EXPORT_IMAGE."
