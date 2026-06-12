@@ -1884,6 +1884,13 @@ function buildFlowReactor(model, opts) {
   const uid = "pf" + (++_pfUid);
   const solar     = (model.sources || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
   const loadTotal = (model.loads   || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  // The single input node sums ALL sources. Only call it "Solar" when the
+  // input really is all PV — an AC charger / DC-DC feeding the battery is
+  // charging input, not solar. Mixed input gets a neutral "Power in" label
+  // (the breakdown below itemises Solar vs AC charger separately).
+  const pvW = (model.sources || []).filter(x => (x.color || "pv") === "pv")
+                .reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
+  const inLabel = (solar - pvW) > 1 ? "Power in" : "Solar";
   const battW = Math.round((opts && opts.battNetW) || model.batteryNetW || 0);
   const soc = model.bank ? Math.max(0, Math.min(100, +model.bank.soc || 0)) : 0;
   const DB = 5;
@@ -2014,7 +2021,7 @@ function buildFlowReactor(model, opts) {
       "font-weight": "700", fill: colorVar, class: "pf-num" }); val.textContent = _pfFmtW(valW); g.appendChild(val);
     return g;
   }
-  svg.appendChild(node(S, "Solar", solar, "var(--pf-solar)", !showIn, "sun", vertical));
+  svg.appendChild(node(S, inLabel, solar, "var(--pf-solar)", !showIn, "sun", vertical));
   svg.appendChild(node(L, "Loads", loadTotal, "var(--pf-load-2)", !showOut, "house", false));
 
   const stage = document.createElement("div");
@@ -2027,7 +2034,6 @@ function buildFlowReactor(model, opts) {
 // in-or-out / Loads. Replaces the old battery summary bar, which duplicated
 // the SoC + state + watts the reactor core already shows.
 function buildFlowLegend(model, battW) {
-  const solar     = (model.sources || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
   const loadTotal = (model.loads   || []).reduce((s, x) => s + Math.max(0, +x.power || 0), 0);
   const wrap = document.createElement("div");
   wrap.className = "pf-legend";
@@ -2040,7 +2046,22 @@ function buildFlowLegend(model, battW) {
     lg.appendChild(b);
     return lg;
   };
-  wrap.appendChild(item("var(--pf-solar)", "Solar", solar));
+  // Group inputs by their label so a non-solar source (e.g. an AC charger)
+  // shows as its own line — "Solar 395 W · AC Charger 120 W" — instead of
+  // being summed into "Solar". PV uses the solar colour; everything else
+  // uses the grid/charger colour.
+  const groups = new Map();
+  (model.sources || []).forEach(x => {
+    const w = Math.max(0, +x.power || 0);
+    const label = x.label || "Solar";
+    const g = groups.get(label) || { w: 0, color: x.color || "pv" };
+    g.w += w; groups.set(label, g);
+  });
+  if (groups.size === 0) groups.set("Solar", { w: 0, color: "pv" });
+  groups.forEach((g, label) => {
+    const cv = g.color === "pv" ? "var(--pf-solar)" : "var(--pf-grid, var(--accent, #58a6ff))";
+    wrap.appendChild(item(cv, label, g.w));
+  });
   if (battW > 5)        wrap.appendChild(item("var(--pf-charge)", "Into battery", battW));
   else if (battW < -5)  wrap.appendChild(item("var(--pf-discharge)", "From battery", -battW));
   else                  wrap.appendChild(item("var(--text-3)", "Battery", 0));
