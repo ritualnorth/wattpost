@@ -501,6 +501,12 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
             ruuvi_was_running = await _ruuvi_scanner().pause()
         except Exception:
             log.debug("ble_scan: ruuvi scanner pause skipped (not in use)")
+        disc_was_running = False
+        try:
+            from ..transport import ble_discovery
+            disc_was_running = await ble_discovery.scanner().pause()
+        except Exception:
+            log.debug("ble_scan: discovery scanner pause skipped (not in use)")
         try:
             # `return_adv=True` makes BleakScanner give us each device's
             # latest advertisement_data alongside the BLEDevice object.
@@ -544,6 +550,12 @@ async def ble_scan(data: BleScanRequest, state: State) -> dict[str, Any]:
                     await _ruuvi_scanner().resume()
                 except Exception:
                     log.warning("ble_scan: ruuvi scanner resume failed")
+            if disc_was_running:
+                try:
+                    from ..transport import ble_discovery
+                    await ble_discovery.scanner().resume()
+                except Exception:
+                    log.warning("ble_scan: discovery scanner resume failed")
     import time as _time
     now = int(_time.time())
     out = []

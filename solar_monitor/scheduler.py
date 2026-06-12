@@ -451,6 +451,26 @@ class PollScheduler:
         if self._updater is not None:
             await self._updater.start()
 
+        # Always-on BLE discovery (zero-config). Only when NO per-type
+        # broadcast transport is configured — otherwise that scanner
+        # already records discovery and a second scanner would fight for
+        # the radio (BlueZ allows one discovery per adapter). On a fresh
+        # or Renogy-only box this is what surfaces an in-range Victron /
+        # sensor before you've added it. Paused around modbus connects +
+        # manual scans (see ble_modbus / api.setup). Re-evaluated on every
+        # config hot-reload, so adding a broadcast device cleanly hands the
+        # radio to its per-type scanner.
+        self._discovery_on = not any(
+            str((t or {}).get("type", "")).endswith("_advertise")
+            for t in (self.config.transports or [])
+        )
+        if self._discovery_on:
+            try:
+                from .transport import ble_discovery
+                await ble_discovery.scanner().start()
+            except Exception:
+                log.exception("discovery scanner failed to start (non-fatal)")
+
         self._stop.clear()
         self._task = asyncio.create_task(self._run(), name="poll-scheduler")
         self._maint_task = asyncio.create_task(self._maintenance(), name="maintenance")
@@ -513,6 +533,12 @@ class PollScheduler:
             await self._hotspot.stop()
         if self._updater is not None:
             await self._updater.stop()
+        if getattr(self, "_discovery_on", False):
+            try:
+                from .transport import ble_discovery
+                await ble_discovery.scanner().stop()
+            except Exception:
+                log.warning("discovery scanner stop failed", exc_info=True)
 
         log.info("scheduler stopped")
 

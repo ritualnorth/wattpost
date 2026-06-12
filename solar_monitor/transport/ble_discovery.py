@@ -98,3 +98,95 @@ def snapshot(max_age_s: float = 300.0) -> list[dict[str, Any]]:
             out.append(r)
     out.sort(key=lambda r: r["last_seen"], reverse=True)
     return out
+
+
+# --------------------------------------------------------------------------
+# Standalone always-on discovery scanner.
+#
+# When the box has NO broadcast transport configured (a fresh box, or a
+# Renogy-only box), nothing is listening, so an in-range Victron/sensor
+# would never be discovered until you'd already added it — chicken/egg.
+# This scanner runs regardless, on every radio, recording into the
+# registry above so the setup UI can offer in-range gear from first boot.
+#
+# Coexistence: BlueZ allows one discovery per adapter, so when a per-type
+# advert scanner IS configured (Victron etc.) the scheduler doesn't start
+# this one — that scanner already records discovery. And like the per-type
+# scanners, this one is paused around Renogy modbus connects + manual
+# scans (see ble_modbus + api/setup) so it never fights for the radio.
+import asyncio
+import logging
+
+log = logging.getLogger(__name__)
+
+
+class DiscoveryScanner:
+    """One passive BleakScanner per HCI adapter, recording every advert
+    into the discovery registry. Best-effort per adapter + per op."""
+
+    def __init__(self) -> None:
+        self._scanners: list[Any] = []
+        self._lock = asyncio.Lock()
+
+    async def _start_all(self) -> None:
+        from bleak import BleakScanner
+        from .ble_victron_advertise import _list_hci_adapters
+        for ad in (_list_hci_adapters() or [None]):
+            try:
+                kw: dict = {"detection_callback": _on_advert}
+                if ad:
+                    kw["adapter"] = ad
+                sc = BleakScanner(**kw)
+                await sc.start()
+                self._scanners.append(sc)
+                log.info("discovery scanner started on %s", ad or "default")
+            except Exception:
+                log.exception("discovery scanner: failed to start on %s",
+                              ad or "default")
+
+    async def _stop_all(self) -> None:
+        for sc in self._scanners:
+            try:
+                await sc.stop()
+            except Exception:
+                log.exception("discovery scanner stop failed")
+        self._scanners = []
+
+    async def start(self) -> None:
+        async with self._lock:
+            if not self._scanners:
+                await self._start_all()
+
+    async def stop(self) -> None:
+        async with self._lock:
+            await self._stop_all()
+
+    async def pause(self) -> bool:
+        """Stop scanning so a peer (Renogy connect / manual scan) can use
+        the radio. Returns True if we were running."""
+        async with self._lock:
+            if not self._scanners:
+                return False
+            await self._stop_all()
+            return True
+
+    async def resume(self) -> None:
+        async with self._lock:
+            if not self._scanners:
+                await self._start_all()
+
+
+def _on_advert(device: Any, ad_data: Any) -> None:
+    record(device, ad_data)
+
+
+_GLOBAL_DISCOVERY: DiscoveryScanner | None = None
+
+
+def scanner() -> DiscoveryScanner:
+    """Module singleton, so the scheduler, ble_modbus and api/setup all
+    talk to the same standalone discovery scanner."""
+    global _GLOBAL_DISCOVERY
+    if _GLOBAL_DISCOVERY is None:
+        _GLOBAL_DISCOVERY = DiscoveryScanner()
+    return _GLOBAL_DISCOVERY

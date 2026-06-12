@@ -166,11 +166,17 @@ class BleModbusTransport(Transport):
         #      registered; otherwise stays stopped.
         async with HCI_DISCOVER_LOCK:
             victron_was_running = False
+            disc_was_running = False
             try:
                 from .ble_victron_advertise import _scanner as _victron_scanner
                 victron_was_running = await _victron_scanner().pause()
             except Exception:
                 log.debug("[%s] victron scanner pause skipped (not in use)", self.id)
+            try:
+                from . import ble_discovery
+                disc_was_running = await ble_discovery.scanner().pause()
+            except Exception:
+                log.debug("[%s] discovery scanner pause skipped (not in use)", self.id)
             try:
                 dev = await BleakScanner.find_device_by_address(
                     self.address, timeout=self.discovery_timeout
@@ -191,6 +197,12 @@ class BleModbusTransport(Transport):
                         await _victron_scanner().resume()
                     except Exception:
                         log.warning("[%s] victron scanner resume failed", self.id)
+                if disc_was_running:
+                    try:
+                        from . import ble_discovery
+                        await ble_discovery.scanner().resume()
+                    except Exception:
+                        log.warning("[%s] discovery scanner resume failed", self.id)
         # Enumerate the GATT services + characteristics we actually
         # got. Used both for diagnostics ("connected but probe times
         # out" is usually a wrong-characteristic issue) and to
