@@ -974,7 +974,14 @@ def index() -> File:
     path = _web_dir() / "index.html"
     if not path.exists():
         raise NotFoundException("index.html missing, was the package built correctly?")
-    return File(path=path, media_type="text/html", content_disposition_type="inline")
+    # no-cache (revalidate, not no-store) so the browser always re-checks the
+    # shell HTML and picks up new ?v= asset versions after a deploy. Without
+    # it Safari heuristically caches the shell for hours and serves stale
+    # app.js/styles.css — the recurring "stale shell" on the broker, where
+    # the appliance SW deliberately doesn't run. Assets stay long-cached via
+    # their ?v= busters; only the shell revalidates.
+    return File(path=path, media_type="text/html", content_disposition_type="inline",
+                headers={"Cache-Control": "no-cache"})
 
 
 @get("/kiosk", sync_to_thread=False)
@@ -990,7 +997,8 @@ def kiosk_index() -> File:
     path = _web_dir() / "index.html"
     if not path.exists():
         raise NotFoundException("index.html missing")
-    return File(path=path, media_type="text/html", content_disposition_type="inline")
+    return File(path=path, media_type="text/html", content_disposition_type="inline",
+                headers={"Cache-Control": "no-cache"})
 
 
 # Mode-aware kiosk route — pin a wall display at /kiosk/cabin (for
@@ -1011,7 +1019,8 @@ def kiosk_index_mode(mode: str) -> File:
     # Pass the requested mode through to the SPA via a header the
     # boot script reads; it doesn't need to be in the body since the
     # path itself encodes the intent (`window.location.pathname`).
-    return File(path=path, media_type="text/html", content_disposition_type="inline")
+    return File(path=path, media_type="text/html", content_disposition_type="inline",
+                headers={"Cache-Control": "no-cache"})
 
 
 @get("/login", sync_to_thread=False)

@@ -57,6 +57,17 @@
         navigator.serviceWorker.register('/sw.js', {
           updateViaCache: 'none',
         }).catch(() => {});
+        // When a new SW takes control (after a deploy: new sw.js → install
+        // → skipWaiting → claim), reload ONCE so the page picks up the new
+        // shell instead of sitting on the old cached app.js/index.html
+        // until the user manually clears site data. The guard prevents a
+        // reload loop; the single first-install reload is harmless.
+        let _wpSwReloading = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (_wpSwReloading) return;
+          _wpSwReloading = true;
+          window.location.reload();
+        });
       });
     }
   </script>
@@ -1492,6 +1503,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=284"></script>
+  <script src="/web/app.js?v=285"></script>
 </body>
 </html>

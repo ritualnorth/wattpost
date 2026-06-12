@@ -4071,16 +4071,22 @@ function devSoc(l) {
   return (s == null || isNaN(+s)) ? null : Math.max(0, Math.min(100, +s));
 }
 function devVolt(l) {
-  const v = l.voltage_v ?? l.battery_voltage_v;
+  // Include charger/inverter output rails (e.g. Victron AC charger reports
+  // output_1_voltage_v, not battery_voltage_v) so the list shows V/A/W for
+  // non-battery devices too.
+  const v = l.voltage_v ?? l.battery_voltage_v ?? l.output_1_voltage_v ?? l.ac_output_voltage_v;
   return (v == null || isNaN(+v)) ? null : +v;
 }
 function devCurr(l) {
-  const a = l.current_a ?? l.battery_current_a;
+  const a = l.current_a ?? l.battery_current_a ?? l.output_1_current_a ?? l.ac_output_current_a;
   return (a == null || isNaN(+a)) ? null : +a;
 }
 function devPower(l) {
-  if (l.power_w != null && !isNaN(+l.power_w)) return +l.power_w;
-  if (l.pv_power_w != null && !isNaN(+l.pv_power_w)) return +l.pv_power_w;
+  // Charge controllers/loads use power_w/pv_power_w; AC chargers + DC-DC
+  // surface their delivered power as output_(1_)power_w / ac_output_power_w.
+  for (const k of ["power_w", "pv_power_w", "output_1_power_w", "output_power_w", "ac_output_power_w"]) {
+    if (l[k] != null && !isNaN(+l[k])) return +l[k];
+  }
   const v = devVolt(l), a = devCurr(l);
   if (v != null && a != null) return v * a;
   return null;
@@ -11150,12 +11156,15 @@ async function wizEditTransport({ id, type, address, port }) {
     promptDefault = address || "";
     field = "address";
   } else if (type === "ble_victron_advertise") {
-    promptLabel = "New BLE MAC for " + id + " (leave blank to keep):";
-    promptDefault = address || "";
-    field = "address";
+    // Key first — that's what people fix when readings stay blank (wrong
+    // Instant Readout key). MAC is the rare secondary edit.
+    promptLabel = "Encryption key for " + id + " — 32 hex chars from "
+      + "VictronConnect → the device → Product info → Show (leave blank to keep):";
+    promptDefault = "";
+    field = "encryption_key";
     second = {
-      label: "New encryption key (32 hex chars, leave blank to keep):",
-      field: "encryption_key",
+      label: "BLE MAC (only if the device itself changed; leave blank to keep):",
+      field: "address",
     };
   } else if (type === "serial_modbus") {
     promptLabel = "New serial port for " + id + " (e.g. /dev/ttyUSB0):";
