@@ -1,0 +1,12 @@
+# Presence of this file is what makes pi-gen export an image AFTER this
+# stage has run. Without it, the only EXPORT_IMAGE in the stage list is
+# upstream stage2's, so pi-gen exports the *lite* rootfs captured BEFORE
+# stage-wattpost installs anything — i.e. a vanilla Raspberry Pi OS image
+# with no WattPost on it. That was the v0.1.167 SD regression: a
+# wattpost-lite.img.xz that booted to a bare Pi with empty /opt, no
+# wattpost user, no service. build-image.sh removes stage2's marker so
+# this is the one and only image exported.
+IMG_SUFFIX=""
+if [ "${USE_QEMU}" = "1" ]; then
+	export IMG_SUFFIX="${IMG_SUFFIX}-qemu"
+fi

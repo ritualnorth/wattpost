@@ -71,6 +71,16 @@ sed -i 's|debian-archive-keyring\.pgp|debian-archive-keyring.gpg|g' \
 rm -rf "${PIGEN_DIR}/${STAGE_NAME}"
 cp -r  "${REPO_ROOT}/packaging/pi-gen/${STAGE_NAME}" "${PIGEN_DIR}/${STAGE_NAME}"
 
+# pi-gen exports one image per stage that carries an EXPORT_IMAGE file.
+# Upstream stage2 (lite) ships one, so left alone pi-gen exports the lite
+# rootfs captured BEFORE stage-wattpost runs — a WattPost-less image (the
+# v0.1.167 "empty SD" regression: wattpost-lite.img.xz booted to a bare
+# Pi). Drop stage2's export markers so the ONLY image pi-gen produces is
+# ours — stage-wattpost carries its own EXPORT_IMAGE, captured AFTER the
+# install. This guarantees deploy/ holds exactly one, correct image and
+# the CI "Locate artefact" step can't pick up the wrong one.
+rm -f "${PIGEN_DIR}/stage2/EXPORT_IMAGE" "${PIGEN_DIR}/stage2/EXPORT_NOOBS"
+
 # Also stage the WattPost source tree inside pi-gen so it gets baked
 # into the container image. The original 00-copy-source script relied
 # on a $WATTPOST_SRC host path that's invisible to the Docker build;
@@ -104,7 +114,9 @@ fi
 echo "    staged $(du -sh "${SRC_STAGE_DIR}" | awk '{print $1}'), $(find "${SRC_STAGE_DIR}" -type f | wc -l) files"
 
 # Skip the desktop stages (3, 4, 5) and use lite (stage 2) as the base
-# our stage builds on. SKIP_IMAGES on stages we don't ship.
+# our stage-wattpost builds on. Only stage-wattpost exports an image
+# (stage2's EXPORT_IMAGE was removed above), so the deployed .img is the
+# rootfs *after* the WattPost install, not the bare lite base.
 cat > "${PIGEN_DIR}/config" <<EOF
 IMG_NAME=wattpost
 RELEASE=trixie
