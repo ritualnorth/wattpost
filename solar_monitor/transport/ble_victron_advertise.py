@@ -35,6 +35,25 @@ STALE_AFTER_SECONDS = 60.0
 
 # ---------- module-level shared scanner ----------
 
+def _list_hci_adapters() -> list[str]:
+    """Local BLE adapters as ['hci0', 'hci1', …], read from sysfs. An
+    empty list means "let Bleak pick the default" (non-Linux hosts, or
+    sysfs unreadable) — callers fall back to a single default scanner."""
+    import glob as _glob
+    import os as _os
+    import re as _re
+    try:
+        # /sys/class/bluetooth also lists per-connection children like
+        # "hci0:64" — only real adapters match ^hci\d+$.
+        return sorted(
+            n for n in (_os.path.basename(p)
+                        for p in _glob.glob("/sys/class/bluetooth/hci*"))
+            if _re.fullmatch(r"hci\d+", n)
+        )
+    except Exception:
+        return []
+
+
 class _SharedVictronScanner:
     """Singleton wrapping a BleakScanner that fans every Victron
     advertisement out to the transport instance registered for the
@@ -44,7 +63,10 @@ class _SharedVictronScanner:
 
     def __init__(self) -> None:
         self._subscribers: dict[str, "BleVictronAdvertiseTransport"] = {}
-        self._scanner: BleakScanner | None = None
+        # One BleakScanner per local HCI adapter (hci0, hci1, …) so a
+        # Victron device on ANY radio is heard, not just the BlueZ
+        # default. Empty until the first transport registers.
+        self._scanners: list[BleakScanner] = []
         self._lock = asyncio.Lock()
         # Adapter-health tracking (#244). When the BLE dongle wedges
         # (Realtek firmware bug on the RTL8761B family is the common
@@ -55,73 +77,77 @@ class _SharedVictronScanner:
         self._scan_started_at: float = 0.0
         self._last_any_advert_at: float = 0.0
 
+    async def _start_all(self) -> None:
+        """Start one scanner per HCI adapter. Best-effort per adapter:
+        a failure on one (busy/missing) is logged and skipped so the
+        others still run. Falls back to the Bleak default when no
+        adapters can be enumerated (non-Linux / single-radio hosts).
+        Active scan (default) sees advertisements quickly."""
+        adapters = _list_hci_adapters() or [None]
+        for ad in adapters:
+            try:
+                kw: dict = {"detection_callback": self._on_detection}
+                if ad:
+                    kw["adapter"] = ad
+                sc = BleakScanner(**kw)
+                await sc.start()
+                self._scanners.append(sc)
+                log.info("victron scanner started on %s (subscribers=%d)",
+                         ad or "default", len(self._subscribers))
+            except Exception:
+                log.exception("victron scanner: failed to start on %s",
+                              ad or "default")
+        self._scan_started_at = time.monotonic()
+        # Reset on every start, we're tracking "did we hear ANY advert
+        # since the most recent scan-start".
+        self._last_any_advert_at = 0.0
+
+    async def _stop_all(self) -> None:
+        for sc in self._scanners:
+            try:
+                await sc.stop()
+            except Exception:
+                log.exception("victron scanner stop failed")
+        self._scanners = []
+
     async def register(self, transport: "BleVictronAdvertiseTransport") -> None:
         async with self._lock:
             self._subscribers[transport.address] = transport
-            if self._scanner is None:
-                # Active scan (default) sees advertisements quickly;
-                # passive would also work and is slightly cheaper but
-                # has poorer device-name visibility for setup-time
-                # discovery. Active is fine on the dongle.
-                self._scanner = BleakScanner(detection_callback=self._on_detection)
-                await self._scanner.start()
-                self._scan_started_at = time.monotonic()
-                # Reset on every start, we're tracking "did we hear
-                # ANY advert since the most recent scan-start".
-                self._last_any_advert_at = 0.0
-                log.info("victron scanner started (subscribers=%d)",
-                         len(self._subscribers))
+            if not self._scanners:
+                await self._start_all()
 
     async def unregister(self, transport: "BleVictronAdvertiseTransport") -> None:
         async with self._lock:
             self._subscribers.pop(transport.address, None)
-            if not self._subscribers and self._scanner is not None:
-                try:
-                    await self._scanner.stop()
-                except Exception:
-                    log.exception("victron scanner stop failed")
-                self._scanner = None
+            if not self._subscribers and self._scanners:
+                await self._stop_all()
                 log.info("victron scanner stopped (no subscribers)")
 
     async def pause(self) -> bool:
-        """Briefly stop the scanner so another transport can run its
-        own discovery on the same adapter. BlueZ only allows one
-        in-flight discovery session per HCI adapter, without this,
-        the Renogy BT-2 transport's `find_device_by_address` fights
-        the Victron passive scanner and loses with
-        `org.bluez.Error.InProgress`. Returns True if the scanner
-        was actually running and got paused (so the caller knows
-        to resume it). The lock is released between pause/resume
-        so the Victron transport can keep buffering messages, it
-        just won't see new ones for the duration."""
+        """Briefly stop every scanner so another transport can run its
+        own discovery. BlueZ only allows one in-flight discovery session
+        per HCI adapter, without this the Renogy BT-2 transport's
+        `find_device_by_address` fights the Victron passive scanner and
+        loses with `org.bluez.Error.InProgress`. We stop ALL adapters'
+        scanners (the peer connect may land on any radio). Returns True
+        if anything was running (so the caller knows to resume)."""
         async with self._lock:
-            if self._scanner is None:
+            if not self._scanners:
                 return False
-            try:
-                await self._scanner.stop()
-            except Exception:
-                log.exception("victron scanner pause: stop failed")
-            self._scanner = None
+            await self._stop_all()
             log.info("victron scanner paused (peer transport scanning)")
             return True
 
     async def resume(self) -> None:
-        """Counterpart to pause(). Restarts the scanner if there are
-        still subscribers, if every Victron transport closed during
-        the pause window, leave it stopped (unregister-equivalent)."""
+        """Counterpart to pause(). Restarts scanners if there are still
+        subscribers; if every Victron transport closed during the pause
+        window, leave them stopped (unregister-equivalent)."""
         async with self._lock:
-            if self._scanner is not None or not self._subscribers:
+            if self._scanners or not self._subscribers:
                 return
-            self._scanner = BleakScanner(detection_callback=self._on_detection)
-            try:
-                await self._scanner.start()
-                self._scan_started_at = time.monotonic()
-                self._last_any_advert_at = 0.0
-                log.info("victron scanner resumed (subscribers=%d)",
-                         len(self._subscribers))
-            except Exception:
-                log.exception("victron scanner resume: start failed")
-                self._scanner = None
+            await self._start_all()
+            log.info("victron scanner resumed (subscribers=%d)",
+                     len(self._subscribers))
 
     def _on_detection(self, device, ad_data) -> None:
         # Stamp adapter-alive marker before any filtering, receiving
@@ -160,7 +186,7 @@ class _SharedVictronScanner:
         render a "Bluetooth dongle not responding, try a power-cycle"
         banner instead of the user seeing every Victron device
         independently appear silent."""
-        if self._scanner is None or self._scan_started_at == 0.0:
+        if not self._scanners or self._scan_started_at == 0.0:
             return "idle"
         now = time.monotonic()
         running_for = now - self._scan_started_at
