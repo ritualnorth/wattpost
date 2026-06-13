@@ -139,6 +139,15 @@ class HotspotService:
             # Enable it first; best-effort (if it fails, the `up` below surfaces
             # the real error).
             await self._nmcli("radio", "wifi", "on")
+            # Enabling the radio is asynchronous: wlan0 transitions
+            # unavailable→disconnected over a second or two. If we call `up`
+            # while it's still "unavailable", NM finds no suitable wifi
+            # device and fails with "No suitable device found for this
+            # connection" (it rejects eth0 for the interface-name mismatch
+            # and then has nothing left). Wait for the AP interface to leave
+            # the unavailable state first; best-effort + bounded so a truly
+            # absent radio still falls through to the real `up` error below.
+            await self._wait_for_iface_ready(self.cfg.interface)
             rc, _out, err = await self._nmcli(
                 "connection", "up", self.cfg.connection_name
             )
@@ -326,6 +335,39 @@ class HotspotService:
             return False
         names = {line.strip() for line in out.splitlines()}
         return self.cfg.connection_name in names
+
+    async def _wait_for_iface_ready(
+        self, iface: str, timeout: float = 8.0, poll: float = 0.4,
+    ) -> bool:
+        """Poll `nmcli device` until `iface` leaves the 'unavailable'
+        (radio-off) state, i.e. it's ready to host a connection. Returns
+        True once ready, False on timeout. Best-effort: any nmcli error is
+        treated as 'keep waiting' until the deadline, then we let the
+        caller's `connection up` surface the real failure. Used right after
+        `radio wifi on`, whose effect is asynchronous."""
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + timeout
+        while True:
+            try:
+                rc, out, _err = await self._nmcli(
+                    "-t", "-f", "DEVICE,STATE", "device"
+                )
+            except Exception:
+                rc, out = 1, ""
+            if rc == 0:
+                for line in out.splitlines():
+                    dev, _, state = line.partition(":")
+                    if dev == iface:
+                        # Terse STATE is text ("unavailable"/"disconnected"
+                        # /"connected"/...). Anything other than the
+                        # radio-off states means it can host the AP.
+                        if state and "unavailable" not in state \
+                                and "unmanaged" not in state:
+                            return True
+                        break
+            if loop.time() >= deadline:
+                return False
+            await asyncio.sleep(poll)
 
     async def lan_kind(self) -> str | None:
         """What kind of *non-AP* network is the appliance reachable on?

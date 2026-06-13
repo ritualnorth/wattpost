@@ -245,6 +245,14 @@ if [[ -d /etc/NetworkManager ]]; then
             /etc/polkit-1/rules.d/50-wattpost-networkmanager.rules
         systemctl try-reload-or-restart polkit 2>/dev/null || true
     fi
+
+    # `iw` powers the hotspot's connected-client count (status.client_count).
+    # Pi OS Bookworm doesn't ship it by default, so without this the count is
+    # permanently null on real Pis even though it works in the Docker image
+    # (which apt-installs iw). The AP itself works regardless. Best-effort.
+    if ! command -v iw >/dev/null 2>&1; then
+        apt-get install -y iw || warn "couldn't install iw — hotspot client_count will be unavailable"
+    fi
 fi
 
 # ----- venv -----
