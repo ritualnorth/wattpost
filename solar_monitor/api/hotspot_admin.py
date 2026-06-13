@@ -139,10 +139,39 @@ async def update_hotspot_config(
     _save_config(config_path, _mutate)
     log.info("hotspot configured (ssid=%s band=%s ch=%d enabled=%s auto_handoff=%s)",
              new.ssid, new.band, new.channel, new.enabled, new.auto_handoff)
-    # Hot-reload rebuilds the scheduler's HotspotService from the new
-    # block. If enabled=true it auto-brings-up on the reload's start().
-    asyncio.create_task(_hot_reload_bg(state))
+    # Apply in place rather than rebuilding the whole scheduler. The old
+    # path ran _hot_reload, which stops + reconstructs the PollScheduler —
+    # that tears down and reconnects EVERY BLE transport (10-30s of lost
+    # polling) just to change a WiFi flag, and left status() reading the
+    # pre-reload service for the ~5s the rebuild took, so a UI toggle
+    # appeared to bounce back. Setting the live service's cfg is instant,
+    # and the auto-handoff monitor wraps the same instance + reads .cfg
+    # live, so both views stay consistent immediately.
+    scheduler: PollScheduler = state["scheduler"]
+    svc = scheduler.hotspot
+    if svc is not None:
+        svc.cfg = new
+        # Mirror HotspotService.start(): auto-raise only when enabled.
+        # enabled=false deliberately leaves a running AP alone (NM holds
+        # it), exactly as the old rebuild's start() did. When enabled we
+        # (re-)activate so a live AP picks up changed SSID/band/psk;
+        # backgrounded so the PUT returns without waiting on bring-up.
+        if new.enabled and svc.is_available(new):
+            asyncio.create_task(_bg_activate(svc))
+    else:
+        # No live service to update (the scheduler always builds one, so
+        # this is defensive) — fall back to a full reload to materialise it.
+        asyncio.create_task(_hot_reload_bg(state))
     return {"ok": True, "configured": True, "restart_required": False}
+
+
+async def _bg_activate(svc: Any) -> None:
+    """Fire-and-forget AP bring-up so a config PUT returns immediately.
+    Failures surface via status().last_error, same as the manual path."""
+    try:
+        await svc.activate()
+    except Exception:
+        log.exception("hotspot: background activate after config save failed")
 
 
 @post("/api/hotspot/on")
