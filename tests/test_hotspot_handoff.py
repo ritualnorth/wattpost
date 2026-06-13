@@ -109,6 +109,41 @@ async def t_flag_off_cleans_up():
     print("PASS flag-off: turning auto_handoff off drops the monitor-raised AP")
 
 
+async def t_probe_drop_reraises_when_no_known_net():
+    # After a single-radio probe-drop, if NM finds no known network in the
+    # freed window, the AP must come back — but only after the grace window,
+    # so it doesn't flap. (Test plan §2 "AP just comes back".)
+    m, svc = mon(HotspotCfg(auto_handoff=True))
+    svc.lan = None
+    await m.tick(); await m.tick()                      # raise
+    for _ in range(H.RETRY_AFTER_POLLS):
+        if await m.tick() == "probe-drop":
+            break
+    assert not svc._active
+    # Radio freed, still nothing to join → re-raise after GRACE_CHECKS ticks.
+    rs = [await m.tick() for _ in range(H.GRACE_CHECKS)]
+    assert rs == ["wait"] * (H.GRACE_CHECKS - 1) + ["raise"], rs
+    assert svc._active and svc.calls.count("activate") == 2
+    print("PASS probe-drop re-raise: AP returns after grace when no net joins")
+
+
+async def t_probe_drop_stays_down_when_net_rejoins():
+    # After a probe-drop, if NM rejoins a known WiFi network in the freed
+    # window, the AP stays down and is not re-raised. (Test plan §2.)
+    m, svc = mon(HotspotCfg(auto_handoff=True))
+    svc.lan = None
+    await m.tick(); await m.tick()                      # raise
+    for _ in range(H.RETRY_AFTER_POLLS):
+        if await m.tick() == "probe-drop":
+            break
+    assert not svc._active
+    svc.lan = "wifi"                                    # NM rejoined a known net
+    for _ in range(3):
+        assert await m.tick() == "ok"
+    assert svc.calls.count("activate") == 1 and not svc._active
+    print("PASS probe-drop rejoin: AP stays down once a known network joins")
+
+
 async def t_enabled_is_skipped():
     m, svc = mon(HotspotCfg(auto_handoff=True, enabled=True))
     svc.lan = None
@@ -174,7 +209,9 @@ async def t_onboarding_latches_off_after_lan():
 
 async def main():
     for t in (t_not_opted_in, t_local_flag_raises_after_grace, t_eth_return_drops,
-              t_single_radio_probe_drop, t_flag_off_cleans_up, t_enabled_is_skipped,
+              t_single_radio_probe_drop, t_probe_drop_reraises_when_no_known_net,
+              t_probe_drop_stays_down_when_net_rejoins,
+              t_flag_off_cleans_up, t_enabled_is_skipped,
               t_manual_ap_untouched, t_lan_present_noop,
               t_onboarding_raises_fresh_box, t_onboarding_no_probe_drop_blip,
               t_onboarding_latches_off_after_lan):
