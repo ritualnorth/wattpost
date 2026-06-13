@@ -281,6 +281,13 @@ class PollScheduler:
         Returns None when no `hotspot:` block is configured."""
         return self._hotspot
 
+    @property
+    def hotspot_handoff(self) -> AutoHandoffMonitor | None:
+        """Expose the auto-handoff monitor so a hotspot-config PUT can
+        restart it in place (re-evaluating should_run() against the new
+        cfg) instead of rebuilding the whole scheduler."""
+        return self._hotspot_handoff
+
     async def _on_gps_move(self, lat: float, lon: float) -> None:
         """Called by GpsService when a fresh fix moves the daemon's
         effective location enough to warrant a refresh. Mutates the

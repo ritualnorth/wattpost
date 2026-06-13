@@ -151,13 +151,7 @@ async def update_hotspot_config(
     svc = scheduler.hotspot
     if svc is not None:
         svc.cfg = new
-        # Mirror HotspotService.start(): auto-raise only when enabled.
-        # enabled=false deliberately leaves a running AP alone (NM holds
-        # it), exactly as the old rebuild's start() did. When enabled we
-        # (re-)activate so a live AP picks up changed SSID/band/psk;
-        # backgrounded so the PUT returns without waiting on bring-up.
-        if new.enabled and svc.is_available(new):
-            asyncio.create_task(_bg_activate(svc))
+        asyncio.create_task(_bg_apply(scheduler, svc, new))
     else:
         # No live service to update (the scheduler always builds one, so
         # this is defensive) — fall back to a full reload to materialise it.
@@ -165,13 +159,37 @@ async def update_hotspot_config(
     return {"ok": True, "configured": True, "restart_required": False}
 
 
-async def _bg_activate(svc: Any) -> None:
-    """Fire-and-forget AP bring-up so a config PUT returns immediately.
-    Failures surface via status().last_error, same as the manual path."""
-    try:
-        await svc.activate()
-    except Exception:
-        log.exception("hotspot: background activate after config save failed")
+async def _bg_apply(scheduler: PollScheduler, svc: Any, new: HotspotCfg) -> None:
+    """Reconcile the live hotspot to a new cfg without a scheduler rebuild
+    (which would tear down every BLE transport). Runs in the background so
+    the config PUT returns immediately; `svc.cfg` is already updated
+    synchronously by the caller, so status() is correct the instant the
+    PUT returns regardless of this task's timing.
+
+    Two effects to reproduce from the old full hot-reload:
+      1. The auto-handoff monitor's *loop* is started once (at boot) from
+         should_run(); a runtime auto_handoff/onboarding/enabled toggle
+         must restart it or the change wouldn't take until a daemon
+         restart. stop()+start() re-evaluates should_run() against the new
+         cfg (stop() is safe when not running; start() no-ops when it
+         shouldn't run). Without this, turning auto_handoff ON at runtime
+         silently did nothing.
+      2. Mirror HotspotService.start(): auto-raise only when enabled.
+         enabled=false leaves a running AP alone (NM holds it), exactly as
+         the old rebuild's start() did; when enabled we (re-)activate so a
+         live AP picks up a changed SSID/band/psk."""
+    handoff = getattr(scheduler, "hotspot_handoff", None)
+    if handoff is not None:
+        try:
+            await handoff.stop()
+            await handoff.start()
+        except Exception:
+            log.exception("hotspot: handoff-monitor reconcile after config save failed")
+    if new.enabled and svc.is_available(new):
+        try:
+            await svc.activate()
+        except Exception:
+            log.exception("hotspot: background activate after config save failed")
 
 
 @post("/api/hotspot/on")
