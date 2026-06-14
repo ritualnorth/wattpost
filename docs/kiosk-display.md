@@ -48,6 +48,8 @@ The launcher + unit ship on every image, but chromium (~hundreds of MB) is
 sudo apt-get install -y --no-install-recommends cage seatd chromium \
   || sudo apt-get install -y --no-install-recommends cage seatd chromium-browser
 sudo systemctl enable --now seatd
+# Guarantee a console to escape to: Ctrl+Alt+F2 from the panel -> login.
+sudo systemctl enable --now getty@tty2
 
 # 2. Grant the seat groups via a drop-in. They're added here (not in the
 #    shipped unit) because `seat` doesn't exist until seatd is installed —
@@ -83,7 +85,33 @@ board/panel-specific bits can only be confirmed with a display attached:
 - [ ] Headless regression: on a box with NO panel, the unit exits 0 and
       doesn't crash-loop (`systemctl status` shows inactive/dead, not failed).
 
+## Exiting the kiosk to a CLI
+
+The panel runs a fullscreen browser with no window chrome, so the escape
+paths are:
+
+- **Keyboard at the panel — `Ctrl+Alt+F2`** (or F3–F6): switches to a text
+  login console (getty). VT-switching is handled by the seat/kernel layer
+  *beneath* cage+chromium, so the browser can't intercept it. Log in with
+  your Pi user → full CLI. `Ctrl+Alt+F1` switches back to the kiosk.
+  *Caveat:* this needs a real keyboard — a touchscreen alone can't drive a
+  text console, so plan to plug one in for deep troubleshooting (or use SSH).
+- **Over SSH** (if `ssh_enabled`): `sudo systemctl stop wattpost-kiosk-display`
+  drops the panel back to a console without touching the box; `start` brings
+  the kiosk back. This is the keyboard-free way to free the screen.
+- **Normal admin doesn't need the CLI:** Settings, WiFi, updates, etc. all
+  live in the dashboard itself, which is right there on the touchscreen. The
+  console is only for deep OS-level work.
+
+Add to the bring-up checklist:
+- [ ] `Ctrl+Alt+F2` from the panel reaches a login prompt. If it doesn't,
+      ensure a getty is reachable — `sudo systemctl enable --now getty@tty2`
+      — and that the kiosk isn't fighting getty for the same VT.
+
 ## Not yet built (v2, needs hardware to design the UX)
+- A dashboard "Exit kiosk display → console" button (stops the unit via the
+  privileged helper) — a keyboard-free way to free the screen from the panel
+  itself. Modest value since a text console still needs a keyboard to use.
 
 - A Settings/dashboard toggle that installs the stack + flips the flag in one
   click (currently the apt-install is a manual opt-in step above).
