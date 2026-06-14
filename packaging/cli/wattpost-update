@@ -161,6 +161,73 @@ expected_hash=$(awk '{print $1}' "${TMP_SHA}")
 echo "${expected_hash}  ${TMP_TAR}" | sha256sum -c - --quiet
 log "    sha256 verified"
 
+# ----- authenticity: verify the Ed25519-signed release manifest (cloud#15) -----
+# The sha256 above is integrity only — the tarball and its .sha256 come from
+# the same host, so a swapped release swaps both. The signed manifest is
+# verified by the CURRENTLY-RUNNING (trusted) venv against the pinned release
+# pubkey. FAIL-SAFE by design: only a definitive tamper signal (bad signature,
+# manifest/tarball sha mismatch, or a signed downgrade) aborts the update; a
+# missing/unsigned manifest or ANY inconclusive result grandfathers through
+# with a warning — so this can never brick an update on its own. (Full closure
+# — refuse unsigned entirely — is a later flip once every live release carries
+# a signature; v0.1.179+ do.)
+TMP_MANIFEST="$(mktemp --suffix=.json)"
+MANIFEST_URL="${SRC_BASE%/*}/wattpost-release-manifest.json${CB}"
+if curl -fsSL --connect-timeout 10 --max-time 30 -o "${TMP_MANIFEST}" "${MANIFEST_URL}" 2>/dev/null; then
+    set +e
+    "${APP_ROOT}/venv/bin/python" - "${TMP_MANIFEST}" "${expected_hash}" <<'PYV'
+import json, sys
+try:
+    from solar_monitor import __version__ as CUR
+    from solar_monitor.update.release_verify import verify_release, pinned_pubkey
+    m = json.load(open(sys.argv[1]))
+    tar_sha = sys.argv[2]
+    sig = (m.get("signature") or "").strip()
+    # The CURRENTLY-RUNNING code does this verify. A box still on a
+    # pre-signing version has no pinned key yet — it has no trust anchor, so
+    # it MUST grandfather (otherwise every existing box would refuse the very
+    # update that first ships the key). Enforcement begins once a box is on a
+    # key-bearing version (v0.1.179+).
+    if pinned_pubkey() is None:
+        sys.exit(7)                                  # no trust anchor -> grandfather
+    if not sig:
+        sys.exit(7)                                  # unsigned -> grandfather
+    if m.get("sha256") != tar_sha:
+        sys.exit(8)                                  # manifest pins another tarball
+    if not verify_release({"version": m["version"], "sha256": m["sha256"],
+                           "channel": m["channel"]}, sig):
+        sys.exit(9)                                  # bad signature
+    def _parts(v):
+        out = []
+        for p in v.lstrip("v").split("."):
+            out.append((0, int(p)) if p.isdigit() else (1, p))
+        return tuple(out)
+    try:
+        if _parts(m["version"]) < _parts(CUR):
+            sys.exit(10)                             # signed downgrade -> refuse
+    except Exception:
+        pass                                         # unparseable -> don't block
+    sys.exit(0)
+except SystemExit:
+    raise
+except Exception:
+    sys.exit(7)                                      # any error -> grandfather
+PYV
+    rc=$?
+    set -e
+    case "${rc}" in
+        0)  log "    release signature verified" ;;
+        7)  log "    WARNING: release unsigned / verifier unavailable — grandfathering" ;;
+        8)  rm -f "${TMP_MANIFEST}"; log "ERROR: manifest sha256 != downloaded tarball — refusing"; exit 1 ;;
+        9)  rm -f "${TMP_MANIFEST}"; log "ERROR: release signature INVALID — refusing (possible tampering)"; exit 1 ;;
+        10) rm -f "${TMP_MANIFEST}"; log "ERROR: refusing to downgrade — use wattpost-rollback for an intentional revert"; exit 1 ;;
+        *)  log "    WARNING: signature check inconclusive (rc=${rc}) — grandfathering" ;;
+    esac
+else
+    log "    WARNING: no signed manifest available — grandfathering"
+fi
+rm -f "${TMP_MANIFEST}"
+
 # ----- extract source -----
 tar -xzf "${TMP_TAR}" -C "${INACTIVE_TARGET}/src" --strip-components=0
 # The tarball's top-level may or may not be a wrapping dir; handle
