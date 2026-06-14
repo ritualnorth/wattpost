@@ -402,6 +402,10 @@ async def set_device_display_name(
     store: Store = state["store"]
     body = await request.json()
     name = body.get("display_name") if isinstance(body, dict) else None
+    # Coerce a non-string display_name (the store does .strip() on it) so a
+    # bogus {"display_name": 5} fails cleanly rather than 500ing.
+    if name is not None and not isinstance(name, str):
+        name = str(name)
     devs = {d["label"]: d for d in await store.list_devices()}
     if label not in devs:
         raise NotFoundException(f"unknown device {label!r}")

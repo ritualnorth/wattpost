@@ -166,6 +166,22 @@ async def auth_callback(request: Request) -> Response:
             detail="OIDC id_token failed verification",
         )
 
+    # OIDC core §3.1.3.7: bind the id_token to THIS auth request via the
+    # nonce we generated + sent in the authorize step. PKCE + single-use
+    # state already cover the main attacks; this is the spec-mandated
+    # id_token replay/injection guard. A nonce claim can't be stripped
+    # without breaking the signature we just verified, so an ABSENT nonce
+    # only means an older cloud that doesn't mint it yet — grandfather that
+    # (warn), so this appliance build is safe whatever the cloud's version.
+    # A PRESENT-but-mismatched nonce is tampering → refuse.
+    tok_nonce = claims.get("nonce")
+    if tok_nonce is None:
+        log.warning("auth_oidc: id_token carries no nonce (older cloud?) — "
+                    "skipping nonce binding check")
+    elif tok_nonce != pending.nonce:
+        log.warning("auth_oidc: id_token nonce mismatch — refusing login")
+        raise HTTPException(status_code=400, detail="OIDC nonce mismatch")
+
     # Issue local session. We stash the OIDC claims on the session
     # record so future requests can know the sub / scope / acr.
     from .. import web_auth as _wa

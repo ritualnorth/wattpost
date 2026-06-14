@@ -432,8 +432,10 @@ async def kiosk_tokens_create(data: dict) -> dict[str, Any]:
     can differ; omitted = the appliance-wide default applies at render."""
     from .. import web_auth as _wa
     from .kiosk_admin import _VALID_SKINS
-    name = (data or {}).get("name") or ""
-    skin = ((data or {}).get("skin") or "").strip().lower()
+    # Coerce to str: both flow into .strip(), so a non-string name/skin
+    # would 500. str(x or "") gives "" for missing and a safe repr otherwise.
+    name = str((data or {}).get("name") or "")
+    skin = str((data or {}).get("skin") or "").strip().lower()
     if skin and skin not in _VALID_SKINS:
         raise HTTPException(status_code=400, detail=f"skin must be one of {_VALID_SKINS}")
     tid, plaintext = _wa.create_kiosk_token(name, skin)

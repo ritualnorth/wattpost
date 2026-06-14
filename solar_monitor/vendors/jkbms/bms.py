@@ -157,7 +157,10 @@ def _parse_cell_info(frame: bytes) -> dict[str, Any]:
         out["total_charge_ah"]     = round(
             _u32le(frame, 154 + trailer_off) / 1000.0, 1
         )
-    except struct.error:
+    # IndexError too: this block has bare frame[140/141+off] reads that
+    # struct.error wouldn't catch. In-bounds today behind the length gates,
+    # but cheap insurance if a gate ever loosens (worst case: one reading lost).
+    except (struct.error, IndexError):
         pass
 
     out["_protocol_version"] = "JK02_32S" if is_32s else "JK02_24S"

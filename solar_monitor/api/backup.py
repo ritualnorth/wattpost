@@ -999,6 +999,33 @@ async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.text[:300])
     body = r.content
+    # #297-3: verify the appliance-made signature the cloud echoes back,
+    # against our OWN keypair, BEFORE staging anything. A compromised cloud
+    # can swap the bytes under our backup row but can't re-sign with our
+    # sealed private key, so this is the guarantee that "rebuild from cloud"
+    # only ever applies a backup THIS appliance produced. verify_archive
+    # grandfathers pre-signing backups (all three headers absent → allow +
+    # warn) and refuses on a mismatched/partial/tampered signature.
+    from ..backup import signing as _backup_signing
+    sig_b64   = r.headers.get("X-WP-Backup-Signature")
+    pubkey_fp = r.headers.get("X-WP-Backup-Pubkey-Fp")
+    sig_alg   = r.headers.get("X-WP-Backup-Sig-Alg")
+    try:
+        await asyncio.to_thread(
+            _backup_signing.verify_archive,
+            body, sig_b64=sig_b64, pubkey_fp=pubkey_fp, alg=sig_alg,
+        )
+    except _backup_signing.BackupSigError as e:
+        log.warning("cloud-restore: signature verify failed for backup %d: %s",
+                    backup_id, e)
+        # 4xx so the actionable detail reaches the client (a 5xx is masked).
+        raise HTTPException(
+            status_code=409,
+            detail=f"backup signature verification failed: {e}",
+        )
+    if not (sig_b64 or pubkey_fp or sig_alg):
+        log.warning("cloud-restore: backup %d carries no signature "
+                    "(pre-0.1.99) — grandfathered, allowing restore", backup_id)
     verdict = await asyncio.to_thread(_verify_archive, body)
     db_target = _resolve_db_path(state)
     config_target = Path(state.get("config_path") or "/etc/wattpost/config.yaml")
