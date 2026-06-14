@@ -29,9 +29,11 @@ from nacl.exceptions import BadSignatureError, CryptoError
 log = logging.getLogger(__name__)
 
 # Release public key (base64 of the raw 32-byte Ed25519 key), pinned at build
-# time. EMPTY until the release keypair is provisioned — empty => fail-closed,
-# the box never auto-applies. Generate with `scripts/sign_release.py --genkey`.
-RELEASE_PUBKEY_B64 = ""
+# time. The matching private seed lives ONLY as the WATTPOST_RELEASE_SIGNING_KEY
+# CI secret (release pipeline) — never in this repo, never on an appliance.
+# Provisioned 2026-06-14. An override at /etc/wattpost/release-pubkey wins over
+# this (for rotation without a code change).
+RELEASE_PUBKEY_B64 = "Mq7F1FSi1nJ8WzAfgKliqj3rRXig647qXv2NeQS9N0s"  # gitleaks:allow (PUBLIC key, safe to commit)
 
 # Optional override file: lets the image ship/rotate a key without a code
 # change. Takes precedence over the baked-in constant when present + non-empty.

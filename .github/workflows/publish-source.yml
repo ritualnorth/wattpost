@@ -73,9 +73,44 @@ jobs:
           echo "out_dir=${OUT_DIR}" >> "$GITHUB_OUTPUT"
           ls -lah "${OUT_DIR}"
 
-      # Attach the source tarball + sha256 to the GitHub Release (the
-      # .img.xz is attached by build-image.yml). GitHub Releases is the
-      # canonical home the cloud's /api/releases/latest reads from.
+      # Ed25519-sign a manifest pinning {version, sha256, channel} (cloud#15
+      # authenticity layer). The appliance verifies this against the pubkey
+      # baked into release_verify.py before applying an update — so a swapped
+      # tarball (or a swapped .sha256, which shares the same host) is rejected.
+      # The private seed is the WATTPOST_RELEASE_SIGNING_KEY secret, never in
+      # the repo/image. Always writes a manifest (signature:"" when unsigned)
+      # so the attach step's file list never misses — the appliance
+      # grandfathers an empty signature.
+      - name: Sign release manifest (Ed25519)
+        id: sign
+        env:
+          WATTPOST_RELEASE_SIGNING_KEY: ${{ secrets.WATTPOST_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          OUT_DIR="${{ steps.tarball.outputs.out_dir }}"
+          SHA=$(awk '{print $1}' "${OUT_DIR}/wattpost-source.tar.gz.sha256")
+          TAG="${GITHUB_REF_NAME}"
+          if ${{ contains(github.ref_name, '-') }}; then CHANNEL=beta; else CHANNEL=stable; fi
+          if [ -z "${WATTPOST_RELEASE_SIGNING_KEY:-}" ]; then
+            echo "::warning::WATTPOST_RELEASE_SIGNING_KEY unset — publishing UNSIGNED manifest"
+            printf '{"version":"%s","sha256":"%s","channel":"%s","signature":""}\n' \
+              "$TAG" "$SHA" "$CHANNEL" > "${OUT_DIR}/wattpost-release-manifest.json"
+            exit 0
+          fi
+          python3 -m pip install --quiet pynacl
+          SIG=$(python3 scripts/sign_release.py --version "$TAG" --sha256 "$SHA" --channel "$CHANNEL" 2>/dev/null)
+          python3 - "$TAG" "$SHA" "$CHANNEL" "$SIG" \
+            > "${OUT_DIR}/wattpost-release-manifest.json" <<'PY'
+          import json, sys
+          v, sha, ch, sig = sys.argv[1:5]
+          print(json.dumps({"version": v, "sha256": sha, "channel": ch, "signature": sig}))
+          PY
+          echo "signed manifest for ${TAG} (${CHANNEL}):"
+          cat "${OUT_DIR}/wattpost-release-manifest.json"
+
+      # Attach the source tarball + sha256 + signed manifest to the GitHub
+      # Release (the .img.xz is attached by build-image.yml). GitHub Releases
+      # is the canonical home the cloud's /api/releases/latest reads from.
       - name: Attach source to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -83,6 +118,7 @@ jobs:
           files: |
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz.sha256
+            ${{ steps.tarball.outputs.out_dir }}/wattpost-release-manifest.json
           # RC tags (v…-rcN) publish as prereleases — keeps the beta channel
           # and `releases/latest` (stable) correctly separated.
           prerelease: ${{ contains(github.ref_name, '-') }}
