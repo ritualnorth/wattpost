@@ -138,10 +138,18 @@ class TunnelService:
         # Drain output line-by-line. Stops naturally when the child
         # closes its pipe.
         assert self._proc.stdout is not None
-        async for raw in self._proc.stdout:
-            line = raw.decode(errors="replace").rstrip()
-            if line:
-                log.info("[cloudflared] %s", line)
-        rc = await self._proc.wait()
-        log.warning("tunnel: cloudflared exited rc=%s", rc)
-        self._proc = None
+        try:
+            async for raw in self._proc.stdout:
+                line = raw.decode(errors="replace").rstrip()
+                if line:
+                    log.info("[cloudflared] %s", line)
+        finally:
+            # Always reap the child + clear the handle, even if the drain
+            # loop raised — otherwise cloudflared is left a zombie and the
+            # next _run_once overwrites self._proc, so stop() can no longer
+            # terminate the orphan (leaks a process per reconnect).
+            try:
+                rc = await self._proc.wait()
+                log.warning("tunnel: cloudflared exited rc=%s", rc)
+            finally:
+                self._proc = None

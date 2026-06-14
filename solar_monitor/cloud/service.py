@@ -88,6 +88,20 @@ class CloudService:
         # lives in-memory only; a daemon restart legitimately invalidates
         # it (the snapshot file might be gone) so re-snapshot is correct.
         self._update_snapshots: dict[int, str] = {}
+        # Strong refs to fire-and-forget tasks. asyncio holds only a WEAK
+        # ref to a running task, so an unawaited create_task() result can be
+        # GC'd and silently cancelled mid-flight — a dropped command
+        # dispatch or, worst case, the restore re-exec never firing. Keep a
+        # ref until the task finishes (discarded via done-callback).
+        self._bg_tasks: set[asyncio.Task] = set()
+
+    def _spawn(self, coro, *, name: str | None = None) -> asyncio.Task:
+        """Fire-and-forget a coroutine while retaining a strong reference
+        so it can't be garbage-collected before it completes."""
+        t = asyncio.create_task(coro, name=name)
+        self._bg_tasks.add(t)
+        t.add_done_callback(self._bg_tasks.discard)
+        return t
 
     @property
     def cfg(self) -> CloudCfg:
@@ -439,7 +453,7 @@ class CloudService:
                 # update that takes 30s) doesn't block the next
                 # scheduled heartbeat. The dispatcher does its own
                 # serialization within a single command type.
-                asyncio.create_task(self._dispatch_command(cmd))
+                self._spawn(self._dispatch_command(cmd), name="cloud-cmd-dispatch")
             # Cache the owner's white-label branding (Installer tier)
             # so the local dashboard can render the custom brand
             # without a separate round-trip per page load. Stored in
@@ -476,7 +490,7 @@ class CloudService:
             if self._apply_cloud_update_channel(body.get("update_channel")):
                 updater = getattr(self.scheduler, "_updater", None)
                 if updater is not None:
-                    asyncio.create_task(updater.check_once())
+                    self._spawn(updater.check_once(), name="cloud-update-check")
         except Exception as e:
             log.warning("cloud heartbeat: failed to parse response body: %s", e)
         # Promote the pending alerts-uploaded cursor now that the
@@ -601,7 +615,7 @@ class CloudService:
             })
             # The store has a kv_set helper that the forecast service
             # already uses; same write path.
-            asyncio.create_task(store.kv_set("cloud.branding", payload))
+            self._spawn(store.kv_set("cloud.branding", payload), name="cloud-branding")
         except Exception as e:
             log.debug("cloud heartbeat: failed to cache branding: %s", e)
 
@@ -635,6 +649,12 @@ class CloudService:
         if cmd_id in self._dispatched_cmds:
             log.debug("cloud command %d already dispatched this session; skipping", cmd_id)
             return
+        # Bound the set so a long-lived appliance taking routine commands
+        # (rule sync, backups, disk cleanup) for weeks doesn't grow it
+        # without limit. Keep the most recent ids; cmd_ids only increase, so
+        # an evicted-then-re-sent old id is implausible.
+        if len(self._dispatched_cmds) >= 500:
+            self._dispatched_cmds = set(sorted(self._dispatched_cmds)[-250:])
         self._dispatched_cmds.add(cmd_id)
 
         # Cross-restart guard for the spawning kinds. The per-process set
@@ -1189,7 +1209,7 @@ class CloudService:
                 log.exception("scheduler stop failed before restore re-exec")
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
-        asyncio.create_task(_delayed_exec())
+        self._spawn(_delayed_exec(), name="cloud-restore-exec")
 
     async def _dispatch_set_local_rule(self, cmd_id: int, cmd: dict[str, Any]) -> None:
         """#261 slice 2, apply a cloud-edited rule to the local engine.

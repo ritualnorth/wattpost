@@ -411,7 +411,7 @@ function valueTooltipPlugin() {
             ? ser.value(u, v, s, idx)
             : String(v);
           const color = typeof ser.stroke === 'string' ? ser.stroke : 'currentColor';
-          rows.push(`<div><span class="chart-value-tip-sw" style="background:${color}"></span>${ser.label}: <em>${fmt}</em></div>`);
+          rows.push(`<div><span class="chart-value-tip-sw" style="background:${color}"></span>${escHtml(ser.label)}: <em>${escHtml(String(fmt))}</em></div>`);
         }
         if (!rows.length) { tip.style.display = 'none'; return; }
         tip.innerHTML = `<strong>${head}</strong>${rows.join('')}`;
@@ -9837,7 +9837,7 @@ function renderOutputPanelHtml(o) {
     `<span class="output-state-pill output-unknown">· unknown</span>`;
   const lastCmd = o.last_command;
   const lastLine = lastCmd
-    ? `Last command: <strong>${lastCmd.action}</strong> · ${fmt.ago(lastCmd.at)} · by ${lastCmd.by} · ${lastCmd.result}`
+    ? `Last command: <strong>${escHtml(lastCmd.action)}</strong> · ${fmt.ago(lastCmd.at)} · by ${escHtml(lastCmd.by)} · ${escHtml(lastCmd.result)}`
     : `No command issued yet.`;
   const safetyBanner = o.safety_confirmed ? "" : `
     <div class="output-safety">
@@ -9877,7 +9877,7 @@ function renderOutputPanelHtml(o) {
             <path d="M9 18h6"/><path d="M10 22h4"/>
             <path d="M2 12a10 10 0 0 1 20 0c0 3-1.5 5.5-4 7h-12c-2.5-1.5-4-4-4-7z"/>
           </svg>
-          ${o.name}
+          ${escHtml(o.name)}
         </h2>
         <div class="panel-sub">${stateLabel}</div>
       </div>
@@ -11090,10 +11090,10 @@ function renderScanResults(alive, partial = false) {
         <div class="wiz-row-main">
           <div class="wiz-row-title">
             <span class="wiz-row-slave">#${r.slave_id}</span>
-            <span class="wiz-row-model">${r.model || '·'}</span>
+            <span class="wiz-row-model">${escHtml(r.model || '·')}</span>
           </div>
           <div class="wiz-row-meta">
-            <span class="wiz-tag">${r.vendor || 'unknown vendor'}</span>
+            <span class="wiz-tag">${escHtml(r.vendor || 'unknown vendor')}</span>
             <span class="wiz-tag">${kindLbl}</span>
             ${known ? '<span class="wiz-tag wiz-tag--known">already added</span>' : ''}
           </div>

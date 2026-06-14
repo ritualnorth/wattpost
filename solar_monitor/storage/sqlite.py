@@ -705,6 +705,13 @@ class Store:
                     encoded = json.dumps(val)
                     str_rows.append((ts, "bank", k, encoded))
                     latest_str.append(("bank", k, ts, encoded))
+                else:
+                    # Any other type (bool, list, …) falls through all three
+                    # branches and would be silently dropped. Log it: the old
+                    # failure mode was a crash, the new one is silent loss,
+                    # which is harder to spot when a new bank field appears.
+                    log.warning("record_poll: bank field %r has unhandled "
+                                "type %s — dropping", k, type(val).__name__)
             device_meta_rows.append(("bank", "internal", "bank", None, ts))
 
         db = self._db
