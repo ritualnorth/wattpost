@@ -524,6 +524,19 @@ class KioskCfg(msgspec.Struct, kw_only=True):
     per-browser localStorage override still wins for that one browser."""
     default: bool = False    # open the local dashboard straight into kiosk
     skin: str = "halo"       # active skin: halo | ember | command
+    # ----- On-device wall display (#8) -----
+    # Drive a physical HDMI monitor / Pi touchscreen wired to THIS box.
+    # Off by default — only a box with a panel attached turns it on. When
+    # enabled, the appliance boots a fullscreen browser (cage + chromium on
+    # Pi OS Lite, no desktop) pointed at its own /kiosk view. Pi image only;
+    # a no-op on Docker (no seat/display). The launcher self-gates on this
+    # flag, so the systemd unit is harmless when it's off.
+    display_enabled: bool = False
+    # Pin the panel to a mode (home|van|cabin|marine|kiosk) → /kiosk/<mode>.
+    # "" = the plain /kiosk view (honours `skin` + `default`).
+    display_mode: str = ""
+    # Panel rotation for portrait / wall mounts: 0 | 90 | 180 | 270.
+    display_rotate: int = 0
 
 
 class WebCfg(msgspec.Struct, kw_only=True):

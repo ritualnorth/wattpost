@@ -542,6 +542,29 @@ if [ -f /etc/avahi/avahi-daemon.conf ]; then
     systemctl restart avahi-daemon || warn "avahi restart failed — wattpost.local may not resolve until reboot"
 fi
 
+# ----- wall-display kiosk launcher + unit (#8) -----
+# Install the tiny launcher + systemd unit for driving an attached HDMI /
+# touchscreen panel. The unit is ENABLED but self-gates — it exits 0 unless
+# kiosk.display_enabled is set AND a panel is present — so a headless box is
+# unaffected. We deliberately do NOT apt-install the heavy display stack
+# (cage + seatd + chromium, hundreds of MB) here: most appliances are
+# headless and would never use it. Enabling the panel installs the stack as
+# an opt-in step (see docs/kiosk-display.md). Pi-only; harmless if dirs exist.
+if [ -d /etc/systemd/system ] && [ -f "${SCRIPT_DIR}/cli/wattpost-kiosk-display" ]; then
+    step "installing wall-display kiosk launcher + unit"
+    install -m 0755 "${SCRIPT_DIR}/cli/wattpost-kiosk-display" \
+        /usr/local/bin/wattpost-kiosk-display 2>/dev/null \
+        || warn "kiosk-display launcher install failed (wall display unavailable)"
+    if [ -f "${SCRIPT_DIR}/systemd/wattpost-kiosk-display.service" ]; then
+        install -m 0644 "${SCRIPT_DIR}/systemd/wattpost-kiosk-display.service" \
+            /etc/systemd/system/wattpost-kiosk-display.service
+        systemctl daemon-reload
+        # Safe to enable everywhere: the launcher exits 0 on a box with the
+        # feature off or no panel, so systemd never restarts it there.
+        systemctl enable wattpost-kiosk-display.service >/dev/null 2>&1 || true
+    fi
+fi
+
 # ----- prefer IPv4 for outbound -----
 # Many home routers hand out a global IPv6 address via SLAAC but don't
 # actually route IPv6 to the internet. RFC 6724 then makes glibc prefer

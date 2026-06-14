@@ -1,0 +1,39 @@
+[Unit]
+Description=WattPost wall-display kiosk (HDMI / touchscreen)
+Documentation=https://github.com/ritualnorth/wattpost
+# Points a fullscreen browser at this box's own dashboard, so the daemon
+# must be up; cage needs a seat from seatd.
+After=wattpost.service seatd.service systemd-user-sessions.target
+Wants=wattpost.service seatd.service
+# The launcher self-gates (exits 0 when kiosk.display_enabled is off or no
+# panel is attached), so leaving this unit enabled on every image is safe —
+# a headless box just exits cleanly and systemd does NOT restart it.
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=wattpost
+Group=wattpost
+# ONLY groups that exist on the base Lite image — `video` is always present
+# (wattpost.service uses it too). The `render`/`input`/`seat` groups a cage
+# seat needs are added by a drop-in the opt-in display-stack install writes
+# (seatd creates the `seat` group); putting them here statically would make
+# systemd fail at spawn (status 216/GROUP) on every headless box that hasn't
+# installed the stack — defeating the launcher's self-gate. See
+# docs/kiosk-display.md.
+SupplementaryGroups=video
+Environment=WATTPOST_CONFIG=/etc/wattpost/config.yaml
+Environment=XDG_RUNTIME_DIR=/run/wattpost-kiosk
+Environment=WLR_NO_HARDWARE_CURSORS=1
+RuntimeDirectory=wattpost-kiosk
+RuntimeDirectoryMode=0700
+ExecStart=/usr/local/bin/wattpost-kiosk-display
+# Restart only on a genuine crash, with a backoff so a misconfigured panel
+# can't hammer the GPU. A clean exit 0 (disabled/headless) is not a failure,
+# so systemd leaves it stopped in that case.
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

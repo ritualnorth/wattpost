@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Wall-display kiosk (#8): boot a fullscreen browser on an attached HDMI
+# monitor / Pi touchscreen, pointed at THIS appliance's own /kiosk view.
+#
+# Runs under `cage` — a single-client Wayland kiosk compositor — on Pi OS
+# Lite (no desktop). chromium is used (not a lighter WPE browser) because
+# the dashboard SPA relies on canvas charts + Leaflet maps that render
+# reliably in Chromium.
+#
+# SELF-GATING: exits 0 immediately when kiosk.display_enabled is false, or
+# when there's no DRM/seat (a headless box). So the systemd unit is safe to
+# leave enabled on every image — a box with no panel simply does nothing.
+#
+# Hardware bring-up (can't be verified headless — see docs/kiosk-display.md):
+#   * panel rotation is best-effort via wlroots transform; some panels need
+#     a KMS/config.txt approach instead.
+#   * GPU/driver + font availability are board/panel specific.
+set -uo pipefail
+
+CONFIG="${WATTPOST_CONFIG:-/etc/wattpost/config.yaml}"
+VENV_PY="${WATTPOST_VENV_PY:-/opt/wattpost/venv/bin/python}"
+LOCAL_URL="${WATTPOST_LOCAL_URL:-http://localhost}"
+
+log() { echo "wattpost-kiosk-display: $*" >&2; }
+
+# Read display config via the venv (a proper YAML parse, not awk). Falls
+# back to disabled on any error so a malformed config never launches a panel.
+eval "$("${VENV_PY}" - "${CONFIG}" <<'PY' 2>/dev/null || echo 'ENABLED=0 MODE= ROTATE=0'
+import sys
+try:
+    from solar_monitor.config import load_config
+    k = load_config(sys.argv[1]).kiosk
+    if k is None:
+        print("ENABLED=0 MODE= ROTATE=0")
+    else:
+        mode = "".join(c for c in (k.display_mode or "") if c.isalnum())
+        rot = k.display_rotate if k.display_rotate in (0, 90, 180, 270) else 0
+        print(f"ENABLED={1 if k.display_enabled else 0} MODE={mode} ROTATE={rot}")
+except Exception:
+    print("ENABLED=0 MODE= ROTATE=0")
+PY
+)"
+
+if [ "${ENABLED:-0}" != "1" ]; then
+    log "kiosk.display_enabled is off — nothing to drive"
+    exit 0
+fi
+
+# Bail cleanly unless a display output is actually CONNECTED. A headless Pi
+# still exposes /dev/dri/card* (the VideoCore GPU is always present), so the
+# meaningful test is a DRM connector reporting "connected". No connector (or
+# no DRM at all, e.g. Docker) => nothing to drive, exit 0 — don't crash-loop.
+if ! grep -qx connected /sys/class/drm/*/status 2>/dev/null; then
+    log "no connected display output — nothing to drive"
+    exit 0
+fi
+
+# Pick whichever chromium the image actually has (Pi OS has flip-flopped
+# between `chromium` and `chromium-browser`).
+CHROME=""
+for c in chromium chromium-browser; do
+    if command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
+done
+if [ -z "$CHROME" ]; then
+    log "no chromium binary found — install it (packaging/install.sh handles this)"
+    exit 0
+fi
+
+# Wait for the local dashboard to answer before launching the browser, so
+# the first frame isn't a connection error.
+for _ in $(seq 1 30); do
+    if curl -fsS -o /dev/null --max-time 2 "${LOCAL_URL}/api/health" 2>/dev/null; then break; fi
+    sleep 2
+done
+
+# Build the kiosk URL. A pinned mode → /kiosk/<mode>; else the plain view.
+case "${MODE:-}" in
+    home|van|cabin|marine|kiosk) URL="${LOCAL_URL}/kiosk/${MODE}" ;;
+    *)                           URL="${LOCAL_URL}/kiosk" ;;
+esac
+
+# Rotation (best-effort; validate on hardware). wlroots reads these.
+export WLR_NO_HARDWARE_CURSORS=1
+case "${ROTATE:-0}" in
+    90)  export WLR_RANDR_TRANSFORM=90 ;;
+    180) export WLR_RANDR_TRANSFORM=180 ;;
+    270) export WLR_RANDR_TRANSFORM=270 ;;
+esac
+
+mkdir -p /var/lib/wattpost/kiosk-chrome 2>/dev/null || true
+
+log "launching ${CHROME} kiosk at ${URL} (rotate=${ROTATE:-0})"
+# cage runs the one client fullscreen and exits when it exits. The chromium
+# flags suppress first-run/update/crash chrome so the panel only ever shows
+# the dashboard.
+exec cage -d -- "${CHROME}" \
+    --kiosk "${URL}" \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-features=Translate \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    --no-first-run \
+    --check-for-update-interval=31536000 \
+    --user-data-dir=/var/lib/wattpost/kiosk-chrome
