@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">WattPost</string>
-    <string name="title_activity_main">WattPost</string>
-    <string name="package_name">io.wattpost.app</string>
-    <string name="custom_url_scheme">io.wattpost.app</string>
-</resources>
