@@ -404,6 +404,7 @@ async def rotate_web_password() -> dict[str, Any]:
     # rotation isn't a hard failure if the mirror write throws.
     try:
         _wa.PASSWORD_PLAINTEXT_PATH.write_text(new_pw + "\n", encoding="utf-8")
+        os.chmod(_wa.PASSWORD_PLAINTEXT_PATH, 0o600)  # cleartext — owner-only
     except OSError:
         log.warning("web-password rotate: plaintext mirror write failed (non-fatal)")
     # Rotating is an explicit user action → we're past first-run; drop

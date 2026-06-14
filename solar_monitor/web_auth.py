@@ -654,10 +654,13 @@ def hash_password(plaintext: str) -> str:
 
 
 def write_password_hash(plaintext: str) -> None:
-    """Replace the stored password hash. Caller is responsible for
-    file ownership / mode, this just writes the bytes."""
+    """Replace the stored password hash, owner-only (0600)."""
     PASSWORD_HASH_PATH.parent.mkdir(parents=True, exist_ok=True)
     PASSWORD_HASH_PATH.write_text(hash_password(plaintext) + "\n", encoding="utf-8")
+    try:
+        os.chmod(PASSWORD_HASH_PATH, 0o600)  # never world-readable
+    except OSError:
+        pass
 
 
 def ensure_first_boot_password() -> str | None:
@@ -694,6 +697,7 @@ def ensure_first_boot_password() -> str | None:
     # Docker installs can both show it. Best-effort.
     try:
         PASSWORD_PLAINTEXT_PATH.write_text(plaintext + "\n", encoding="utf-8")
+        os.chmod(PASSWORD_PLAINTEXT_PATH, 0o600)  # cleartext — owner-only
     except OSError:
         pass
     # Mark this as the untouched auto-generated password so the login

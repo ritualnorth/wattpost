@@ -619,6 +619,21 @@ def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
     cfg = msgspec.convert(raw, Config)
 
+    # Harden the config file mode at runtime. config.yaml holds bearer_token,
+    # sso_secret, tunnel_token + SMTP/MQTT creds, but the atomic tmp-replace
+    # writers across the _admin endpoints drop the mode back to the umask
+    # default (often world-readable) on every save. install.sh sets a tight
+    # mode on the Pi, but a settings save or the first cloud-pair rewrite
+    # undoes it. Heal it here on every load — startup AND hot-reload (a
+    # settings save triggers a reload, so the post-save window closes
+    # immediately). Best-effort; the runtime equivalent of the install-time
+    # chmod (Docker installs never run install.sh).
+    try:
+        import os as _os
+        _os.chmod(Path(path), 0o600)
+    except OSError:
+        pass
+
     # #258, first-boot default rules. Only seeds when:
     #   1. `alerts:` is empty (or absent), AND
     #   2. `alerts_seeded:` is missing or False.
