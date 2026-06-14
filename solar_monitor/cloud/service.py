@@ -403,10 +403,14 @@ class CloudService:
             from . import command_verify as _cverify
             from .. import signed_audit as _sa
             for cmd in commands:
-                # Each cmd carries its own appliance_id so the
-                # verifier doesn't need an out-of-band hint.
-                appliance_id = int(cmd.get("appliance_id") or 0)
                 try:
+                    # Each cmd carries its own appliance_id so the verifier
+                    # doesn't need an out-of-band hint. Parse INSIDE the try:
+                    # a malformed appliance_id must reject just this command,
+                    # not raise out of the loop and abort dispatch of the
+                    # whole batch plus the cloud-delivered settings
+                    # (branding/SSO/backup/channel) handled below it.
+                    appliance_id = int(cmd.get("appliance_id") or 0)
                     ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
                 except Exception:
                     log.exception("command verify raised, treating as untrusted")
@@ -513,13 +517,22 @@ class CloudService:
         if bk is None:
             return False
         changed = False
+        # Coerce defensively — these come from the cloud heartbeat
+        # response; a non-numeric value would otherwise raise out of the
+        # response handler and skip the settings applied after this call.
         if interval_hours is not None:
-            iv = int(interval_hours)
+            try:
+                iv = int(interval_hours)
+            except (TypeError, ValueError):
+                iv = 0
             if iv >= 1 and bk.interval_hours != iv:
                 bk.interval_hours = iv
                 changed = True
         if keep_count is not None:
-            kc = int(keep_count)
+            try:
+                kc = int(keep_count)
+            except (TypeError, ValueError):
+                kc = 0
             if kc >= 1 and bk.keep_count != kc:
                 bk.keep_count = kc
                 changed = True
@@ -1470,7 +1483,10 @@ class CloudService:
         try:
             engine = getattr(self.scheduler, "_alerts", None)
             last_fired = getattr(engine, "_last_fired", {}) if engine else {}
-            rules = list(self._all_rules)
+            # Cap at source: a box with hundreds of rules would otherwise
+            # make this the biggest extras key and get it shed by the
+            # byte-budget trim every beat, flapping the cloud Rules UI.
+            rules = list(self._all_rules)[:50]
             if rules:
                 extras["local_alert_rules"] = [
                     {
@@ -1546,7 +1562,10 @@ class CloudService:
             engine = getattr(self.scheduler, "_alerts", None)
             since_ts = int(getattr(self, "_alerts_uploaded_ts", 0))
             if engine is not None and hasattr(engine, "recent_events_since"):
-                events = engine.recent_events_since(since_ts, limit=20)
+                # Belt-and-suspenders [:20]: don't rely solely on the
+                # engine honouring `limit` (a fresh process has
+                # _alerts_uploaded_ts unset → since_ts=0 → full ring buffer).
+                events = (engine.recent_events_since(since_ts, limit=20) or [])[:20]
                 if events:
                     # Map rule_id → transports so cloud knows which
                     # events the user wants fanned out via cloud
