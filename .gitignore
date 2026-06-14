@@ -75,3 +75,12 @@ cloud/.env.*
 # Editor / tool local state
 .vscode/
 .idea/
+
+# Local untracked clutter (sorted out 2026-06-14) — keep these out of the
+# repo so a stray `git add .` can't commit a 52MB DB backup, 96MB of
+# node_modules, or design scratch. The `*.db` rule above doesn't catch
+# `.db.legacy.bak`, hence the explicit `*.bak`.
+*.bak
+/design/
+/mobile-app/
+/fit_final.png
