@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import asyncio
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -362,6 +363,12 @@ class Store:
         )
         self.path = path if self._is_memory else Path(path)
         self._db: aiosqlite.Connection | None = None
+        # Serialises the two multi-statement background writers
+        # (record_poll, rollup_and_purge). They run as separate asyncio
+        # tasks on one connection, and aiosqlite's commit() is
+        # connection-global — without this, one writer's commit() can flush
+        # the other's half-finished transaction. Reads don't need it (WAL).
+        self._write_lock = asyncio.Lock()
         # Bank-aggregator policy (#121). Defaults match BankCfg's
         # defaults; the scheduler calls `set_bank_policy()` after
         # boot to apply any user override from config.yaml.
@@ -593,6 +600,15 @@ class Store:
     # ---------- writes ----------
 
     async def record_poll(
+        self, result: dict[str, Any], ts_override: int | None = None,
+    ) -> None:
+        """Persist one poll result, serialised against rollup_and_purge so
+        their multi-statement transactions can't interleave commits on the
+        shared connection. Thin wrapper; the work is in _record_poll_locked."""
+        async with self._write_lock:
+            await self._record_poll_locked(result, ts_override)
+
+    async def _record_poll_locked(
         self, result: dict[str, Any], ts_override: int | None = None,
     ) -> None:
         """Persist a single `orchestrator.poll_once()` result.
@@ -1246,6 +1262,13 @@ class Store:
     # ---------- maintenance ----------
 
     async def rollup_and_purge(self, now: int | None = None) -> dict[str, int]:
+        """Serialised against record_poll (see _write_lock) so the long
+        rollup+purge transaction can't have its commit pre-empted by a
+        concurrent poll write. Thin wrapper around _rollup_and_purge_locked."""
+        async with self._write_lock:
+            return await self._rollup_and_purge_locked(now)
+
+    async def _rollup_and_purge_locked(self, now: int | None = None) -> dict[str, int]:
         """Compute pending rollups and apply retention. Idempotent.
 
         Re-rolls a sliding window so any late-arriving samples get folded in.
