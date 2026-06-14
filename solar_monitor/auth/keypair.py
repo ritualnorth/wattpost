@@ -227,12 +227,12 @@ def load_or_create(dir_: Path | str = DEFAULT_DIR) -> Keypair:
     First call generates + persists a new ed25519 keypair. Subsequent
     calls load the existing one from disk. Idempotent.
 
-    Raises KeypairError if the existing file is present but won't
-    decrypt, that means either the machine-id changed (disk moved to
-    a new host) or the file is corrupted. Caller decides whether to
-    fail-loud or regenerate (default: fail-loud; regenerating without
-    a deliberate user action would silently invalidate every cloud-
-    side trust relationship).
+    If the sealed file is present but won't decrypt — machine-id churn
+    (common on Docker, where the anchor can change across recreates) or a
+    corrupt file — we delete it and regenerate rather than fail-loud
+    (changed post-v0.1.94: fail-loud left such boxes permanently stuck).
+    The regeneration rotates the keypair, so the cloud re-registers the new
+    public key on the next heartbeat and records it as an audited rotation.
     """
     dir_ = Path(dir_)
     sealed_path = dir_ / PRIVATE_SEALED

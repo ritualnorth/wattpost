@@ -174,45 +174,12 @@ log "    sha256 verified"
 TMP_MANIFEST="$(mktemp --suffix=.json)"
 MANIFEST_URL="${SRC_BASE%/*}/wattpost-release-manifest.json${CB}"
 if curl -fsSL --connect-timeout 10 --max-time 30 -o "${TMP_MANIFEST}" "${MANIFEST_URL}" 2>/dev/null; then
+    # Orchestration lives in solar_monitor.update.verify_download (a
+    # unit-tested module, not an inline heredoc). Run with the CURRENTLY-
+    # RUNNING venv so the trusted code authenticates the new download.
     set +e
-    "${APP_ROOT}/venv/bin/python" - "${TMP_MANIFEST}" "${expected_hash}" <<'PYV'
-import json, sys
-try:
-    from solar_monitor import __version__ as CUR
-    from solar_monitor.update.release_verify import verify_release, pinned_pubkey
-    m = json.load(open(sys.argv[1]))
-    tar_sha = sys.argv[2]
-    sig = (m.get("signature") or "").strip()
-    # The CURRENTLY-RUNNING code does this verify. A box still on a
-    # pre-signing version has no pinned key yet — it has no trust anchor, so
-    # it MUST grandfather (otherwise every existing box would refuse the very
-    # update that first ships the key). Enforcement begins once a box is on a
-    # key-bearing version (v0.1.179+).
-    if pinned_pubkey() is None:
-        sys.exit(7)                                  # no trust anchor -> grandfather
-    if not sig:
-        sys.exit(7)                                  # unsigned -> grandfather
-    if m.get("sha256") != tar_sha:
-        sys.exit(8)                                  # manifest pins another tarball
-    if not verify_release({"version": m["version"], "sha256": m["sha256"],
-                           "channel": m["channel"]}, sig):
-        sys.exit(9)                                  # bad signature
-    def _parts(v):
-        out = []
-        for p in v.lstrip("v").split("."):
-            out.append((0, int(p)) if p.isdigit() else (1, p))
-        return tuple(out)
-    try:
-        if _parts(m["version"]) < _parts(CUR):
-            sys.exit(10)                             # signed downgrade -> refuse
-    except Exception:
-        pass                                         # unparseable -> don't block
-    sys.exit(0)
-except SystemExit:
-    raise
-except Exception:
-    sys.exit(7)                                      # any error -> grandfather
-PYV
+    "${APP_ROOT}/venv/bin/python" -m solar_monitor.update.verify_download \
+        "${TMP_MANIFEST}" "${expected_hash}"
     rc=$?
     set -e
     case "${rc}" in
