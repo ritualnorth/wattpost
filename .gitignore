@@ -82,5 +82,4 @@ cloud/.env.*
 # `.db.legacy.bak`, hence the explicit `*.bak`.
 *.bak
 /design/
-/mobile-app/
 /fit_final.png

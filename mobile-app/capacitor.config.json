@@ -1,0 +1,51 @@
+{
+  "appId": "io.wattpost.app",
+  "appName": "WattPost",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#0d1117",
+    "scheme": "WattPost",
+    "limitsNavigationsToAppBoundDomains": false,
+    "appendUserAgent": "WattPostApp/0.1.0"
+  },
+  "android": {
+    "backgroundColor": "#0d1117",
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "appendUserAgent": "WattPostApp/0.1.0"
+  },
+  "server": {
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "cleartext": false,
+    "allowNavigation": [
+      "wattpost.cloud",
+      "*.wattpost.cloud"
+    ]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 800,
+      "backgroundColor": "#0d1117",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "PushNotifications": {
+      "presentationOptions": [
+        "badge",
+        "sound",
+        "alert"
+      ]
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0d1117"
+    }
+  }
+}
