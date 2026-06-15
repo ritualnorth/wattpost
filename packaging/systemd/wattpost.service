@@ -20,6 +20,13 @@ SupplementaryGroups=bluetooth video
 
 WorkingDirectory=/opt/wattpost
 Environment=PYTHONUNBUFFERED=1
+# Cap glibc malloc arenas. Python plus the uvicorn/anyio threadpool and
+# bleak's dbus thread otherwise let glibc spin up ~8x CPU-count heap arenas,
+# which inflates RSS 20-40% on a multi-core Pi for no benefit. Two arenas is
+# ample for this low-allocation async workload; the trim threshold returns
+# freed heap to the OS instead of hoarding it. Pure win on constrained Pis.
+Environment=MALLOC_ARENA_MAX=2
+Environment=MALLOC_TRIM_THRESHOLD_=131072
 # Single source of truth for runtime paths so the install script and
 # pi-gen stage only have to set them in one place.
 Environment=WATTPOST_CONFIG=/etc/wattpost/config.yaml

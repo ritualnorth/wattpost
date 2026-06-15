@@ -234,7 +234,11 @@ PRAGMAS = (
     "PRAGMA journal_mode = WAL",
     "PRAGMA synchronous = NORMAL",
     "PRAGMA temp_store = MEMORY",
-    "PRAGMA mmap_size = 134217728",  # 128 MB; harmless if RAM is smaller
+    # 32 MB. The mmap'd DB pages are *resident* (they show up in RSS via
+    # smaps), so on a memory-constrained Pi a 128 MB mmap quietly cost ~100 MB
+    # of RAM once the DB grew past it. 32 MB is plenty of read acceleration;
+    # the 8 MB page cache below carries the hot working set.
+    "PRAGMA mmap_size = 33554432",   # 32 MB
     "PRAGMA cache_size = -8192",     # 8 MB
 )
 

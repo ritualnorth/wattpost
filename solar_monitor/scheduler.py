@@ -7,6 +7,8 @@ backs off but doesn't kill the loop.
 from __future__ import annotations
 
 import asyncio
+import ctypes
+import ctypes.util
 import logging
 import random
 import time
@@ -28,6 +30,41 @@ from .outputs.service import OutputsService
 from .storage import Store
 
 log = logging.getLogger(__name__)
+
+
+_libc: Any = None  # cached glibc handle; set False once malloc_trim is known absent
+
+
+def _malloc_trim() -> None:
+    """Best-effort: hand glibc's freed heap back to the OS.
+
+    Long-running Python daemons ratchet RSS up because glibc keeps freed
+    arenas resident rather than returning them. We call this after the
+    maintenance pass (the rollup/purge runs temp tables in memory and frees a
+    lot) so weeks of uptime don't leave the high-water mark stuck high. No-op
+    on non-glibc platforms.
+    """
+    global _libc
+    if _libc is False:
+        return
+    try:
+        if _libc is None:
+            _libc = ctypes.CDLL(ctypes.util.find_library("c") or "libc.so.6")
+        _libc.malloc_trim(0)
+    except Exception:
+        _libc = False  # not glibc / no malloc_trim — stop trying
+
+
+def _rss_mb() -> int | None:
+    """Resident set size in MB, or None if unavailable (non-Linux)."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) // 1024
+    except Exception:
+        return None
+    return None
 
 
 def _transport_is_open(t: Any) -> bool:
@@ -678,6 +715,18 @@ class PollScheduler:
                 await self.store.rollup_and_purge()
             except Exception:
                 log.exception("maintenance pass failed; will retry next interval")
+            # Hand the heap freed by the purge back to the OS. glibc otherwise
+            # holds it, so RSS only ratchets upward over weeks of uptime. The
+            # reclaim is logged so a long-running box tells us hoarding (RSS
+            # drops here) from a genuine leak (it doesn't).
+            before = _rss_mb()
+            _malloc_trim()
+            after = _rss_mb()
+            if before is not None and after is not None and before - after >= 5:
+                log.info(
+                    "malloc_trim reclaimed %d MB (RSS %d -> %d MB)",
+                    before - after, before, after,
+                )
             try:
                 await asyncio.wait_for(
                     self._stop.wait(),

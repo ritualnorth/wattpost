@@ -92,6 +92,13 @@ COPY docs         /app/docs
 # point and `python -m solar_monitor` resolve.
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+# Cap glibc malloc arenas. Python + the uvicorn/anyio threadpool + bleak's
+# dbus thread otherwise make glibc spin up ~8x CPU-count heap arenas, which
+# inflates RSS 20-40% on a multi-core Pi/host for no benefit. Two is ample for
+# this low-allocation async workload; the trim threshold hands freed heap back
+# to the OS rather than hoarding it. Applies to every container install.
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_TRIM_THRESHOLD_=131072
 # Tells the daemon's update-checker that this install is Docker —
 # the dashboard shows "docker compose pull" copy instead of an
 # Update-now button that wouldn't work (wattpost-update helper
