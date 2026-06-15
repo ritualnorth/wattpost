@@ -8,7 +8,13 @@ dependencies = [
     "pyserial>=3.5",
     "pyyaml>=6.0",
     "msgspec>=0.19",
-    "litestar[standard]>=2.13",
+    # Base litestar, NOT [standard]: that extra dragged in uvicorn[standard]'s
+    # uvloop + httptools + websockets + watchfiles (plus jinja2/rich/click),
+    # none of which the appliance uses — it serves SSE not websockets, uses
+    # static HTML not templates, and has its own argparse CLI. Bare uvicorn
+    # (below) runs the asyncio loop + h11, ample at a 60s poll cadence, and
+    # this trims ~15-20 MB of resident libs off the daemon + shrinks the image.
+    "litestar>=2.13",
     "aiosqlite>=0.20",
     "uvicorn>=0.30",
     "aiomqtt>=2.0",        # MQTT exporter + (future) MQTT-publish alert transport

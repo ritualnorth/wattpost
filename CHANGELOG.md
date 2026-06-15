@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.185] - 2026-06-15
+
+Trim unused web-server dependencies for a leaner footprint.
+
+### Changed
+- **Use base `litestar` instead of the `litestar[standard]` extra.** That
+  extra dragged in uvicorn[standard]'s uvloop, httptools, websockets and
+  watchfiles (plus jinja2/rich), none of which the appliance uses: it serves
+  SSE rather than websockets, static HTML rather than templates, and ships
+  its own argparse CLI. Bare uvicorn (asyncio loop + h11 parser) is ample at
+  a 60s poll cadence. Trims ~15-20 MB of resident libraries off the daemon
+  and shrinks the image. Full test suite green; uvicorn boots clean without
+  the accelerators.
+
 ## [0.1.184] - 2026-06-15
 
 Lower the appliance's steady-state memory use on the Pi.
