@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.184] - 2026-06-15
+
+Lower the appliance's steady-state memory use on the Pi.
+
+### Changed
+- **Steady-state RSS cut substantially.** Long-running daemons crept up to
+  400-500 MB RSS over weeks. The cause was glibc holding freed heap (arena
+  fragmentation) plus the 128 MB SQLite mmap sitting resident in RAM, not a
+  code leak: the poll/store path stays allocation-flat over 30k cycles. Cap
+  glibc arenas (`MALLOC_ARENA_MAX=2`) on both the systemd and Docker run
+  paths, call `malloc_trim()` after each maintenance pass (logging what it
+  reclaims so a real box reports the win), and cut the SQLite `mmap_size`
+  from 128 MB to 32 MB. Fresh-boot RSS is ~60-70 MB.
+
 ## [0.1.169-beta.14] - 2026-06-11
 
 Beta — fix the whole mobile dashboard rendering oversized.
