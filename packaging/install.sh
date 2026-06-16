@@ -542,6 +542,29 @@ if [ -f /etc/avahi/avahi-daemon.conf ]; then
     systemctl restart avahi-daemon || warn "avahi restart failed — wattpost.local may not resolve until reboot"
 fi
 
+# ----- zram swap (low-RAM headroom) -----
+# Compressed RAM swap so a memory spike can't OOM-kill the daemon on a
+# memory-tight board. It's the difference between viable and not on a 512 MB
+# Pi Zero 2 W, and harmless on bigger Pis: zram only consumes RAM as pages are
+# actually swapped to it, so on a box with spare RAM it sits idle. zstd
+# compresses cold pages by roughly 2-3x, giving a small board real effective
+# headroom without a disk swapfile (no SD-card wear). Pi-only; a Docker host
+# manages its own swap.
+step "configuring zram swap"
+if ! dpkg -s zram-tools >/dev/null 2>&1; then
+    apt-get install -y zram-tools || warn "couldn't install zram-tools — no swap cushion on low-RAM Pis"
+fi
+if dpkg -s zram-tools >/dev/null 2>&1; then
+    zcfg=/etc/default/zramswap
+    touch "$zcfg"
+    if grep -qE '^#*ALGO=' "$zcfg"; then sed -i 's/^#*ALGO=.*/ALGO=zstd/' "$zcfg"; else echo 'ALGO=zstd' >> "$zcfg"; fi
+    if grep -qE '^#*PERCENT=' "$zcfg"; then sed -i 's/^#*PERCENT=.*/PERCENT=50/' "$zcfg"; else echo 'PERCENT=50' >> "$zcfg"; fi
+    systemctl enable zramswap.service >/dev/null 2>&1 || true
+    # The restart fails harmlessly during the pi-gen image build (no running
+    # systemd in the chroot); it's enabled above, so it comes up on first boot.
+    systemctl restart zramswap.service 2>/dev/null || warn "zram swap will start on next boot"
+fi
+
 # ----- wall-display kiosk launcher + unit (#8) -----
 # Install the tiny launcher + systemd unit for driving an attached HDMI /
 # touchscreen panel. The unit is ENABLED but self-gates — it exits 0 unless

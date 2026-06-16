@@ -8,6 +8,19 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.186] - 2026-06-16
+
+Make memory-tight Pis (such as the 512 MB Pi Zero 2 W) a safe target.
+
+### Added
+- **zram compressed swap on Pi installs.** `install.sh` now installs and
+  enables zram-tools (zstd, 50% of RAM) so a memory spike can't OOM-kill the
+  daemon on a low-RAM board. This is what makes a 512 MB Pi Zero 2 W viable;
+  it's harmless on bigger Pis, since zram only uses RAM as pages are actually
+  swapped to it. No disk swapfile, so no SD-card wear. Baked into the SD image
+  too (the image build runs `install.sh`). Docker hosts are unaffected; they
+  manage their own swap.
+
 ## [0.1.185] - 2026-06-15
 
 Trim unused web-server dependencies for a leaner footprint.
