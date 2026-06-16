@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.187] - 2026-06-16
+
+Add a System-health history graph.
+
+### Added
+- **System-health chart** under Settings → Device health: CPU temperature,
+  memory and disk over the last 24 hours, plus an under-voltage / throttle
+  event summary. The appliance now records its own vitals into a small
+  dedicated time-series each poll (served at `/api/system/host-history`,
+  30-day retention). Especially handy on a memory- and power-tight board like
+  the Pi Zero 2 W: a glance shows whether it's throttling or browning out.
+  The same host_health already rides the cloud heartbeat, so paired sites get
+  it in the cloud too.
+
 ## [0.1.186] - 2026-06-16
 
 Make memory-tight Pis (such as the 512 MB Pi Zero 2 W) a safe target.
