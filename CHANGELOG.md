@@ -8,6 +8,13 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.188] - 2026-06-16
+
+### Fixed
+- **System-health chart layout**: the chart's legend no longer overlaps the
+  under-voltage / throttle event summary below it. The chart container now
+  grows to fit uPlot's legend instead of clipping it at a fixed height.
+
 ## [0.1.187] - 2026-06-16
 
 Add a System-health history graph.
