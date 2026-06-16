@@ -5868,6 +5868,7 @@ function renderSettings() {
   refreshLocalTelemetryToggle();  // #217, anonymous install ping (off by default)
   refreshHistorySettings();  // #172, editable poll interval + retention
   refreshDeviceHealth();     // SoC temp / throttle / disk / mem / load / uptime
+  refreshHostHealthChart();  // host-health history chart (CPU temp / mem / disk + events)
   refreshSolarPauseSettings();  // #163, solar-aware charger pause
   refreshLocationPanel();    // #263/#264, share-with-cloud toggle
   refreshGpsControl();       // #125, USB GPS enable/disable
@@ -6630,6 +6631,78 @@ async function refreshDeviceHealth() {
     const dd = Math.floor(up / 86400), hh = Math.floor((up % 86400) / 3600), mm = Math.floor((up % 3600) / 60);
     set("#dh-uptime", dd > 0 ? `${dd}d ${hh}h` : (hh > 0 ? `${hh}h ${mm}m` : `${mm}m`));
   }
+}
+
+// ── Host-health history chart ───────────────────────────────────────
+// Reads /api/system/host-history (CPU temp + memory + disk over the last
+// 24h, with under-voltage/throttle event flags) and renders it under the
+// Device-health card. Same uPlot recipe as the energy chart.
+let hostHealthChart = null;
+
+async function refreshHostHealthChart() {
+  const root = document.getElementById("dh-chart");
+  if (!root) return;
+  let d;
+  try { d = await api("/api/system/host-history?hours=24"); }
+  catch (e) { return; }
+  drawHostHealthChart(root, d);
+  renderHostHealthEvents(d);
+}
+
+function drawHostHealthChart(root, payload) {
+  if (hostHealthChart) { hostHealthChart.destroy(); hostHealthChart = null; }
+  const ts = (payload && payload.ts) || [];
+  if (!ts.length) {
+    root.innerHTML = `<div style="padding:.8rem;color:var(--text-3);font-size:.85rem;">No system-health samples yet &mdash; give it a few minutes of polling.</div>`;
+    return;
+  }
+  const s = payload.series || {};
+  const pal = chartPalette();
+  const fmtC   = (v) => v == null ? "·" : v.toFixed(1) + " °C";
+  const fmtPct = (v) => v == null ? "·" : v.toFixed(0) + " %";
+  const opts = {
+    width: Math.max(root.clientWidth, 320), height: 240,
+    cursor: { drag: { x: true, y: false } },
+    scales: { x: { time: true }, temp: { auto: true }, pct: { range: [0, 100], auto: false } },
+    series: [
+      {},
+      { label: "CPU temp", stroke: "#ff8c42", width: 1.6, scale: "temp", value: (_u, v) => fmtC(v) },
+      { label: "Memory",   stroke: "#5b9bd5", width: 1.4, scale: "pct",  value: (_u, v) => fmtPct(v) },
+      { label: "Disk",     stroke: "#9aa3ad", width: 1.0, scale: "pct",  value: (_u, v) => fmtPct(v) },
+    ],
+    axes: [
+      { stroke: pal.axis, grid: { stroke: pal.grid }, ticks: { stroke: pal.gridStrong }, space: 50, size: 36 },
+      { stroke: pal.axis, grid: { stroke: pal.grid }, scale: "temp",
+        values: (_u, sp) => sp.map(v => v == null ? "" : v.toFixed(0) + "°") },
+      { stroke: pal.axis, scale: "pct", side: 1, grid: { show: false },
+        values: (_u, sp) => sp.map(v => v == null ? "" : v.toFixed(0) + "%") },
+    ],
+    legend: { show: true },
+    plugins: [valueTooltipPlugin()],
+  };
+  const cols = [ts, s.cpu_temp_c || [], s.mem_used_pct || [], s.disk_used_pct || []];
+  try {
+    hostHealthChart = new uPlot(opts, cols, root);
+  } catch (e) {
+    console.error("uPlot host-health failed:", e);
+    root.innerHTML = `<div style="padding:.8rem;color:var(--red);font-size:.85rem;">Chart render failed: ${e.message}</div>`;
+  }
+}
+
+function renderHostHealthEvents(payload) {
+  const el = document.getElementById("dh-events");
+  if (!el) return;
+  const s = (payload && payload.series) || {};
+  const count = (arr) => (arr || []).reduce((n, v) => n + (v ? 1 : 0), 0);
+  const uv = count(s.under_voltage), th = count(s.throttled);
+  if (!uv && !th) {
+    el.innerHTML = `<span style="color:var(--green,#56d364)">No under-voltage or throttle events in the last 24h.</span>`;
+    return;
+  }
+  const parts = [];
+  if (uv) parts.push(`${uv} under-voltage`);
+  if (th) parts.push(`${th} throttle`);
+  el.innerHTML = `<span style="color:var(--amber,#f0b849)">⚠ ${parts.join(" · ")} event${(uv + th) > 1 ? "s" : ""} in the last 24h &mdash; check the power supply / cooling.</span>`;
 }
 
 async function refreshHistorySettings() {

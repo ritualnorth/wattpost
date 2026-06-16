@@ -617,6 +617,15 @@ class PollScheduler:
                         log.exception("mqtt_in: merge into poll result failed")
                 self._last_result = result
                 await self.store.record_poll(result)
+                # Sample the appliance's own vitals (CPU temp, memory, load,
+                # under-voltage/throttle) into the host-health series for the
+                # System-health chart. Best-effort; never let it disturb the
+                # poll loop.
+                try:
+                    from . import host_health as _hh
+                    await self.store.record_host_health(_hh.snapshot())
+                except Exception:
+                    log.exception("host-health sample failed")
                 # Output adapters (#104), discover-on-first-poll and
                 # refresh state from every snapshot. Tolerant of crash:
                 # any failure logs but doesn't stall polling.

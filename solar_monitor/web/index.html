@@ -961,6 +961,14 @@
             <div class="settings-row"><span>Memory used</span><span class="v" id="dh-mem">·</span></div>
             <div class="settings-row"><span>CPU load (1m)</span><span class="v" id="dh-load">·</span></div>
             <div class="settings-row"><span>Uptime</span><span class="v" id="dh-uptime">·</span></div>
+            <!-- Host-health history: CPU temperature, memory and disk over the
+                 last 24h, with any under-voltage / throttle events flagged
+                 below. Fed by /api/system/host-history. -->
+            <div class="dh-history" style="margin-top:.7rem;">
+              <div class="settings-foot" style="margin:.2rem 0 .4rem">History &mdash; last 24 hours</div>
+              <div id="dh-chart" style="height:240px;"></div>
+              <div id="dh-events" class="settings-foot" style="margin-top:.45rem"></div>
+            </div>
           </div>
           <!-- Solar-aware charger pause hidden from prod until ready (#163).
                Re-enable by removing the `hidden` attribute below — the JS
@@ -1503,6 +1511,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=286"></script>
+  <script src="/web/app.js?v=287"></script>
 </body>
 </html>

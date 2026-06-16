@@ -127,6 +127,19 @@ CREATE TABLE IF NOT EXISTS poll_runs (
     errors_json   TEXT
 );
 
+-- Host-health time-series: the appliance's own vitals (CPU temperature,
+-- memory/disk use, load, and under-voltage/throttle events), sampled once
+-- per poll. Kept in its own narrow table, deliberately NOT folded into the
+-- device `samples` table, so it never touches the device list, the bank
+-- aggregator or the exporters. A handful of (metric, ts) rows per poll.
+CREATE TABLE IF NOT EXISTS host_samples (
+    ts     INTEGER NOT NULL,
+    metric TEXT    NOT NULL,
+    value  REAL    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_host_samples_metric_ts
+    ON host_samples (metric, ts);
+
 -- Small key/value scratch table for cached blobs (forecast payloads,
 -- third-party integration state, etc). Use it for things too small to
 -- warrant their own schema; anything bigger should get a real table.
@@ -1263,6 +1276,77 @@ class Store:
             "table": table,
         }
 
+    # ---------- host health ----------
+
+    async def record_host_health(self, snap: dict[str, Any], ts: int | None = None) -> None:
+        """Persist the numeric subset of a host_health snapshot as a small
+        time-series. Best-effort and tolerant: a missing/non-numeric field is
+        skipped, never raised into the poll loop. Booleans store as 1.0/0.0 so
+        an under-voltage/throttle event reads as a spike on the chart.
+        Serialised on the same write lock as the other writers."""
+        if self._db is None:
+            return
+        ts = int(ts) if ts is not None else int(time.time())
+        soc = snap.get("soc") or {}
+        mem = snap.get("memory") or {}
+        disk = snap.get("disk") or {}
+        load = snap.get("loadavg") or {}
+        rows: list[tuple[int, str, float]] = []
+
+        def _add(metric: str, val: Any) -> None:
+            if isinstance(val, bool):
+                rows.append((ts, metric, 1.0 if val else 0.0))
+            elif isinstance(val, (int, float)):
+                rows.append((ts, metric, float(val)))
+
+        _add("cpu_temp_c",    soc.get("temp_c"))
+        _add("mem_used_pct",  mem.get("percent"))
+        _add("disk_used_pct", disk.get("percent"))
+        _add("load_1m",       load.get("load_1m"))
+        _add("under_voltage", soc.get("under_voltage_now"))
+        _add("throttled",     soc.get("throttled_now"))
+        if not rows:
+            return
+        async with self._write_lock:
+            await self._db.executemany(
+                "INSERT INTO host_samples(ts, metric, value) VALUES (?, ?, ?)", rows
+            )
+            await self._db.commit()
+
+    async def get_host_history(
+        self, since: int, until: int | None = None, bucket_seconds: int | None = None,
+    ) -> dict[str, dict[str, list]]:
+        """Host-health series for the System-health chart, as
+        {metric: {ts: [...], values: [...]}} for every metric in the window.
+        Gauges (temp/mem/disk/load) are bucket-averaged; the 0/1 event flags
+        (under_voltage, throttled) use MAX so a single event in a bucket still
+        shows as a spike rather than being averaged away."""
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        until = until if until is not None else int(time.time())
+        if bucket_seconds and bucket_seconds > 1:
+            sql = (
+                "SELECT metric, (ts / ?) * ? AS bucket, "
+                "  CASE WHEN metric IN ('under_voltage','throttled') "
+                "       THEN MAX(value) ELSE AVG(value) END "
+                "FROM host_samples WHERE ts BETWEEN ? AND ? "
+                "GROUP BY metric, bucket ORDER BY metric, bucket"
+            )
+            params: tuple = (bucket_seconds, bucket_seconds, since, until)
+        else:
+            sql = (
+                "SELECT metric, ts, value FROM host_samples "
+                "WHERE ts BETWEEN ? AND ? ORDER BY metric, ts"
+            )
+            params = (since, until)
+        out: dict[str, dict[str, list]] = {}
+        async with self._db.execute(sql, params) as cur:
+            async for metric, t, v in cur:
+                d = out.setdefault(metric, {"ts": [], "values": []})
+                d["ts"].append(int(t))
+                d["values"].append(round(float(v), 2))
+        return out
+
     # ---------- maintenance ----------
 
     async def rollup_and_purge(self, now: int | None = None) -> dict[str, int]:
@@ -1355,6 +1439,12 @@ class Store:
             "DELETE FROM poll_runs WHERE ts < ?", (now - 30 * 86400,)
         )
         stats["purged_poll_runs"] = purged_runs.rowcount
+
+        # Host-health series: keep ~30 days for the System-health chart.
+        purged_host = await db.execute(
+            "DELETE FROM host_samples WHERE ts < ?", (now - 30 * 86400,)
+        )
+        stats["purged_host"] = purged_host.rowcount
 
         # Prune archived forecast points past retention. We keep enough
         # history for the accuracy widget to look back ~30 days.

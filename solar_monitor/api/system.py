@@ -833,6 +833,35 @@ async def device_health() -> dict[str, Any]:
     return _hh.snapshot()
 
 
+@get("/api/system/host-history")
+async def host_history(state: State, hours: int = 24, since: int | None = None) -> dict[str, Any]:
+    """Host-health time-series for the System-health chart: CPU temperature,
+    memory/disk use, load and under-voltage/throttle events over the requested
+    window (default the last 24h). Bucketed server-side so the payload stays
+    small regardless of window length."""
+    import time as _time
+    store = state["store"]
+    now = int(_time.time())
+    if since is None:
+        since = now - max(1, hours) * 3600
+    span = max(1, now - since)
+    # Cap at ~240 points per series; never finer than the 60s poll cadence.
+    bucket = max(60, span // 240)
+    raw = await store.get_host_history(since, now, bucket_seconds=bucket)
+    # Pivot to aligned columns the chart can consume directly: one shared ts
+    # grid (union of all buckets) with each metric a parallel array, null
+    # where that metric has no sample in a bucket.
+    grid = sorted({t for m in raw.values() for t in m["ts"]})
+    idx = {t: i for i, t in enumerate(grid)}
+    series: dict[str, list] = {}
+    for metric, d in raw.items():
+        col: list = [None] * len(grid)
+        for t, v in zip(d["ts"], d["values"]):
+            col[idx[t]] = v
+        series[metric] = col
+    return {"since": since, "until": now, "bucket_seconds": bucket, "ts": grid, "series": series}
+
+
 @patch("/api/system/history_settings")
 async def patch_history_settings(
     data: HistorySettingsPatch, state: State,

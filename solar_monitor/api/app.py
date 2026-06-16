@@ -97,7 +97,7 @@ from .system import (
     release_changelog, appliance_branding, rotate_web_password,
     kiosk_tokens_list, kiosk_tokens_create, kiosk_tokens_revoke,
     netsec_status, netsec_set_firewall, netsec_set_ssh,
-    get_history_settings, patch_history_settings, device_health,
+    get_history_settings, patch_history_settings, device_health, host_history,
     reset_to_defaults,
 )
 from .backup import (
@@ -1788,6 +1788,7 @@ def build_app(
             get_history_settings,
             patch_history_settings,
             device_health,
+            host_history,
             reset_to_defaults,
             update_state,
             update_check_now,
