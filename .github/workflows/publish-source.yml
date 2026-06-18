@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Need history so we can stamp the tarball with the commit SHA.
           fetch-depth: 0
@@ -113,7 +113,7 @@ jobs:
       # is the canonical home the cloud's /api/releases/latest reads from.
       - name: Attach source to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz
