@@ -1,0 +1,173 @@
+# Connectivity v2 — proposal
+
+Status: **draft / not implemented.** This captures a redesign discussion,
+not the current shipping architecture (see [architecture.md](architecture.md)
+and [remote-access.md](remote-access.md) for what's live today). Written up
+so the reasoning survives past the conversation that produced it.
+
+## Why revisit this
+
+The current connectivity story grew in layers: a home-grown remote-access
+system, retired in v0.1.34 for a Cloudflare Tunnel + broker, with an SSO-token
+front door left armed but unused alongside the broker that replaced it (see
+the tunnel section of the last architecture review). Identity has picked up
+six-plus coexisting mechanisms across that same evolution. None of it is
+wrong so much as it's three generations of decisions still all present at
+once. This proposal is what the design looks like with only one generation.
+
+## The one rule everything else follows
+
+**The app never asks the user to pick "local" or "remote."** One dashboard,
+one connect flow. The app tries the LAN first (fast timeout) and falls back
+to the cloud automatically; a small status indicator ("Live" vs "Synced 4m
+ago") tells a technical user which channel it landed on, but nothing about
+the UI changes based on it. Every decision below is in service of this.
+
+## Local access
+
+- **WiFi only. Never BLE for pairing/discovery.** The onboard BLE radio is
+  already committed to reading battery/BMS hardware (some via held-open GATT
+  connections — JBD, Daly, JKBMS — some via passive broadcast scanning —
+  Victron, Ruuvi, Mopeka, Govee). Layering a peripheral/advertising role on
+  the same radio for phone pairing contends with that traffic and is a
+  plausible cause of BLE flakiness that's already a support burden today.
+  mDNS + HTTP over WiFi has no such conflict and is already the mechanism
+  used for first-boot onboarding (`WattPost-Setup` AP + captive portal) — so
+  this isn't a new direction, just dropping a second, conflicting one that
+  was never finished (`connection.ts`'s BLE rung throws `not-implemented`).
+- **The Pi should be a plain WiFi client whenever any other network is
+  available** (home WiFi, van park WiFi, and especially a dedicated van
+  router — see below). Self-hosted AP mode is the first-boot / no-router-at-
+  all fallback, not the primary design center. This sidesteps the
+  single-radio AP+uplink contention (`hotspot/handoff.py`'s 30s poll /
+  debounce / periodic-blip dance) entirely for anyone with a router, because
+  the Pi never needs to run the AP and an uplink at once.
+- **Local reachability must not depend on the network having internet.**
+  mDNS/HTTP to a local IP needs no internet — but iOS and Android both run
+  connectivity checks and will silently deprioritize or route around a WiFi
+  network they've classified as internet-less, which produces exactly the
+  "connected to the van's WiFi but the app can't reach the Pi" symptom.
+  Fix: bind local probe/API traffic explicitly to the WiFi interface
+  (`NWParameters.requiredInterfaceType = .wifi` on iOS,
+  `ConnectivityManager.bindProcessToNetwork` on Android), overriding the
+  OS's internet-availability judgment for that traffic. Standard practice
+  for any local-IoT-control app; not exotic.
+
+## Device ↔ cloud: replace heartbeat + tunnel with MQTT + device shadow
+
+Industry-standard pattern (AWS IoT Core, Azure IoT Hub, and the closest OSS
+comparable, Home Assistant Cloud) for exactly this problem — a device with
+an intermittent, sometimes-bad uplink that needs to report state and receive
+occasional commands without a live session:
+
+- Device holds a persistent MQTT connection (reconnect-with-backoff is
+  built into the protocol, not something to hand-roll). Publishes small
+  telemetry messages on its own schedule; no polling required either
+  direction.
+- **Device shadow**: cloud holds "desired state," device holds "reported
+  state," they reconcile whenever connected. This *is* the "push a setting
+  change down from the cloud" mechanism asked for repeatedly in the original
+  discussion — and WattPost already has half of it
+  (`solar_monitor/cloud/command_verify.py` signs update/backup/rollback/
+  rule-sync commands cloud→device today). This proposal is "extend that to
+  general settings," not "invent something new."
+- **Broker's "last will"** marks the device offline the instant its
+  connection drops, so the app can honestly show "last synced Nm ago"
+  instead of silently going stale.
+- **Degrades honestly on bad links.** A held-open interactive session (the
+  current tunnel) breaks visibly mid-use on a flaky connection. MQTT
+  reconnect + shadow degrades to *staler data and delayed commands* instead
+  — representable in the UI as a "pending" state rather than a dropped
+  session. This is the strongest argument for the change: it isn't just
+  simpler, it fails better.
+- Settings changes become **eventually consistent**: UI shows "Pending —
+  will apply next check-in," flips to confirmed once the device's next
+  publish echoes the change back. This is the one genuinely new UI pattern
+  the redesign needs.
+
+## What happens to the tunnel
+
+Demoted to a rare, explicit escape hatch (Victron VRM's "Remote Console" is
+the model — most usage never touches it) rather than the default path for
+"Open site." Telemetry-sync + the extended command channel covers viewing
+data and changing settings remotely; a live tunnel is only for cases that
+need full local-UI parity (debugging, support access). Whether to keep it at
+all vs. rely on `remote_access.py`'s existing staff-consent path for that
+narrow case is an open question, not decided here.
+
+## Resilience: SIM/cellular router as the recommended answer for remote access
+
+If a phone is joined to the same network as the Pi, it should always reach
+it — but "away from the van, want to check in" fundamentally requires *some*
+internet source in the van; no WiFi-radio cleverness creates connectivity
+that isn't there. Recommending a SIM/4G router (common van-life gear already,
+not a purchase solely for this app) as the answer for real remote access:
+
+- Removes the single-radio AP/uplink conflict (Pi is just a client on it).
+- Removes the "OS avoids no-internet networks" failure mode (a router with
+  real internet looks like a normal trusted network to the phone).
+- Collapses "near the van" and "hiking away" into one consistent network
+  identity instead of two different code paths.
+- Self-hosted AP mode remains supported for the no-router-at-all case, but
+  explicitly as the fallback tier, documented as such.
+
+## Phone-as-relay for the fully isolated Pi
+
+For the Pi with no router and no independent uplink at all: the phone can
+opportunistically carry data in both directions without needing any special
+trust, by piggybacking on signing the device already does:
+
+- The Pi signs its heartbeat payload locally regardless of connectivity
+  (signing needs no internet, only *sending* does). If it detects no
+  route to the cloud, it holds the already-signed blob. A phone on LAN
+  fetches it (`GET /api/pending-sync` or similar) and forwards the opaque
+  envelope to the cloud whenever *it* next has any internet. The cloud
+  verifies the signature exactly as if the Pi sent it directly — the phone
+  never handles the device's key.
+- Same idea in reverse for queued desired-state commands: phone fetches
+  them from the cloud when it has signal, delivers them to the Pi over LAN
+  next time they're together.
+- Honest scope: this catches things up on next visit, it isn't continuous
+  remote monitoring. It's a resilience layer under the SIM-router
+  recommendation, not a replacement for it.
+
+## Mobile app: native shell, not a webview wrapper
+
+- **React Native or Flutter**, not Capacitor. The "flash SD card, open app,
+  it just finds your box" pitch needs real native mDNS + BLE (BLE for
+  battery-pairing *help* flows in-app, not device pairing — see above),
+  which a webview can't do without fighting the framework.
+- Local device dashboard can stay a served web UI *inside* the app once a
+  connection is established (no native rewrite needed there) — the app
+  shell needs to be native specifically for discovery and for feeling like
+  one consistent product whether the data's live or synced.
+- Local and cloud dashboards should render from the *same* UI rather than
+  the cloud having a separate, simpler fleet-view (`wpc.js`) distinct from
+  the device's own SPA (`app.js`) — most of this falls out for free once
+  both paths feed the same shadow-backed view model instead of one being
+  "the real dashboard" and the other "the cloud's copy of it."
+
+## Relationship to existing cleanup items
+
+Independent of whether this whole proposal is adopted, these apply either
+way and should happen regardless:
+
+- Remove the superseded `.io` + SSO-redirect-token tunnel front door
+  (`api/sites.py`'s `mint_sso_token`, the appliance's `/sso` route, the
+  `origin=sso` session concept) — dead in practice, still fully armed.
+- Remove or finish `wattpost-app/src/lib/connection.ts`'s unused `connect()`
+  ladder — nothing calls it, and its BLE rung is a stub.
+- Fix `pairing.md` and `cloud-architecture.md`, which still describe the
+  pre-broker `.io` direct-tunnel flow as current.
+
+## What this proposal doesn't decide
+
+- Whether to build the MQTT/shadow layer as self-hosted (EMQX, Mosquitto)
+  or on a managed IoT platform (AWS IoT Core) — infra choice, not
+  architecture.
+- Exact scope of what settings move into the desired-state schema first.
+- Whether the tunnel is removed outright or kept as a narrow, explicitly-
+  invoked feature.
+- Timeline — this is sized in months, not a weekend refactor, and should be
+  sequenced deliberately rather than attempted alongside normal feature
+  work.
