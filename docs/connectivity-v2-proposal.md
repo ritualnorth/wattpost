@@ -53,12 +53,19 @@ the UI changes based on it. Every decision below is in service of this.
   OS's internet-availability judgment for that traffic. Standard practice
   for any local-IoT-control app; not exotic.
 
-## Device ↔ cloud: replace heartbeat + tunnel with MQTT + device shadow
+## Device ↔ cloud: add MQTT + device shadow as a fallback under the tunnel
 
-Industry-standard pattern (AWS IoT Core, Azure IoT Hub, and the closest OSS
-comparable, Home Assistant Cloud) for exactly this problem — a device with
-an intermittent, sometimes-bad uplink that needs to report state and receive
-occasional commands without a live session:
+Correction to an earlier draft of this doc: Home Assistant Cloud (Nabu
+Casa) is **not** an example of this pattern — verified against Nabu Casa's
+own docs, it's a live SNI-routed TCP tunnel (SniTun) straight to the local
+instance, the same category as WattPost's current Cloudflare Tunnel, not a
+synced-metrics cloud. That's actually *why* HA's cloud UI is trivially
+identical to its local UI: one server, proxied, not two rendering paths
+kept in sync. Tesla/Enphase/SolarEdge are the real examples of the
+MQTT/shadow pattern below (also the standard shape behind AWS IoT Core and
+Azure IoT Hub) — a device with an intermittent, sometimes-bad uplink that
+needs to report state and receive occasional commands without a live
+session:
 
 - Device holds a persistent MQTT connection (reconnect-with-backoff is
   built into the protocol, not something to hand-roll). Publishes small
@@ -87,13 +94,22 @@ occasional commands without a live session:
 
 ## What happens to the tunnel
 
-Demoted to a rare, explicit escape hatch (Victron VRM's "Remote Console" is
-the model — most usage never touches it) rather than the default path for
-"Open site." Telemetry-sync + the extended command channel covers viewing
-data and changing settings remotely; a live tunnel is only for cases that
-need full local-UI parity (debugging, support access). Whether to keep it at
-all vs. rely on `remote_access.py`'s existing staff-consent path for that
-narrow case is an open question, not decided here.
+Revised from an earlier draft: **the tunnel stays the primary path**, not a
+demoted escape hatch. The HA comparison above is the reason why — a single
+live server proxied through is what makes "cloud UI == local UI" trivially
+true, which is a real, explicitly-stated product goal here, not something
+to trade away for resilience alone. What actually needs fixing isn't the
+tunnel concept, it's that WattPost has *two generations* of tunnel
+front-door coexisting (see cleanup items below) where HA has one, clean,
+audited mechanism.
+
+The MQTT/shadow layer's job shrinks accordingly: it's the **fallback under
+the tunnel**, not its replacement. When the tunnel can be held open, it's
+the whole experience (live, identical locally and remotely). When the link
+is too bad to hold a session (the van/cabin case this project actually
+targets, more than HA's typical home-broadband user), the app falls back to
+"last synced Nm ago" from the shadow channel instead of just breaking. Primary
+experience from the tunnel, safety net from the shadow — not either/or.
 
 ## Resilience: SIM/cellular router as the recommended answer for remote access
 
@@ -150,15 +166,37 @@ trust, by piggybacking on signing the device already does:
 ## Relationship to existing cleanup items
 
 Independent of whether this whole proposal is adopted, these apply either
-way and should happen regardless:
+way. Status:
 
-- Remove the superseded `.io` + SSO-redirect-token tunnel front door
-  (`api/sites.py`'s `mint_sso_token`, the appliance's `/sso` route, the
-  `origin=sso` session concept) — dead in practice, still fully armed.
-- Remove or finish `wattpost-app/src/lib/connection.ts`'s unused `connect()`
-  ladder — nothing calls it, and its BLE rung is a stub.
-- Fix `pairing.md` and `cloud-architecture.md`, which still describe the
-  pre-broker `.io` direct-tunnel flow as current.
+- **Done.** Removed the superseded `.io` + SSO-redirect-token tunnel front
+  door: `api/sites.py`'s `mint_sso_token` + its route, the appliance's
+  `/sso` route (`api/app.py`), `consume_sso_token` + the SSO nonce cache +
+  the `origin=sso` session concept (`web_auth.py`). `sso_secret` and
+  `verify_broker_auth`/`broker_auth_scope` were left untouched — that's the
+  live broker HMAC mechanism, just confusingly named after the flow that
+  used to share it. Renaming `sso_secret` (e.g. to `broker_secret`) is a
+  separate migration: it's read from already-paired appliances' persisted
+  `config.yaml` and pushed every heartbeat, so it needs a back-compat read
+  of the old key, not just a find-replace.
+- **Done.** Removed `wattpost-app/src/lib/connection.ts`'s unused
+  `connect()` ladder, `ApplianceConnection`, and the now-dead
+  `Appliance.password` field + `setAppliancePassword()` (only ever written
+  by the removed native LAN-login path, never read elsewhere — the webview
+  handles its own login). Kept `resolveBaseUrl()`/`probeLan()`, which are
+  live.
+- **Done.** Fixed `pairing.md` and `cloud-architecture.md`, which described
+  the pre-broker direct-to-`.io` flow as current; both now describe the
+  Caddy/broker/`X-WP-Broker-Auth` path that's actually live, and are
+  explicit that `.io` is an internal tunnel hostname, never a user-facing
+  URL.
+- **Not done — needs a small backend feature, not a cleanup.** The "same
+  box shows twice" (LAN entry + cloud entry) issue in `store.ts` can't be
+  fixed client-side: `/api/health` doesn't expose any pairing identity
+  today, so there's no reliable way to correlate a hand-added LAN entry
+  with a cloud-synced one. Matching by label would be fragile and could
+  wrongly merge two different appliances that happen to share a name.
+  Real fix: have `/api/health` (or a similar local endpoint) report the
+  appliance's cloud slug when paired, then merge client-side on that.
 
 ## What this proposal doesn't decide
 
