@@ -129,12 +129,17 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     # over the tunnel.
     tunnel_token:      str  = ""
     tunnel_hostname:   str  = ""
-    # Per-appliance HMAC key for cloud→appliance SSO (#137). Cloud
+    # Per-appliance HMAC key for the cloud broker (#139, #137). Cloud
     # pushes this via the pair response + every heartbeat response;
-    # the daemon persists it here and verifies inbound /sso?token=…
-    # requests against it. Empty until the appliance has heartbeat-ed
-    # at least once post-v0.0.38; while empty, tunnel access falls
-    # back to the local-password login page.
+    # the daemon persists it here and verifies inbound
+    # X-WP-Broker-Auth headers on tunnel-origin requests against it
+    # (see web_auth.verify_broker_auth). Empty until the appliance has
+    # heartbeat-ed at least once post-v0.0.38; while empty, no
+    # tunnel-origin request can authenticate (there is no LAN-password
+    # fallback over the tunnel — see api/app.py's auth middleware).
+    # Named sso_secret for historical reasons (#137 originally paired
+    # it with a since-removed SSO-redirect login flow); it's kept as
+    # the live broker-auth key, renaming it is a separate migration.
     sso_secret:        str  = ""
     # Deprecated legacy kiosk token. The appliance no longer mints,
     # serves, or honours a `?key=` kiosk URL — cloud kiosk now flows
