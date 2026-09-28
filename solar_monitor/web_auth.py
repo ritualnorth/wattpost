@@ -95,7 +95,6 @@ ANONYMOUS_PATH_PREFIXES = (
     # kiosk session cookie. Pre-auth by necessity (a wall display has
     # no login); self-guards on verify_kiosk_token() + rejects tunnel.
     "/api/kiosk/claim",
-    "/sso",  # cloud-issued SSO redirect lands here; verifies its own token
     # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
     # own state before issuing a session, so they're safe-anon.
@@ -124,11 +123,12 @@ ANONYMOUS_PATH_PREFIXES = (
     "/canonical.html",
 )
 
-# In-memory session store. Token → {"issued_at": epoch, "origin": "local"|"sso"}.
-# Origin matters because tunnel-origin requests must be backed by an
-# "sso" session, a local-password session shouldn't grant tunnel
-# access (the password is a fallback for LAN, not the perimeter for
-# internet exposure).
+# In-memory session store. Token → {"issued_at": epoch, "origin": "local"|
+# "kiosk"|"oidc"}. Origin matters because tunnel-origin requests are never
+# granted by a session cookie at all (only the cloud broker's signed
+# X-WP-Broker-Auth header, see verify_broker_auth) — a local-password
+# session shouldn't grant tunnel access either way (the password is a
+# fallback for LAN, not the perimeter for internet exposure).
 #
 # Read-through cache over SESSIONS_PATH: every issue/revoke writes the
 # file, every read hits the dict. On module import we slurp whatever
@@ -190,11 +190,6 @@ def _persist_sessions_to_disk() -> None:
 
 
 _load_sessions_from_disk()
-# Recently-used SSO nonces (jti claims). HMAC tokens are otherwise
-# replayable within their 60 s window if intercepted. Keys are the
-# nonce strings; values are the unix-second they expire. Cleaned on
-# every issue.
-_SSO_NONCES_SEEN: dict[str, int] = {}
 
 
 def _argon2_hasher():
@@ -362,7 +357,7 @@ def verify_kiosk_token(plaintext: str | None) -> bool:
 
 
 def session_origin(token: str | None) -> str | None:
-    """Origin tag of a live session ('local' | 'sso' | 'kiosk'), or None."""
+    """Origin tag of a live session ('local' | 'kiosk' | 'oidc'), or None."""
     rec = _session_record(token)
     return None if rec is None else str(rec.get("origin", "local"))
 
@@ -403,10 +398,10 @@ def issue_session(origin: str = "local") -> str:
     """Generate a fresh session token and remember it. Returns the
     token; caller drops it in the response Set-Cookie.
 
-    `origin` tags the session for the tunnel-origin check in the
-    middleware, "local" for local-password logins, "sso" for
-    cloud-redirect SSO logins. Tunnel-origin requests require an
-    "sso" session (see is_session_valid_for_tunnel)."""
+    `origin` records how the session was established ("local" for
+    password logins, "kiosk" for a wall-display token, "oidc" for
+    LAN OIDC login). No session origin grants tunnel-origin access —
+    that's the broker header's job alone, see verify_broker_auth."""
     _gc_sessions()
     token = secrets.token_urlsafe(32)
     _SESSIONS[token] = {"issued_at": time.time(), "origin": origin}
@@ -436,18 +431,6 @@ def is_session_valid(token: str | None) -> bool:
     return _session_record(token) is not None
 
 
-def is_session_valid_for_tunnel(token: str | None) -> bool:
-    """Tunnel-origin requests need a session whose origin is "sso",
-    i.e. one issued by the /sso endpoint after verifying a cloud-
-    signed redirect token. Local-password sessions don't qualify
-    (you can still use the password on the LAN, but it can't grant
-    you internet-facing access on its own)."""
-    rec = _session_record(token)
-    if rec is None:
-        return False
-    return rec.get("origin") == "sso"
-
-
 def _gc_sessions() -> None:
     """Drop sessions older than the TTL. O(n) scan; n is small here
     (a couple of admin browsers, in practice). Runs only on issue,
@@ -459,10 +442,6 @@ def _gc_sessions() -> None:
         for t in expired:
             _SESSIONS.pop(t, None)
         _persist_sessions_to_disk()
-    # Also GC the SSO nonce cache.
-    expired_n = [n for n, exp in _SSO_NONCES_SEEN.items() if exp < int(now)]
-    for n in expired_n:
-        _SSO_NONCES_SEEN.pop(n, None)
 
 
 def verify_broker_auth_verdict(
@@ -547,55 +526,6 @@ def broker_auth_scope(header_value: str, sso_secret_hex: str) -> str | None:
     on this, see api/app.py middleware (#225)."""
     verdict, _, scope = verify_broker_auth_verdict(header_value, sso_secret_hex)
     return scope if verdict == "ok" else None
-
-
-def consume_sso_token(token: str, sso_secret_hex: str) -> dict | None:
-    """Verify a cloud-signed SSO redirect token. Returns the decoded
-    payload dict on success, None on any failure (bad signature,
-    expired, replayed, malformed).
-
-    Token format: `urlsafe_b64(payload_json)` + `.` + `urlsafe_b64(sig)`.
-    Sig is HMAC-SHA256(sso_secret_bytes, payload_json_bytes).
-
-    Replay protection: the `jti` claim is recorded in _SSO_NONCES_SEEN
-    until exp + 10s. A second use within that window is rejected even
-    if the signature is otherwise valid."""
-    import base64
-    import hashlib
-    import hmac
-    import json as _json
-
-    if not token or "." not in token or not sso_secret_hex:
-        return None
-    try:
-        body_b64, sig_b64 = token.split(".", 1)
-        # Pad for urlsafe_b64decode (we stripped = on the mint side).
-        pad = lambda s: s + "=" * (-len(s) % 4)
-        body = base64.urlsafe_b64decode(pad(body_b64))
-        sig  = base64.urlsafe_b64decode(pad(sig_b64))
-    except Exception:
-        return None
-    try:
-        key = bytes.fromhex(sso_secret_hex)
-    except ValueError:
-        return None
-    expected = hmac.new(key, body, hashlib.sha256).digest()
-    if not hmac.compare_digest(expected, sig):
-        return None
-    try:
-        payload = _json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, _json.JSONDecodeError):
-        return None
-    exp = payload.get("exp")
-    if not isinstance(exp, int) or exp < int(time.time()):
-        return None
-    jti = payload.get("jti")
-    if not isinstance(jti, str) or not jti:
-        return None
-    if jti in _SSO_NONCES_SEEN:
-        return None  # replay
-    _SSO_NONCES_SEEN[jti] = exp + 10
-    return payload
 
 
 def is_loopback_source(scope: dict) -> bool:

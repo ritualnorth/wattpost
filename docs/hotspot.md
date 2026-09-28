@@ -5,6 +5,13 @@ point**, so a phone or laptop can reach the dashboard when there's no
 other network around. This is the field-setup and off-grid story: plug
 the box in, join the `WattPost-Setup` network, open the page.
 
+If you want the appliance reachable from *outside* the van too, a cheap
+SIM/4G router is the better long-term answer than relying on this mode
+— see [Getting the appliance online in the first place](remote-access.md#getting-the-appliance-online-in-the-first-place).
+It also sidesteps the single-radio limitations below entirely, since the
+appliance just joins it as a plain WiFi client instead of running its
+own access point.
+
 > **Status:** manual control, auto-handoff **and the captive portal** are
 > all shipped. Drive the hotspot by hand, let it raise itself whenever
 > there's no other network (*Auto-handoff*), and have a joining device

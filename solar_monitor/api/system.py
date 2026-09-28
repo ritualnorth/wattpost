@@ -64,14 +64,12 @@ def _proc_uptime_seconds() -> float | None:
 @get("/api/system/auth-status")
 async def auth_status(request: Request, state: State) -> dict[str, Any]:
     """Read-only signal of whether the current request is authed,
-    and by what mechanism. Three positive cases:
+    and by what mechanism. Two positive cases:
 
       1. Local session cookie, set by /api/login after a password
-         sign-in. origin="local".
-      2. SSO session cookie, set by /sso after a cloud-minted token
-         (e.g. dashboard "Open" button → broker-redirect-with-token).
-         origin="sso".
-      3. Broker HMAC header, every request via the cloud broker
+         sign-in (or /api/kiosk/claim, /auth/callback), origin
+         "local"/"kiosk"/"oidc" respectively.
+      2. Broker HMAC header, every request via the cloud broker
          (<slug>.wattpost.cloud) carries X-WP-Broker-Auth signed by
          the per-appliance sso_secret. Stateless, per-request.
          origin="broker".
@@ -80,7 +78,7 @@ async def auth_status(request: Request, state: State) -> dict[str, Any]:
     /login redirect when the request is already broker-authed) and
     to decide whether to show a Sign Out button.
 
-    Required for cloud broker UX: without case 3, broker-authed
+    Required for cloud broker UX: without case 2, broker-authed
     users would be bounced to /login by the SPA gate, hit a dead
     end (login-tunnel.html says "sign in via wattpost.cloud"), and
     be stuck.
@@ -93,7 +91,7 @@ async def auth_status(request: Request, state: State) -> dict[str, Any]:
         sso = (cfg.cloud.sso_secret if (cfg and cfg.cloud) else "") or ""
         if sso and _wa.verify_broker_auth(broker_header, sso):
             return {"authed": True, "origin": "broker"}
-    # Cookie-based session (local password OR cloud SSO redirect).
+    # Cookie-based session (local password, kiosk, or LAN OIDC).
     token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
     if not token:
         return {"authed": False, "origin": None, "first_run": _wa.is_first_run()}

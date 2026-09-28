@@ -17,6 +17,39 @@ port-forwarding, no public IP, no certs to manage.
    request is signed with a short-lived HMAC and verified against the
    appliance's `owner_id` before the cloud forwards it to the tunnel.
 
+## Getting the appliance online in the first place
+
+Remote access needs *some* internet connection reaching the appliance —
+no tunnel or broker can create connectivity that isn't there. For a van,
+cabin, or anywhere off a home network, the recommended setup is a
+**cheap SIM/4G router** (many vanlifers already run one for their own
+internet anyway):
+
+- **Point the appliance at it like any other WiFi network.** The
+  appliance should just be a WiFi *client* on the router — it doesn't
+  need to run its own access point at all once there's a real router
+  present. Your phone joins the same router; local access (`wattpost.local`)
+  and remote access both work over it, with no config needed to switch
+  between them.
+- **This sidesteps the single-radio hotspot limitations entirely.** The
+  appliance's own hotspot mode (see [WiFi hotspot](hotspot.md)) is a
+  genuinely good fallback for a box with no router around at all, but a
+  single WiFi radio can't run an access point *and* stay connected to
+  the internet at the same time — see that doc's *Single-radio caveat*
+  and *Auto-handoff* sections for what that trade-off looks like in
+  practice. A dedicated router sidesteps the trade-off completely: the
+  appliance is never doing double duty on one radio.
+- **This is what actually makes "check in while you're out hiking"
+  possible.** If the van has no internet source of its own, there's no
+  path from your phone back to it regardless of appliance settings —
+  a SIM router (or a cellular hotspot you leave switched on) is the
+  piece that makes that scenario work at all, not a WattPost setting.
+
+If you don't have or want a router, the appliance's own hotspot mode
+(off by default, opt-in) still works — you'll just join `WattPost-Setup`
+directly when you're at the van, and remote access while away won't be
+available unless something else at that location has internet.
+
 ## Pairing
 
 1. Sign in at **[wattpost.cloud](https://wattpost.cloud)**.

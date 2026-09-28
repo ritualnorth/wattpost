@@ -1,6 +1,6 @@
 # Pair an appliance
 
-Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the multi-site dashboard, posts heartbeats, and gets a `<slug>.wattpost.io` remote-access URL.
+Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the multi-site dashboard, posts heartbeats, and gets a `<slug>.wattpost.cloud` remote-access URL.
 
 ## Steps
 
@@ -9,15 +9,15 @@ Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the mult
 3. On your Pi's dashboard, go to **Settings → Integrations → WattPost cloud** and paste the code into the pairing field.
 4. Hit **Pair**. Within a few seconds the appliance:
    - exchanges the code for a long-lived bearer token
-   - gets assigned a unique slug like `<slug>.wattpost.io`
-   - starts a [Cloudflare tunnel](#how-the-tunnel-works) for the remote-access URL
+   - gets assigned a unique slug and a per-appliance broker secret
+   - starts a [Cloudflare tunnel](#how-the-tunnel-works) backing its `<slug>.wattpost.cloud` remote-access URL
    - posts its first heartbeat
 5. Refresh `wattpost.cloud`. Your appliance is there, online.
 
 ## What pairing actually does
 
 - The appliance saves the bearer token to `/etc/wattpost/config.yaml` under `cloud:`
-- The cloud creates a Cloudflare Tunnel + DNS record for the slug
+- The cloud creates a Cloudflare Tunnel + DNS record for the slug (internally `<slug>.wattpost.io`; you never see or use this hostname)
 - The appliance launches a `cloudflared` daemon to maintain that tunnel
 - Heartbeats post every ~5 minutes (configurable)
 
@@ -27,12 +27,12 @@ No port-forwarding, no inbound network changes. The tunnel is outbound-only from
 
 Clicking **Open site →** on a card at `wattpost.cloud`:
 
-1. Browser navigates to `https://<slug>.wattpost.io`
-2. Cloudflare routes the request through the tunnel
-3. `cloudflared` on the appliance proxies it to `localhost:80`
-4. The appliance's daemon serves the same dashboard you'd see on the LAN
+1. Browser navigates to `https://<slug>.wattpost.cloud` — the broker domain, not the raw tunnel hostname.
+2. The cloud's edge (Caddy) checks your `wattpost.cloud` session owns this appliance, then signs a short-lived, per-request `X-WP-Broker-Auth` header and forwards the request through the Cloudflare Tunnel.
+3. `cloudflared` on the appliance proxies it to `localhost:80`.
+4. The appliance verifies the broker header (it's signed with the same per-appliance secret exchanged at pair time) and serves the same dashboard you'd see on the LAN.
 
-No second login: the cloud already authenticated you when you signed in, and the appliance trusts loopback traffic (the request reaches it from `127.0.0.1` via cloudflared). See [Local web password](/docs/local-password) for the full trust model.
+No second login: the cloud already authenticated you when you signed in, and each request the broker forwards carries its own fresh, signed proof of that — the appliance never needs a session of its own for tunnel traffic. See [Local web password](/docs/local-password) for the full trust model.
 
 ## Unpair
 

@@ -1181,50 +1181,6 @@ def kiosk_claim(data: dict, request: Request) -> Response:
     return resp
 
 
-@get("/sso", sync_to_thread=False)
-def sso_redirect(request: Request, state: State, token: str = "") -> Response:
-    """Cloud→appliance SSO landing (#137). The cloud's dashboard
-    mints a short-lived HMAC-signed token bound to (user, appliance,
-    exp=60s) and redirects the user here. We verify the signature
-    against the per-appliance `sso_secret` exchanged at pair time,
-    issue a session cookie tagged origin=sso, and bounce to /.
-
-    Failures fall through to /login so a stale link doesn't dead-end
-    the user."""
-    from .. import web_auth as _wa
-    config: Config = state["config"]
-    sso_secret = (config.cloud.sso_secret if config.cloud else "") or ""
-    if not sso_secret:
-        # Appliance hasn't heartbeated post-update yet; no key to
-        # verify against. Send the user to /login as a fallback.
-        return Response(
-            content="",
-            status_code=302,
-            headers={"Location": "/login?next=/&sso_unavail=1"},
-        )
-    payload = _wa.consume_sso_token(token, sso_secret)
-    if payload is None:
-        return Response(
-            content="",
-            status_code=302,
-            headers={"Location": "/login?next=/&sso_failed=1"},
-        )
-    session = _wa.issue_session(origin="sso")
-    resp = Response(content="", status_code=302, headers={"Location": "/"})
-    resp.set_cookie(
-        key=_wa.SESSION_COOKIE_NAME,
-        value=session,
-        max_age=_wa.SESSION_TTL_SECONDS,
-        httponly=True,
-        samesite="lax",
-        path="/",
-        # Tunnel is HTTPS-only at the CF edge; secure cookies survive
-        # the round-trip back through cloudflared to the appliance.
-        secure=True,
-    )
-    return resp
-
-
 async def _audit(state, *, event_type: str, payload: dict | None = None) -> None:
     """Helper: write_event to the signed audit log (Phase 8B).
     Best-effort, never raises into the caller, since security
@@ -1708,12 +1664,14 @@ def build_app(
                 if qtok and _web_auth.verify_kiosk_token(qtok):
                     await self.app(scope, receive, send)
                     return
-            # Tunnel-origin requests require an SSO-issued session;
-            # local-password sessions only grant LAN access. Keeps the
-            # local password as a fallback while making cloud-login
-            # the actual perimeter for internet-facing traffic.
+            # Tunnel-origin requests are never granted by a session
+            # cookie, only by the broker's X-WP-Broker-Auth header
+            # (checked earlier in this middleware). Local-password
+            # sessions only grant LAN access, keeping the local
+            # password a LAN fallback rather than the internet-facing
+            # perimeter.
             if tunnel:
-                ok = _web_auth.is_session_valid_for_tunnel(token)
+                ok = False
             else:
                 ok = _web_auth.is_session_valid(token)
             if ok:
@@ -1891,7 +1849,6 @@ def build_app(
             netsec_set_firewall,
             netsec_set_ssh,
             do_logout,
-            sso_redirect,
             # Identity v2 Phase 3 (#305), LAN OIDC login. Both
             # endpoints 404 when oidc_config.json is absent (i.e.
             # the appliance hasn't completed v2 upgrade yet), so
