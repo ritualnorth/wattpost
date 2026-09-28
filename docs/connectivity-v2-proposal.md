@@ -74,13 +74,25 @@ session:
 - **Device shadow**: cloud holds "desired state," device holds "reported
   state," they reconcile whenever connected. This *is* the "push a setting
   change down from the cloud" mechanism asked for repeatedly in the original
-  discussion — and WattPost already has half of it
-  (`solar_monitor/cloud/command_verify.py` signs update/backup/rollback/
-  rule-sync commands cloud→device today). This proposal is "extend that to
-  general settings," not "invent something new."
+  discussion — and WattPost already has this working end-to-end for one
+  settings category: alert rules. `set_local_rule`/`delete_local_rule`
+  commands (#261 slice 2, `solar_monitor/cloud/service.py`
+  `_dispatch_command`) carry a rule spec in `payload_json`, are signed the
+  same way as update/backup/rollback (`command_verify.py`), and are applied
+  on the next heartbeat. This is the concrete template for "extend that to
+  general settings" — proven infrastructure to reuse per settings category,
+  not something to design from scratch.
 - **Broker's "last will"** marks the device offline the instant its
   connection drops, so the app can honestly show "last synced Nm ago"
   instead of silently going stale.
+  **Partially shipped without MQTT**: `/api/sites` already computes
+  `online`/`age_seconds` from plain HTTP heartbeats (no persistent
+  connection needed for this part), and the app now surfaces it — a
+  "Live" / "Synced Nm ago" / "Never synced" badge per cloud-reachable
+  site, refreshed on every Sites view-enter, not just at sign-in (see
+  `wattpost-app/src/lib/cloud.ts`, `store.ts`, `pages/Sites.tsx`). MQTT
+  would still be the better transport for this at fleet scale, but the
+  "show freshness honestly" UX doesn't need to wait on that migration.
 - **Degrades honestly on bad links.** A held-open interactive session (the
   current tunnel) breaks visibly mid-use on a flaky connection. MQTT
   reconnect + shadow degrades to *staler data and delayed commands* instead
