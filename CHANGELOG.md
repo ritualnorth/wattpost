@@ -8,6 +8,22 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Removed
+- **Dead SSO-redirect tunnel front door**: the `/sso` route,
+  `consume_sso_token`, the SSO nonce replay cache, and the `origin=sso`
+  session concept. Superseded by the cloud broker's `X-WP-Broker-Auth`
+  header, which is unchanged by this — `sso_secret` and
+  `verify_broker_auth`/`broker_auth_scope` are still the live mechanism,
+  just confusingly named after the flow that used to share the same
+  secret.
+
+### Changed
+- **Docs**: `pairing.md` and `remote-access.md` now describe the actual
+  Caddy/broker/`X-WP-Broker-Auth` remote-access flow instead of the
+  pre-broker direct-to-`.io` tunnel story, and recommend a SIM/4G router
+  as the practical path to reliable remote access (the appliance's own
+  hotspot mode is the no-router fallback, not the primary story).
+
 ## [0.1.188] - 2026-06-16
 
 ### Fixed
