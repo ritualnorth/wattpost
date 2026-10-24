@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Internal: split `api/app.py` (per-device routes into `devices_api.py`, HTML pages and login into `pages_auth.py`). No behaviour change; function bodies and the route table are identical.
 - Internal: split `storage/sqlite.py` (analytics and outputs into mixin modules) and `api/setup.py` (device discovery scans into `setup_scan.py`). No behaviour change; function bodies and the route table are identical.
 - Add: `restart_poller` cloud command. Stops and starts the poll loop in-process (reconnects Bluetooth and serial transports) without restarting the daemon or web UI. Signed like every other command.
 - Fix: in demo mode `/api/setup/transports` returned 500 (the demo's synthetic poller has no transports), so the Setup screen's transport list failed on the public demo.
