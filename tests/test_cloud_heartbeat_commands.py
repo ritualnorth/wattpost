@@ -2,12 +2,19 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
 
 from solar_monitor.cloud import service as svc
 from solar_monitor.cloud.service import CloudService
 from solar_monitor.config import CloudCfg
 
 from test_command_verify import Env
+
+
+@pytest.fixture(autouse=True)
+def _private_state_dir(tmp_path, monkeypatch):
+    """Each test gets its own signing-key pin and ledger (every Env makes a new key)."""
+    monkeypatch.setenv("WATTPOST_DB", str(tmp_path / "db.sqlite"))
 
 
 class FakeResp:

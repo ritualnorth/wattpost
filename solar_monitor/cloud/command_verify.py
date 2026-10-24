@@ -215,6 +215,13 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int,
                     kid, cmd.get("id"))
         return False
 
+    if not _pin_allows(kid, match):
+        log.error("command_verify: cmd id=%s is signed by key %r which is NOT the one "
+                  "pinned at pairing; refusing. If the cloud was rebuilt or its key "
+                  "changed on purpose, re-trust it in Settings -> Integrations.",
+                  cmd.get("id"), kid)
+        return False
+
     vk = oidc_rp._verify_key_from_jwk(match)
     if vk is None:
         log.warning("command_verify: unsupported JWK shape for kid %r, refusing", kid)
@@ -229,6 +236,7 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int,
                     cmd.get("id"), e)
         return False
 
+    _pin_after_verified(kid, match)
     log.debug("command_verify: cmd id=%s sig ok (kid=%s)", cmd.get("id"), kid[:8])
     return True
 
@@ -314,3 +322,94 @@ def default_ledger_path() -> str:
     db = os.environ.get("WATTPOST_DB", "")
     base = os.path.dirname(db) if db else "/var/lib/wattpost"
     return os.path.join(base, "cloud_command_ledger.json")
+
+
+# ---- signing-key pin (trust on first use) ---------------------------------
+#
+# The cloud publishes its command-signing keys in a JWKS. Without a pin, whoever
+# can alter that document (a database compromise, a hijacked CDN or DNS record)
+# can publish a key of their own and sign commands the appliance will run. So
+# the appliance remembers the keys it saw at pairing and afterwards only
+# accepts those. The cloud has one long-lived signing key and no rotation, so
+# a new kid is exactly the situation worth refusing; the owner re-trusts it
+# from Settings after checking it is a change they expect (a rebuilt cloud).
+
+def default_pin_path() -> str:
+    db = os.environ.get("WATTPOST_DB", "")
+    base = os.path.dirname(db) if db else "/var/lib/wattpost"
+    return os.path.join(base, "cloud_signing_pin.json")
+
+
+def _read_pin(path: str) -> dict | None:
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        if isinstance(d, dict) and isinstance(d.get("keys"), dict):
+            return d
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _write_pin(path: str, endpoint: str, keys: dict[str, str]) -> None:
+    from ..fsutil import atomic_write_text
+    atomic_write_text(path, json.dumps({"endpoint": endpoint, "keys": keys}, sort_keys=True))
+
+
+def clear_pin(path: str | None = None) -> bool:
+    path = path or default_pin_path()
+    try:
+        os.unlink(path)
+        return True
+    except FileNotFoundError:
+        return False
+
+
+def pin_state(path: str | None = None) -> dict:
+    d = _read_pin(path or default_pin_path())
+    return {"pinned": d is not None, "kids": sorted((d or {}).get("keys", {}))}
+
+
+def _okp_keys(keys: list[dict]) -> dict[str, str]:
+    return {k["kid"]: k["x"] for k in keys
+            if k.get("kty") == "OKP" and k.get("crv") == "Ed25519"
+            and isinstance(k.get("kid"), str) and isinstance(k.get("x"), str)}
+
+
+async def pin_current_keys(*, force: bool = False, path: str | None = None) -> bool:
+    """Pin the cloud's current signing keys. Called at pairing; no-op when a
+    pin already exists unless `force` (the owner's explicit re-trust)."""
+    path = path or default_pin_path()
+    if not force and _read_pin(path) is not None:
+        return False
+    cfg = oidc_config.load()
+    if cfg is None:
+        return False
+    keys = _okp_keys(await oidc_rp.fetch_jwks(cfg.jwks_url, force=True))
+    if not keys:
+        return False
+    _write_pin(path, getattr(cfg, "endpoint", "") or "", keys)
+    log.info("command_verify: pinned %d cloud signing key(s): %s", len(keys), sorted(keys))
+    return True
+
+
+def _pin_allows(kid: str, jwk: dict, path: str | None = None) -> bool:
+    """True if this key may be used to verify a command: it is the pinned one,
+    or there is no pin yet (an install that paired before pins existed)."""
+    d = _read_pin(path or default_pin_path())
+    return d is None or d["keys"].get(kid) == jwk.get("x")
+
+
+def _pin_after_verified(kid: str, jwk: dict, path: str | None = None) -> None:
+    """Trust-on-first-use for installs without a pin: record the key only
+    once it has actually verified a command signature."""
+    path = path or default_pin_path()
+    if _read_pin(path) is not None:
+        return
+    keys = _okp_keys([jwk])
+    if keys:
+        try:
+            cfg = oidc_config.load()
+            _write_pin(path, getattr(cfg, "endpoint", "") or "", keys)
+        except OSError:
+            log.exception("command_verify: could not write the signing-key pin")
