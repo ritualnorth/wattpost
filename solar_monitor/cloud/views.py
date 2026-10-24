@@ -38,7 +38,7 @@ WEATHER_CURRENT_EVERY_S = 10 * 60
 WEATHER_HISTORY_EVERY_S = 30 * 60   # each build is an Open-Meteo call, one per range
 
 # The History page's range buttons: bucket size (seconds) -> span (None = midnight to now).
-# Mirrors ENERGY_RANGES in web/app.js; the cloud serves /api/energy/today?bucket=N from
+# Mirrors ENERGY_RANGES in web/js/06-history.js; the cloud serves /api/energy/today?bucket=N from
 # the view published under f"energy/b{N}".
 ENERGY_RANGES: dict[int, int | None] = {300: None, 900: 86400, 3600: 7 * 86400, 21600: 30 * 86400}
 
