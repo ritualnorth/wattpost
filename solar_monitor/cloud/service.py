@@ -151,20 +151,22 @@ class CloudService:
                           "starting heartbeat loop anyway")
         self._task = asyncio.create_task(self._loop(), name="cloud-heartbeat")
         self._sync_task = None
-        if self.cfg.telemetry_sync:
-            from .rollup_sync import RollupSync
-            from .views import ViewPublisher
-            self._sync = RollupSync(
-                store=self.scheduler.store,
-                endpoint=lambda: self.cfg.endpoint,
-                bearer=lambda: self.cfg.bearer_token,
-                sign=self._signed_headers,
-                backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
-                views=ViewPublisher(self.scheduler.store, self.scheduler),
-            )
-            self._sync_task = asyncio.create_task(
-                self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),
-                name="cloud-rollup-sync")
+        # Always running; `telemetry_sync` is checked live by the loop so the
+        # Settings toggle takes effect without a restart.
+        from .rollup_sync import RollupSync
+        from .views import ViewPublisher
+        self._sync = RollupSync(
+            store=self.scheduler.store,
+            endpoint=lambda: self.cfg.endpoint,
+            bearer=lambda: self.cfg.bearer_token,
+            sign=self._signed_headers,
+            backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
+            views=ViewPublisher(self.scheduler.store, self.scheduler),
+            enabled=lambda: self.cfg.telemetry_sync,
+        )
+        self._sync_task = asyncio.create_task(
+            self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),
+            name="cloud-rollup-sync")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
 

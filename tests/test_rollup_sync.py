@@ -292,3 +292,29 @@ def test_loop_pushes_at_lease_interval_and_returns_to_normal():
         assert waits[-1] == 300                       # lease lapsed: normal cadence
         await st.close()
     _run(go())
+
+
+# ---- settings switch ---------------------------------------------------------
+
+def test_uploads_switched_off_send_nothing_and_resume_when_switched_on():
+    async def go():
+        st = await _store(seed_minutes=2)
+        cloud = FakeCloud()
+        flag = {"on": False}
+        sync = rs.RollupSync(
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "tok", sign=lambda b: {"x-test-sig": "ok"},
+            backfill_hours=lambda: 1, enabled=lambda: flag["on"],
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
+        waits = []
+
+        async def fake_wait(ev, t):
+            waits.append(t)
+            if len(waits) == 2:
+                flag["on"] = True            # user ticks the box in Settings
+            return len(waits) >= 4
+
+        await sync.loop(asyncio.Event(), lambda: 300, sleep=fake_wait)
+        assert waits[:2] == [15.0, 15.0]     # off: only polling the switch
+        assert len(cloud.batches) >= 1       # on: uploads resume, no restart needed
+        await st.close()
+    _run(go())

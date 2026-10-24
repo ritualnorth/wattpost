@@ -78,7 +78,9 @@ class RollupSync:
         backfill_hours: Callable[[], int],
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
         views=None,
+        enabled: Callable[[], bool] = lambda: True,
     ) -> None:
+        self._enabled = enabled           # Settings can switch uploads off live
         self.views = views            # cloud.views.ViewPublisher | None
         self.store = store
         self._endpoint = endpoint
@@ -219,6 +221,12 @@ class RollupSync:
                 return False
         wait = sleep or _wait
         while not stop.is_set():
+            if not self._enabled():
+                # Uploads switched off: do nothing, but keep checking so
+                # switching them back on takes effect without a restart.
+                if await wait(stop, 15.0):
+                    return
+                continue
             t0 = time.monotonic()
             try:
                 res = await self.run_once()

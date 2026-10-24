@@ -7720,6 +7720,13 @@ function renderCloudForm(cc) {
         <label>Heartbeat (minutes)
           <input type="number" name="heartbeat_minutes" value="${cc.heartbeat_minutes ?? 5}" min="1" max="60" required/>
         </label>
+        <label class="alerts-field-wide">
+          <input type="checkbox" name="telemetry_sync" ${cc.telemetry_sync === false ? "" : "checked"}/>
+          Upload history to the cloud so wattpost.cloud can show charts and live values
+        </label>
+        <label>Upload every (minutes)
+          <input type="number" name="telemetry_minutes" value="${cc.telemetry_minutes ?? 5}" min="1" max="60"/>
+        </label>
       </div>
       ${paired ? `
         <p class="settings-foot">
@@ -7850,6 +7857,8 @@ async function saveCloudConfig(form) {
   const payload = {
     endpoint: form.elements["endpoint"].value.trim(),
     heartbeat_minutes: parseInt(form.elements["heartbeat_minutes"].value, 10),
+    telemetry_sync: !!form.elements["telemetry_sync"]?.checked,
+    telemetry_minutes: parseInt(form.elements["telemetry_minutes"]?.value || "5", 10),
   };
   try {
     const r = await fetch("/api/cloud/config", {

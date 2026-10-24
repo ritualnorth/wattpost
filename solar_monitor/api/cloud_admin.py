@@ -34,6 +34,9 @@ log = logging.getLogger(__name__)
 class CloudConfigPayload(msgspec.Struct, kw_only=True):
     endpoint:          str = "https://wattpost.cloud"
     heartbeat_minutes: int = 5
+    # Telemetry upload (history for the cloud dashboard). None = leave as is.
+    telemetry_sync:    bool | None = None
+    telemetry_minutes: int | None = None
 
 
 class PairPayload(msgspec.Struct, kw_only=True):
@@ -67,6 +70,8 @@ def cloud_config_view(config: Config) -> dict[str, Any]:
             "configured":        False,
             "endpoint":          c.endpoint if c else "https://wattpost.cloud",
             "heartbeat_minutes": c.heartbeat_minutes if c else 5,
+            "telemetry_sync":    c.telemetry_sync if c else True,
+            "telemetry_minutes": c.telemetry_minutes if c else 5,
             "appliance_id":      None,
             "label":             "",
         }
@@ -74,6 +79,8 @@ def cloud_config_view(config: Config) -> dict[str, Any]:
         "configured":        True,
         "endpoint":          c.endpoint,
         "heartbeat_minutes": c.heartbeat_minutes,
+        "telemetry_sync":    c.telemetry_sync,
+        "telemetry_minutes": c.telemetry_minutes,
         "appliance_id":      c.appliance_id,
         "label":             c.label,
         # Token is intentionally masked, the UI never gets the real one.
@@ -103,25 +110,39 @@ async def update_cloud_config(
         raise HTTPException(
             status_code=400, detail="endpoint must be http(s) URL",
         )
+    if data.telemetry_minutes is not None and not (1 <= data.telemetry_minutes <= 60):
+        raise HTTPException(
+            status_code=400, detail="telemetry_minutes must be between 1 and 60",
+        )
     existing = config.cloud
     # IMPORTANT: preserve every existing field on edit. `replace` keeps
     # every field we aren't changing, including ones added after this
     # handler was written. (Hand-copying fields here is how the
     # telemetry settings once got silently reset.)
+    changes: dict[str, Any] = {
+        "endpoint": data.endpoint,
+        "heartbeat_minutes": data.heartbeat_minutes,
+    }
+    if data.telemetry_sync is not None:
+        changes["telemetry_sync"] = data.telemetry_sync
+    if data.telemetry_minutes is not None:
+        changes["telemetry_minutes"] = data.telemetry_minutes
     new_c = msgspec.structs.replace(
-        existing if existing is not None else CloudCfg(),
-        endpoint=data.endpoint,
-        heartbeat_minutes=data.heartbeat_minutes,
-    )
+        existing if existing is not None else CloudCfg(), **changes)
     config.cloud = new_c
 
     def _mutate(raw):
         raw["cloud"] = _serialize_cloud(new_c)
         return raw
     _save_config(config_path, _mutate)
-    log.info("cloud config updated (endpoint=%s, every %dm)",
-             new_c.endpoint, new_c.heartbeat_minutes)
-    return {"ok": True, "restart_required": True}
+    log.info("cloud config updated (endpoint=%s, every %dm, telemetry=%s/%dm)",
+             new_c.endpoint, new_c.heartbeat_minutes,
+             "on" if new_c.telemetry_sync else "off", new_c.telemetry_minutes)
+    # The telemetry settings are read live by the sync loop; only the endpoint
+    # and heartbeat cadence need a restart to take effect.
+    restart = (existing is None or existing.endpoint != new_c.endpoint
+               or existing.heartbeat_minutes != new_c.heartbeat_minutes)
+    return {"ok": True, "restart_required": restart}
 
 
 @post("/api/cloud/pair")
