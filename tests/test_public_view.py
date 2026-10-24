@@ -1,5 +1,4 @@
 """`web.public_view: true` exposes dashboard reads only, never config/credentials/control."""
-import pytest
 
 from solar_monitor.api.app import public_view_allows
 

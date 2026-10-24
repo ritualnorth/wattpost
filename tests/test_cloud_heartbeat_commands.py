@@ -1,9 +1,7 @@
 """Drive the real heartbeat_once dispatch path with a fake cloud reply."""
 import asyncio
-from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import pytest
 
 from solar_monitor.cloud import service as svc
 from solar_monitor.cloud.service import CloudService

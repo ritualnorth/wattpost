@@ -1,6 +1,5 @@
 """URLs from the cloud reply (JWKS / OIDC) are only trusted on the paired cloud's host over https."""
 import asyncio
-import json
 
 import httpx
 import pytest
