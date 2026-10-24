@@ -52,7 +52,17 @@ async def weather_history(
     until: int | None = None,
     bucket: int | None = None,
 ) -> dict[str, Any]:
-    """Cloud-cover series aligned to (since, until, bucket).
+    """Cloud-cover series aligned to (since, until, bucket); see
+    `build_weather_history` for the shape."""
+    return await build_weather_history(state["config"], state["store"], since, until, bucket)
+
+
+async def build_weather_history(
+    config: Config, store: Store,
+    since: int | None = None, until: int | None = None, bucket: int | None = None,
+) -> dict[str, Any]:
+    """Cloud-cover series aligned to (since, until, bucket). Shared by the
+    HTTP route above and the cloud view publisher (cloud/views.py).
 
     Returns:
         {
@@ -75,8 +85,6 @@ async def weather_history(
         ))
     bucket_s = int(bucket) if bucket and int(bucket) > 0 else 300
 
-    config: Config = state["config"]
-    store: Store = state["store"]
     wcfg = config.weather
 
     grid_ts = _grid(since, until, bucket_s)

@@ -50,10 +50,8 @@ def _save_config(config_path: str, mutator) -> None:
     _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
 
-@get("/api/weather/current")
-async def get_current_weather(state: State) -> dict[str, Any]:
-    from ..storage.sqlite import Store
-    store: Store = state["store"]
+async def build_current_weather(store) -> dict[str, Any]:
+    """Cached current conditions or the empty shape. Shared with cloud/views.py."""
     cached = await store.kv_get(CACHE_KEY)
     if cached is None:
         return {"provider": None, "fetched_at": None}
@@ -64,6 +62,11 @@ async def get_current_weather(state: State) -> dict[str, Any]:
         return {"provider": None, "fetched_at": None}
     payload.setdefault("fetched_at", updated_at)
     return payload
+
+
+@get("/api/weather/current")
+async def get_current_weather(state: State) -> dict[str, Any]:
+    return await build_current_weather(state["store"])
 
 
 def weather_config_view(config: Config) -> dict[str, Any]:

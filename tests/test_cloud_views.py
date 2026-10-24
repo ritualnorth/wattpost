@@ -90,3 +90,94 @@ def test_one_broken_view_does_not_block_the_rest():
         assert "load-heatmap" not in out and "snapshot" in out and "battery-health" in out
         await st.close()
     asyncio.run(go())
+
+
+class FakeWeather:
+    lat, lon = 51.5, -0.1
+
+
+class FakeCfg:
+    weather = None
+    devices = []
+
+
+class CfgScheduler(FakeScheduler):
+    def __init__(self, cfg):
+        super().__init__()
+        self.config = cfg
+
+
+def test_forecast_and_weather_views_published_even_when_unconfigured():
+    async def go():
+        st = await _setup()
+        pub = ViewPublisher(st, CfgScheduler(FakeCfg()), analytics_every_s=900)
+        first = await pub.due(now=1000)
+        assert first["forecast/pv"] == {"points": [], "fetched_at": None, "provider": None}
+        assert first["weather/current"] == {"provider": None, "fetched_at": None}
+        assert first["forecast/accuracy"]["ok"] is False
+        for b in (300, 900, 3600, 21600):
+            h = first[f"weather/history/b{b}"]
+            assert h["available"] is False and h["configured"] is False
+        await st.close()
+    asyncio.run(go())
+
+
+def test_forecast_and_weather_use_cached_blobs_and_cadence():
+    async def go():
+        import json
+        from solar_monitor.forecast.service import CACHE_KEY as FKEY
+        from solar_monitor.weather.service import CACHE_KEY as WKEY
+        st = await _setup()
+        await st.kv_set(FKEY, json.dumps({"provider": "solcast", "points": [{"ts": 1, "w": 5}]}))
+        await st.kv_set(WKEY, json.dumps({"provider": "openmeteo", "temp_c": 12.0}))
+        pub = ViewPublisher(st, CfgScheduler(FakeCfg()), analytics_every_s=900)
+        first = await pub.due(now=1000)
+        assert first["forecast/pv"]["points"] == [{"ts": 1, "w": 5}]
+        assert first["weather/current"]["temp_c"] == 12.0
+        pub.confirm(first)
+        # weather/current is due after 10 min, forecast only after 30; unchanged -> not re-sent
+        assert "weather/current" not in await pub.due(now=1000 + 11 * 60)
+        await st.kv_set(WKEY, json.dumps({"provider": "openmeteo", "temp_c": 13.0}))
+        later = await pub.due(now=1000 + 22 * 60)
+        assert later["weather/current"]["temp_c"] == 13.0
+        assert "forecast/pv" not in later
+        await st.close()
+    asyncio.run(go())
+
+
+def test_weather_history_built_per_range_when_configured(monkeypatch):
+    async def go():
+        from solar_monitor.cloud import views as V
+        calls = []
+
+        async def fake(config, store, since=None, until=None, bucket=None):
+            calls.append((since, bucket))
+            return {"configured": True, "available": True, "series": {"ts": [1], "cloud_cover_pct": [5.0]}}
+        monkeypatch.setattr(V, "build_weather_history", fake)
+        cfg = FakeCfg(); cfg.weather = FakeWeather()
+        st = await _setup()
+        pub = ViewPublisher(st, CfgScheduler(cfg), analytics_every_s=900)
+        first = await pub.due(now=1000)
+        assert sorted(b for _, b in calls) == [300, 900, 3600, 21600]
+        assert dict((b, s is None) for s, b in calls)[300] is True      # today: midnight default
+        assert first["weather/history/b3600"]["available"] is True
+        await st.close()
+    asyncio.run(go())
+
+
+def test_view_batch_never_exceeds_cloud_limit():
+    async def go():
+        from solar_monitor.cloud.views import MAX_VIEWS_PER_BATCH
+        st = await _setup()
+        pub = ViewPublisher(st, CfgScheduler(FakeCfg()), analytics_every_s=900)
+        pub._device_views = lambda: _many()
+        async def _many():
+            async def b(): return {"x": 1}
+            return {f"device/d{i}/lifetime": b for i in range(40)}
+        first = await pub.due(now=1000)
+        assert len(first) == MAX_VIEWS_PER_BATCH and "snapshot" in first
+        pub.confirm(first)
+        second = await pub.due(now=1001)
+        assert any(k.startswith("device/") for k in second)    # the overflow follows
+        await st.close()
+    asyncio.run(go())

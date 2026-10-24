@@ -60,6 +60,13 @@ Versions follow [Semantic Versioning].
   command channel stay on.
 - **Cloud view mode** in the web UI (`window.WP_CLOUD`): the same dashboard,
   read-only, with staleness measured against the snapshot's own time.
+- **Forecast and weather on the cloud dashboard.** The appliance now also
+  publishes the PV forecast, yesterday's forecast accuracy, current weather
+  and the Energy chart's cloud-cover overlay (one per range button), built by
+  the same code as its own `/api` endpoints, so those panels work on
+  wattpost.cloud. Forecast and history refresh every 30 minutes, current
+  weather every 10; nothing new is sent unless it changed. A batch never
+  carries more than the cloud's 32-view limit; the rest follow on the next sync.
 - Tests for the vendor drivers (fuzzed register contents, known-answer Rover
   and Modbus vectors, poll-level failure handling).
 
