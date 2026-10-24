@@ -30,6 +30,7 @@ import secrets
 from urllib.parse import urlencode
 
 from litestar import Request, Response, get
+from litestar.datastructures import State
 from litestar.exceptions import HTTPException
 from litestar.response import Redirect
 from typing import Any
@@ -50,20 +51,23 @@ def _safe_return_to(raw: str | None) -> str:
 
 
 @get("/api/system/oidc-available", sync_to_thread=False)
-async def oidc_available() -> dict[str, Any]:
+async def oidc_available(state: State) -> dict[str, Any]:
     """Lightweight status the login page polls to decide whether to
     show the "Sign in with WattPost cloud" button. Returns {ok: bool,
     available: bool}. Anonymous-readable; reveals no PII (just whether
-    the appliance has completed v2 upgrade + got an OIDC client)."""
+    cloud sign-in is switched on and the appliance has an OIDC client
+    with a callback). Off by default (`web.cloud_signin`), see config."""
     cfg = oidc_config.load()
-    return {"ok": True, "available": cfg is not None}
+    on = bool(getattr(state["config"].web, "cloud_signin", False)) if state["config"].web else False
+    return {"ok": True, "available": bool(on and cfg is not None and cfg.redirect_uri)}
 
 
 @get("/auth/lan/login", sync_to_thread=False)
-async def auth_lan_login(request: Request) -> Redirect:
+async def auth_lan_login(request: Request, state: State) -> Redirect:
     """Initiate the OIDC redirect to wattpost.cloud."""
     cfg = oidc_config.load()
-    if cfg is None:
+    web = state["config"].web
+    if cfg is None or not cfg.redirect_uri or not (web and web.cloud_signin):
         raise HTTPException(
             status_code=404,
             detail="OIDC login not configured (appliance hasn't completed v2 upgrade)",
