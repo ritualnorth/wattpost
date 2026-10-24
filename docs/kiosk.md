@@ -17,9 +17,11 @@ The `/kiosk` route is **always anonymous**. Never gated by the local web passwor
 - **Raspberry Pi connected to a monitor:** install chromium + xdotool, drop a systemd unit that launches `chromium --kiosk <url>` on boot.
 - **Browser on a laptop:** the dashboard's Settings → **Kiosk by default on this device** toggle in localStorage. Opens kiosk on first load every time.
 
-## Copying a kiosk link from the cloud
+## Sharing a kiosk link from the cloud
 
-On `wattpost.cloud`, every paired appliance card has a **Kiosk link** button. Click it → copies `https://<slug>.wattpost.io/kiosk` to your clipboard. Paste into the tablet's browser.
+On `wattpost.cloud`, open the site's **Manage** sheet and use **Wall display link**: give it a label, choose how long it lasts (a day up to no expiry), optionally pick a look (Halo, Ember or Command), and optionally lock it to the first device that opens it. The link is shown once, so copy it then and paste it into the tablet's browser.
+
+The cloud kiosk is read-only and shows the live basics only: state of charge, power flow and today's totals. It never shows history, device details or your location, and it can't change anything. You can see how often each link has been opened and from which country, and revoke it from the same sheet, which stops it straight away.
 
 ## What kiosk shows
 
@@ -29,10 +31,6 @@ On `wattpost.cloud`, every paired appliance card has a **Kiosk link** button. Cl
 - Auto-refreshing every poll (~60 s)
 
 Nothing else. No tabs, no menus, no settings. If you need history, alerts, or device config, that's the full dashboard.
-
-## Hiding the exit button
-
-The kiosk view has a small "Exit kiosk" button in the corner so you can get back to the full UI from the kiosk device itself. If you want to hide it from prying fingers, add `?lock=1` to the URL: `https://<slug>.wattpost.io/kiosk?lock=1`.
 
 ## Going back to the full dashboard
 
