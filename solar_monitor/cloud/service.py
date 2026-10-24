@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from ..config import CloudCfg
+from ..procutil import reexec
 from . import request_sign as _request_sign
 
 log = logging.getLogger(__name__)
@@ -1243,7 +1244,7 @@ class CloudService:
         # it for the user-driven restore); the config path was pinned
         # onto the scheduler by build_app at startup.
         from pathlib import Path
-        import os, sys
+        import os
         store = getattr(self.scheduler, "store", None)
         store_path = (
             getattr(store, "_path", None) or getattr(store, "path", None)
@@ -1298,7 +1299,7 @@ class CloudService:
                 await self.scheduler.stop()
             except Exception:
                 log.exception("scheduler stop failed before restore re-exec")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            reexec()
 
         self._spawn(_delayed_exec(), name="cloud-restore-exec")
 
