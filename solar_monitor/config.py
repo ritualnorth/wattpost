@@ -544,6 +544,12 @@ class WebCfg(msgspec.Struct, kw_only=True):
     # checks catch most proxies but cannot be complete, so if you put nginx /
     # Caddy / HAProxy / a tunnel client on this host, set this to false.
     trust_loopback: bool = True
+    # Offer "Sign in with WattPost cloud" on the login page. Off: the flow
+    # sends the browser back to a per-appliance callback host
+    # (<slug>.wattpost.cloud) that stopped resolving when the tunnel was
+    # removed, so it cannot complete. Leave off until the cloud hands out a
+    # callback that works without inbound access to the appliance.
+    cloud_signin: bool = False
     # Inbound host firewall (nftables, Pi image only). On by default:
     # default-deny INPUT, allowing only the dashboard, mDNS, DHCP, the
     # hotspot's DHCP/DNS, and SSH-when-enabled. The master escape hatch
