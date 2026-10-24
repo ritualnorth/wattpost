@@ -472,14 +472,24 @@ class CloudService:
             from .. import signed_audit as _sa
             for cmd in commands:
                 try:
-                    # Each cmd carries its own appliance_id so the verifier
-                    # doesn't need an out-of-band hint. Parse INSIDE the try:
-                    # a malformed appliance_id must reject just this command,
-                    # not raise out of the loop and abort dispatch of the
-                    # whole batch plus the cloud-delivered settings
-                    # (branding/backup/channel) handled below it.
-                    appliance_id = int(cmd.get("appliance_id") or 0)
-                    ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
+                    # The id a command is verified against is THIS
+                    # appliance's own (from config), never the one the
+                    # command claims: otherwise a command legitimately
+                    # signed for another appliance would verify here.
+                    # Unpaired (no id) means refuse everything. Parsing
+                    # happens INSIDE the try so one malformed command
+                    # rejects just itself, not the batch.
+                    own_id = self.cfg.appliance_id
+                    if own_id is None:
+                        log.warning("cloud command %s refused: no appliance_id configured",
+                                    cmd.get("id"))
+                        ok = False
+                    else:
+                        claimed = cmd.get("appliance_id")
+                        if claimed is not None and str(claimed) != str(own_id):
+                            log.warning("cloud command %s claims appliance_id=%s, "
+                                        "this appliance is %s", cmd.get("id"), claimed, own_id)
+                        ok = await _cverify.verify_command(cmd, appliance_id=int(own_id))
                     if ok and self._ledger().seen(int(cmd.get("id") or 0)):
                         log.warning("command %s already ran; ignoring replay", cmd.get("id"))
                         ok = False

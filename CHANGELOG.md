@@ -71,6 +71,10 @@ Versions follow [Semantic Versioning].
   commands that already completed (remembered across restarts) are refused.
   Signatures now cover a domain tag so they cannot be confused with anything
   else the cloud's key signs. The cloud must be updated alongside.
+- **Commands are verified against this appliance's own id.** The id used to
+  verify a cloud command was read from the command itself, so a command
+  legitimately signed for another appliance was accepted. It now comes from
+  `cloud.appliance_id`; an unpaired appliance refuses every command.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and
