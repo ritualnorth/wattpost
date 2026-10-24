@@ -285,7 +285,9 @@ class PollScheduler:
         the live BLE link to probe slave IDs without taking BlueZ down."""
         if self._poller is None:
             return None
-        return self._poller._transports.get(transport_id)
+        # The demo's SyntheticPoller has no transports at all.
+        transports = getattr(self._poller, "_transports", None)
+        return transports.get(transport_id) if transports else None
 
     @property
     def gps(self) -> GpsService | None:
