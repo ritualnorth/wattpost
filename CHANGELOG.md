@@ -81,6 +81,10 @@ Versions follow [Semantic Versioning].
   The first successful login (or any existing local session) now clears the
   first-run marker, and the endpoint shares the `/api/login` brute-force
   backoff.
+- **A signed command's `queued_at` must be UTC.** The signature ignores the
+  timezone offset but the freshness check used it, so re-labelling a signed
+  command's offset stretched the 7-day replay window by up to 14 hours.
+  Commands with a non-zero offset are refused.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and

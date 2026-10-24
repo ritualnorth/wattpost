@@ -138,6 +138,14 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
         qat_dt = datetime.fromisoformat(str(queued_at))
         if qat_dt.tzinfo is None:
             qat_dt = qat_dt.replace(tzinfo=timezone.utc)
+        elif qat_dt.utcoffset() != timedelta(0):
+            # canonical_repr drops the offset (it re-stamps the wall clock as
+            # UTC), so a non-zero offset would keep the signature valid while
+            # shifting the apparent age used below: a way to stretch the
+            # replay window by up to ~14h. The cloud only ever signs UTC.
+            log.warning("command_verify: cmd id=%s queued_at has a non-UTC offset, refusing",
+                        cmd.get("id"))
+            return False
     except ValueError:
         log.warning("command_verify: cmd id=%s malformed queued_at", cmd.get("id"))
         return False

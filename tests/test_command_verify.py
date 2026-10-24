@@ -149,6 +149,29 @@ def test_stale_and_future_commands_are_refused():
         env.restore()
 
 
+def test_non_utc_offset_cannot_stretch_the_replay_window():
+    """canonical_repr drops the offset, so rewriting it keeps the signature
+    valid. A command signed 7d10h ago re-labelled -12:00 would look 6d22h old."""
+    env = Env()
+    try:
+        old = datetime.now(timezone.utc) - timedelta(days=7, hours=10)
+        c = env.command(queued_at=old)
+        assert verify(env, c) is False                      # stale as signed
+        c["queued_at"] = old.replace(tzinfo=None).isoformat() + "-12:00"
+        assert verify(env, c) is False
+        for off in ("+05:30", "-00:30", "+14:00"):
+            fresh = env.command(queued_at=datetime.now(timezone.utc))
+            fresh["queued_at"] = fresh["queued_at"].replace("+00:00", off)
+            assert verify(env, fresh) is False, off
+        # an explicit zero offset and a naive stamp are still UTC
+        fresh = env.command(queued_at=datetime.now(timezone.utc))
+        assert verify(env, fresh) is True
+        fresh["queued_at"] = fresh["queued_at"].replace("+00:00", "")
+        assert verify(env, fresh) is True
+    finally:
+        env.restore()
+
+
 def test_unknown_kid_is_refused():
     env = Env()
     try:
