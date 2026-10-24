@@ -154,12 +154,14 @@ class CloudService:
         self._sync_task = None
         if self.cfg.telemetry_sync:
             from .rollup_sync import RollupSync
+            from .views import ViewPublisher
             self._sync = RollupSync(
                 store=self.scheduler.store,
                 endpoint=lambda: self.cfg.endpoint,
                 bearer=lambda: self.cfg.bearer_token,
                 sign=self._signed_headers,
                 backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
+                views=ViewPublisher(self.scheduler.store, self.scheduler),
             )
             self._sync_task = asyncio.create_task(
                 self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),

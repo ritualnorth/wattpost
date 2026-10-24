@@ -69,7 +69,9 @@ class RollupSync:
         sign: Callable[[bytes], dict[str, str]],
         backfill_hours: Callable[[], int],
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
+        views=None,
     ) -> None:
+        self.views = views            # cloud.views.ViewPublisher | None
         self.store = store
         self._endpoint = endpoint
         self._bearer = bearer
@@ -136,6 +138,7 @@ class RollupSync:
                     rows = await self.store.closed_rollups_after(
                         wm, now=now, limit=BATCH_ROWS)
                     devices, latest = await self._inventory()
+                    views = await self.views.due() if self.views is not None else {}
                     if not rows and res.batches > 0:
                         res.caught_up = True
                         break
@@ -143,7 +146,9 @@ class RollupSync:
                     # run so the cloud's device cards and live values stay fresh.
                     ack = await self._post(client, {
                         "batch_id": uuid.uuid4().hex, "devices": devices,
-                        "rollups": rows, "latest": latest})
+                        "rollups": rows, "latest": latest, "views": views})
+                    if self.views is not None:
+                        self.views.confirm(views)
                     res.batches += 1
                     res.sent_rows += len(rows)
                     if not rows:
