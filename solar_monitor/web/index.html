@@ -1479,6 +1479,20 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=288"></script>
+  <!-- The UI is plain scripts, loaded in order; they share one global scope. -->
+  <script src="/web/js/01-core.js?v=289"></script>
+  <script src="/web/js/02-dashboard.js?v=289"></script>
+  <script src="/web/js/03-power-flow.js?v=289"></script>
+  <script src="/web/js/04-forecast-weather.js?v=289"></script>
+  <script src="/web/js/05-alerts-devices.js?v=289"></script>
+  <script src="/web/js/06-history.js?v=289"></script>
+  <script src="/web/js/07-routing-settings.js?v=289"></script>
+  <script src="/web/js/08-network-system.js?v=289"></script>
+  <script src="/web/js/09-integrations.js?v=289"></script>
+  <script src="/web/js/10-alerts-editor.js?v=289"></script>
+  <script src="/web/js/11-wiring.js?v=289"></script>
+  <script src="/web/js/12-device-pages.js?v=289"></script>
+  <script src="/web/js/13-setup-wizard.js?v=289"></script>
+  <script src="/web/js/14-diagnostics-docs.js?v=289"></script>
 </body>
 </html>

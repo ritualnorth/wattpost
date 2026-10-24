@@ -18,11 +18,24 @@
 // the inner cache-busters (?v=NN) don't help if the cached index.html
 // itself is what's stale. Suffix corresponds to the current app.js
 // version so future-me can see at a glance what's pinned.
-const CACHE_VERSION = 'wattpost-v182-app288-css193';
+const CACHE_VERSION = 'wattpost-v183-app289-css193';
 const SHELL = [
   '/',
   '/web/styles.css',
-  '/web/app.js',
+  '/web/js/01-core.js',
+  '/web/js/02-dashboard.js',
+  '/web/js/03-power-flow.js',
+  '/web/js/04-forecast-weather.js',
+  '/web/js/05-alerts-devices.js',
+  '/web/js/06-history.js',
+  '/web/js/07-routing-settings.js',
+  '/web/js/08-network-system.js',
+  '/web/js/09-integrations.js',
+  '/web/js/10-alerts-editor.js',
+  '/web/js/11-wiring.js',
+  '/web/js/12-device-pages.js',
+  '/web/js/13-setup-wizard.js',
+  '/web/js/14-diagnostics-docs.js',
   '/web/uPlot.min.css',
   '/web/uPlot.iife.min.js',
   // Leaflet vendored locally (was a CDN load that blocked the captive

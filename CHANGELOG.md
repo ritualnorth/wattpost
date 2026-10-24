@@ -10,6 +10,8 @@ Versions follow [Semantic Versioning].
 
 - Fix: restart-in-place (Settings restart, restore from backup, restore from cloud) crashed with `attempted relative import with no known parent package` when the daemon had been started with `python -m solar_monitor.cli`, because the re-exec rebuilt the command line from `sys.argv`. It now re-runs the interpreter with its original arguments (`sys.orig_argv`). The packaged `solar-monitor` script was unaffected.
 
+- Internal: the 12,400-line `web/app.js` is now 14 plain scripts under `web/js/` (largest 1,459 lines), loaded in order by `index.html` and precached by the service worker. No behaviour change. The package data now includes `web/js/`, the vendored Leaflet files and the font (the Leaflet map and font were missing from wheel installs), and a test fails if a page loads an asset the wheel would not ship.
+
 - The login page no longer offers "Sign in with WattPost cloud" by default. That flow sends the browser back to a per-appliance callback host (`<slug>.wattpost.cloud`) that stopped resolving when the tunnel was removed, so it could not complete. It returns behind `web.cloud_signin: true` once the cloud hands out a callback that works without inbound access to the appliance. Local password login is unchanged.
 
 - History charts now show the range you picked. The Energy chart and the Detailed metrics chart fitted their x-axis to whatever data existed, so "30 days" with an hour of history drew an hour-wide axis and a new site looked like it had a month of data. The axis now covers the requested window, with the data sitting where it belongs inside it.
