@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Cloud uploads no longer carry the per-metric `latest` list (live values already travel in the snapshot view) and send the device inventory only when it changes, saving bytes on cellular and Starlink links.
+
 ### Removed
 - **The Cloudflare tunnel.** The appliance no longer runs `cloudflared`, and
   `<slug>.wattpost.cloud` no longer proxies to your dashboard. The

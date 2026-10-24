@@ -124,6 +124,7 @@ class RollupSync:
         # the cloud account it was earned against.
         self._identity = identity
         self._poison: tuple | None = None       # (batch key, consecutive failures)
+        self._inventory_sig: str | None = None  # last device inventory the cloud accepted
         self._enabled = enabled           # Settings can switch uploads off live
         self.views = views            # cloud.views.ViewPublisher | None
         self.store = store
@@ -186,6 +187,7 @@ class RollupSync:
                 if self.views is not None and hasattr(self.views, "reset"):
                     self.views.reset()
                 self._poison = None
+                self._inventory_sig = None
                 return fresh
             if stored is None:
                 await self.store.kv_set(IDENTITY_KEY, ident)   # adopt; keep any watermark
@@ -308,7 +310,19 @@ class RollupSync:
                         wm = raw_rows[-1][0]
                         await self.store.kv_set(WATERMARK_KEY, str(wm))
                         continue
-                    devices, latest = await self._inventory()
+                    # Live values already travel inside the snapshot view, so
+                    # the per-metric `latest` list is no longer uploaded, and
+                    # the device inventory only goes up when it changes.
+                    devices = []
+                    if res.batches == 0:
+                        inv, _ = await self._inventory()
+                        sig = json.dumps(inv, sort_keys=True, default=str)
+                        if sig != self._inventory_sig:
+                            devices, pending_sig = inv, sig
+                        else:
+                            pending_sig = self._inventory_sig
+                    else:
+                        pending_sig = self._inventory_sig
                     # Views are built once per run (first batch), and only
                     # when something is actually about to be sent.
                     views = (await self.views.due(live=self.live_interval() is not None)
@@ -318,7 +332,7 @@ class RollupSync:
                     try:
                         ack = await self._post(client, {
                             "batch_id": uuid.uuid4().hex, "devices": devices,
-                            "rollups": rows, "latest": latest, "views": views})
+                            "rollups": rows, "latest": [], "views": views})
                     except HttpStatusError as e:
                         if not rows or e.status in _RETRYABLE_STATUS:
                             raise
@@ -336,6 +350,7 @@ class RollupSync:
                         await self.store.kv_set(WATERMARK_KEY, str(wm))
                         continue
                     self._poison = None
+                    self._inventory_sig = pending_sig
                     if isinstance(ack, dict) and ack.get("rejected"):
                         log.warning("rollup sync: cloud rejected %s row(s) of the batch",
                                     ack.get("rejected"))
