@@ -253,12 +253,28 @@ class CommandLedger:
         self.cap = cap
         self._ids: list[int] = self._read()
 
-    def _read(self) -> list[int]:
+    @staticmethod
+    def _load(path: str) -> list[int] | None:
+        """ids from one file, or None if it is missing/corrupt."""
         try:
-            with open(self.path) as f:
-                return sorted({int(x) for x in json.load(f)})[-self.cap:]
+            with open(path) as f:
+                data = json.load(f)
+            if not isinstance(data, list):
+                return None
+            return sorted({int(x) for x in data})
         except (OSError, ValueError, TypeError):
-            return []
+            return None
+
+    def _read(self) -> list[int]:
+        ids = self._load(self.path)
+        if ids is None:
+            # Main file missing or corrupt (power cut mid-write on an SD
+            # card): fall back to the previous good copy rather than
+            # forgetting every completed command and re-opening replay.
+            ids = self._load(self.path + ".bak")
+            if ids is not None:
+                log.warning("command ledger: %s unreadable, recovered from .bak", self.path)
+        return (ids or [])[-self.cap:]
 
     def seen(self, cmd_id: int) -> bool:
         if cmd_id in self._ids:
@@ -273,7 +289,23 @@ class CommandLedger:
             tmp = self.path + ".tmp"
             with open(tmp, "w") as f:
                 json.dump(self._ids, f)
+                f.flush()
+                os.fsync(f.fileno())
+            # Keep the previous good ledger as .bak (only if it parses).
+            if self._load(self.path) is not None:
+                try:
+                    os.replace(self.path, self.path + ".bak")
+                except OSError:
+                    pass
             os.replace(tmp, self.path)
+            try:                       # make the rename itself durable
+                dfd = os.open(os.path.dirname(self.path) or ".", os.O_RDONLY)
+                try:
+                    os.fsync(dfd)
+                finally:
+                    os.close(dfd)
+            except OSError:
+                pass
         except OSError:
             log.exception("command ledger: could not persist")
 

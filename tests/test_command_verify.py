@@ -223,6 +223,35 @@ def test_ledger_survives_corrupt_file():
     assert cv.CommandLedger(p).seen(1)
 
 
+def test_ledger_fsyncs_file_and_directory(monkeypatch):
+    calls = []
+    real = os.fsync
+    monkeypatch.setattr(os, "fsync", lambda fd: (calls.append(fd), real(fd))[1])
+    led = _ledger()
+    led.record(1)
+    assert len(calls) >= 2          # the tmp file, then the directory
+
+
+def test_ledger_keeps_a_bak_and_recovers_from_a_corrupt_main_file():
+    led = _ledger()
+    led.record(1)
+    led.record(2)
+    assert os.path.exists(led.path + ".bak")
+    open(led.path, "w").write("{trunc")             # torn write
+    again = cv.CommandLedger(led.path)
+    assert again.seen(1)                            # recovered from .bak, replay still blocked
+    # both files gone/corrupt -> empty, not a crash
+    open(led.path + ".bak", "w").write("garbage")
+    assert not cv.CommandLedger(led.path).seen(1)
+    # a corrupt main must not clobber a good .bak with garbage on the next record
+    led2 = _ledger()
+    led2.record(7); led2.record(8)
+    open(led2.path, "w").write("zzz")
+    r = cv.CommandLedger(led2.path)
+    r.record(9)
+    assert cv.CommandLedger(led2.path).seen(7) and cv.CommandLedger(led2.path).seen(9)
+
+
 # ---- cross-repo golden vector (same one lives in wattpost-cloud) -------------
 
 def test_golden_vector_matches_the_cloud_byte_for_byte():

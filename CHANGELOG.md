@@ -144,6 +144,9 @@ Versions follow [Semantic Versioning].
   day of 5 s data and 100 metrics, on the shared database connection); it
   now aggregates in 2-hour windows and stops once the batch is full (about
   0.2 s), with identical results.
+- The signed-command ledger (which stops a completed command being replayed)
+  is now fsynced, keeps a `.bak` of the previous good copy, and falls back
+  to it if the main file is corrupt after a power cut.
 
 ## [0.1.188] - 2026-06-16
 
