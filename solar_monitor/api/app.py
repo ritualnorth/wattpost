@@ -25,13 +25,15 @@ from litestar.static_files import create_static_files_router
 from ..config import Config
 from ..scheduler import PollScheduler
 from ..storage import Store
-from .setup import (
+from .setup_scan import (
     ble_status,
     discovered,
     ble_scan,
     ble_diagnose,
     usb_scan,
     hid_scan,
+)
+from .setup import (
     add_transport,
     edit_setup_transport,
     delete_setup_transport,
