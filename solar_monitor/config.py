@@ -127,25 +127,9 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     telemetry_sync:    bool = True
     telemetry_minutes: int  = 5     # how often to push
     telemetry_backfill_hours: int = 24   # first-sync history window
-    # Cloudflare Tunnel credentials, returned by the cloud's
-    # /api/pair/exchange when the cloud has CF API access. Empty
-    # when the cloud hasn't yet had CF credentials configured
-    # (development, or pre-launch production), appliance still
-    # works locally + pushes heartbeats, just doesn't expose itself
-    # over the tunnel.
-    tunnel_token:      str  = ""
-    tunnel_hostname:   str  = ""
-    # Per-appliance HMAC key for cloud→appliance SSO (#137). Cloud
-    # pushes this via the pair response + every heartbeat response;
-    # the daemon persists it here and verifies inbound /sso?token=…
-    # requests against it. Empty until the appliance has heartbeat-ed
-    # at least once post-v0.0.38; while empty, tunnel access falls
-    # back to the local-password login page.
-    sso_secret:        str  = ""
     # Deprecated legacy kiosk token. The appliance no longer mints,
-    # serves, or honours a `?key=` kiosk URL — cloud kiosk now flows
-    # through the cloud's kiosk-shares registry (broker `scope=kiosk`),
-    # and LAN kiosk uses the READONLY_PUBLIC path. Field kept so older
+    # serves, or honours a `?key=` kiosk URL; LAN kiosk uses kiosk
+    # tokens or the READONLY_PUBLIC path. Field kept so older
     # configs still load; it is unused.
     kiosk_token:       str  = ""
 
@@ -453,7 +437,7 @@ class HotspotCfg(msgspec.Struct, kw_only=True):
     DHCP + NAT, 10.42.0.1/24 by default), so there's no hostapd /
     dnsmasq to install or hand-configure.
 
-    Strictly opt-in and non-fatal, same contract as the tunnel:
+    Strictly opt-in and non-fatal:
       - `enabled` only controls auto-bring-up on boot. Manual
         on/off via /api/hotspot/{on,off} works regardless, as long
         as the host has nmcli + the radio.
@@ -634,12 +618,35 @@ _DEFAULT_ALERT_RULES: list[dict[str, Any]] = [
 ]
 
 
+# cloud.* keys that belonged to the removed Cloudflare tunnel / cloud->appliance
+# SSO. Old config.yaml files may still carry them; they are dropped on load
+# (and scrubbed from the file) so they are never read or written back.
+_LEGACY_CLOUD_KEYS = ("tunnel_token", "tunnel_hostname", "sso_secret")
+
+
+def _strip_legacy_cloud_keys(raw: Any) -> bool:
+    """Remove removed cloud.* keys from the raw YAML dict in place.
+    Returns True if anything was removed."""
+    cloud = raw.get("cloud") if isinstance(raw, dict) else None
+    if not isinstance(cloud, dict):
+        return False
+    found = [k for k in _LEGACY_CLOUD_KEYS if k in cloud]
+    for k in found:
+        del cloud[k]
+    return bool(found)
+
+
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
+    if _strip_legacy_cloud_keys(raw):
+        try:
+            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+        except Exception:
+            pass  # in-memory drop is enough; retried on the next load
     cfg = msgspec.convert(raw, Config)
 
-    # Harden the config file mode at runtime. config.yaml holds bearer_token,
-    # sso_secret, tunnel_token + SMTP/MQTT creds, but the atomic tmp-replace
+    # Harden the config file mode at runtime. config.yaml holds bearer_token
+    # + SMTP/MQTT creds, but the atomic tmp-replace
     # writers across the _admin endpoints drop the mode back to the umask
     # default (often world-readable) on every save. install.sh sets a tight
     # mode on the Pi, but a settings save or the first cloud-pair rewrite

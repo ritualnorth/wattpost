@@ -49,7 +49,6 @@ def test_secrets_are_masked_and_never_leak():
     cloud = SimpleNamespace(
         bearer_token="tok-secret", endpoint="https://wattpost.cloud",
         heartbeat_minutes=5, appliance_id="ap1", label="Site",
-        tunnel_token="tt", tunnel_hostname="x.wattpost.cloud",
     )
     cfg = SimpleNamespace(forecast=fc, weather=None, cloud=cloud, exporters=[])
     agg = _aggregate(cfg)

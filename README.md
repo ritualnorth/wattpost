@@ -6,7 +6,8 @@
 
 <p align="center">
   Local-first, multi-vendor solar and battery monitoring for off-grid setups.<br>
-  Runs on a Raspberry Pi or any Docker host. Your data never leaves your network.
+  Runs on a Raspberry Pi or any Docker host. Local-first: it works fully with no account.<br>
+  If you pair it with wattpost.cloud it pushes 1-minute telemetry rollups and a few summary views to your account (you can turn that off in Settings), and the appliance never accepts inbound connections from the cloud.
 </p>
 
 <p align="center">
@@ -84,9 +85,10 @@ cp config.example.yaml config.yaml
 ## Cloud (optional)
 
 Local-only is free forever. The cloud add-on at
-[wattpost.cloud](https://wattpost.cloud) adds remote access, multi-site fleet
-view, push notifications, and encrypted backups for £6/mo. Most people don't
-need it.
+[wattpost.cloud](https://wattpost.cloud) adds a remote read-only dashboard
+(rendered from data your appliance pushes out; the appliance never accepts
+inbound connections), multi-site fleet view, push notifications, and encrypted
+backups for £6/mo. Most people don't need it.
 
 ## Documentation
 

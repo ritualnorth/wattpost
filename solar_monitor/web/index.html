@@ -5,35 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0a0d12" id="meta-theme-color" />
   <title>WattPost</title>
-  <!-- Suppress PWA hints when this HTML is served via the cloud
-       broker (<slug>.wattpost.cloud). Push notifications register
-       against the page's origin; if a user "Add to Home Screen"s
-       from a broker URL they'd get a per-appliance PWA scoped to
-       that single broker subdomain, alerts wouldn't reach it
-       (cloud sends push from wattpost.cloud origin), and the
-       multi-site picker wouldn't exist. The canonical install
-       target is wattpost.cloud/app. LAN access (192.168.x.x etc.)
-       still installs the appliance PWA, that's still valid for
-       offline-first / no-cloud customers. -->
-  <script>
-    (function () {
-      try {
-        if (location.hostname.endsWith('.wattpost.cloud')) {
-          // Tag for the SW block below + any other code that wants
-          // to know it's running in broker context.
-          window._wp_no_pwa = true;
-          var sel = 'link[rel="manifest"], link[rel="apple-touch-icon"], '
-                  + 'meta[name="apple-mobile-web-app-capable"], '
-                  + 'meta[name="apple-mobile-web-app-status-bar-style"], '
-                  + 'meta[name="apple-mobile-web-app-title"]';
-          var nodes = document.querySelectorAll(sel);
-          for (var i = 0; i < nodes.length; i++) nodes[i].remove();
-        }
-      } catch (_) { /* ignore, non-fatal */ }
-    })();
-  </script>
-  <!-- PWA: install-to-home-screen + offline shell. Stripped above
-       when accessed via the cloud broker. -->
+  <!-- PWA: install-to-home-screen + offline shell. -->
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/web/icon-192.png" />
   <link rel="icon" type="image/svg+xml" href="/web/icon.svg" />
@@ -41,12 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WattPost" />
   <script>
-    // Skip SW registration when the HTML was served via the cloud
-    // broker, the cloud's own SW (at wattpost.cloud/wp-sw.js)
-    // owns push delivery for paired users. Registering a second SW
-    // on the broker subdomain would just compete for the alerts
-    // inbox notification flow.
-    if (!window._wp_no_pwa && 'serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         // updateViaCache: 'none' tells the browser to bypass the
         // HTTP cache when fetching sw.js itself. Without it, iOS
@@ -88,7 +55,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=192" />
+  <link rel="stylesheet" href="/web/styles.css?v=193" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -474,7 +441,7 @@
               Hook up a free <a href="https://solcast.com/free-rooftop-solar-forecasting" target="_blank" rel="noopener">Solcast</a>
               hobbyist key in <a href="#/settings">Settings → Integrations</a> and this tile fills with
               tomorrow's kWh estimate, peak time, and a dashed forecast overlay on the History chart.
-              Nothing leaves your network without it.
+              Without a key, no forecast request is ever made.
             </p>
             <a class="tomorrow-empty-cta" href="#/docs/forecast">How it works →</a>
           </div>
@@ -848,9 +815,6 @@
                 <span id="signout-btn-label">Sign out</span>
               </button>
             </div>
-            <p id="signout-broker-note" class="settings-block-note" hidden style="margin:.5rem 0 0;color:var(--text-2);font-size:.85rem;line-height:1.45">
-              You're signed in via wattpost.cloud. The button above takes you to cloud sign-out, ending that session ends broker access to this appliance.
-            </p>
           </div>
           <div class="settings-block settings-block--cta" data-subroute="devices">
             <h3>Devices &amp; setup</h3>
@@ -1511,6 +1475,6 @@
 
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
-  <script src="/web/app.js?v=287"></script>
+  <script src="/web/app.js?v=288"></script>
 </body>
 </html>

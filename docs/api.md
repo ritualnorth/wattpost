@@ -54,7 +54,6 @@ Every appliance the token's owner has paired.
       "id": 42,
       "label": "RV rooftop",
       "slug": "ax4mn3uo01",
-      "tunnel_url": "https://ax4mn3uo01.wattpost.io/",
       "online": true,
       "last_seen": "2026-05-14T13:47:01Z",
       "created_at": "2026-05-12T18:30:00Z"

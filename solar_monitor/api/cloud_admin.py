@@ -78,13 +78,6 @@ def cloud_config_view(config: Config) -> dict[str, Any]:
         "label":             c.label,
         # Token is intentionally masked, the UI never gets the real one.
         "bearer_token":      "****",
-        # Tunnel surface: hostname is shown on Integrations so the
-        # operator can copy/click it; tunnel_enabled is true once a
-        # token has been issued at pair time (CF creds were configured
-        # on the cloud), false for older/legacy pairings that need a
-        # re-pair to pick up a token.
-        "tunnel_enabled":    bool(c.tunnel_token),
-        "tunnel_hostname":   c.tunnel_hostname or None,
     }
 
 
@@ -111,17 +104,10 @@ async def update_cloud_config(
             status_code=400, detail="endpoint must be http(s) URL",
         )
     existing = config.cloud
-    # IMPORTANT: preserve every existing field on edit. Earlier
-    # versions of this handler only carried bearer_token + appliance_id
-    # + label across, which silently wiped tunnel_token,
-    # tunnel_hostname, and sso_secret every time the user clicked
-    # Save in Settings → Cloud. Seen after a v0.0.38 pull:
-    # heartbeat populated sso_secret, then Settings-save reset it,
-    # then SSO redirects failed with 401 because the appliance had
-    # no key to verify against.
-    # `replace` keeps every field we aren't changing, including ones added
-    # after this handler was written. (Hand-copying fields here is how
-    # sso_secret, and later the telemetry settings, got silently reset.)
+    # IMPORTANT: preserve every existing field on edit. `replace` keeps
+    # every field we aren't changing, including ones added after this
+    # handler was written. (Hand-copying fields here is how the
+    # telemetry settings once got silently reset.)
     new_c = msgspec.structs.replace(
         existing if existing is not None else CloudCfg(),
         endpoint=data.endpoint,
@@ -184,9 +170,6 @@ async def pair_appliance(
         bearer_token=body["bearer_token"],
         appliance_id=body.get("appliance_id"),
         label=body.get("label") or "",
-        tunnel_token=body.get("tunnel_token") or "",
-        tunnel_hostname=body.get("tunnel_hostname") or "",
-        sso_secret=body.get("sso_secret") or "",
     )
     config.cloud = new_c
 
@@ -196,7 +179,7 @@ async def pair_appliance(
     _save_config(config_path, _mutate)
     log.info("paired with cloud (appliance_id=%s)", new_c.appliance_id)
 
-    # Hot-start the cloud + tunnel services in the live daemon so the
+    # Hot-start the cloud service in the live daemon so the
     # first heartbeat fires NOW, not after a manual restart. Previously
     # the only way to "complete" pairing was to restart wattpost,
     # confusing UX since the user already clicked Save. We still flag
@@ -216,7 +199,7 @@ async def pair_appliance(
 
 
 async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
-    """Spin up CloudService + TunnelService against the live scheduler
+    """Spin up CloudService against the live scheduler
     after a successful pair. Returns True iff at least the heartbeat
     service is up; False (with a logged exception) tells the caller to
     still ask the user to restart.
@@ -225,7 +208,6 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
     pull in the full scheduler graph."""
     try:
         from ..cloud.service import CloudService
-        from ..tunnel.service import TunnelService
     except Exception:
         log.exception("hot-start: failed to import service modules")
         return False
@@ -251,20 +233,6 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
     except Exception:
         log.exception("hot-start: cloud heartbeat service failed to start")
         return False
-    # Tunnel, best-effort; success here is bonus, not required.
-    try:
-        if TunnelService.is_available(cfg):
-            old_t = getattr(scheduler, "_tunnel", None)
-            if old_t is not None:
-                try:
-                    await old_t.stop()
-                except Exception:
-                    log.warning("hot-start: stopping old tunnel raised", exc_info=True)
-            t = TunnelService(cfg)
-            scheduler._tunnel = t
-            await t.start()
-    except Exception:
-        log.exception("hot-start: tunnel service failed to start (non-fatal)")
     log.info("hot-start: cloud heartbeat live without daemon restart")
     return True
 
@@ -319,7 +287,7 @@ def persist_cloud_cfg(cfg: CloudCfg, config_path: str | None = None) -> None:
     """Background-write helper. Looks up the active config.yaml path
     (the daemon's --config arg) and rewrites it with the serialised
     `cfg`. Used by the cloud heartbeat service when the cloud pushes
-    a new sso_secret to a not-yet-migrated appliance.
+    new pairing state (e.g. a changed label or telemetry settings).
 
     `config_path` overrides the path lookup; defaults to the
     environment variable WATTPOST_CONFIG which the systemd unit /

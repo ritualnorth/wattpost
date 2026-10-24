@@ -91,7 +91,7 @@ from .outputs import (
     patch_solar_pause,
 )
 from .system import (
-    auth_status, broker_auth_log, diagnostics_bundle, system_info,
+    auth_status, diagnostics_bundle, system_info,
     update_state, update_check_now, set_update_channel, update_apply, update_log,
     slot_state, slot_rollback,
     release_changelog, appliance_branding, rotate_web_password,
@@ -171,10 +171,9 @@ async def today_soc_envelope(state: State) -> dict[str, Any]:
 async def get_integrations(state: State) -> dict[str, Any]:
     """One-shot view of all four Settings → Integrations configs
     (#18). The panel used to fire four parallel requests
-    (/api/{forecast,weather,cloud,exporters/mqtt}/config); over the
-    cloud tunnel that burst could trip the edge 429 limiter and, with
-    Promise.all, fail the whole panel. Folding them into a single
-    broker round-trip removes the burst. Each sub-view is the same
+    (/api/{forecast,weather,cloud,exporters/mqtt}/config); with
+    Promise.all one slow or failed request failed the whole panel.
+    Folding them into a single round-trip removes that. Each sub-view is the same
     pure config→dict the individual endpoints still serve, so the
     shapes are identical and the per-integration GET/PUT routes stay
     for the form save/clear flows."""
@@ -810,9 +809,8 @@ def index() -> File:
     # no-cache (revalidate, not no-store) so the browser always re-checks the
     # shell HTML and picks up new ?v= asset versions after a deploy. Without
     # it Safari heuristically caches the shell for hours and serves stale
-    # app.js/styles.css — the recurring "stale shell" on the broker, where
-    # the appliance SW deliberately doesn't run. Assets stay long-cached via
-    # their ?v= busters; only the shell revalidates.
+    # app.js/styles.css (the recurring "stale shell"). Assets stay
+    # long-cached via their ?v= busters; only the shell revalidates.
     return File(path=path, media_type="text/html", content_disposition_type="inline",
                 headers={"Cache-Control": "no-cache"})
 
@@ -857,68 +855,9 @@ def kiosk_index_mode(mode: str) -> File:
 
 
 @get("/login", sync_to_thread=False)
-def login_page(request: Request, state: State) -> File | Response:
-    """Static HTML login form. POSTs to /api/login → cookie + redirect.
-
-    Special case: when the request reached us via the Cloudflare
-    Tunnel (CF-Ray header present), the password form is a dead
-    end, local-password sessions don't grant tunnel access by
-    design (#137). Serve a different page that explains "sign in
-    via wattpost.cloud and click Open" rather than letting the
-    user fill in a password that issues a session their next click
-    will 401 against."""
+def login_page(request: Request) -> File | Response:
+    """Static HTML login form. POSTs to /api/login → cookie + redirect."""
     from .. import web_auth as _wa
-    if _wa.is_tunnel_origin(request.scope):
-        # Broker-authed users are already signed in from the appliance's
-        # POV, every request from the cloud broker carries a valid
-        # X-WP-Broker-Auth HMAC. They have no business seeing the
-        # "Sign in via wattpost.cloud" dead-end. Bounce them straight
-        # to wherever they were heading (the `next` param) or the SPA.
-        # Triggered when the SPA's Settings gate races + redirects to
-        # /login before auth-status resolves.
-        broker_header = None
-        for k, v in request.scope.get("headers", []):
-            if k == b"x-wp-broker-auth":
-                broker_header = v.decode("latin-1", errors="ignore")
-                break
-        if broker_header:
-            cfg = state.get("config") if hasattr(state, "get") else state["config"]
-            sso = (cfg.cloud.sso_secret if (cfg and cfg.cloud) else "") or ""
-            if sso and _wa.verify_broker_auth(broker_header, sso):
-                # Honour ?next= but only when it's an internal path;
-                # bare "/" otherwise. Open-redirect defence.
-                qs = request.scope.get("query_string", b"") or b""
-                target = "/"
-                for part in qs.split(b"&"):
-                    if part.startswith(b"next="):
-                        nxt = part[5:].decode("latin-1", errors="ignore")
-                        # Decode + sanity-check it's a relative same-origin path
-                        from urllib.parse import unquote
-                        nxt = unquote(nxt)
-                        if nxt.startswith("/") and not nxt.startswith("//"):
-                            target = nxt
-                        break
-                return Response(content="", status_code=302,
-                                headers={"Location": target})
-        page = _web_dir() / "login-tunnel.html"
-        if page.exists():
-            return File(path=page, media_type="text/html",
-                        content_disposition_type="inline")
-        # Fallback: plain text if the template is missing.
-        return Response(
-            content=(
-                "<!doctype html><meta charset=utf-8>"
-                "<title>Sign in via wattpost.cloud</title>"
-                "<body style=\"font:14px system-ui;max-width:420px;"
-                "margin:6rem auto;padding:0 1rem;color:#cdd6e0\">"
-                "<h1>Direct tunnel access isn't supported</h1>"
-                "<p>Sign in at <a href=\"https://wattpost.cloud\">"
-                "wattpost.cloud</a> and click <b>Open</b> on this "
-                "appliance to access it remotely.</p>"
-                "</body>"
-            ),
-            media_type="text/html",
-        )
     # First run: the password is still the auto-generated one the user
     # has never seen. Offer an in-browser "create your password" page
     # instead of an "enter password" form they can't fill. `?signin=1`
@@ -942,14 +881,8 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
     first run (while it's still the auto-generated one). Lets a LAN user
     claim the box in-browser instead of fishing the random password out
     of the MOTD / docker logs. Self-guards: only works while
-    is_first_run(), and never over the cloud tunnel (cloud users are
-    already authenticated by the broker and onboard via wattpost.cloud)."""
+    is_first_run()."""
     from .. import web_auth as _wa
-    if _wa.is_tunnel_origin(request.scope):
-        return Response(
-            {"ok": False, "detail": "set the password on the local network"},
-            status_code=403,
-        )
     if not _wa.is_first_run():
         return Response(
             {"ok": False,
@@ -990,12 +923,8 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
 def kiosk_claim(data: dict, request: Request) -> Response:
     """Exchange a valid kiosk token for a read-only kiosk session cookie.
     The wall display loads `/kiosk?token=<t>` and the SPA calls this once
-    per load. Self-guards: rejects tunnel origin (kiosk tokens are a LAN
-    credential) and only issues a cookie for a token that verifies."""
+    per load. Self-guards: only issues a cookie for a token that verifies."""
     from .. import web_auth as _wa
-    if _wa.is_tunnel_origin(request.scope):
-        return Response({"ok": False, "detail": "kiosk tokens are local-only"},
-                        status_code=403)
     tok = (data or {}).get("token") or ""
     if not _wa.verify_kiosk_token(tok):
         return Response({"ok": False, "detail": "invalid or revoked kiosk token"},
@@ -1006,50 +935,6 @@ def kiosk_claim(data: dict, request: Request) -> Response:
         key=_wa.SESSION_COOKIE_NAME, value=session,
         max_age=_wa.SESSION_TTL_SECONDS, httponly=True,
         samesite="lax", path="/", secure=False,
-    )
-    return resp
-
-
-@get("/sso", sync_to_thread=False)
-def sso_redirect(request: Request, state: State, token: str = "") -> Response:
-    """Cloud→appliance SSO landing (#137). The cloud's dashboard
-    mints a short-lived HMAC-signed token bound to (user, appliance,
-    exp=60s) and redirects the user here. We verify the signature
-    against the per-appliance `sso_secret` exchanged at pair time,
-    issue a session cookie tagged origin=sso, and bounce to /.
-
-    Failures fall through to /login so a stale link doesn't dead-end
-    the user."""
-    from .. import web_auth as _wa
-    config: Config = state["config"]
-    sso_secret = (config.cloud.sso_secret if config.cloud else "") or ""
-    if not sso_secret:
-        # Appliance hasn't heartbeated post-update yet; no key to
-        # verify against. Send the user to /login as a fallback.
-        return Response(
-            content="",
-            status_code=302,
-            headers={"Location": "/login?next=/&sso_unavail=1"},
-        )
-    payload = _wa.consume_sso_token(token, sso_secret)
-    if payload is None:
-        return Response(
-            content="",
-            status_code=302,
-            headers={"Location": "/login?next=/&sso_failed=1"},
-        )
-    session = _wa.issue_session(origin="sso")
-    resp = Response(content="", status_code=302, headers={"Location": "/"})
-    resp.set_cookie(
-        key=_wa.SESSION_COOKIE_NAME,
-        value=session,
-        max_age=_wa.SESSION_TTL_SECONDS,
-        httponly=True,
-        samesite="lax",
-        path="/",
-        # Tunnel is HTTPS-only at the CF edge; secure cookies survive
-        # the round-trip back through cloudflared to the appliance.
-        secure=True,
     )
     return resp
 
@@ -1075,27 +960,14 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
     safe, else `/`). Demo-mode + no-password installs short-circuit
     above this in the middleware, so we don't have to handle them.
 
-    Refuses tunnel-origin requests. Local-password sessions aren't
-    valid via tunnel anyway (the middleware rejects them); accepting
-    the password here would issue a useless session and confuse the
-    user. The /login page itself shows a tunnel-specific message
-    when it detects tunnel origin, so this is belt-and-braces.
-
     Phase 8B (#310), login outcomes recorded in the signed audit
     log so brute-force probes leave a tamper-evident trace and the
     cloud's per-site security view (when wired) can flag anomalies."""
     from .. import web_auth as _wa
-    if _wa.is_tunnel_origin(request.scope):
-        return Response(
-            {"ok": False,
-             "detail": "direct tunnel sign-in not supported, "
-                       "use wattpost.cloud and click Open"},
-            status_code=403,
-        )
     client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
     # Brute-force backoff: per-source-IP, exponential after a few free
-    # tries. Loopback (the cloud-broker path) is exempt so the owner is
-    # never locked out via the tunnel.
+    # tries. Genuine loopback (on-box) is exempt so the owner can never
+    # be locked out of their own device.
     loopback = _wa.is_loopback_source(request.scope)
     if not loopback:
         wait = _wa.login_locked_for(client_ip)
@@ -1131,7 +1003,7 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
         httponly=True,
         samesite="lax",
         path="/",
-        secure=False,  # appliance is HTTP on the LAN; cloud tunnel is HTTPS but the cookie is the local one
+        secure=False,  # appliance is HTTP on the LAN
     )
     return resp
 
@@ -1174,14 +1046,12 @@ def manifest() -> File:
     )
 
 
-# Path prefixes a cloud-broker KIOSK-scope request (#225) may reach on
-# this appliance. GET/HEAD/OPTIONS only — enforced at the call site. The
-# brokered cloud kiosk (`<slug>.wattpost.cloud/kiosk`) is the appliance's
-# own SPA, so it must be able to read `/api/kiosk/config` to render the
-# owner's chosen skin; without it a shared kiosk silently falls back to
-# the default skin (Milestone D). Module-level so it's a single source of
-# truth + regression-testable.
-KIOSK_BROKER_GET_PATHS = (
+# Path prefixes a kiosk credential (LAN kiosk token / kiosk session) may
+# reach on this appliance. GET/HEAD/OPTIONS only, enforced in
+# kiosk_scope_allows. The kiosk is the appliance's own SPA, so it must be
+# able to read `/api/kiosk/config` to render the owner's chosen skin.
+# Module-level so it's a single source of truth + regression-testable.
+KIOSK_GET_PATHS = (
     "/kiosk", "/api/snapshot", "/api/devices", "/api/poll_run",
     "/api/today", "/api/energy/today", "/api/weather", "/api/kiosk/config",
     # Live-update stream so a token'd LAN wall display gets real-time
@@ -1192,15 +1062,15 @@ KIOSK_BROKER_GET_PATHS = (
 
 
 def kiosk_scope_allows(method: str, path: str) -> bool:
-    """Whether a cloud-broker KIOSK-scope request (#225) for (method, path)
-    is permitted on this appliance. Read-only by construction — only safe
-    GET-family methods on the `KIOSK_BROKER_GET_PATHS` allow-list pass; a
+    """Whether a kiosk-credential request for (method, path) is permitted
+    on this appliance. Read-only by construction — only safe
+    GET-family methods on the `KIOSK_GET_PATHS` allow-list pass; a
     kiosk visitor can never mutate (e.g. PATCH /api/kiosk/config is denied,
     so a guest can't change the wall display's skin)."""
     if method.upper() not in ("GET", "HEAD", "OPTIONS"):
         return False
     return path == "/kiosk" or any(
-        path.startswith(p) for p in KIOSK_BROKER_GET_PATHS
+        path.startswith(p) for p in KIOSK_GET_PATHS
     )
 
 
@@ -1228,7 +1098,7 @@ def build_app(
         )
     scheduler = PollScheduler(config, store, interval_seconds=interval_seconds)
     # Stash config_path on the scheduler too so the CloudService it
-    # owns can persist mutations (sso_secret from heartbeat) without
+    # owns can persist mutations (cloud pairing state from heartbeat) without
     # needing access to app.state.
     scheduler.config_path = config_path
 
@@ -1346,8 +1216,8 @@ def build_app(
     #   - demo mode: bypass entirely
     #   - no password set on the appliance: bypass (first-boot grace,
     #     or self-hosted dev who skipped install.sh)
-    #   - source IP is loopback: trusted (the cloud tunnel proxies via
-    #     localhost; LAN clients can't fake that)
+    #   - source IP is loopback and not relayed by a reverse proxy:
+    #     trusted (LAN clients can't fake that)
     #   - anonymous paths (/kiosk, /web/static, /login, /api/login,
     #     /api/heartbeat): always allowed
     #   - GET on /api/* read endpoints: allowed when "read-only public"
@@ -1359,8 +1229,8 @@ def build_app(
     # Login is mandatory for the whole appliance by default (cloud #15).
     # Anonymous LAN viewing only happens when the operator explicitly
     # opts in via `web.public_view` (a deliberately-public box). Wall
-    # displays use a kiosk token regardless. Loopback + cloud-broker
-    # still bypass; the first-run flow makes sure a password exists.
+    # displays use a kiosk token regardless. Genuine loopback
+    # still bypasses; the first-run flow makes sure a password exists.
     _READONLY_PUBLIC = bool(getattr(config, "web", None) and config.web.public_view)
 
     class _LocalAuthMiddleware:
@@ -1374,8 +1244,8 @@ def build_app(
             # Bypass: demo mode (public read-only by design) OR real
             # loopback (curl from the Pi, SSH port-forward, daemon
             # talking to itself). is_loopback_source returns False
-            # for tunnel-origin requests, see the CF-header sniff
-            # in web_auth.is_loopback_source.
+            # for requests relayed by a reverse proxy on this host
+            # (forwarding headers present).
             #
             # "no password set" is NO LONGER a bypass condition. Until
             # 0.0.37 it was, on the assumption install.sh always ran;
@@ -1388,85 +1258,6 @@ def build_app(
             if _DEMO or _web_auth.is_loopback_source(scope):
                 await self.app(scope, receive, send)
                 return
-            # Path + method + kiosk read allow-list, consumed by the
-            # cloud-broker kiosk-scope path below (#225). The legacy
-            # `?key=<token>` bypass was removed: cloud kiosk now flows
-            # through the broker's signed `scope=kiosk` header, and LAN
-            # kiosk uses the READONLY_PUBLIC path. There is no
-            # appliance-side share token to leak, rotate, or revoke.
-            _path = scope.get("path", "/")
-            _method = scope.get("method", "GET").upper()
-            # Cloud broker (#139). When the cloud proxies a logged-in
-            # user's request through to this appliance, it stamps the
-            # request with X-WP-Broker-Auth = <ts>.<hmac> signed with
-            # the per-appliance sso_secret. We verify against our
-            # local copy of sso_secret. Valid header = the cloud has
-            # already authenticated this user; we trust the request
-            # exactly as if it had a valid SSO session. No session
-            # cookie is issued, broker traffic is stateless per
-            # request.
-            broker_header: bytes | None = None
-            _cf_ray: str | None = None
-            for k, v in scope.get("headers", []):
-                if k == b"x-wp-broker-auth":
-                    broker_header = v
-                elif k == b"cf-ray":
-                    _cf_ray = v.decode("ascii", errors="ignore")
-            if broker_header is not None:
-                # `config` is captured by closure from build_app's
-                # arguments. Its `.cloud` is mutated in place by the
-                # heartbeat service when the cloud sends an sso_secret,
-                # so this lookup always reflects the current value.
-                _sso = (
-                    config.cloud.sso_secret if config.cloud else ""
-                ) or ""
-                # Verbose verdict path: records into diagnostics ring
-                # so /api/diagnostics/broker-auth can replay what
-                # happened during incidents. Costs effectively nothing
-                # (HMAC was going to run anyway).
-                from .. import diagnostics as _diag
-                _verdict, _age, _bscope = _web_auth.verify_broker_auth_verdict(
-                    broker_header.decode("latin-1", errors="ignore"), _sso,
-                )
-                _diag.record_broker_auth(
-                    path=scope.get("path", "/"),
-                    method=scope.get("method", "GET"),
-                    verdict=_verdict,
-                    header_age_s=_age,
-                    cf_ray=_cf_ray,
-                    # Capture the raw header shape only when the verify
-                    # failed, costs nothing on the happy path, and gives
-                    # us the exact bytes to diagnose cloud↔appliance
-                    # wire-format drift like the one #225 caused.
-                    header_prefix=(
-                        broker_header.decode("latin-1", errors="replace")[:80]
-                        if (broker_header is not None and _verdict != "ok")
-                        else None
-                    ),
-                )
-                if _verdict == "ok":
-                    # Owner-scope ("user") = full access, same as a
-                    # local logged-in session. Kiosk-scope ("kiosk")
-                    # = read-only allow-list, identical to the legacy
-                    # ?key= bypass (#225). Staff-read ("staff_read") =
-                    # an owner-approved read-only support session (#10):
-                    # any safe GET, never a write.
-                    if _bscope == "user":
-                        await self.app(scope, receive, send)
-                        return
-                    if _bscope == "kiosk":
-                        if kiosk_scope_allows(_method, _path):
-                            await self.app(scope, receive, send)
-                            return
-                        # Outside the allow-list: fall through to
-                        # auth-required. The kiosk visitor doesn't
-                        # have a local session, so they get 401'd.
-                    if _bscope == "staff_read":
-                        if _method in ("GET", "HEAD", "OPTIONS"):
-                            await self.app(scope, receive, send)
-                            return
-                        # A read grant must never mutate: writes fall
-                        # through to auth-required and get 401'd.
             # No password file = misconfigured install. Fail-closed
             # to the login page (which itself surfaces a "password
             # not configured" message), NEVER let the request through.
@@ -1498,13 +1289,8 @@ def build_app(
                 return
             method = scope.get("method", "GET").upper()
             # READONLY_PUBLIC bypass: allow GET reads on LAN without a
-            # session, so kiosks-on-wifi keep working unchanged. Does
-            # NOT apply to tunnel-origin requests, a leaked tunnel
-            # URL would otherwise leak every metric on the appliance
-            # to anonymous viewers.
-            tunnel = _web_auth.is_tunnel_origin(scope)
-            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS") \
-                    and not tunnel:
+            # session, so kiosks-on-wifi keep working unchanged.
+            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS"):
                 await self.app(scope, receive, send)
                 return
             # Look up the session cookie.
@@ -1522,8 +1308,8 @@ def build_app(
             # Local kiosk credential (read-only wall displays, cloud #15).
             # A kiosk-origin session cookie — or a valid ?token= on a
             # kiosk-scoped GET to bootstrap the first load — grants the
-            # read-only KIOSK allow-list only, never writes, never tunnel.
-            if not tunnel and kiosk_scope_allows(method, path):
+            # read-only KIOSK allow-list only, never writes.
+            if kiosk_scope_allows(method, path):
                 if _web_auth.session_origin(token) == "kiosk":
                     await self.app(scope, receive, send)
                     return
@@ -1537,15 +1323,7 @@ def build_app(
                 if qtok and _web_auth.verify_kiosk_token(qtok):
                     await self.app(scope, receive, send)
                     return
-            # Tunnel-origin requests require an SSO-issued session;
-            # local-password sessions only grant LAN access. Keeps the
-            # local password as a fallback while making cloud-login
-            # the actual perimeter for internet-facing traffic.
-            if tunnel:
-                ok = _web_auth.is_session_valid_for_tunnel(token)
-            else:
-                ok = _web_auth.is_session_valid(token)
-            if ok:
+            if _web_auth.is_session_valid(token):
                 await self.app(scope, receive, send)
                 return
             # Reject.
@@ -1613,7 +1391,6 @@ def build_app(
             system_info,
             auth_status,
             diagnostics_bundle,
-            broker_auth_log,
             get_history_settings,
             patch_history_settings,
             device_health,
@@ -1720,7 +1497,6 @@ def build_app(
             netsec_set_firewall,
             netsec_set_ssh,
             do_logout,
-            sso_redirect,
             # Identity v2 Phase 3 (#305), LAN OIDC login. Both
             # endpoints 404 when oidc_config.json is absent (i.e.
             # the appliance hasn't completed v2 upgrade yet), so

@@ -153,7 +153,7 @@ action_local_password() {
         body="Generates a NEW random password for the local dashboard\n(http://wattpost.local). All existing browser sessions are\nsigned out. Continue?"
     else
         title="Set web password?"
-        body="By default the local dashboard accepts any LAN client.\nSetting a password gates write endpoints (settings, restart,\nconfig changes) behind it. Cloud tunnel access is unaffected.\n\nContinue?"
+        body="By default the local dashboard accepts any LAN client.\nSetting a password gates write endpoints (settings, restart,\nconfig changes) behind it.\n\nContinue?"
     fi
     if ! confirm "${title}" "${body}"; then return 0; fi
     # "wattpost-<5-hex>" — short, human-readable, brand-able. Argon2
@@ -184,7 +184,7 @@ action_clear_local_password() {
         msg "Already cleared" "No local web password is currently set — the LAN already has open access to the dashboard."
         return 0
     fi
-    if ! confirm "Clear web password?" "Removes the local password. The dashboard reverts to LAN-trusted (any device on your network can access + change settings).\n\nCloud tunnel access is unaffected.\n\nContinue?"; then return 0; fi
+    if ! confirm "Clear web password?" "Removes the local password. The dashboard reverts to LAN-trusted (any device on your network can access + change settings).\n\nContinue?"; then return 0; fi
     ${SUDO} rm -f /etc/wattpost/web-password /etc/wattpost/web-password.hash
     ${SUDO} systemctl restart wattpost
     msg "Cleared" "Local password removed. Any LAN client can now access the dashboard. Set a new one any time via this menu."
@@ -226,10 +226,9 @@ PY
 
 action_pair_status() {
     if grep -qE '^  bearer_token:' "${CONFIG_FILE}" 2>/dev/null; then
-        local label tunnel
+        local label
         label="$(awk '/^cloud:/{f=1} f && /^  label:/{print substr($0, index($0,$2)); exit}' "${CONFIG_FILE}" | tr -d '"')"
-        tunnel="$(awk '/^cloud:/{f=1} f && /^  tunnel_hostname:/{print $2; exit}' "${CONFIG_FILE}")"
-        msg "Cloud pairing" "Paired as: ${label:-?}\nTunnel host: ${tunnel:-not provisioned}\n\nManage from app.wattpost.io → your account → Sites,\nor unpair below."
+        msg "Cloud pairing" "Paired as: ${label:-?}\n\nManage from app.wattpost.io → your account → Sites,\nor unpair below."
     else
         msg "Cloud pairing" "Not paired with WattPost cloud.\n\nPair from the dashboard: Settings → Integrations → WattPost cloud → Pair.\n(The browser flow is friendlier than typing pairing codes over SSH.)"
     fi
@@ -241,7 +240,7 @@ action_unpair() {
         msg "Not paired" "There's no cloud pairing to remove."
         return 0
     fi
-    if confirm "Unpair from cloud?" "Removes the bearer token + tunnel from this appliance. Cloud-side cleanup happens on next dashboard delete. Continue?"; then
+    if confirm "Unpair from cloud?" "Removes the bearer token from this appliance. Cloud-side cleanup happens on next dashboard delete. Continue?"; then
         # Strip the cloud: block in place. Awk drops everything from
         # 'cloud:' until the next zero-indented section.
         ${SUDO} awk 'BEGIN{drop=0} /^cloud:/{drop=1; next} drop && /^[a-zA-Z]/{drop=0} !drop{print}' \

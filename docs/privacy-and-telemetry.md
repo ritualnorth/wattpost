@@ -61,7 +61,7 @@ If, and only if, you flip `discovery.enabled: true` in `config.yaml`, the applia
 
 ## What stays local, always
 
-Just to be explicit about what we _don't_ do, because the privacy-conscious crowd asks: WattPost never sends any of the following anywhere unless you've paired the appliance to wattpost.cloud (which is a deliberate, billed action with a card-on-file gate):
+Just to be explicit about what we _don't_ do, because the privacy-conscious crowd asks: WattPost never sends any of the following anywhere unless you've paired the appliance to wattpost.cloud (a deliberate action you take yourself):
 
 - Battery voltage, current, SoC, temperature, cell voltages
 - Solar PV power, MPPT load, charger state, schedule entries
@@ -69,7 +69,7 @@ Just to be explicit about what we _don't_ do, because the privacy-conscious crow
 - Local user accounts, sessions, login attempts
 - Your network's other devices
 
-If you pair (the SaaS tier), all of the above flow to the cloud as part of the heartbeat, that's the whole point of pairing, and you can see exactly what's in each heartbeat at any time via the appliance's diagnostics endpoint or `journalctl -u wattpost`.
+If you pair (the SaaS tier), the appliance **pushes** a heartbeat plus 1-minute telemetry rollups (battery and PV readings, power flows, daily energy totals) and a few summary views to your account, that's the whole point of pairing: the cloud dashboard is rendered from that pushed copy. You can switch the telemetry upload off in **Settings → Integrations → WattPost cloud** (`cloud.telemetry_sync: false`) while staying paired, or unpair to stop everything. Every connection is outbound from the appliance: the cloud never connects in, and there is no tunnel. You can see what each heartbeat contains via the appliance's diagnostics endpoint or `journalctl -u wattpost`.
 
 ## How to verify yourself
 

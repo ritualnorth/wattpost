@@ -2,7 +2,7 @@
 
 **Viewing** the WattPost dashboard (the page at `http://wattpost.local`) needs no login — anyone on your LAN can see it, the same read-only trust model as Pi-hole, Home Assistant, Solar Assistant. **Changing anything (Settings)** requires a password.
 
-On first boot the appliance generates a random password so the box is never wide open. The **first time you open Settings in the browser**, it prompts you to **create your own password** — no SSH required. That's the normal path for most people. (The cloud tunnel at `<slug>.wattpost.io` has its own strong auth and bypasses the local password.)
+On first boot the appliance generates a random password so the box is never wide open. The **first time you open Settings in the browser**, it prompts you to **create your own password** — no SSH required. That's the normal path for most people. (The wattpost.cloud dashboard is a separate, read-only copy of pushed data with its own account login; it never touches the local password.)
 
 ## Setting your password
 
@@ -34,12 +34,14 @@ Same menu, same option. Generates a fresh random password and signs all existing
 | `/kiosk` | Always anonymous (wall-display URL never asks for login) |
 | `GET /api/devices/*`, `GET /api/today` etc | Read-only-public mode (default): anonymous OK. Strict mode: requires login. |
 | `POST /api/setup/*`, `POST /api/system/restart` etc | Login required |
-| Cloud tunnel access | Bypasses local auth. The cloud already authed you |
+| Requests from the appliance itself (`127.0.0.1`, not relayed by a proxy) | Trusted, e.g. `curl` on the Pi or an SSH port-forward |
 | `/api/heartbeat` | Bearer token (the appliance → cloud flow, unchanged) |
 
-## The cloud-tunnel bypass
+## Local-request trust
 
-Visits arriving through `<slug>.wattpost.io` come from `cloudflared` on the local appliance, which proxies to `localhost:80`. That means the source IP is `127.0.0.1`. Kernel-decided, **can't be spoofed** by a LAN client. The middleware trusts loopback. So clicking **Open Site** in `wattpost.cloud` works without prompting for the local password.
+A request whose TCP source is the appliance itself (`127.0.0.1` / `::1`), such as `curl` run on the Pi or an SSH port-forward, is trusted. The kernel decides the source address, so a LAN client **can't spoof it**. If the request carries reverse-proxy headers (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`, ...) it was relayed by something on the box (nginx, Caddy, ...), so it is treated like any other remote request and needs the password.
+
+The cloud plays no part here: wattpost.cloud shows a copy of the data your appliance pushes and never connects to the appliance, so there is no cloud sign-in that bypasses this password.
 
 ## Lost the password?
 

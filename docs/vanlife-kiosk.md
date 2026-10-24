@@ -75,13 +75,3 @@ Ventilate the back. The Pi 5 throttles at 80 °C, and a sealed cabinet on a 35 �
 | Touch registers wrong coordinates | After rotation change, run `wattpost-config` → **Display** → **Calibrate touch**. |
 | Backlight stays on at night | Set `quiet_hours` in `config.yaml`. The display helper reads it on next reboot. |
 | Random reboots | Almost always a weak USB-C supply. Use the official 27 W. |
-
-## Cloud kiosk URL (if you want to flip between vans)
-
-If you have multiple appliances paired to wattpost.cloud. Say, the van and a cabin. And want one kiosk that flips between them, use the cloud broker URL in Chromium's launch URL instead of `localhost`:
-
-```
-https://<slug>.wattpost.cloud/kiosk?lock=1
-```
-
-Different SSID, different appliance, same dashboard URL. The cloud broker (#139) reverse-proxies to whichever appliance you're paired to from this device.

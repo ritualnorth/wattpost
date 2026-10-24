@@ -7,7 +7,6 @@ Kiosk is the **chrome-free, read-only** version of the dashboard. A giant SoC do
 | Where you are | URL |
 | - | - |
 | LAN (same network as Pi) | `http://wattpost.local/kiosk` |
-| Through the cloud tunnel | `https://<slug>.wattpost.io/kiosk` |
 
 The `/kiosk` route is **always anonymous**. Never gated by the local web password, even when one is set. So an old tablet stuck to the wall can boot, open the bookmark, and live there.
 

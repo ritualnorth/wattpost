@@ -489,8 +489,8 @@ async function loadKioskConfig() {
     if (_tog) _tog.checked = !!APPLIANCE_KIOSK.default;
     // The local display may have booted before this loaded — if the
     // appliance now says default-kiosk and we're on the dashboard with
-    // no explicit route, go to kiosk (never on a broker/cloud view).
-    if (APPLIANCE_KIOSK.default && !IS_BROKER_VIEW &&
+    // no explicit route, go to kiosk (never on the cloud view).
+    if (APPLIANCE_KIOSK.default && !CLOUD_VIEW &&
         (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")) {
       window.location.hash = "#/kiosk";
     } else {
@@ -621,21 +621,6 @@ const KIOSK_KEY_PARAM = (() => {
   } catch (_) { return ""; }
 })();
 
-// True when the dashboard is being served via the cloud broker
-// (`<slug>.wattpost.cloud` / legacy `.wattpost.io`) rather than
-// directly on the appliance's LAN IP. Used to suppress UI bits
-// that only make sense for someone with full local access, most
-// notably the Kiosk → Exit button, which on broker would dump
-// the customer into the Settings/Devices/etc full chrome that
-// app.wattpost.cloud is supposed to own. Locally (192.168.x or
-// wattpost.local) Exit stays, the van/cabin operator wants to
-// flip between the SoC kiosk and the dashboard freely.
-const IS_BROKER_VIEW = (() => {
-  try {
-    const h = (window.location.hostname || "").toLowerCase();
-    return /\.wattpost\.cloud$|\.wattpost\.io$/.test(h);
-  } catch (_) { return false; }
-})();
 function _withKiosk(path) {
   if (!KIOSK_KEY_PARAM) return path;
   // Only attach to relative paths (don't leak the token to third
@@ -896,18 +881,6 @@ let pollingFallbackTimer = null;
 let _firstBootRedirected = false;
 function openStream() {
   if (eventStream) return;
-  // Broker-origin shortcut: never open SSE when loaded over the cloud
-  // broker hostname. Previously we let SSE open and closed it later
-  // once /api/system/auth-status resolved with origin=broker, but on
-  // iOS Safari that race already cost you: the moment the EventSource
-  // connection is in flight, Safari serialises its tiny per-host HTTP
-  // pool around it. Every /api/* fetch then queues behind an SSE
-  // that's about to close → white page. Skipping SSE entirely at the
-  // URL level dodges the trap. See memory: ios_safari_sse_tunnel.
-  if (IS_BROKER_VIEW) {
-    startPollingFallback();
-    return;
-  }
   try {
     // _withKiosk attaches the kiosk ?token= when in kiosk mode so a
     // token'd wall display gets live updates; a no-op otherwise (the
@@ -2287,10 +2260,9 @@ function buildFlowSvgV2(model, opts) {
   return svg;
 }
 
-// Drill-in routing. Hash routes, using location.href would break
-// inside the broker tunnel (abc123xyz0.wattpost.cloud), which only
-// proxies the SPA shell + /api/*. Anything else returns the raw
-// 404 JSON. Hash routes stay within the SPA and work everywhere.
+// Drill-in routing. Hash routes, using location.href would break on
+// the cloud view, which only serves the SPA shell + its data API.
+// Hash routes stay within the SPA and work everywhere.
 //
 // Battery → #292 dedicated detail page (bank aggregate). Sources go
 // to the devices list so users can see the per-device live numbers.
@@ -7303,9 +7275,8 @@ document.getElementById("settings-update-now")?.addEventListener("click", async 
 // Update-now: fire-and-poll. /api/system/update/apply backgrounds the
 // helper and 202s immediately; we then poll /api/system/update/log
 // every 2s to surface progress. install.sh restarts the daemon mid-
-// flight so /api/system/update/log will briefly 502 (cloudflared not
-// proxying yet), we tolerate that and resume polling once the daemon
-// comes back up.
+// flight so /api/system/update/log will briefly fail to connect, we
+// tolerate that and resume polling once the daemon comes back up.
 document.getElementById("settings-update-apply")?.addEventListener("click", async (e) => {
   const btn = e.currentTarget;
   if (!confirm("Apply update now? The daemon will restart at the end of the install (dashboard reconnects automatically in ~30s).")) return;
@@ -7373,13 +7344,12 @@ let integrationsState = { forecast: null, weather: null, cloud: null, mqtt: null
 async function refreshIntegrationsPanel() {
   const host = $("#settings-integrations");
   if (!host) return;
-  // One broker round-trip (#18). This used to fire four parallel
-  // requests (forecast/weather/cloud/mqtt config); over the cloud
-  // tunnel that burst could trip the edge 429 limiter and, because it
-  // was a Promise.all, fail the entire panel. /api/system/integrations
-  // folds all four into a single response. Retry once on 429 with a
-  // short backoff, and on a hard failure keep whatever we already had
-  // on screen instead of blanking the panel.
+  // One round-trip (#18). This used to fire four parallel requests
+  // (forecast/weather/cloud/mqtt config) and, because it was a
+  // Promise.all, one failure failed the entire panel.
+  // /api/system/integrations folds all four into a single response.
+  // Retry once on 429 with a short backoff, and on a hard failure keep
+  // whatever we already had on screen instead of blanking the panel.
   let data = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -7486,15 +7456,7 @@ function renderIntegrationsPanel() {
       id: "cloud", name: "WattPost cloud", ok: cloudConfigured,
       status: cloudConfigured ? "paired" : "not paired",
       sub: cloudConfigured
-        ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}${
-            // Tunnel hostname deliberately not surfaced — it's cloud→appliance
-            // plumbing, not a shareable link (the tunnel needs an SSO session
-            // only the cloud can mint). Keep the "no tunnel" warning: it IS
-            // actionable diagnostic.
-            integrationsState.cloud.tunnel_enabled === false
-              ? ` · <span class="ar-tag ar-tag--warn">no tunnel. Re-pair to enable remote access</span>`
-              : ""
-          }`
+        ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}`
         : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`,
       action: cloudConfigured ? "Edit" : "Pair", attr: "data-edit-cloud",
     }) +
@@ -9108,7 +9070,7 @@ if (kioskSkinSelect) {
 // "Open the local display in kiosk" is now an APPLIANCE-side setting
 // (#28), so it's meaningful from a cloud session too — setting it there
 // PATCHes the appliance and the local wall display obeys. The cloud tab
-// itself never auto-kiosks (the boot redirect is gated on !IS_BROKER_VIEW),
+// itself never auto-kiosks (the boot redirect is gated on !CLOUD_VIEW),
 // so showing the toggle here is safe and is the whole point of the fix.
 const kioskExitBtn = $("#kiosk-exit");
 if (kioskExitBtn) {
@@ -9116,26 +9078,15 @@ if (kioskExitBtn) {
   //   - kiosk-token share URL (#150): visitor has no session at
   //     all, would land in the dashboard with no auth and see
   //     401s everywhere, bad UX.
-  //   - Cloud-broker view: customer IS authed via the cloud, but
-  //     the broker dashboard at xyz.wattpost.cloud should be
-  //     SoC-kiosk-only. Full Settings / Devices / Setup chrome
-  //     belongs in app.wattpost.cloud, not on the appliance
-  //     broker URL. Keeps the broker view focused.
   // The Exit button still renders on direct local access
   // (192.168.x.x / wattpost.local) where the van/cabin operator
   // genuinely wants to flip between SoC kiosk and the full UI.
-  if (KIOSK_KEY_PARAM || IS_BROKER_VIEW) {
+  if (KIOSK_KEY_PARAM) {
     kioskExitBtn.hidden = true;
   }
   kioskExitBtn.addEventListener("click", () => {
-    // Belt-and-braces: even if the button is somehow clicked while
-    // KIOSK_KEY_PARAM or IS_BROKER_VIEW is set, just stay on /kiosk
-    // rather than navigating into chrome that should be hidden.
     if (KIOSK_KEY_PARAM) {
       window.location.href = "/";
-    } else if (IS_BROKER_VIEW) {
-      // Broker, stay put, no breakout.
-      return;
     } else {
       window.location.hash = "#/";
     }
@@ -9268,23 +9219,6 @@ async function loadKioskTokens() {
 const kioskCreateBtn = $("#kiosk-create-btn");
 if (kioskCreateBtn) {
   kioskCreateBtn.addEventListener("click", async () => {
-    // Kiosk tokens are appliance-local: the Pi verifies them against its
-    // own token store. A link only works on an origin that reaches the
-    // appliance directly (the LAN). When this page is loaded through the
-    // cloud broker (<slug>.wattpost.cloud), location.origin is the broker
-    // — a token link there points at the cloud, which can't verify it and
-    // bounces to /login. So don't mint a dead link; send them to the cloud
-    // dashboard, which has its own shareable kiosk system (/k/<short>).
-    if (location.hostname.endsWith(".wattpost.cloud")) {
-      const out = document.getElementById("kiosk-create-result");
-      if (out) {
-        out.hidden = false;
-        out.innerHTML = `
-          <div class="rotate-pw-label">Local-network kiosk links can't be created over the cloud.</div>
-          <div class="rotate-pw-foot">You're connected to this appliance through wattpost.cloud right now, so a link made here would point at the cloud and won't open. Two options: open this dashboard on the appliance's local network address to create a LAN kiosk link, or create a kiosk that works anywhere from the <a href="https://wattpost.cloud/app" target="_blank" rel="noopener">cloud dashboard</a>.</div>`;
-      }
-      return;
-    }
     const name = prompt("Name this display (e.g. Cabin, Van screen):", "Kiosk");
     if (name === null) return;
     // Theme picked for THIS link (empty = appliance default). Bound to the
@@ -9398,16 +9332,7 @@ if (_nsFw || _nsSsh) loadNetsec();
   if (!signoutBtn) return;
   if (document.body.classList.contains("is-demo")) return;
 
-  // Click handler: behaviour branches by origin (set in the
-  // auth-status fetch below). LAN cookie sessions hit /api/logout
-  // + reload; broker sessions jump to wattpost.cloud sign-out
-  // because clearing the LAN cookie doesn't end a broker view
-  // (the broker re-injects an HMAC header on every request).
   signoutBtn.addEventListener("click", async () => {
-    if (signoutBtn.dataset.origin === "broker") {
-      window.location.href = "https://wattpost.cloud/logout";
-      return;
-    }
     try {
       await fetch("/api/logout", {
         method: "POST", credentials: "same-origin",
@@ -9420,10 +9345,7 @@ if (_nsFw || _nsSsh) loadNetsec();
 
   // Hide until we know the user is actually signed in. Avoids
   // showing a Sign-out button to an anonymous LAN viewer who's
-  // never authed in the first place. For broker-origin sessions
-  // we DO show it (relabeled "Exit cloud session") + a short note
-  // that the click takes you to wattpost.cloud's sign-out, because
-  // ending the broker session requires ending the cloud session.
+  // never authed in the first place.
   signoutBtn.hidden = true;
   fetch("/api/system/auth-status", { credentials: "same-origin" })
     .then((r) => r.ok ? r.json() : null)
@@ -9435,26 +9357,6 @@ if (_nsFw || _nsSsh) loadNetsec();
       if (authed) {
         signoutBtn.dataset.origin = origin || "local";
         signoutBtn.hidden = false;
-        const label = document.getElementById("signout-btn-label");
-        const note  = document.getElementById("signout-broker-note");
-        if (origin === "broker") {
-          if (label) label.textContent = "Exit cloud session";
-          if (note)  { note.hidden = false; note.style.display = "block"; }
-        }
-      }
-      // Broker-origin: skip SSE, use polling. iOS Safari serialises
-      // its small per-host HTTP connection pool around a long-lived
-      // EventSource through the Cloudflare tunnel, queuing every
-      // /api/* fetch behind the SSE, dashboard sits at "connecting"
-      // forever even though the data is one request away. Polling
-      // every 5 s is plenty for a remote view and dodges the trap.
-      // Local LAN keeps SSE, it works fine on a fresh connection.
-      if (authed && origin === "broker") {
-        if (typeof eventStream !== "undefined" && eventStream) {
-          try { eventStream.close(); } catch (_) {}
-          eventStream = null;
-        }
-        if (typeof startPollingFallback === "function") startPollingFallback();
       }
     })
     .catch(() => { /* leave hidden on network error */ });
@@ -9509,10 +9411,10 @@ if (_kioskPathMatch) {
 // If the appliance is set to default-to-kiosk and the URL has no explicit
 // hash, redirect before the initial setRoute runs (instant via the cached
 // flag; loadKioskConfig() below corrects it from the appliance config and
-// re-routes if needed). Skipped on broker/cloud views — only the local
+// re-routes if needed). Skipped on the cloud view — only the local
 // wall display should auto-kiosk.
 else if (
-  !IS_BROKER_VIEW &&
+  !CLOUD_VIEW &&
   kioskDefault() &&
   (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/")
 ) {

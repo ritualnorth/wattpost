@@ -22,7 +22,6 @@ WattPost ships no default login, and SSH is off unless you enabled it (with your
   Dashboard:  http://wattpost.local
   Daemon:     ● running
   Cloud:      not paired (pair at https://wattpost.cloud/app/pair)
-  Tunnel:     ─
 
   Type wattpost-config for the setup menu.
 ```

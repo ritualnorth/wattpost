@@ -317,8 +317,7 @@ fi
 # ----- local web UI password (opt-in) -----
 # By default, the local dashboard accepts any LAN client — same trust
 # model as Pi-hole, Solar Assistant, Home Assistant Yellow. Most
-# off-grid setups have a single trusted network, and the cloud
-# tunnel's auth is the strong gate for remote access. Security-
+# off-grid setups have a single trusted network. Security-
 # conscious users (shared housing, corporate LAN, multi-tenant
 # warehouses) opt in via `wattpost-config → Set local web password`,
 # which writes /etc/wattpost/web-password.hash. The middleware
@@ -409,44 +408,6 @@ if [ -f "${SCRIPT_DIR}/sbin/wattpost-netctl" ]; then
         warn "you're connected over SSH, and SSH is OFF by default — the firewall will close port 22 when the daemon restarts."
         warn "to keep SSH: set web.ssh_enabled: true in ${CONFIG_FILE} before this finishes, or re-enable later from the local dashboard (Settings) / console."
     fi
-fi
-
-# ----- cloudflared (optional, for cloud tunnel) -----
-# Install Cloudflare's cloudflared binary so the daemon can expose
-# the local dashboard at <slug>.wattpost.io once it's paired to the
-# cloud. Idempotent: skipped if already installed. Apt-managed (via
-# Cloudflare's signed repo) so `apt upgrade` keeps it current.
-#
-# Skip entirely on architectures Cloudflare doesn't ship for —
-# tunnel will simply stay off, appliance keeps working locally.
-if ! command -v cloudflared >/dev/null; then
-    step "installing cloudflared (for cloud tunnel — optional)"
-    ARCH="$(dpkg --print-architecture 2>/dev/null || true)"
-    case "${ARCH}" in
-        amd64|arm64|armhf)
-            if ! [ -f /usr/share/keyrings/cloudflare-main.gpg ]; then
-                curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg \
-                    | gpg --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
-            fi
-            if ! [ -f /etc/apt/sources.list.d/cloudflared.list ]; then
-                # Cloudflare ships `bookworm` + `any` distros only —
-                # no `trixie` repo as of mid-2026. The package is a
-                # statically-linked Go binary, so the bookworm package
-                # works fine on a trixie host. Pin to bookworm to
-                # avoid "Release file not found" on newer Pi OS.
-                echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] \
-https://pkg.cloudflare.com/cloudflared bookworm main" \
-                    > /etc/apt/sources.list.d/cloudflared.list
-            fi
-            apt-get update -qq
-            apt-get install -y cloudflared
-            ;;
-        *)
-            warn "cloudflared not available for arch '${ARCH}' — cloud tunnel will be disabled."
-            ;;
-    esac
-else
-    step "cloudflared already installed ($(cloudflared --version 2>/dev/null | head -1))"
 fi
 
 # ----- version file (read by motd) -----

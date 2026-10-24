@@ -10,7 +10,7 @@ There are **three** ways to put WattPost on your phone, and the differences matt
 | A WattPost icon on your home screen, no app store | **Add to Home Screen from wattpost.cloud/app** |
 | Fast lookup from a desktop browser | A regular browser bookmark to `wattpost.cloud/app` |
 
-Whatever you do, **always install from `wattpost.cloud/app`**, never from the per-appliance URL (`abc123xyz0.wattpost.cloud/` etc). The reason's [below](#why-not-the-broker-url).
+Whatever you do, **always install from `wattpost.cloud/app`**, never from the appliance's own LAN address. The reason's [below](#why-not-the-lan-url).
 
 ## Option 1 · Native app (recommended on phone)
 
@@ -50,24 +50,20 @@ Just open `wattpost.cloud/app` in any browser. Bookmark it if you want.
 
 You can still receive push notifications without installing, same Enable button on **Account → Notifications**, they'll arrive while the browser is running, even if the WattPost tab isn't open. **On iOS Safari this only works after Add to Home Screen.** Other browsers (Chrome / Firefox on desktop, Chrome on Android) work without an install.
 
-## Why not the broker URL? {#why-not-the-broker-url}
+## Why not the appliance's LAN address? {#why-not-the-lan-url}
 
-Each appliance has its own remote-access URL, `abc123xyz0.wattpost.cloud/`, `def456uvw0.wattpost.cloud/`, etc. These open the appliance's local dashboard through a Cloudflare tunnel.
+The appliance serves its own dashboard on your LAN (`http://wattpost.local`, `192.168.x.x`). You can install that as a PWA for offline-first, no-cloud use, but for notifications and your whole fleet you should install from `wattpost.cloud/app`.
 
-You **can** browse them, but you should not **install** them as a PWA.
-
-Push notifications register against the page's origin (the part of the URL before the first `/`). If you install a PWA from `abc123xyz0.wattpost.cloud/`:
+Push notifications register against the page's origin (the part of the URL before the first `/`). If you install a PWA from the appliance's LAN address:
 
 - The PWA only knows about that one appliance
-- Push registers against that subdomain, but cloud-fired alerts (like "appliance offline") are sent from `wattpost.cloud`'s origin
-- Notifications don't deliver to the broker PWA
+- Push registers against the LAN origin, but cloud-fired alerts (like "appliance offline") are sent from `wattpost.cloud`'s origin
+- Notifications don't deliver to the LAN PWA
 - There's no multi-site picker
 - There's no alerts inbox
 - The account / billing pages aren't reachable inside the PWA
 
-Install from `wattpost.cloud/app` instead. From there you tap into any site to see its dashboard, including the same broker view, but inside the WattPost app shell with the alerts inbox, account, and the rest of your fleet one tap away.
-
-(As of `v0.1.43` of the appliance, broker URLs explicitly suppress the "Add to Home Screen" prompt to keep this from happening by accident. On LAN, `192.168.x.x`, the appliance's own PWA still installs, for the offline-first / no-cloud user.)
+Install from `wattpost.cloud/app` instead. From there you tap into any site to see its dashboard (a read-only copy rendered from the data the appliance pushes), inside the WattPost app shell with the alerts inbox, account, and the rest of your fleet one tap away.
 
 ## Notifications screen explained
 

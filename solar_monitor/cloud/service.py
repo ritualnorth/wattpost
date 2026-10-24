@@ -67,8 +67,7 @@ class CloudService:
         to a freshly-built CloudCfg. Otherwise a heartbeat firing
         after a user clicked Save in Settings → Cloud could mutate
         a stale CloudCfg, persist its (outdated) state back to
-        config.yaml, and quietly drift the in-memory SSO secret away
-        from what /sso reads on the request path (#148).
+        config.yaml (#148).
         """
         from ..config import Config as _Config
         if isinstance(config_or_cfg, _Config):
@@ -449,7 +448,7 @@ class CloudService:
                     # a malformed appliance_id must reject just this command,
                     # not raise out of the loop and abort dispatch of the
                     # whole batch plus the cloud-delivered settings
-                    # (branding/SSO/backup/channel) handled below it.
+                    # (branding/backup/channel) handled below it.
                     appliance_id = int(cmd.get("appliance_id") or 0)
                     ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
                 except Exception:
@@ -487,11 +486,6 @@ class CloudService:
             # under key `cloud.branding`. Hobby/Pro accounts → empty
             # dict, which clears any previously-cached brand.
             self._cache_branding(body.get("branding") or {})
-            # SSO secret distribution (#137). Cloud always echoes this
-            # back; if our local copy is empty (legacy pair, or first
-            # heartbeat post-update), persist it to config.yaml so the
-            # /sso endpoint can verify cloud-signed redirect tokens.
-            self._maybe_persist_sso_secret(body.get("sso_secret"))
             # #17 — backup-upload management lives in the cloud dashboard
             # now. Honour the cloud-delivered toggle by mirroring it onto
             # the live backup config, so the backup service uploads (or
@@ -602,30 +596,6 @@ class CloudService:
         updater.set_channel(want)
         log.info("update channel set to %s by the cloud dashboard", want)
         return True
-
-    def _maybe_persist_sso_secret(self, sso_secret: str | None) -> None:
-        """Save the cloud-issued SSO HMAC key if we don't already have
-        one. Idempotent, if our copy matches, no-op. If it differs
-        (cloud rotated), trust the cloud and update. Persistence goes
-        through the same config.yaml write path the pair flow uses,
-        so the appliance survives restarts."""
-        if not sso_secret or not isinstance(sso_secret, str):
-            return
-        if self.cfg.sso_secret == sso_secret:
-            return
-        log.info("cloud heartbeat: caching SSO secret (was empty=%s)",
-                 not self.cfg.sso_secret)
-        try:
-            # Mutate the live config struct in place AND persist to
-            # config.yaml so the new secret survives daemon restart.
-            self.cfg.sso_secret = sso_secret
-            # Delegate the file write to the cloud_admin helper so the
-            # YAML round-trip stays consistent across all writers.
-            from ..api import cloud_admin as _ca
-            cfg_path = getattr(self.scheduler, "config_path", None)
-            _ca.persist_cloud_cfg(self.cfg, config_path=cfg_path)
-        except Exception:
-            log.exception("cloud heartbeat: failed to persist sso_secret")
 
     def _cache_branding(self, branding: dict[str, Any]) -> None:
         """Persist the {brand_name, brand_support_email, brand_logo_url}
@@ -1077,7 +1047,7 @@ class CloudService:
         re-execs the daemon so the new SQLite + config are loaded fresh.
 
         Critical UX note: the live `cloud.bearer_token`,
-        `cloud.sso_secret`, and `cloud.tunnel_token` are preserved by
+        `cloud.appliance_id` are preserved by
         `_stage_and_swap` (#146 phase-2 fix), pairing survives the
         restore. Without that the appliance would come back online
         un-paired and the user would have to re-pair to see it on the
@@ -1435,14 +1405,6 @@ class CloudService:
         # 'pi'.
         import os as _os
         extras["deployment"] = "docker" if _os.environ.get("WATTPOST_DEPLOYMENT") == "docker" else "pi"
-        # Local dashboard port the appliance actually serves on, so the cloud
-        # can point the per-appliance tunnel ingress at it even if the user
-        # changed WATTPOST_PORT. systemd + the Docker entrypoint both set this
-        # env to the served port; default 80. (wattpost-cloud#7)
-        try:
-            extras["local_port"] = int(_os.environ.get("WATTPOST_PORT") or 80)
-        except (TypeError, ValueError):
-            extras["local_port"] = 80
         # #267, host-health snapshot (disk, memory, load, uptime,
         # hostname, LAN IP). Cheap stdlib reads; the cloud renders
         # this as a Device-health card on /app/site/{id} and uses it
@@ -1464,17 +1426,9 @@ class CloudService:
                 extras["location"] = loc_payload
         except Exception:
             log.exception("cloud heartbeat: location resolution failed")
-        # Kiosk share-token (Option C of the kiosk security model).
-        # The cloud dashboard's "Kiosk" button reads this and builds
-        # the share URL `<slug>.wattpost.cloud/kiosk?key=<token>`.
-        # Safe to ship in extras: it IS the public bearer for the
-        # share URL, anyone with the URL has it anyway. Stays out
-        # of the audit log + isn't sensitive like the bearer_token.
-        if self.cfg.kiosk_token:
-            extras["kiosk_token"] = self.cfg.kiosk_token
         # Active kiosk skin so the cloud can preview what a shared kiosk
         # link will display ("this share shows the Command skin") without
-        # round-tripping through the broker. Cheap (~20 bytes); defaults
+        # asking the appliance. Cheap (~20 bytes); defaults
         # to halo when unset.
         try:
             _kcfg = getattr(self._config, "kiosk", None)
@@ -1910,26 +1864,22 @@ class CloudService:
                         exc_info=True)
 
         # Keep extras under the cloud's cap. The core fields (soc_pct,
-        # net_w) plus the small routing/identity extras — local_port
-        # above all, since the cloud derives the tunnel proxy port from
-        # it — MUST get through so the box registers online and stays
-        # reachable. The bulky render-only enrichment is best-effort:
+        # net_w) plus the small identity extras MUST get through so the
+        # box registers online. The bulky render-only enrichment is best-effort:
         # shed the single biggest non-essential key, repeatedly, until
         # we're under budget. Size-based (not a fixed key order) so it
         # adapts to whatever is heavy on a given box — on a busy rig the
         # signed-audit backlog dominated, on others it might be energy
         # history or device snapshots. Without this a busy multi-device
         # install overflows and the cloud 413s EVERY heartbeat — the box
-        # then looks permanently offline and its tunnel port never
-        # binds. Each shed key is re-sent next beat, so enrichment
+        # then looks permanently offline. Each shed key is re-sent next beat, so enrichment
         # converges once the transient pressure passes. Budget sits a
         # margin under the cloud's _EXTRAS_MAX_BYTES (8 KiB).
         import json as _json
         _EXTRAS_BUDGET = 7800
-        # Never shed these: small, and load-bearing for routing/identity.
+        # Never shed these: small, and load-bearing for identity.
         _EXTRAS_KEEP = {
-            "local_port", "version", "deployment", "kiosk_token",
-            "kiosk_skin", "alert_count",
+            "version", "deployment", "kiosk_skin", "alert_count",
         }
 
         def _extras_bytes() -> int:

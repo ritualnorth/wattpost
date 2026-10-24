@@ -330,12 +330,12 @@ def _stage_and_swap(
     Order: write all `.new` siblings first; then swap each over its
     target. If a write fails, no target is touched.
 
-    Pairing-preserve: the live cloud block (bearer_token, sso_secret,
-    tunnel_*, appliance_id) is read BEFORE the swap and re-injected
+    Pairing-preserve: the live cloud block (bearer_token,
+    appliance_id) is read BEFORE the swap and re-injected
     into the restored YAML. Restoring a backup taken on a previous
     install would otherwise clobber the fresh pair's tokens with
-    the dead appliance's, breaking heartbeat, SSO, and the CF
-    tunnel route. Same-appliance rollback is unaffected (the
+    the dead appliance's, breaking heartbeat and telemetry
+    push. Same-appliance rollback is unaffected (the
     preserved values match what was in the backup anyway).
 
     The web-password files are *not* overwritten when the target
