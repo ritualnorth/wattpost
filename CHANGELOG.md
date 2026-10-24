@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Add: `restart_poller` cloud command. Stops and starts the poll loop in-process (reconnects Bluetooth and serial transports) without restarting the daemon or web UI. Signed like every other command.
 - Fix: in demo mode `/api/setup/transports` returned 500 (the demo's synthetic poller has no transports), so the Setup screen's transport list failed on the public demo.
 
 - Security hardening in the UI scripts flagged by CodeQL: the HTML escape used for attribute values now escapes quotes (it covered `<`, `>` and `&` only, so a USB port name or kiosk-token id containing a quote could break out of its attribute), and the power-flow click handler no longer assigns arbitrary values to `location.href`. Also removed a replace-with-itself no-op.
