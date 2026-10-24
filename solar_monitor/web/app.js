@@ -4567,9 +4567,9 @@ function drawCompareChart(metric, datasets) {
     dataCols.push(col);
   });
 
-  const tsMin = ts[0], tsMax = ts[ts.length - 1];
-  const xScale = (tsMin != null && tsMax > tsMin)
-    ? { time: true, range: [tsMin, tsMax] } : { time: true };
+  const first = datasets[0]?.data || {};
+  const win = chartWindow(first.since, first.until, ts[0], ts[ts.length - 1]);
+  const xScale = win ? { time: true, range: win } : { time: true };
 
   const opts = {
     width, height: 340,
@@ -4709,7 +4709,8 @@ async function refreshEnergyOverview(rangeKey) {
   const legendCloud = document.getElementById("energy-legend-weather");
   if (legendCloud) legendCloud.hidden = !cloudAvailable;
 
-  drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc, cloud });
+  drawEnergyChart(host, ts, { solar, charger, load, batIn, batOut, soc, cloud },
+                  { since: payload.since_ts, until: payload.until_ts });
 
   // Sub-line: time range. Days for multi-day windows so it reads
   // "May 17 → 24" instead of two midnight timestamps.
@@ -4765,7 +4766,7 @@ function setText(id, t) {
   if (el) el.textContent = t;
 }
 
-function drawEnergyChart(root, ts, series) {
+function drawEnergyChart(root, ts, series, window_ = null) {
   if (energyChart) { energyChart.destroy(); energyChart = null; }
   if (!ts.length) {
     root.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">No samples yet today.</div>`;
@@ -4794,7 +4795,10 @@ function drawEnergyChart(root, ts, series) {
     width, height: 280,
     cursor: { drag: { x: true, y: false } },
     scales: {
-      x: { time: true },
+      x: (() => {
+        const w = chartWindow(window_?.since, window_?.until, ts[0], ts[ts.length - 1]);
+        return w ? { time: true, range: w } : { time: true };
+      })(),
       // Power axis (signed, battery discharge dips below 0).
       y: { auto: true },
       // SoC + cloud cover share the 0..100 right axis. Both are
@@ -4916,6 +4920,22 @@ function makeForecastInterp(points) {
     }
     return null;
   };
+}
+
+// The x-range a history chart should show: the window the user asked for
+// (the server echoes `since` / `until`), widened to cover the data if it
+// somehow lies outside. Fitting to the data alone made a 30-day chart with
+// one hour of samples look like an hour-long chart, and hid how little
+// history exists. Falls back to the data's own span when no usable window
+// comes back. Returns [min, max] or null (let uPlot decide).
+function chartWindow(since, until, tsMin, tsMax) {
+  const ok = (v) => typeof v === "number" && isFinite(v) && v > 0;
+  let lo = tsMin, hi = tsMax;
+  if (ok(since) && ok(until) && until > since && (until - since) <= 6 * 366 * 86400) {
+    lo = lo == null ? since : Math.min(since, lo);
+    hi = hi == null ? until : Math.max(until, hi);
+  }
+  return (lo != null && hi != null && hi > lo) ? [lo, hi] : null;
 }
 
 function drawChart(label, metric, data, forecast = null) {
@@ -5052,11 +5072,12 @@ function drawChart(label, metric, data, forecast = null) {
 
   // Auto-fit X scale to whatever timeline we ended up with, historical
   // only, or historical + forecast extension.
-  const tsMin = combinedTs.length ? combinedTs[0] : null;
-  const tsMax = combinedTs.length ? combinedTs[combinedTs.length - 1] : null;
-  const xScale = (tsMin != null && tsMax != null && tsMax > tsMin)
-    ? { time: true, range: [tsMin, tsMax] }
-    : { time: true };
+  const dataMin = combinedTs.length ? combinedTs[0] : null;
+  const dataMax = combinedTs.length ? combinedTs[combinedTs.length - 1] : null;
+  const win = chartWindow(data?.since, data?.until, dataMin, dataMax);
+  const tsMin = win ? win[0] : dataMin;
+  const tsMax = win ? win[1] : dataMax;
+  const xScale = win ? { time: true, range: win } : { time: true };
 
   const opts = {
     width, height: 340,
