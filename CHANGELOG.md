@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Cloud command-signing keys are now pinned at pairing (trust on first use for installs that paired earlier). A command signed by any other key is refused, so a tampered cloud database or JWKS can't mint commands this appliance will run. After a deliberate cloud rebuild, re-trust with `POST /api/cloud/signing-key/retrust`; `GET /api/cloud/signing-key` shows what is pinned. Unpairing clears the pin.
+
 - Cloud uploads no longer carry the per-metric `latest` list (live values already travel in the snapshot view) and send the device inventory only when it changes, saving bytes on cellular and Starlink links.
 
 ### Removed

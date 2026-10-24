@@ -273,8 +273,35 @@ async def unpair_appliance(state: State) -> dict[str, Any]:
         raw.pop("cloud", None)
         return raw
     _save_config(config_path, _mutate)
+    from ..cloud.command_verify import clear_pin
+    clear_pin()
     log.info("unpaired from cloud")
     return {"ok": True, "configured": False, "restart_required": True}
+
+
+@get("/api/cloud/signing-key")
+async def cloud_signing_key() -> dict[str, Any]:
+    from ..cloud.command_verify import pin_state
+    return pin_state()
+
+
+@post("/api/cloud/signing-key/retrust", status_code=200)
+async def cloud_retrust_signing_key(state: State) -> dict[str, Any]:
+    """Re-pin the cloud's command-signing keys to whatever its JWKS publishes
+    now. For when the cloud was rebuilt or its key changed on purpose; the
+    appliance refuses commands signed by any other key until you do this."""
+    from ..cloud.command_verify import pin_current_keys
+    config: Config = state["config"]
+    if config.cloud is None:
+        raise HTTPException(status_code=409, detail="not paired with a cloud")
+    try:
+        ok = await pin_current_keys(force=True)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"could not fetch the cloud's keys: {e}")
+    if not ok:
+        raise HTTPException(status_code=502, detail="the cloud published no usable signing key")
+    from ..cloud.command_verify import pin_state
+    return {"ok": True, **pin_state()}
 
 
 @post("/api/cloud/heartbeat", status_code=202)

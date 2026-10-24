@@ -293,6 +293,7 @@ class CloudService:
                                     jwks_url=body["jwks_url"],
                                     discovery_url=body["oidc_discovery_url"],
                                 )
+                                await self._pin_signing_keys()
                             except Exception:
                                 log.exception(
                                     "identity v2: failed to persist OIDC "
@@ -360,6 +361,7 @@ class CloudService:
                             jwks_url=body["jwks_url"],
                             discovery_url=body["oidc_discovery_url"],
                         )
+                        await self._pin_signing_keys()
                     except Exception:
                         # Non-fatal, Phase 3 OIDC client is additive;
                         # legacy cookie auth still works without it.
@@ -1409,6 +1411,15 @@ class CloudService:
         engine = getattr(self.scheduler, "_alerts", None)
         if engine is not None and hasattr(engine, "reload_rules"):
             engine.reload_rules(self._all_rules)
+
+    async def _pin_signing_keys(self) -> None:
+        """Remember the cloud's command-signing keys as seen at pairing."""
+        from .command_verify import pin_current_keys
+        try:
+            await pin_current_keys()
+        except Exception:
+            log.warning("could not pin the cloud's signing keys yet; "
+                        "will pin the first key that verifies a command", exc_info=True)
 
     def _ledger(self):
         from .command_verify import CommandLedger, default_ledger_path

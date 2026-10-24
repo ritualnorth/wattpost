@@ -74,6 +74,7 @@ from .energy import energy_today
 from .cloud_admin import (
     get_cloud_config, update_cloud_config, pair_appliance,
     unpair_appliance, trigger_heartbeat, cloud_config_view,
+    cloud_signing_key, cloud_retrust_signing_key,
 )
 from .exporters_admin import (
     get_mqtt_config, update_mqtt_config, test_mqtt, mqtt_config_view,
@@ -1521,6 +1522,8 @@ def build_app(
             update_cloud_config,
             pair_appliance,
             unpair_appliance,
+            cloud_signing_key,
+            cloud_retrust_signing_key,
             trigger_heartbeat,
             get_mqtt_config,
             update_mqtt_config,

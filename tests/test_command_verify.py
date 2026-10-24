@@ -13,7 +13,15 @@ from types import SimpleNamespace
 
 from nacl.signing import SigningKey
 
+import pytest
+
 from solar_monitor.cloud import command_verify as cv
+
+
+@pytest.fixture(autouse=True)
+def _private_state_dir(tmp_path, monkeypatch):
+    """Keep the signing-key pin (and ledger) out of the real state directory."""
+    monkeypatch.setenv("WATTPOST_DB", str(tmp_path / "db.sqlite"))
 
 APPLIANCE = 7
 KID = "kid-1"
@@ -278,3 +286,55 @@ def test_version_fields_must_look_like_release_versions():
         assert bad({"payload_json": '{"version": "%s"}' % evil}), evil
     assert bad({"payload_json": '{"image": "evil.example/x:1"}'}), "custom images are refused"
     assert bad({"payload_json": "not json"}) and bad({"payload_json": "[1]"})
+
+
+# ---- signing-key pin (trust on first use) ----------------------------------
+
+def test_first_verified_command_pins_the_key_and_a_new_key_is_then_refused():
+    env = Env()
+    try:
+        assert verify(env, env.command(cmd_id=1)) is True
+        assert cv.pin_state()["pinned"] is True
+        # The cloud (or whoever controls its JWKS) now publishes a different
+        # key under the same kid and signs with it: refused.
+        evil = SigningKey.generate()
+        env.jwk = {"kty": "OKP", "crv": "Ed25519", "kid": KID, "x": _b64u(bytes(evil.verify_key))}
+        assert verify(env, env.command(cmd_id=2, sign_key=evil)) is False
+        # ...and under a brand new kid.
+        env.jwk = dict(env.jwk, kid="kid-2")
+        c = env.command(cmd_id=3, sign_key=evil)
+        c["signing_kid"] = "kid-2"
+        assert verify(env, c) is False
+    finally:
+        env.restore()
+
+
+def test_a_forged_command_cannot_plant_its_own_pin():
+    env = Env()
+    try:
+        evil = SigningKey.generate()
+        env.jwk = {"kty": "OKP", "crv": "Ed25519", "kid": KID, "x": _b64u(bytes(evil.verify_key))}
+        bad = env.command(sign_key=SigningKey.generate())      # signed by neither
+        assert verify(env, bad) is False
+        assert cv.pin_state()["pinned"] is False               # nothing pinned by a failed verify
+    finally:
+        env.restore()
+
+
+def test_pairing_pins_up_front_and_retrust_replaces_it():
+    env = Env()
+    try:
+        cv.oidc_config.load = lambda: SimpleNamespace(jwks_url="https://x/jwks", endpoint="https://x")
+        assert run(cv.pin_current_keys()) is True
+        assert cv.pin_state() == {"pinned": True, "kids": [KID]}
+        assert run(cv.pin_current_keys()) is False             # already pinned: no silent overwrite
+        new = SigningKey.generate()
+        env.jwk = {"kty": "OKP", "crv": "Ed25519", "kid": "kid-new", "x": _b64u(bytes(new.verify_key))}
+        c = env.command(sign_key=new)
+        c["signing_kid"] = "kid-new"
+        assert verify(env, c) is False                         # new key refused until the owner re-trusts
+        assert run(cv.pin_current_keys(force=True)) is True    # the owner's explicit action
+        assert verify(env, c) is True
+        assert cv.clear_pin() is True and cv.pin_state()["pinned"] is False
+    finally:
+        env.restore()
