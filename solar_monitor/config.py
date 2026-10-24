@@ -537,6 +537,13 @@ class WebCfg(msgspec.Struct, kw_only=True):
     # appliance. Wall displays use a kiosk token regardless of this
     # flag. This is the explicit opt-out for a deliberately-public box.
     public_view: bool = False
+    # Requests whose TCP peer is loopback (127.0.0.1 / ::1) are treated as
+    # the local owner and skip the login (the Pi's own kiosk browser, curl on
+    # the box, wattpost-config). That is unsafe if a reverse proxy runs on the
+    # SAME host: every request it relays then arrives from loopback. Header
+    # checks catch most proxies but cannot be complete, so if you put nginx /
+    # Caddy / HAProxy / a tunnel client on this host, set this to false.
+    trust_loopback: bool = True
     # Inbound host firewall (nftables, Pi image only). On by default:
     # default-deny INPUT, allowing only the dashboard, mDNS, DHCP, the
     # hotspot's DHCP/DNS, and SSH-when-enabled. The master escape hatch

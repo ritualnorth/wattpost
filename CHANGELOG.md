@@ -105,6 +105,14 @@ Versions follow [Semantic Versioning].
   credentials), diagnostics and logs, network, setup and cloud endpoints.
   Those prefixes now require a session even in public view; dashboard and
   kiosk reads are unchanged.
+- **Loopback trust no longer assumes a header denylist is complete.** New
+  `web.trust_loopback` (default true) turns the "connection from this
+  machine is the owner" shortcut off, for installs that run a reverse proxy
+  on the same host; docs/security.md explains when to set it. A loopback
+  request is now also treated as proxied if it carries `Via`, `Forwarded`,
+  any `X-Forwarded-*` / `CF-*`, `X-Real-IP`, `True-Client-IP`, `X-Original-
+  Forwarded-For`, `X-Client-IP`, `Fastly-Client-IP` or `X-Cluster-Client-
+  IP`, or an `Origin`/`Referer` for a non-loopback host.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and

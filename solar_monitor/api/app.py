@@ -1297,6 +1297,9 @@ def build_app(
     # displays use a kiosk token regardless. Genuine loopback
     # still bypasses; the first-run flow makes sure a password exists.
     _READONLY_PUBLIC = bool(getattr(config, "web", None) and config.web.public_view)
+    # `web.trust_loopback: false` for a reverse proxy on this same host.
+    _web_auth.set_trust_loopback(
+        getattr(getattr(config, "web", None), "trust_loopback", True))
 
     class _LocalAuthMiddleware:
         def __init__(self, app):
