@@ -12,6 +12,7 @@ only when their content changed.
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -26,6 +27,7 @@ log = logging.getLogger(__name__)
 
 SNAPSHOT_EVERY_S = 0            # every sync
 ANALYTICS_EVERY_S = 15 * 60     # battery health, heatmap, runtime, per-device stats
+BUILDER_TIMEOUT_S = 20          # one slow view must not stall the whole sync
 ENERGY_TODAY_EVERY_S = 5 * 60   # the "Energy today" chart moves faster than the rest
 
 # The History page's range buttons: bucket size (seconds) -> span (None = midnight to now).
@@ -44,7 +46,10 @@ class ViewPublisher:
     """Builds the set of views due for upload and remembers what the cloud
     already has, so unchanged analytics are not re-sent."""
 
-    def __init__(self, store, scheduler, *, analytics_every_s: int = ANALYTICS_EVERY_S) -> None:
+    def __init__(self, store, scheduler, *, analytics_every_s: int = ANALYTICS_EVERY_S,
+                 builder_timeout_s: float = BUILDER_TIMEOUT_S) -> None:
+        self.builder_timeout_s = builder_timeout_s
+        self._pending: dict[str, _Sent] = {}
         self.store = store
         self.scheduler = scheduler
         self.analytics_every_s = analytics_every_s
@@ -71,19 +76,12 @@ class ViewPublisher:
         """Views to upload now, as {name: body}. Call `confirm()` with the
         returned names once the cloud has acked the batch.
 
-        With `live=True` (a viewer holds a lease) only the snapshot is built:
-        it is what the dashboard animates from, and the analytics keep their
-        own slower cadence."""
+        `live` is accepted for compatibility but changes nothing: while a
+        viewer holds a lease the snapshot still goes with every sync (its
+        cadence is "every sync") and the analytics views are still built
+        at their normal cadence. Skipping them in live mode meant a page
+        watched for hours never refreshed its histograms or energy chart."""
         now = now if now is not None else time.time()
-        if live:
-            self._pending = {}
-            try:
-                body = await self.scheduler.build_snapshot()
-            except Exception:  # noqa: BLE001
-                log.exception("live snapshot failed to build")
-                return {}
-            self._pending["snapshot"] = _Sent("", now)
-            return {"snapshot": body}
         builders: dict[str, tuple[int, Callable[[], Awaitable[dict[str, Any]]]]] = {
             "snapshot": (SNAPSHOT_EVERY_S, self.scheduler.build_snapshot),
         }
@@ -111,7 +109,11 @@ class ViewPublisher:
             if prev is not None and every and now - prev.at < every:
                 continue
             try:
-                body = await fn()
+                body = await asyncio.wait_for(fn(), timeout=self.builder_timeout_s)
+            except asyncio.TimeoutError:
+                log.warning("view %s took longer than %.0fs to build; skipping",
+                            name, self.builder_timeout_s)
+                continue
             except Exception:  # noqa: BLE001 — one broken view must not block the rest
                 log.exception("view %s failed to build; skipping", name)
                 continue
@@ -127,6 +129,11 @@ class ViewPublisher:
             out[name] = body
             self._pending[name] = _Sent(digest, now)
         return out
+
+    def reset(self) -> None:
+        """Forget what the cloud has (it is a different cloud/account now)."""
+        self._sent.clear()
+        self._pending = {}
 
     def confirm(self, names) -> None:
         for n in names:

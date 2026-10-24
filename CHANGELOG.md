@@ -150,6 +150,14 @@ Versions follow [Semantic Versioning].
 - The signed-command ledger (which stops a completed command being replayed)
   is now fsynced, keeps a `.bak` of the previous good copy, and falls back
   to it if the main file is corrupt after a power cut.
+- Telemetry upload is robust to bad rows now that the cloud drops them:
+  batches are sent as strict JSON (non-finite numbers dropped or nulled, NUL
+  characters stripped), a batch the cloud keeps refusing with a 4xx/5xx is
+  bisected so the good rows are delivered and the watermark moves past the
+  bad ones (never during an outage, nor for 401/408/429), the watermark is
+  reset when the appliance id or cloud endpoint changes, and views are built
+  once per run with a 20 s per-view timeout and their normal cadence while
+  someone is watching live.
 
 ## [0.1.188] - 2026-06-16
 

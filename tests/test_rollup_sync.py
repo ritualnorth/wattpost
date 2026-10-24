@@ -542,3 +542,257 @@ def test_first_batch_is_fast_with_a_day_of_5s_data_and_100_metrics():
         assert took < 1.0, f"first batch took {took:.2f}s"
         await st.close()
     _run(go())
+
+
+# ---- strict JSON / NUL scrubbing -------------------------------------------------
+
+def test_scrub_replaces_non_finite_and_strips_nul():
+    d = rs.scrub({"a\x00b": [float("nan"), float("inf"), 1.5, "x\x00y", ("t", float("-inf"))]})
+    assert d == {"ab": [None, None, 1.5, "xy", ["t", None]]}
+
+
+def test_post_body_is_strict_json_even_with_nan_in_views():
+    async def go():
+        st = await _store(seed_minutes=2)
+        seen = []
+
+        def handler(req):
+            seen.append(gzip.decompress(req.content))
+            body = json.loads(seen[-1])
+            top = max((r[0] for r in body["rollups"]), default=None)
+            return httpx.Response(200, json={"acked_through": top})
+
+        class V:
+            async def due(self, live=False):
+                return {"snapshot": {"x": float("nan"), "y": float("inf"), "s": "a\x00b"}}
+            def confirm(self, names): pass
+
+        sync = rs.RollupSync(
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            backfill_hours=lambda: 1, views=V(),
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        res = await sync.run_once(now=T0 + 400)
+        assert res.error is None, res.error
+        raw = seen[0]
+        assert b"NaN" not in raw and b"Infinity" not in raw and b"\\u0000" not in raw
+        assert json.loads(raw)["views"]["snapshot"] == {"x": None, "y": None, "s": "ab"}
+        await st.close()
+    _run(go())
+
+
+def test_non_finite_rollup_rows_are_dropped_and_do_not_wedge_the_watermark():
+    async def go():
+        st = await _store(seed_minutes=3)
+        await st._db.execute("UPDATE samples SET value = 1e999 WHERE ts = ? AND metric = 'power_w'",
+                             (T0 + 2 * 60,))
+        await st._db.execute("UPDATE samples SET value = 1e999 WHERE ts = ? AND metric = 'power_w'",
+                             (T0 + 2 * 60 + 15,))
+        await st._db.commit()
+        cloud = FakeCloud()
+        res = await _sync(st, cloud).run_once(now=T0 + 400)
+        assert res.error is None, res.error
+        sent = [r for b in cloud.batches for r in b["rollups"]]
+        assert all(abs(x) < 1e30 for r in sent for x in r[3:6])
+        assert res.skipped_rows >= 1
+        assert int((await st.kv_get(rs.WATERMARK_KEY))[0]) == T0 + 2 * 60   # moved past the bad bucket
+        await st.close()
+    _run(go())
+
+
+# ---- poison batches ---------------------------------------------------------------
+
+def _poison_cloud(bad_bucket, status=400, down=False):
+    cloud = FakeCloud()
+    cloud.received = []
+
+    def handler(req):
+        body = json.loads(gzip.decompress(req.content))
+        if down:
+            return httpx.Response(503, text="down")
+        if any(r[0] == bad_bucket and r[2] == "power_w" for r in body["rollups"]):
+            return httpx.Response(status, text="bad row")
+        cloud.received += body["rollups"]
+        top = max((r[0] for r in body["rollups"]), default=None)
+        return httpx.Response(200, json={"acked_through": top, "rejected": 0})
+    cloud.handler = handler
+    return cloud
+
+
+def test_persistent_4xx_batch_is_bisected_and_the_watermark_moves_past_the_poison_row():
+    async def go():
+        st = await _store(seed_minutes=5)
+        cloud = _poison_cloud(T0 + 120)
+        sync = _sync(st, cloud)
+        for _ in range(rs.POISON_THRESHOLD - 1):
+            res = await sync.run_once(now=T0 + 400)
+            assert res.error and "HTTP 400" in res.error
+            assert await st.kv_get(rs.WATERMARK_KEY) is None      # still retrying the same batch
+        res = await sync.run_once(now=T0 + 400)
+        assert res.error is None, res.error
+        assert res.skipped_rows == 1
+        keys = {(r[0], r[2]) for r in cloud.received}
+        assert len(keys) == 9 and (T0 + 120, "power_w") not in keys   # everything else arrived
+        assert int((await st.kv_get(rs.WATERMARK_KEY))[0]) == T0 + 4 * 60
+        # next run is clean and does not resend
+        before = len(cloud.received)
+        res = await sync.run_once(now=T0 + 400)
+        assert res.error is None and len(cloud.received) == before
+        await st.close()
+    _run(go())
+
+
+def test_outage_is_never_mistaken_for_poison():
+    async def go():
+        st = await _store(seed_minutes=5)
+        for status, down in ((503, True),):
+            cloud = _poison_cloud(T0 + 120, down=down)
+            sync = _sync(st, cloud)
+            for _ in range(rs.POISON_THRESHOLD + 3):
+                res = await sync.run_once(now=T0 + 400)
+                assert res.error and res.skipped_rows == 0
+            assert await st.kv_get(rs.WATERMARK_KEY) is None
+        await st.close()
+    _run(go())
+
+
+def test_auth_and_rate_limit_statuses_are_never_poison():
+    async def go():
+        st = await _store(seed_minutes=3)
+        for status in (401, 408, 429):
+            cloud = _poison_cloud(T0 + 60, status=status)
+            sync = _sync(st, cloud)
+            for _ in range(rs.POISON_THRESHOLD + 2):
+                res = await sync.run_once(now=T0 + 400)
+                assert res.error and res.skipped_rows == 0
+            assert await st.kv_get(rs.WATERMARK_KEY) is None
+        await st.close()
+    _run(go())
+
+
+# ---- watermark identity ------------------------------------------------------------
+
+def test_watermark_is_reset_when_appliance_or_endpoint_changes():
+    async def go():
+        st = await _store(seed_minutes=3)
+        cloud = FakeCloud()
+        ident = {"v": "7|https://a.example"}
+
+        def mk():
+            return rs.RollupSync(
+                store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
+                sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+                identity=lambda: ident["v"],
+                client_factory=lambda: httpx.AsyncClient(
+                    transport=httpx.MockTransport(cloud.handler)))
+
+        await mk().run_once(now=T0 + 400)
+        n1 = sum(len(b["rollups"]) for b in cloud.batches)
+        assert n1 == 6
+        await mk().run_once(now=T0 + 400)                       # same identity: nothing resent
+        assert sum(len(b["rollups"]) for b in cloud.batches) == n1
+        ident["v"] = "8|https://a.example"                       # re-paired as another appliance
+        await mk().run_once(now=T0 + 400)
+        assert sum(len(b["rollups"]) for b in cloud.batches) == 2 * n1
+        ident["v"] = "8|https://b.example"                       # same id, different endpoint
+        await mk().run_once(now=T0 + 400)
+        assert sum(len(b["rollups"]) for b in cloud.batches) == 3 * n1
+        await st.close()
+    _run(go())
+
+
+def test_legacy_watermark_without_identity_is_kept():
+    async def go():
+        st = await _store(seed_minutes=3)
+        await st.kv_set(rs.WATERMARK_KEY, str(T0 + 2 * 60))
+        cloud = FakeCloud()
+        sync = rs.RollupSync(
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
+            sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+            identity=lambda: "7|https://a",
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
+        await sync.run_once(now=T0 + 400)
+        assert sum(len(b["rollups"]) for b in cloud.batches) == 0     # nothing newer than wm
+        assert (await st.kv_get(rs.IDENTITY_KEY))[0] == "7|https://a"
+        await st.close()
+    _run(go())
+
+
+# ---- views: live cadence, timeout, one build per run ---------------------------------
+
+def test_live_mode_still_builds_due_analytics_views():
+    from solar_monitor.cloud.views import ViewPublisher
+
+    class Sched:
+        n = 0
+        async def build_snapshot(self):
+            Sched.n += 1
+            return {"type": "snapshot", "ts": Sched.n}
+
+    async def go():
+        st = await _store(seed_minutes=2)
+        pub = ViewPublisher(st, Sched(), analytics_every_s=900)
+        first = await pub.due(now=1000, live=True)
+        assert "snapshot" in first and "battery-health" in first and "load-heatmap" in first
+        pub.confirm(first)
+        again = await pub.due(now=1010, live=True)
+        assert list(again) == ["snapshot"]                 # analytics keep their normal cadence
+        later = await pub.due(now=1000 + 901, live=True)
+        assert "snapshot" in later                         # and come due again while live
+        await st.close()
+    _run(go())
+
+
+def test_a_slow_view_builder_times_out_and_the_rest_still_go():
+    from solar_monitor.cloud import views as V
+
+    class Sched:
+        async def build_snapshot(self):
+            return {"type": "snapshot", "ts": 1}
+
+    async def go():
+        st = await _store(seed_minutes=2)
+        pub = V.ViewPublisher(st, Sched(), analytics_every_s=900, builder_timeout_s=0.1)
+
+        async def hang(store):
+            await asyncio.sleep(30)
+        orig = V.viewmodels.battery_health
+        V.viewmodels.battery_health = hang
+        try:
+            import time as _t
+            t = _t.perf_counter()
+            out = await pub.due(now=1000)
+            assert _t.perf_counter() - t < 5
+        finally:
+            V.viewmodels.battery_health = orig
+        assert "battery-health" not in out and "snapshot" in out and "load-heatmap" in out
+        await st.close()
+    _run(go())
+
+
+def test_views_are_built_once_per_run_not_per_batch():
+    async def go():
+        st = await _store(seed_minutes=5)
+        builds = []
+
+        class V:
+            async def due(self, live=False):
+                builds.append(1)
+                return {"snapshot": {"ts": len(builds)}}
+            def confirm(self, names): pass
+
+        old = rs.BATCH_ROWS
+        rs.BATCH_ROWS = 4
+        try:
+            cloud = FakeCloud()
+            sync = rs.RollupSync(
+                store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
+                sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1, views=V(),
+                client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
+            res = await sync.run_once(now=T0 + 400)
+        finally:
+            rs.BATCH_ROWS = old
+        assert res.error is None and len(cloud.batches) >= 3
+        assert len(builds) == 1
+        assert "snapshot" in cloud.batches[0]["views"] and cloud.batches[-1]["views"] == {}
+        await st.close()
+    _run(go())

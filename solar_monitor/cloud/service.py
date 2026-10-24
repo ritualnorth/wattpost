@@ -204,6 +204,10 @@ class CloudService:
             # No cloud config (unpaired live) means uploads are off, not a crash.
             enabled=lambda: bool(self._cfg_get("telemetry_sync", False)
                                  and self._cfg_get("bearer_token", "")),
+            identity=lambda: (
+                f"{self._cfg_get('appliance_id', None)}|"
+                f"{str(self._cfg_get('endpoint', '')).rstrip('/').lower()}"
+                if self.cfg is not None else ""),
         )
         self._sync_task = asyncio.create_task(
             self._sync.loop(self._stop,

@@ -52,9 +52,45 @@ LIVE_MAX_INTERVAL_S = 60          # nor slower: a hostile reply must not park th
 LIVE_MAX_TTL_S = 300              # nor leased for longer than this per grant
 
 
+IDENTITY_KEY = "cloud_rollup_identity"
+POISON_THRESHOLD = 3              # identical-batch failures before we bisect
+# A status that says "this request is bad", as opposed to "try again later"
+# (401 auth, 408/429 transient). Persistent ones are treated as a poison batch.
+_RETRYABLE_STATUS = frozenset({401, 408, 429})
+
+
+class HttpStatusError(RuntimeError):
+    def __init__(self, status: int, text: str) -> None:
+        super().__init__(f"HTTP {status}: {text[:200]}")
+        self.status = status
+
+
+def _clean_str(v):
+    return v.replace("\x00", "") if isinstance(v, str) else v
+
+
+def scrub(obj):
+    """Make a body safe for strict JSON: non-finite floats become None and NUL
+    characters are stripped from every string (keys included)."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, str):
+        return _clean_str(obj)
+    if isinstance(obj, dict):
+        return {_clean_str(k) if isinstance(k, str) else k: scrub(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [scrub(v) for v in obj]
+    return obj
+
+
+def _row_ok(r) -> bool:
+    return all(math.isfinite(float(x)) for x in (r[3], r[4], r[5]))
+
+
 @dataclass
 class SyncResult:
     sent_rows: int = 0
+    skipped_rows: int = 0          # poison / non-finite rows given up on
     batches: int = 0
     caught_up: bool = False
     error: str | None = None
@@ -82,7 +118,12 @@ class RollupSync:
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
         views=None,
         enabled: Callable[[], bool] = lambda: True,
+        identity: Callable[[], str] = lambda: "",
     ) -> None:
+        # "{appliance_id}|{endpoint}": the watermark only means anything for
+        # the cloud account it was earned against.
+        self._identity = identity
+        self._poison: tuple | None = None       # (batch key, consecutive failures)
         self._enabled = enabled           # Settings can switch uploads off live
         self.views = views            # cloud.views.ViewPublisher | None
         self.store = store
@@ -131,6 +172,23 @@ class RollupSync:
         self._live_interval = interval
 
     async def _watermark(self, now: int) -> int:
+        fresh = (now - self._backfill_hours() * 3600) // 60 * 60 - 60
+        ident = self._identity()
+        if ident:
+            stored = await self.store.kv_get(IDENTITY_KEY)
+            if stored is not None and stored[0] != ident:
+                # Re-paired, or a different account/endpoint: what the old
+                # cloud acknowledged says nothing about the new one.
+                log.warning("rollup sync: cloud identity changed (%s -> %s); "
+                            "restarting the backfill", stored[0], ident)
+                await self.store.kv_set(WATERMARK_KEY, str(fresh))
+                await self.store.kv_set(IDENTITY_KEY, ident)
+                if self.views is not None and hasattr(self.views, "reset"):
+                    self.views.reset()
+                self._poison = None
+                return fresh
+            if stored is None:
+                await self.store.kv_set(IDENTITY_KEY, ident)   # adopt; keep any watermark
         got = await self.store.kv_get(WATERMARK_KEY)
         if got is not None:
             try:
@@ -145,13 +203,13 @@ class RollupSync:
                             "restarting backfill", wm, now)
             except ValueError:
                 log.warning("rollup sync: bad watermark %r, restarting backfill", got[0])
-        return (now - self._backfill_hours() * 3600) // 60 * 60 - 60
+        return fresh
 
     async def _inventory(self) -> tuple[list[dict], list[list]]:
         devices = [
-            {"device": d["label"], "vendor": d["vendor"] or "unknown",
-             "kind": d["kind"] or "unknown", "slave_id": d["slave_id"],
-             "display_name": d["display_name"],
+            {"device": _clean_str(d["label"]), "vendor": _clean_str(d["vendor"] or "unknown"),
+             "kind": _clean_str(d["kind"] or "unknown"), "slave_id": d["slave_id"],
+             "display_name": _clean_str(d["display_name"]),
              "first_seen": d["first_seen"], "last_seen": d["last_seen"]}
             for d in await self.store.list_devices()
         ]
@@ -162,14 +220,17 @@ class RollupSync:
                 if metric.startswith("_"):
                     continue
                 if isinstance(val, (int, float)) and not isinstance(val, bool):
-                    latest.append([device, metric, ts, float(val), None])
+                    if math.isfinite(float(val)):
+                        latest.append([_clean_str(device), _clean_str(metric), ts, float(val), None])
                 elif isinstance(val, str):
-                    latest.append([device, metric, ts, None, val[:256]])
+                    latest.append([_clean_str(device), _clean_str(metric), ts, None,
+                                   _clean_str(val[:256])])
         return devices, latest
 
     async def _post(self, client: httpx.AsyncClient, body: dict) -> dict:
         raw = gzip.compress(
-            json.dumps(body, separators=(",", ":")).encode("utf-8"), compresslevel=6)
+            json.dumps(scrub(body), separators=(",", ":"),
+                       allow_nan=False, default=str).encode("utf-8"), compresslevel=6)
         headers = {
             "Authorization": f"Bearer {self._bearer()}",
             "Content-Type": "application/json",
@@ -180,8 +241,49 @@ class RollupSync:
             f"{self._endpoint().rstrip('/')}/api/ingest/rollups",
             content=raw, headers=headers)
         if r.status_code >= 400:
-            raise RuntimeError(f"HTTP {r.status_code}: {r.text[:200]}")
+            raise HttpStatusError(r.status_code, r.text)
         return r.json()
+
+    async def _isolate(self, client: httpx.AsyncClient, rows: list) -> int:
+        """The full batch keeps getting a 4xx/5xx. Find the rows the cloud
+        refuses by bisection (rollups only, no inventory/views), so the good
+        ones are delivered and the watermark can move past the bad ones.
+        Returns how many rows were given up on.
+
+        Guarded against mistaking an outage for poison: a rollup-less post
+        must succeed first, and again before any single row is condemned;
+        if the cloud is simply down this raises and nothing is skipped."""
+        def control() -> dict:
+            return {"batch_id": uuid.uuid4().hex, "devices": [], "rollups": [],
+                    "latest": [], "views": {}}
+
+        await self._post(client, control())
+        skipped = 0
+
+        async def go(chunk: list) -> None:
+            nonlocal skipped
+            try:
+                ack = await self._post(client, {
+                    "batch_id": uuid.uuid4().hex, "devices": [], "rollups": chunk,
+                    "latest": [], "views": {}})
+                top = ack.get("acked_through")
+                if not isinstance(top, int) or isinstance(top, bool) or top != chunk[-1][0]:
+                    raise RuntimeError(f"cloud acked {top!r}, expected exactly {chunk[-1][0]}")
+            except HttpStatusError as e:
+                if e.status in _RETRYABLE_STATUS:
+                    raise
+                if len(chunk) == 1:
+                    await self._post(client, control())      # still alive? then it is the row
+                    log.warning("rollup sync: cloud refuses row %r (%s); skipping it",
+                                chunk[0], e)
+                    skipped += 1
+                    return
+                mid = len(chunk) // 2
+                await go(chunk[:mid])
+                await go(chunk[mid:])
+
+        await go(rows)
+        return skipped
 
     async def run_once(self, now: int | None = None) -> SyncResult:
         res = SyncResult()
@@ -190,19 +292,53 @@ class RollupSync:
             wm = await self._watermark(now)
             async with self._client_factory() as client:
                 for _ in range(MAX_BATCHES_PER_RUN):
-                    rows = await self.store.closed_rollups_after(
+                    raw_rows = await self.store.closed_rollups_after(
                         wm, now=now, limit=BATCH_ROWS)
-                    devices, latest = await self._inventory()
-                    views = (await self.views.due(live=self.live_interval() is not None)
-                             if self.views is not None else {})
-                    if not rows and res.batches > 0:
+                    if not raw_rows and res.batches > 0:
                         res.caught_up = True
                         break
+                    # Rows with a non-finite statistic can never be valid JSON;
+                    # give up on them here rather than poisoning the batch.
+                    rows = [r for r in raw_rows if _row_ok(r)]
+                    if len(rows) != len(raw_rows):
+                        res.skipped_rows += len(raw_rows) - len(rows)
+                        log.warning("rollup sync: dropping %d row(s) with non-finite values",
+                                    len(raw_rows) - len(rows))
+                    if raw_rows and not rows:
+                        wm = raw_rows[-1][0]
+                        await self.store.kv_set(WATERMARK_KEY, str(wm))
+                        continue
+                    devices, latest = await self._inventory()
+                    # Views are built once per run (first batch), and only
+                    # when something is actually about to be sent.
+                    views = (await self.views.due(live=self.live_interval() is not None)
+                             if self.views is not None and res.batches == 0 else {})
                     # Even with nothing new, send inventory + latest once per
                     # run so the cloud's device cards and live values stay fresh.
-                    ack = await self._post(client, {
-                        "batch_id": uuid.uuid4().hex, "devices": devices,
-                        "rollups": rows, "latest": latest, "views": views})
+                    try:
+                        ack = await self._post(client, {
+                            "batch_id": uuid.uuid4().hex, "devices": devices,
+                            "rollups": rows, "latest": latest, "views": views})
+                    except HttpStatusError as e:
+                        if not rows or e.status in _RETRYABLE_STATUS:
+                            raise
+                        key = (wm, rows[-1][0], len(rows))
+                        n = self._poison[1] + 1 if self._poison and self._poison[0] == key else 1
+                        self._poison = (key, n)
+                        if n < POISON_THRESHOLD:
+                            raise
+                        skipped = await self._isolate(client, rows)
+                        self._poison = None
+                        res.skipped_rows += skipped
+                        res.batches += 1
+                        res.sent_rows += len(rows) - skipped
+                        wm = raw_rows[-1][0]
+                        await self.store.kv_set(WATERMARK_KEY, str(wm))
+                        continue
+                    self._poison = None
+                    if isinstance(ack, dict) and ack.get("rejected"):
+                        log.warning("rollup sync: cloud rejected %s row(s) of the batch",
+                                    ack.get("rejected"))
                     if self.views is not None:
                         self.views.confirm(views)
                     self._note_lease(ack)
@@ -220,7 +356,7 @@ class RollupSync:
                             or top != rows[-1][0]):
                         raise RuntimeError(
                             f"cloud acked {top!r}, expected exactly {rows[-1][0]}")
-                    wm = top
+                    wm = max(top, raw_rows[-1][0])    # trailing dropped rows are behind us too
                     await self.store.kv_set(WATERMARK_KEY, str(wm))
                 else:
                     res.caught_up = False
