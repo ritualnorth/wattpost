@@ -139,6 +139,21 @@ def test_limit_never_splits_a_bucket():
 
 # ---- RollupSync ------------------------------------------------------------
 
+def test_inventory_is_sent_once_then_only_when_it_changes():
+    async def go():
+        st = await _store(seed_minutes=5)
+        cloud = FakeCloud()
+        sync = _sync(st, cloud)                       # one syncer: it remembers what the cloud has
+        await sync.run_once(now=T0 + 400)
+        assert cloud.batches[0]["devices"] and cloud.batches[0]["latest"] == []
+        await sync.run_once(now=T0 + 460)
+        assert cloud.batches[-1]["devices"] == []     # unchanged, so not resent
+        sync._inventory_sig = None                    # what an identity change does
+        await sync.run_once(now=T0 + 520)
+        assert cloud.batches[-1]["devices"]
+    asyncio.run(go())
+
+
 def test_happy_path_advances_watermark_and_is_caught_up():
     async def go():
         st = await _store(seed_minutes=5)
@@ -147,7 +162,7 @@ def test_happy_path_advances_watermark_and_is_caught_up():
         assert res.error is None and res.caught_up and res.sent_rows == 10
         assert (await st.kv_get(rs.WATERMARK_KEY))[0] == str(T0 + 240)
         b = cloud.batches[0]
-        assert b["devices"][0]["device"] == "bank" and b["latest"]
+        assert b["devices"][0]["device"] == "bank" and b["latest"] == []
         # Nothing new: next run sends inventory only, zero rollups.
         res = await _sync(st, cloud).run_once(now=T0 + 460)
         assert res.sent_rows == 0 and res.caught_up
