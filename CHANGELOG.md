@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Cloud heartbeats now carry the bank's voltage, current, remaining Ah and temperature when the bank reports them. The Home Assistant integration's voltage, current, remaining-capacity and temperature sensors read these and had always shown unknown.
+
 - Requests to the cloud are now signed with scheme v2: the signature covers the HTTP method and request path (with query) as well as the body, and `X-WP-Sig-Version: 2` is sent, so a captured signed body can't be replayed at a different endpoint. Command status reports, cloud backup upload/list/download, the mTLS certificate request and discovery uploads are signed too, where before they carried only the bearer token. Update the cloud before appliances: an older cloud only understands the v1 signature.
 
 - Settings -> Integrations -> WattPost cloud has a "Re-trust cloud key" button for accepting the cloud's current command-signing key after you rebuilt or moved the cloud on purpose.

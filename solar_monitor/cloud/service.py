@@ -90,6 +90,23 @@ def _bad_version_field(cmd: dict[str, Any]) -> str | None:
 MAX_COMMANDS_PER_HEARTBEAT = 20
 
 
+def _bank_extras(bank: dict) -> dict:
+    """Bank-level readings the heartbeat carries for the cloud's public API
+    (the Home Assistant integration's voltage / current / remaining-Ah /
+    temperature sensors). Only numeric values that exist are copied, so a bank
+    without a shunt simply omits them."""
+    out: dict = {}
+    for key in ("voltage_v", "current_a", "remaining_ah", "temperature_c"):
+        v = bank.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v == v and abs(v) != float("inf"):
+            out[key] = round(float(v), 3)
+    cap, soc = bank.get("capacity_ah"), bank.get("soc_pct")
+    if ("remaining_ah" not in out and isinstance(cap, (int, float)) and cap > 0
+            and isinstance(soc, (int, float))):
+        out["remaining_ah"] = round(float(cap) * float(soc) / 100.0, 2)
+    return out
+
+
 class CloudService:
     def __init__(self, config_or_cfg, scheduler) -> None:
         """Accepts either a Config (preferred) or a bare CloudCfg
@@ -1783,6 +1800,7 @@ class CloudService:
                 # (-5 .. +5 W) or capacity is unknown.
                 try:
                     bank_state = latest_for_extras.get("bank") or {}
+                    extras.update(_bank_extras(bank_state))
                     cap_ah  = bank_state.get("capacity_ah")
                     voltage = bank_state.get("voltage_v") or 12.8
                     soc_now = bank_state.get("soc_pct")
