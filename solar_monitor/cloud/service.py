@@ -151,6 +151,19 @@ class CloudService:
             log.exception("identity v2: registration raised; "
                           "starting heartbeat loop anyway")
         self._task = asyncio.create_task(self._loop(), name="cloud-heartbeat")
+        self._sync_task = None
+        if self.cfg.telemetry_sync:
+            from .rollup_sync import RollupSync
+            self._sync = RollupSync(
+                store=self.scheduler.store,
+                endpoint=lambda: self.cfg.endpoint,
+                bearer=lambda: self.cfg.bearer_token,
+                sign=self._signed_headers,
+                backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
+            )
+            self._sync_task = asyncio.create_task(
+                self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),
+                name="cloud-rollup-sync")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
 
@@ -163,6 +176,14 @@ class CloudService:
             except (asyncio.CancelledError, Exception):
                 pass
             self._task = None
+        t = getattr(self, "_sync_task", None)
+        if t is not None:
+            t.cancel()
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._sync_task = None
 
     async def _identity_v2_upgrade_bg(self) -> None:
         """Identity v2 (#303), generate ed25519 keypair if missing,
@@ -315,6 +336,31 @@ class CloudService:
             log.warning("identity v2: cloud round-trip failed: %s, "
                         "will retry on next boot", e)
 
+    def _signed_headers(self, body: bytes) -> dict[str, str]:
+        """ed25519 request-signature headers for `body`.
+
+        Signed form is `"v1\n<ts>\n<body>"`: the version tag is pinned so a
+        future scheme can be told apart, and the cloud checks `ts` is fresh
+        (5 min) to cap replay. With these headers a leaked bearer token alone
+        can't forge requests. Best effort: a keypair load failure returns no
+        headers (the cloud refuses unsigned ingest; the heartbeat still
+        grandfathers it)."""
+        try:
+            from datetime import datetime, timezone
+            from ..auth import keypair as _kp
+            import base64 as _b64
+            kp = _kp.load_or_create()
+            ts = datetime.now(timezone.utc).isoformat()
+            sig = kp.sign(b"v1\n" + ts.encode("ascii") + b"\n" + body)
+            return {
+                "X-WP-Heartbeat-Ts":  ts,
+                "X-WP-Heartbeat-Fp":  kp.fingerprint,
+                "X-WP-Heartbeat-Sig": _b64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
+            }
+        except Exception:
+            log.exception("request signing skipped")
+            return {}
+
     async def heartbeat_once(self) -> bool:
         """Build + send one heartbeat. Returns True on 2xx, False on
         anything else. Used by the loop and also exposed for the
@@ -337,29 +383,7 @@ class CloudService:
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
         }
-        # Phase 6B alt-C (#308), sign the heartbeat with the Phase 1
-        # ed25519 keypair so a leaked bearer alone is useless.
-        # Signed form: "v1\n<ts>\n<body>", version tag pinned so a
-        # future scheme change can be rejected, ts fresh-checked
-        # cloud-side (5min window) to cap replay attacks. The cloud
-        # grandfathers heartbeats without these headers during the
-        # rollout. Best-effort: keypair load failure ships unsigned
-        # (older Identity-v1 boxes never have a keypair).
-        try:
-            from datetime import datetime, timezone
-            from ..auth import keypair as _kp
-            import base64 as _b64
-            kp = _kp.load_or_create()
-            ts = datetime.now(timezone.utc).isoformat()
-            signed = b"v1\n" + ts.encode("ascii") + b"\n" + body_bytes
-            sig = kp.sign(signed)
-            headers["X-WP-Heartbeat-Ts"]  = ts
-            headers["X-WP-Heartbeat-Fp"]  = kp.fingerprint
-            headers["X-WP-Heartbeat-Sig"] = (
-                _b64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii")
-            )
-        except Exception:
-            log.exception("heartbeat sign skipped, uploading bearer-only")
+        headers.update(self._signed_headers(body_bytes))
         try:
             # follow_redirects=True so an appliance still pointing at
             # an older hostname (e.g. https://wattpost.io after we

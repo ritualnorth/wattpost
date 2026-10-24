@@ -121,6 +121,12 @@ class CloudCfg(msgspec.Struct, kw_only=True):
     appliance_id:      int | None = None
     label:             str  = ""
     heartbeat_minutes: int  = 5
+    # Push closed 1-minute rollups to the cloud so its dashboard has
+    # history and live values. Pairing is the opt-in; this lets a paired
+    # box keep the heartbeat but stop uploading telemetry.
+    telemetry_sync:    bool = True
+    telemetry_minutes: int  = 5     # how often to push
+    telemetry_backfill_hours: int = 24   # first-sync history window
     # Cloudflare Tunnel credentials, returned by the cloud's
     # /api/pair/exchange when the cloud has CF API access. Empty
     # when the cloud hasn't yet had CF credentials configured
