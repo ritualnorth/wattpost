@@ -211,3 +211,18 @@ def test_golden_vector_matches_the_cloud_byte_for_byte():
         nonce="AAAAAAAAAAAAAAAAAAAAAA")
     assert hashlib.sha256(cv.signing_input(r)).hexdigest() == \
         "3e1d953f55c0c60d02c1521d51571c596b6cf8a9bb95426dacdcf1539e3b4e66"
+
+
+# ---- strings inside a (validly signed) command --------------------------------
+
+def test_version_fields_must_look_like_release_versions():
+    from solar_monitor.cloud.service import _bad_version_field as bad
+    assert bad({"target_version": "0.1.188"}) is None
+    assert bad({"target_version": "v0.1.188-rc.1"}) is None
+    assert bad({"payload_json": '{"version": "0.2.0"}'}) is None
+    assert bad({}) is None
+    for evil in ("0.1.1; rm -rf /", "$(reboot)", "latest", "../../x", "0.1.188 ", "1.2", "x" * 40):
+        assert bad({"target_version": evil}), evil
+        assert bad({"payload_json": '{"version": "%s"}' % evil}), evil
+    assert bad({"payload_json": '{"image": "evil.example/x:1"}'}), "custom images are refused"
+    assert bad({"payload_json": "not json"}) and bad({"payload_json": "[1]"})

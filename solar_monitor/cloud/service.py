@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from typing import Any
 
@@ -55,6 +56,32 @@ def _mark_tried_cmd(cmd_id: int) -> None:
         os.replace(tmp, p)
     except Exception:
         pass
+
+
+_VERSION_RE = re.compile(r"^v?[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(?:[-+][0-9A-Za-z.\-]{1,16})?$")
+
+
+def _bad_version_field(cmd: dict[str, Any]) -> str | None:
+    """Why this command's version strings are unacceptable, or None."""
+    import json as _json
+    tv = cmd.get("target_version")
+    if tv not in (None, "") and not _VERSION_RE.match(str(tv)):
+        return "target_version is not a release version"
+    raw = cmd.get("payload_json")
+    if raw:
+        try:
+            payload = _json.loads(raw) if isinstance(raw, str) else dict(raw)
+        except Exception:
+            return "payload is not JSON"
+        if not isinstance(payload, dict):
+            return "payload is not an object"
+        for k in ("version", "image"):
+            v = payload.get(k)
+            if k == "version" and v not in (None, "") and not _VERSION_RE.match(str(v)):
+                return "payload version is not a release version"
+            if k == "image" and v not in (None, ""):
+                return "custom image references are not accepted"
+    return None
 
 
 class CloudService:
@@ -650,6 +677,16 @@ class CloudService:
         if cmd_id in self._dispatched_cmds:
             log.debug("cloud command %d already dispatched this session; skipping", cmd_id)
             return
+        # A signature says the cloud issued this command, not that its strings
+        # are sane. Version strings end up in an updater request and in
+        # subprocess arguments, so hold them to a release-version shape here
+        # no matter who signed them.
+        if kind in ("update", "rollback", "pin_image_tag"):
+            bad = _bad_version_field(cmd)
+            if bad:
+                log.warning("cloud command %d (%s) refused: %s", cmd_id, kind, bad)
+                await self._patch_command_status(cmd_id, "failed", error=f"refused: {bad}")
+                return
         # Bound the set so a long-lived appliance taking routine commands
         # (rule sync, backups, disk cleanup) for weeks doesn't grow it
         # without limit. Keep the most recent ids; cmd_ids only increase, so
