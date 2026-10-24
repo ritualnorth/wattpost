@@ -184,7 +184,19 @@ class RollupSync:
                 return False
         wait = sleep or _wait
         while not stop.is_set():
-            res = await self.run_once()
+            t0 = time.monotonic()
+            try:
+                res = await self.run_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — a bug here must not end the loop
+                log.exception("rollup sync loop iteration crashed")
+                self.failures += 1
+                res = SyncResult(error=f"{type(e).__name__}: {e}")
+            log.info("rollup sync: %d rows in %d batch(es), %s, %.1fs",
+                     res.sent_rows, res.batches,
+                     res.error or ("caught up" if res.caught_up else "more pending"),
+                     time.monotonic() - t0)
             if res.error:
                 delay = backoff_delay(self.failures)
             elif not res.caught_up:

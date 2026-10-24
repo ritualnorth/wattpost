@@ -20,11 +20,18 @@ from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
 from .. import viewmodels
+from ..api.energy import compute_energy
 
 log = logging.getLogger(__name__)
 
 SNAPSHOT_EVERY_S = 0            # every sync
 ANALYTICS_EVERY_S = 15 * 60     # battery health, heatmap, runtime, per-device stats
+ENERGY_TODAY_EVERY_S = 5 * 60   # the "Energy today" chart moves faster than the rest
+
+# The History page's range buttons: bucket size (seconds) -> span (None = midnight to now).
+# Mirrors ENERGY_RANGES in web/app.js; the cloud serves /api/energy/today?bucket=N from
+# the view published under f"energy/b{N}".
+ENERGY_RANGES: dict[int, int | None] = {300: None, 900: 86400, 3600: 7 * 86400, 21600: 30 * 86400}
 
 
 @dataclass
@@ -76,6 +83,13 @@ class ViewPublisher:
         analytics.update(await self._device_views())
         for name, fn in analytics.items():
             builders[name] = (self.analytics_every_s, fn)
+        for bucket, span in ENERGY_RANGES.items():
+            builders[f"energy/b{bucket}"] = (
+                min(ENERGY_TODAY_EVERY_S, self.analytics_every_s) if span is None
+                else self.analytics_every_s,
+                lambda b=bucket, sp=span: compute_energy(
+                    self.store, since=(int(time.time()) - sp) if sp else None, bucket=b),
+            )
 
         out: dict[str, dict[str, Any]] = {}
         self._pending: dict[str, _Sent] = {}

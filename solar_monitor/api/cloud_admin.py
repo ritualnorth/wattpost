@@ -119,16 +119,13 @@ async def update_cloud_config(
     # heartbeat populated sso_secret, then Settings-save reset it,
     # then SSO redirects failed with 401 because the appliance had
     # no key to verify against.
-    new_c = CloudCfg(
+    # `replace` keeps every field we aren't changing, including ones added
+    # after this handler was written. (Hand-copying fields here is how
+    # sso_secret, and later the telemetry settings, got silently reset.)
+    new_c = msgspec.structs.replace(
+        existing if existing is not None else CloudCfg(),
         endpoint=data.endpoint,
-        bearer_token=existing.bearer_token if existing else "",
-        appliance_id=existing.appliance_id if existing else None,
-        label=existing.label if existing else "",
         heartbeat_minutes=data.heartbeat_minutes,
-        tunnel_token=existing.tunnel_token if existing else "",
-        tunnel_hostname=existing.tunnel_hostname if existing else "",
-        sso_secret=existing.sso_secret if existing else "",
-        kiosk_token=existing.kiosk_token if existing else "",
     )
     config.cloud = new_c
 
@@ -178,20 +175,18 @@ async def pair_appliance(
         raise HTTPException(status_code=502, detail=f"pairing failed: {detail}")
 
     body = r.json()
-    new_c = CloudCfg(
+    # Start from the existing config so a re-pair keeps everything it does not
+    # own (heartbeat cadence, telemetry settings, kiosk token so share URLs
+    # survive). Only the credentials the cloud just issued are replaced.
+    new_c = msgspec.structs.replace(
+        config.cloud if config.cloud else CloudCfg(),
         endpoint=data.endpoint,
         bearer_token=body["bearer_token"],
         appliance_id=body.get("appliance_id"),
         label=body.get("label") or "",
-        heartbeat_minutes=(config.cloud.heartbeat_minutes if config.cloud else 5),
         tunnel_token=body.get("tunnel_token") or "",
         tunnel_hostname=body.get("tunnel_hostname") or "",
         sso_secret=body.get("sso_secret") or "",
-        # Preserve kiosk_token across a re-pair so existing share
-        # URLs don't break. If the previous CloudCfg had one set,
-        # carry it forward; otherwise load_config will generate
-        # one lazily on the next start.
-        kiosk_token=(config.cloud.kiosk_token if config.cloud else ""),
     )
     config.cloud = new_c
 
@@ -337,22 +332,16 @@ def persist_cloud_cfg(cfg: CloudCfg, config_path: str | None = None) -> None:
     _save_config(path, _mutate)
 
 
+_CLOUD_ALWAYS = ("endpoint", "bearer_token", "appliance_id", "label", "heartbeat_minutes")
+
+
 def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        "endpoint":          c.endpoint,
-        "bearer_token":      c.bearer_token,
-        "appliance_id":      c.appliance_id,
-        "label":             c.label,
-        "heartbeat_minutes": c.heartbeat_minutes,
+    """Every CloudCfg field, so a field added later is persisted without
+    anyone remembering to list it here. Fields still at their default are
+    left out (keeps config.yaml free of empty placeholders) except the core
+    pairing fields, which are always written."""
+    defaults = msgspec.structs.asdict(CloudCfg())
+    return {
+        k: v for k, v in msgspec.structs.asdict(c).items()
+        if k in _CLOUD_ALWAYS or v != defaults[k]
     }
-    # Only persist tunnel fields when they're set, keeps existing
-    # config.yaml files free of empty placeholders.
-    if c.tunnel_token:
-        out["tunnel_token"]    = c.tunnel_token
-    if c.tunnel_hostname:
-        out["tunnel_hostname"] = c.tunnel_hostname
-    if c.sso_secret:
-        out["sso_secret"]      = c.sso_secret
-    if c.kiosk_token:
-        out["kiosk_token"]     = c.kiosk_token
-    return out

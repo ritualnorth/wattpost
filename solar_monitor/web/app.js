@@ -314,6 +314,11 @@ let solarPauseStatus = null;
 // staleness boundaries and bank.netW.
 const _frame = { nowSec: 0, bank: null, flowModel: null };
 
+// Cloud view: wattpost.cloud serves this same UI read-only against data the
+// appliance published. No setup wizard, no Settings, no BLE status, and the
+// status pill reports how fresh the appliance's last upload is.
+const CLOUD_VIEW = !!window.WP_CLOUD;
+
 // ---------- demo-mode banner (one-shot, runs at boot) ----------
 // /api/system/info exposes `demo: true|false` from the WATTPOST_DEMO=1
 // container env. The Settings → About flow also reads this and toggles
@@ -800,7 +805,10 @@ function applySnapshot(frame) {
   solarPauseStatus = frame.solar_pause || null;
   // Frame-scoped cache. Reset on every apply so a stale value from the
   // previous tick can't leak into the next render.
-  _frame.nowSec = Date.now() / 1000;
+  // Cloud view: "now" is the moment the appliance built this snapshot, so
+  // staleness means "was this device silent when the snapshot was taken",
+  // not "was the snapshot taken a while ago" (the pill reports that).
+  _frame.nowSec = (CLOUD_VIEW && frame.ts) ? frame.ts : Date.now() / 1000;
   _frame.bank = null;
   _frame.flowModel = null;
   renderStatus(frame.poll_run || {});
@@ -936,6 +944,7 @@ function stopPollingFallback() {
 }
 
 async function _maybeFirstBootRedirect() {
+  if (CLOUD_VIEW) return;
   // Wait for /api/system/info to resolve before deciding, without
   // this gate, the SSE snapshot can arrive first and demo visitors
   // get yanked into the wizard before the demo flag classifies them.
@@ -950,6 +959,13 @@ async function _maybeFirstBootRedirect() {
 }
 
 function renderStatus(run) {
+  if (CLOUD_VIEW) {
+    const age = run && run.cloud ? run.cloud.age_s : null;
+    if (age == null) { setStatus("warn", "Waiting for data"); return; }
+    if (age <= 600)  { setStatus("ok", "Online"); return; }
+    if (age <= 3600) { setStatus("warn", "Delayed"); return; }
+    setStatus("err", "Offline"); return;
+  }
   // Daemon-side issues first, if the scheduler's not running or the
   // last_run is stale, nothing else matters.
   if (!run.scheduler_running) { setStatus("err", "Offline"); return; }
@@ -3629,7 +3645,7 @@ function renderAlerts() {
   const push = (a) => alerts.push(a);
 
   // Comms / poll health
-  if (lastRun) {
+  if (lastRun && !CLOUD_VIEW) {
     const age = Math.floor(Date.now() / 1000) - lastRun.ts;
     if (age > 300) push({ level: "alarm", category: "comms_alarm",
       lbl: "No recent poll", value: fmt.ago(lastRun.ts) });
@@ -3638,7 +3654,7 @@ function renderAlerts() {
     if (lastRun.errors_count > 0) push({ level: "warn", category: "poll_errors",
       lbl: `${lastRun.errors_count} device error${lastRun.errors_count === 1 ? "" : "s"}`,
       value: "last poll" });
-  } else {
+  } else if (!CLOUD_VIEW) {
     push({ level: "warn", category: "no_first_poll",
       lbl: "Daemon starting", value: "no poll yet" });
   }
@@ -5707,6 +5723,10 @@ function currentRouteName() { return parseRoute().name; }
 
 function setRoute(_unused) {
   const route = parseRoute();
+  if (CLOUD_VIEW && (route.name === "setup" || route.name === "settings")) {
+    window.location.hash = "#/";
+    return;
+  }
   // Auth gate: redirect to /login when an unauthed visitor tries to
   // open Settings or Setup. Demo mode skips (no auth at all). If we
   // haven't yet resolved the auth state (race with the bootstrap
