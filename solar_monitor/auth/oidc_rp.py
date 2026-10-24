@@ -52,6 +52,10 @@ JWKS_TTL_SECONDS = 60 * 60 * 24
 # State store TTL, the redirect round-trip should take <5min in
 # normal browsing. Anything older was abandoned + can be cleared.
 STATE_TTL_SECONDS = 60 * 5
+# /auth/lan/login is anonymous and every hit stashes a pending entry (and
+# rewrites the pending file). Cap the store so it cannot be grown without
+# bound; the oldest entries are dropped first.
+MAX_PENDING = 20
 
 
 # ---------------------------------------------------------------- #
@@ -360,6 +364,9 @@ def stash_pending(*, pkce_verifier: str, nonce: str, return_to: str) -> str:
     """Generate a fresh state token, store the PKCE verifier + nonce
     + post-login return path against it, return the state value."""
     _gc_pending()
+    while len(_pending) >= MAX_PENDING:
+        oldest = min(_pending, key=lambda k: _pending[k].created_at)
+        _pending.pop(oldest, None)
     state = secrets.token_urlsafe(24)
     _pending[state] = _PendingAuth(
         pkce_verifier=pkce_verifier,

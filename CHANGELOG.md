@@ -119,6 +119,9 @@ Versions follow [Semantic Versioning].
   All config writers now go through one atomic helper that creates the temp
   file 0600, fsyncs and renames; `load_config`'s own rewrites (legacy-key
   scrub, alert seeding, kiosk token) are atomic too.
+- The anonymous `/auth/lan/login` endpoint can no longer grow
+  `oidc_pending.json` without bound: pending OIDC flows are capped at 20
+  (oldest dropped first) and still expire after 5 minutes.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and
