@@ -70,12 +70,41 @@ def test_hostile_reply_keeps_previous_config(oidc_dir):
         _urls("wattpost.cloud", "http"),
         {**_urls(), "jwks_url": "https://evil.example/jwks"},
         {**_urls(), "discovery_url": "https://evil.example/.well-known/openid-configuration"},
-        {**_urls(), "redirect_uri": "https://evil.example/auth/callback"},
         {**_urls(), "jwks_url": "javascript:alert(1)"},
         {**_urls(), "jwks_url": None},
     ):
         assert oidc_config.save_from_cloud(endpoint=EP, **evil) is None
         assert oidc_config.load() == before
+
+
+def test_legacy_per_appliance_callback_does_not_discard_the_jwks(oidc_dir):
+    """The cloud sends redirect_uri = https://<slug>.wattpost.cloud/auth/callback.
+    It is a subdomain, not the endpoint host; it must not take the JWKS (the
+    trust anchor for every signed command) down with it."""
+    got = oidc_config.save_from_cloud(
+        endpoint=EP, **{**_urls(), "redirect_uri": "https://garage-stack.wattpost.cloud/auth/callback"})
+    assert got is not None
+    assert got.jwks_url == "https://wattpost.cloud/oidc/jwks"
+    assert got.redirect_uri == "https://garage-stack.wattpost.cloud/auth/callback"
+
+
+def test_callback_on_another_host_is_blanked_but_the_jwks_is_kept(oidc_dir):
+    got = oidc_config.save_from_cloud(
+        endpoint=EP, **{**_urls(), "redirect_uri": "https://evil.example/auth/callback"})
+    assert got is not None and got.redirect_uri == ""
+    assert oidc_config.load().jwks_url == "https://wattpost.cloud/oidc/jwks"
+    # a lookalike that merely ends with the same letters is not a subdomain
+    got = oidc_config.save_from_cloud(
+        endpoint=EP, **{**_urls(), "redirect_uri": "https://evilwattpost.cloud/auth/callback"})
+    assert got.redirect_uri == ""
+
+
+def test_loopback_dev_cloud_keeps_its_jwks_despite_the_production_callback(oidc_dir):
+    got = oidc_config.save_from_cloud(
+        endpoint="http://127.0.0.1:8401",
+        **{**_urls("127.0.0.1:8401", "http"), "redirect_uri": "https://slug.wattpost.cloud/auth/callback"})
+    assert got is not None and got.redirect_uri == ""
+    assert got.jwks_url == "http://127.0.0.1:8401/oidc/jwks"
 
 
 def test_hostile_first_reply_saves_nothing(oidc_dir):

@@ -338,3 +338,21 @@ def test_pairing_pins_up_front_and_retrust_replaces_it():
         assert cv.clear_pin() is True and cv.pin_state()["pinned"] is False
     finally:
         env.restore()
+
+
+def test_a_pin_made_for_another_cloud_does_not_block_a_re_paired_one():
+    env = Env()
+    try:
+        cv.oidc_config.load = lambda: SimpleNamespace(jwks_url="https://old.example/jwks", endpoint="https://old.example")
+        assert run(cv.pin_current_keys()) is True
+        new = SigningKey.generate()
+        env.jwk = {"kty": "OKP", "crv": "Ed25519", "kid": "kid-other", "x": _b64u(bytes(new.verify_key))}
+        c = env.command(sign_key=new)
+        c["signing_kid"] = "kid-other"
+        assert verify(env, c) is False                         # same cloud, different key: refused
+        # the owner paired to a different cloud host: the old pin no longer applies
+        cv.oidc_config.load = lambda: SimpleNamespace(jwks_url="https://new.example/jwks", endpoint="https://new.example")
+        assert verify(env, c) is True
+        assert cv.pin_state()["kids"] == ["kid-other"]          # and it re-pinned the new cloud
+    finally:
+        env.restore()

@@ -351,9 +351,30 @@ def _read_pin(path: str) -> dict | None:
     return None
 
 
+def _cloud_host() -> str:
+    """Host of the cloud whose keys these are (from the saved OIDC config, which
+    is pinned to the endpoint the owner configured)."""
+    from ..urlcheck import host_of
+    cfg = oidc_config.load()
+    return (host_of(getattr(cfg, "jwks_url", "") or "") or "") if cfg else ""
+
+
 def _write_pin(path: str, endpoint: str, keys: dict[str, str]) -> None:
     from ..fsutil import atomic_write_text
-    atomic_write_text(path, json.dumps({"endpoint": endpoint, "keys": keys}, sort_keys=True))
+    atomic_write_text(path, json.dumps(
+        {"endpoint": endpoint, "host": _cloud_host(), "keys": keys}, sort_keys=True))
+
+
+def _pin_for_this_cloud(path: str) -> dict | None:
+    """The pin, unless it was made for a different cloud (the owner re-paired
+    to another host without unpairing): then it no longer applies."""
+    d = _read_pin(path)
+    if d is None:
+        return None
+    host = _cloud_host()
+    if d.get("host") and host and d["host"] != host:
+        return None
+    return d
 
 
 def clear_pin(path: str | None = None) -> bool:
@@ -380,7 +401,7 @@ async def pin_current_keys(*, force: bool = False, path: str | None = None) -> b
     """Pin the cloud's current signing keys. Called at pairing; no-op when a
     pin already exists unless `force` (the owner's explicit re-trust)."""
     path = path or default_pin_path()
-    if not force and _read_pin(path) is not None:
+    if not force and _pin_for_this_cloud(path) is not None:
         return False
     cfg = oidc_config.load()
     if cfg is None:
@@ -396,7 +417,7 @@ async def pin_current_keys(*, force: bool = False, path: str | None = None) -> b
 def _pin_allows(kid: str, jwk: dict, path: str | None = None) -> bool:
     """True if this key may be used to verify a command: it is the pinned one,
     or there is no pin yet (an install that paired before pins existed)."""
-    d = _read_pin(path or default_pin_path())
+    d = _pin_for_this_cloud(path or default_pin_path())
     return d is None or d["keys"].get(kid) == jwk.get("x")
 
 
@@ -404,7 +425,7 @@ def _pin_after_verified(kid: str, jwk: dict, path: str | None = None) -> None:
     """Trust-on-first-use for installs without a pin: record the key only
     once it has actually verified a command signature."""
     path = path or default_pin_path()
-    if _read_pin(path) is not None:
+    if _pin_for_this_cloud(path) is not None:
         return
     keys = _okp_keys([jwk])
     if keys:

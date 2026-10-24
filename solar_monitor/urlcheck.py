@@ -46,6 +46,16 @@ def same_cloud_host(url: str, endpoint: str) -> bool:
     return h is not None and e is not None and scheme_ok(url) and h == e
 
 
+def cloud_or_subdomain(url: str, endpoint: str) -> bool:
+    """`url` is https (http for loopback) and on the cloud endpoint's host or a
+    subdomain of it. For the per-appliance callback URL the cloud hands out
+    (`<slug>.wattpost.cloud`), which is not a trust anchor."""
+    h, e = host_of(url), host_of(endpoint)
+    if h is None or e is None or not scheme_ok(url):
+        return False
+    return h == e or (not is_loopback_host(e) and h.endswith("." + e))
+
+
 def endpoint_problem(endpoint: str) -> str | None:
     """Why `endpoint` is not an acceptable cloud endpoint, or None."""
     host = host_of(endpoint)

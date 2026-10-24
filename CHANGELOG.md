@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Fix: a newly paired appliance refused every cloud command. The cloud's per-appliance callback URL (`<slug>.wattpost.cloud`) failed the same-host check added with the OIDC URL validation, and that check discarded the whole config including the JWKS URL commands are verified against. Only the JWKS and discovery URLs must be on the cloud host now; the callback may be a subdomain, and if it fits neither it is blanked instead of taking the JWKS with it. The signing-key pin is also tied to the cloud's host, so re-pairing to a different cloud no longer inherits the old cloud's pin.
+
 - Cloud heartbeats now carry the bank's voltage, current, remaining Ah and temperature when the bank reports them. The Home Assistant integration's voltage, current, remaining-capacity and temperature sensors read these and had always shown unknown.
 
 - Requests to the cloud are now signed with scheme v2: the signature covers the HTTP method and request path (with query) as well as the body, and `X-WP-Sig-Version: 2` is sent, so a captured signed body can't be replayed at a different endpoint. Command status reports, cloud backup upload/list/download, the mTLS certificate request and discovery uploads are signed too, where before they carried only the bearer token. Update the cloud before appliances: an older cloud only understands the v1 signature.

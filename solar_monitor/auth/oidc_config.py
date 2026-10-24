@@ -110,23 +110,29 @@ def save_from_cloud(
     jwks_url:      str,
     discovery_url: str,
 ) -> OidcConfig | None:
-    """Persist OIDC parameters taken from a cloud reply, but only if every URL
-    is https (http for loopback in development) AND on the host of the cloud
-    endpoint the user configured. These URLs become the trust anchor for
-    signed commands, so a reply must not be able to move them elsewhere.
+    """Persist OIDC parameters taken from a cloud reply.
 
-    On any violation the previously saved config (if any) is left untouched,
-    a warning is logged, and None is returned. All-or-nothing, so the saved
-    set never mixes old and new values."""
-    from ..urlcheck import same_cloud_host
-    bad = [name for name, url in (("redirect_uri", redirect_uri),
-                                  ("jwks_url", jwks_url),
-                                  ("discovery_url", discovery_url))
+    `jwks_url` and `discovery_url` are the trust anchor for signed commands,
+    so they must be https (http for loopback in development) AND on the host
+    of the cloud endpoint the user configured. A reply that fails that leaves
+    the previously saved config untouched, logs a warning and returns None.
+
+    `redirect_uri` is only where the legacy LAN sign-in flow sends the browser
+    back to (the cloud hands out `<slug>.wattpost.cloud`, which is a subdomain,
+    not the endpoint host). It is not a trust anchor, so one that doesn't fit
+    is blanked instead of discarding the JWKS with it; command verification
+    must never depend on it."""
+    from ..urlcheck import cloud_or_subdomain, same_cloud_host
+    bad = [name for name, url in (("jwks_url", jwks_url), ("discovery_url", discovery_url))
            if not isinstance(url, str) or not same_cloud_host(url, endpoint)]
     if bad or not isinstance(client_id, str) or not client_id:
         log.warning("oidc_config: refusing cloud-supplied %s: not https on the "
                     "configured cloud host (%s); keeping the previous config",
                     ", ".join(bad) or "client_id", endpoint)
         return None
+    if not isinstance(redirect_uri, str) or not cloud_or_subdomain(redirect_uri, endpoint):
+        log.warning("oidc_config: ignoring cloud-supplied redirect_uri (not on the cloud "
+                    "host or a subdomain of %s); LAN sign-in via the cloud is off", endpoint)
+        redirect_uri = ""
     return save(client_id=client_id, redirect_uri=redirect_uri,
                 jwks_url=jwks_url, discovery_url=discovery_url)
