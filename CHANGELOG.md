@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Docs: kiosk page describes the cloud wall-display link (Manage sheet, one-time URL, revocable, read-only) instead of the removed tunnel link, and drops a `?lock=1` option the UI doesn't implement.
 - Tests: node-based tests for the chart logic (`tests/js/`, run from pytest): x-axis window, range stats, forecast interpolation, unit labels. Skipped where node isn't installed.
 - Internal: split UI script `08-network-system.js` into `08-network.js` and `08b-system.js` (cache-buster bumped to 290). No behaviour change.
 - Internal: split `api/app.py` (per-device routes into `devices_api.py`, HTML pages and login into `pages_auth.py`). No behaviour change; function bodies and the route table are identical.
