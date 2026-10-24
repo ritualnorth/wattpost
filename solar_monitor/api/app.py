@@ -881,9 +881,24 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
     first run (while it's still the auto-generated one). Lets a LAN user
     claim the box in-browser instead of fishing the random password out
     of the MOTD / docker logs. Self-guards: only works while
-    is_first_run()."""
+    is_first_run(): the marker it checks is cleared by the first
+    successful login or any password change, so once the owner has been
+    in this endpoint is closed. Shares the /api/login brute-force
+    backoff. (It does not reject proxied requests.)"""
     from .. import web_auth as _wa
+    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    loopback = _wa.is_loopback_source(request.scope)
+    if not loopback:
+        wait = _wa.login_locked_for(client_ip)
+        if wait > 0:
+            return Response(
+                {"ok": False, "detail": "too many attempts — try again shortly"},
+                status_code=429,
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
     if not _wa.is_first_run():
+        if not loopback:
+            _wa.record_login_failure(client_ip)
         return Response(
             {"ok": False,
              "detail": "already set up — sign in with your password"},
@@ -903,7 +918,6 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
             {"ok": False, "detail": f"couldn't save the password: {e}"},
             status_code=500,
         )
-    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
     await _audit(state, event_type="first_run_password_set", payload={"ip": client_ip})
     # Log them straight in so they land in Settings, not a second prompt.
     token = _wa.issue_session()
@@ -990,6 +1004,9 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
     if not loopback:
         _wa.record_login_success(client_ip)
     await _audit(state, event_type="login_succeeded", payload={"ip": client_ip})
+    # The (possibly auto-generated) password has now been used by someone
+    # who knew it: close the anonymous first-run "set a password" window.
+    _wa.clear_first_run_marker()
     token = _wa.issue_session()
     # Validate `next` to only allow same-origin relative paths.
     nxt = (data or {}).get("next") or "/"

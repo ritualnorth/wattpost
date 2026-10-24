@@ -91,11 +91,13 @@ ANONYMOUS_PATH_PREFIXES = (
     "/api/login",
     # First-run "create your password" POST. Pre-auth by necessity (the
     # box has an auto-generated password the user has never seen); the
-    # handler self-guards on is_first_run() + rejects proxied requests.
+    # handler self-guards on is_first_run() (the marker is cleared by the
+    # first successful login or password change) and shares the login
+    # brute-force backoff. It does NOT reject proxied requests.
     "/api/setup/first-run-password",
     # Kiosk-token claim: exchanges a valid ?token= for a read-only
     # kiosk session cookie. Pre-auth by necessity (a wall display has
-    # no login); self-guards on verify_kiosk_token() + rejects proxied requests.
+    # no login); self-guards on verify_kiosk_token().
     "/api/kiosk/claim",
     # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
@@ -219,7 +221,15 @@ def is_first_run() -> bool:
     the box without SSHing in to read the MOTD."""
     if is_demo_mode():
         return False
-    return FIRST_RUN_MARKER_PATH.is_file()
+    if not FIRST_RUN_MARKER_PATH.is_file():
+        return False
+    # Somebody already signed in with the password (older versions never
+    # cleared the marker on login): the box has been claimed, so the
+    # anonymous "create your password" window is closed for good.
+    if any(r.get("origin") == "local" for r in _SESSIONS.values()):
+        clear_first_run_marker()
+        return False
+    return True
 
 
 def clear_first_run_marker() -> None:

@@ -75,6 +75,12 @@ Versions follow [Semantic Versioning].
   verify a cloud command was read from the command itself, so a command
   legitimately signed for another appliance was accepted. It now comes from
   `cloud.appliance_id`; an unpaired appliance refuses every command.
+- **First-run password takeover closed.** `POST /api/setup/first-run-
+  password` stayed open after the owner had signed in with the generated
+  password, so any LAN client could set a new password and get a session.
+  The first successful login (or any existing local session) now clears the
+  first-run marker, and the endpoint shares the `/api/login` brute-force
+  backoff.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and
