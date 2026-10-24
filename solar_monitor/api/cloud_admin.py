@@ -12,6 +12,7 @@ and manage the per-appliance config (endpoint URL + bearer token).
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import logging
 import shutil
 from pathlib import Path
@@ -54,9 +55,7 @@ def _save_config(config_path: str, mutator) -> None:
         raise RuntimeError("config mutator returned None")
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
 
 # ---------- routes ----------
@@ -106,10 +105,10 @@ async def update_cloud_config(
             status_code=400,
             detail="heartbeat_minutes must be between 1 and 60",
         )
-    if not data.endpoint.startswith(("http://", "https://")):
-        raise HTTPException(
-            status_code=400, detail="endpoint must be http(s) URL",
-        )
+    from ..urlcheck import endpoint_problem
+    problem = endpoint_problem(data.endpoint)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
     if data.telemetry_minutes is not None and not (1 <= data.telemetry_minutes <= 60):
         raise HTTPException(
             status_code=400, detail="telemetry_minutes must be between 1 and 60",
@@ -158,6 +157,10 @@ async def pair_appliance(
     code = (data.code or "").strip().upper()
     if not code:
         raise HTTPException(status_code=400, detail="code is required")
+    from ..urlcheck import endpoint_problem
+    problem = endpoint_problem(data.endpoint)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
 
     url = f"{data.endpoint.rstrip('/')}/api/pair/exchange"
     try:

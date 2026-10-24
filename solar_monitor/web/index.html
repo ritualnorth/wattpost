@@ -13,7 +13,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="WattPost" />
   <script>
-    if ('serviceWorker' in navigator) {
+    // Not on wattpost.cloud's read-only copy of this page: it has no /sw.js and
+    // must not register a worker for its origin.
+    if ('serviceWorker' in navigator && !window.WP_CLOUD) {
       window.addEventListener('load', () => {
         // updateViaCache: 'none' tells the browser to bypass the
         // HTTP cache when fetching sw.js itself. Without it, iOS
@@ -1017,8 +1019,10 @@
           <div class="settings-block" data-subroute="integrations">
             <h3>Integrations</h3>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
-              Third-party data sources. Each one needs your own free credentials ·
-              we don't proxy or store anything for you.
+              Optional data sources and exports. Solcast and Open-Meteo use your own
+              credentials and are called straight from this appliance. If you pair
+              WattPost cloud, it stores the history this appliance uploads (you can
+              switch that off below).
             </p>
             <div id="settings-integrations" class="integrations-block">
               <div class="settings-empty">Loading…</div>

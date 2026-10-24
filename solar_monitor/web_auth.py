@@ -91,11 +91,13 @@ ANONYMOUS_PATH_PREFIXES = (
     "/api/login",
     # First-run "create your password" POST. Pre-auth by necessity (the
     # box has an auto-generated password the user has never seen); the
-    # handler self-guards on is_first_run() + rejects proxied requests.
+    # handler self-guards on is_first_run() (the marker is cleared by the
+    # first successful login or password change) and shares the login
+    # brute-force backoff. It does NOT reject proxied requests.
     "/api/setup/first-run-password",
     # Kiosk-token claim: exchanges a valid ?token= for a read-only
     # kiosk session cookie. Pre-auth by necessity (a wall display has
-    # no login); self-guards on verify_kiosk_token() + rejects proxied requests.
+    # no login); self-guards on verify_kiosk_token().
     "/api/kiosk/claim",
     # Identity v2 Phase 3 (#305), OIDC redirect endpoints. /auth/lan/login
     # initiates the flow; /auth/callback completes it. Both verify their
@@ -175,9 +177,8 @@ def _persist_sessions_to_disk() -> None:
     import json as _json
     try:
         SESSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = SESSIONS_PATH.with_suffix(".json.tmp")
-        tmp.write_text(_json.dumps(_SESSIONS), encoding="utf-8")
-        tmp.replace(SESSIONS_PATH)
+        from .fsutil import atomic_write_text
+        atomic_write_text(SESSIONS_PATH, _json.dumps(_SESSIONS))   # live tokens: 0600
     except OSError:
         # Disk full, permissions, RO filesystem. Don't break login,
         # the user's session is still valid in memory for this run.
@@ -219,7 +220,15 @@ def is_first_run() -> bool:
     the box without SSHing in to read the MOTD."""
     if is_demo_mode():
         return False
-    return FIRST_RUN_MARKER_PATH.is_file()
+    if not FIRST_RUN_MARKER_PATH.is_file():
+        return False
+    # Somebody already signed in with the password (older versions never
+    # cleared the marker on login): the box has been claimed, so the
+    # anonymous "create your password" window is closed for good.
+    if any(r.get("origin") == "local" for r in _SESSIONS.values()):
+        clear_first_run_marker()
+        return False
+    return True
 
 
 def clear_first_run_marker() -> None:
@@ -291,9 +300,8 @@ def _load_kiosk_tokens() -> list[dict]:
 
 def _save_kiosk_tokens(toks: list[dict]) -> None:
     KIOSK_TOKENS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = KIOSK_TOKENS_PATH.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(toks), encoding="utf-8")
-    tmp.replace(KIOSK_TOKENS_PATH)
+    from .fsutil import atomic_write_text
+    atomic_write_text(KIOSK_TOKENS_PATH, json.dumps(toks))
 
 
 def create_kiosk_token(name: str = "", skin: str = "") -> tuple[str, str]:
@@ -441,21 +449,51 @@ def _gc_sessions() -> None:
         _persist_sessions_to_disk()
 
 
-# Headers a reverse proxy adds when it relays a request. A genuinely
+# Headers a reverse proxy / CDN adds when it relays a request. A genuinely
 # local request (curl on the Pi, SSH -L, the daemon itself) never has them.
+# A denylist can never be complete (any proxy can be configured to strip or
+# not add them), which is why `web.trust_loopback: false` exists for
+# same-host proxies; this just catches the common ones.
 _PROXY_HEADERS = frozenset({
-    b"x-forwarded-for", b"x-forwarded-host", b"x-forwarded-proto",
-    b"x-real-ip", b"forwarded", b"cf-ray", b"cf-connecting-ip",
-    b"cf-ipcountry",
+    b"via", b"forwarded", b"x-real-ip", b"true-client-ip",
+    b"x-original-forwarded-for", b"x-client-ip", b"fastly-client-ip",
+    b"x-cluster-client-ip",
 })
+_PROXY_HEADER_PREFIXES = (b"x-forwarded-", b"cf-")
+
+# Whether a loopback peer is trusted as "the local owner" at all
+# (config: web.trust_loopback). Set once at startup by build_app().
+TRUST_LOOPBACK = True
+
+
+def set_trust_loopback(value: bool) -> None:
+    global TRUST_LOOPBACK
+    TRUST_LOOPBACK = bool(value)
+
+
+def _foreign_origin(value: bytes) -> bool:
+    """True when an Origin / Referer value names a non-loopback host (or is
+    unparseable / "null"). A browser running on the Pi itself, pointed at
+    localhost, never sends one."""
+    from .urlcheck import host_of, is_loopback_host
+    try:
+        text = value.decode("latin-1").strip()
+    except Exception:
+        return True
+    if not text:
+        return False
+    return not is_loopback_host(host_of(text))
 
 
 def is_proxied(scope: dict) -> bool:
-    """True iff the request carries reverse-proxy forwarding headers,
-    i.e. something relayed it and the TCP peer address says nothing
-    about who the real client is."""
-    for k, _v in scope.get("headers", []):
-        if k.lower() in _PROXY_HEADERS:
+    """True iff the request looks relayed: it carries reverse-proxy / CDN
+    forwarding headers, or an Origin/Referer pointing at a non-loopback host.
+    Then the TCP peer address says nothing about who the real client is."""
+    for k, v in scope.get("headers", []):
+        k = k.lower()
+        if k in _PROXY_HEADERS or k.startswith(_PROXY_HEADER_PREFIXES):
+            return True
+        if k in (b"origin", b"referer") and _foreign_origin(v):
             return True
     return False
 
@@ -465,11 +503,14 @@ def is_loopback_source(scope: dict) -> bool:
     curl, SSH port-forward, the appliance talking to itself.
 
     Returns False when the TCP peer is loopback but the request was
-    relayed by a reverse proxy on the same host (forwarding headers
-    present): the kernel-level client address then always looks
-    loopback, so trusting it would let anyone who can reach the proxy
-    bypass auth.
+    relayed by a reverse proxy on the same host (forwarding headers, or a
+    foreign Origin/Referer): the kernel-level client address then always
+    looks loopback, so trusting it would let anyone who can reach the proxy
+    bypass auth. With `web.trust_loopback: false` loopback gets no special
+    treatment at all.
     """
+    if not TRUST_LOOPBACK:
+        return False
     client = scope.get("client")
     if not client:
         return False

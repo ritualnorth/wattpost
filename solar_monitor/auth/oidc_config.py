@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..fsutil import atomic_write_text
+
 log = logging.getLogger(__name__)
 
 _KEY_DIR = Path(os.environ.get("WATTPOST_KEYS_DIR", "/var/lib/wattpost/keys"))
@@ -94,10 +96,37 @@ def save(
         "discovery_url": cfg.discovery_url,
         "registered_at": cfg.registered_at,
     }, indent=2)
-    tmp = OIDC_CONFIG_PATH.with_suffix(".json.tmp")
-    tmp.write_text(payload)
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, OIDC_CONFIG_PATH)
+    atomic_write_text(OIDC_CONFIG_PATH, payload)
     log.info("oidc_config: persisted client_id=%s redirect_uri=%s",
              client_id, redirect_uri)
     return cfg
+
+
+def save_from_cloud(
+    *,
+    endpoint:      str,
+    client_id:     str,
+    redirect_uri:  str,
+    jwks_url:      str,
+    discovery_url: str,
+) -> OidcConfig | None:
+    """Persist OIDC parameters taken from a cloud reply, but only if every URL
+    is https (http for loopback in development) AND on the host of the cloud
+    endpoint the user configured. These URLs become the trust anchor for
+    signed commands, so a reply must not be able to move them elsewhere.
+
+    On any violation the previously saved config (if any) is left untouched,
+    a warning is logged, and None is returned. All-or-nothing, so the saved
+    set never mixes old and new values."""
+    from ..urlcheck import same_cloud_host
+    bad = [name for name, url in (("redirect_uri", redirect_uri),
+                                  ("jwks_url", jwks_url),
+                                  ("discovery_url", discovery_url))
+           if not isinstance(url, str) or not same_cloud_host(url, endpoint)]
+    if bad or not isinstance(client_id, str) or not client_id:
+        log.warning("oidc_config: refusing cloud-supplied %s: not https on the "
+                    "configured cloud host (%s); keeping the previous config",
+                    ", ".join(bad) or "client_id", endpoint)
+        return None
+    return save(client_id=client_id, redirect_uri=redirect_uri,
+                jwks_url=jwks_url, discovery_url=discovery_url)

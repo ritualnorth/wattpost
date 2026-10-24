@@ -149,6 +149,29 @@ def test_stale_and_future_commands_are_refused():
         env.restore()
 
 
+def test_non_utc_offset_cannot_stretch_the_replay_window():
+    """canonical_repr drops the offset, so rewriting it keeps the signature
+    valid. A command signed 7d10h ago re-labelled -12:00 would look 6d22h old."""
+    env = Env()
+    try:
+        old = datetime.now(timezone.utc) - timedelta(days=7, hours=10)
+        c = env.command(queued_at=old)
+        assert verify(env, c) is False                      # stale as signed
+        c["queued_at"] = old.replace(tzinfo=None).isoformat() + "-12:00"
+        assert verify(env, c) is False
+        for off in ("+05:30", "-00:30", "+14:00"):
+            fresh = env.command(queued_at=datetime.now(timezone.utc))
+            fresh["queued_at"] = fresh["queued_at"].replace("+00:00", off)
+            assert verify(env, fresh) is False, off
+        # an explicit zero offset and a naive stamp are still UTC
+        fresh = env.command(queued_at=datetime.now(timezone.utc))
+        assert verify(env, fresh) is True
+        fresh["queued_at"] = fresh["queued_at"].replace("+00:00", "")
+        assert verify(env, fresh) is True
+    finally:
+        env.restore()
+
+
 def test_unknown_kid_is_refused():
     env = Env()
     try:
@@ -200,6 +223,35 @@ def test_ledger_survives_corrupt_file():
     assert cv.CommandLedger(p).seen(1)
 
 
+def test_ledger_fsyncs_file_and_directory(monkeypatch):
+    calls = []
+    real = os.fsync
+    monkeypatch.setattr(os, "fsync", lambda fd: (calls.append(fd), real(fd))[1])
+    led = _ledger()
+    led.record(1)
+    assert len(calls) >= 2          # the tmp file, then the directory
+
+
+def test_ledger_keeps_a_bak_and_recovers_from_a_corrupt_main_file():
+    led = _ledger()
+    led.record(1)
+    led.record(2)
+    assert os.path.exists(led.path + ".bak")
+    open(led.path, "w").write("{trunc")             # torn write
+    again = cv.CommandLedger(led.path)
+    assert again.seen(1)                            # recovered from .bak, replay still blocked
+    # both files gone/corrupt -> empty, not a crash
+    open(led.path + ".bak", "w").write("garbage")
+    assert not cv.CommandLedger(led.path).seen(1)
+    # a corrupt main must not clobber a good .bak with garbage on the next record
+    led2 = _ledger()
+    led2.record(7); led2.record(8)
+    open(led2.path, "w").write("zzz")
+    r = cv.CommandLedger(led2.path)
+    r.record(9)
+    assert cv.CommandLedger(led2.path).seen(7) and cv.CommandLedger(led2.path).seen(9)
+
+
 # ---- cross-repo golden vector (same one lives in wattpost-cloud) -------------
 
 def test_golden_vector_matches_the_cloud_byte_for_byte():
@@ -211,3 +263,18 @@ def test_golden_vector_matches_the_cloud_byte_for_byte():
         nonce="AAAAAAAAAAAAAAAAAAAAAA")
     assert hashlib.sha256(cv.signing_input(r)).hexdigest() == \
         "3e1d953f55c0c60d02c1521d51571c596b6cf8a9bb95426dacdcf1539e3b4e66"
+
+
+# ---- strings inside a (validly signed) command --------------------------------
+
+def test_version_fields_must_look_like_release_versions():
+    from solar_monitor.cloud.service import _bad_version_field as bad
+    assert bad({"target_version": "0.1.188"}) is None
+    assert bad({"target_version": "v0.1.188-rc.1"}) is None
+    assert bad({"payload_json": '{"version": "0.2.0"}'}) is None
+    assert bad({}) is None
+    for evil in ("0.1.1; rm -rf /", "$(reboot)", "latest", "../../x", "0.1.188 ", "1.2", "x" * 40):
+        assert bad({"target_version": evil}), evil
+        assert bad({"payload_json": '{"version": "%s"}' % evil}), evil
+    assert bad({"payload_json": '{"image": "evil.example/x:1"}'}), "custom images are refused"
+    assert bad({"payload_json": "not json"}) and bad({"payload_json": "[1]"})

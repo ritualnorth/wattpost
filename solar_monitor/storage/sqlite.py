@@ -2272,6 +2272,10 @@ class Store:
             "reliable":          reliable,
         }
 
+    # Width of the raw-sample window aggregated per query in closed_rollups_after
+    # (a multiple of 60 so windows never split a bucket).
+    ROLLUP_WINDOW_S = 2 * 3600
+
     async def closed_rollups_after(
         self, after_ts: int, *, now: int | None = None, limit: int = 5000,
     ) -> list[tuple[int, str, str, float, float, float, int]]:
@@ -2312,15 +2316,25 @@ class Store:
                 rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
                              async for a, b, c, d, e, f, g in cur])
         if len(rows) <= limit and newest_closed >= raw_floor:
-            async with self._db.execute(
-                "SELECT (ts / 60) * 60 AS b, device, metric, "
-                "       AVG(value), MIN(value), MAX(value), COUNT(*) "
-                "FROM samples WHERE ts >= ? AND ts < ? "
-                "GROUP BY b, device, metric ORDER BY b, device, metric LIMIT ?",
-                (max(start, raw_floor), newest_closed + 60, limit + 1 - len(rows)),
-            ) as cur:
-                rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
-                             async for a, b, c, d, e, f, g in cur])
+            # Aggregate raw samples in bounded time windows, oldest first, and
+            # stop as soon as limit+1 rows are in hand. One unbounded
+            # GROUP BY ... LIMIT aggregates the whole remaining range before
+            # LIMIT applies (seconds of work, blocking the shared connection,
+            # when a day or a week of 5 s data is pending).
+            w_start = max(start, raw_floor)
+            w_end = newest_closed + 60
+            while w_start < w_end and len(rows) <= limit:
+                hi = min(w_start + self.ROLLUP_WINDOW_S, w_end)
+                async with self._db.execute(
+                    "SELECT (ts / 60) * 60 AS b, device, metric, "
+                    "       AVG(value), MIN(value), MAX(value), COUNT(*) "
+                    "FROM samples WHERE ts >= ? AND ts < ? "
+                    "GROUP BY b, device, metric ORDER BY b, device, metric LIMIT ?",
+                    (w_start, hi, limit + 1 - len(rows)),
+                ) as cur:
+                    rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
+                                 async for a, b, c, d, e, f, g in cur])
+                w_start = hi
         if len(rows) > limit:
             last = rows[limit][0]
             rows = [r for r in rows[:limit] if r[0] < last]

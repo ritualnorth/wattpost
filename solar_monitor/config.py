@@ -537,6 +537,13 @@ class WebCfg(msgspec.Struct, kw_only=True):
     # appliance. Wall displays use a kiosk token regardless of this
     # flag. This is the explicit opt-out for a deliberately-public box.
     public_view: bool = False
+    # Requests whose TCP peer is loopback (127.0.0.1 / ::1) are treated as
+    # the local owner and skip the login (the Pi's own kiosk browser, curl on
+    # the box, wattpost-config). That is unsafe if a reverse proxy runs on the
+    # SAME host: every request it relays then arrives from loopback. Header
+    # checks catch most proxies but cannot be complete, so if you put nginx /
+    # Caddy / HAProxy / a tunnel client on this host, set this to false.
+    trust_loopback: bool = True
     # Inbound host firewall (nftables, Pi image only). On by default:
     # default-deny INPUT, allowing only the dashboard, mDNS, DHCP, the
     # hotspot's DHCP/DNS, and SSH-when-enabled. The master escape hatch
@@ -636,11 +643,14 @@ def _strip_legacy_cloud_keys(raw: Any) -> bool:
     return bool(found)
 
 
+from .fsutil import atomic_write_text  # noqa: E402
+
+
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
     if _strip_legacy_cloud_keys(raw):
         try:
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass  # in-memory drop is enough; retried on the next load
     cfg = msgspec.convert(raw, Config)
@@ -673,7 +683,7 @@ def load_config(path: str | Path) -> Config:
         try:
             raw["alerts"] = _DEFAULT_ALERT_RULES
             raw["alerts_seeded"] = True
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass
 
@@ -700,7 +710,7 @@ def load_config(path: str | Path) -> Config:
         cfg.cloud.kiosk_token = _secrets.token_urlsafe(24)
         try:
             raw.setdefault("cloud", {})["kiosk_token"] = cfg.cloud.kiosk_token
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass  # in-memory generation is fine for this run
 
@@ -708,7 +718,7 @@ def load_config(path: str | Path) -> Config:
         cfg.cloud.endpoint = "https://wattpost.cloud"
         try:
             raw["cloud"]["endpoint"] = "https://wattpost.cloud"
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             # Persist-back is best-effort. The in-memory upgrade above
             # is enough to make this run work; the next save (pair,

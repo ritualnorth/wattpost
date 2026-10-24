@@ -881,9 +881,24 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
     first run (while it's still the auto-generated one). Lets a LAN user
     claim the box in-browser instead of fishing the random password out
     of the MOTD / docker logs. Self-guards: only works while
-    is_first_run()."""
+    is_first_run(): the marker it checks is cleared by the first
+    successful login or any password change, so once the owner has been
+    in this endpoint is closed. Shares the /api/login brute-force
+    backoff. (It does not reject proxied requests.)"""
     from .. import web_auth as _wa
+    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
+    loopback = _wa.is_loopback_source(request.scope)
+    if not loopback:
+        wait = _wa.login_locked_for(client_ip)
+        if wait > 0:
+            return Response(
+                {"ok": False, "detail": "too many attempts — try again shortly"},
+                status_code=429,
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
     if not _wa.is_first_run():
+        if not loopback:
+            _wa.record_login_failure(client_ip)
         return Response(
             {"ok": False,
              "detail": "already set up — sign in with your password"},
@@ -903,7 +918,6 @@ async def first_run_password(data: dict, request: Request, state: State) -> Resp
             {"ok": False, "detail": f"couldn't save the password: {e}"},
             status_code=500,
         )
-    client_ip = request.scope.get("client", ("?",))[0] if request.scope.get("client") else "?"
     await _audit(state, event_type="first_run_password_set", payload={"ip": client_ip})
     # Log them straight in so they land in Settings, not a second prompt.
     token = _wa.issue_session()
@@ -990,6 +1004,9 @@ async def do_login(data: dict, request: Request, state: State) -> Response:
     if not loopback:
         _wa.record_login_success(client_ip)
     await _audit(state, event_type="login_succeeded", payload={"ip": client_ip})
+    # The (possibly auto-generated) password has now been used by someone
+    # who knew it: close the anonymous first-run "set a password" window.
+    _wa.clear_first_run_marker()
     token = _wa.issue_session()
     # Validate `next` to only allow same-origin relative paths.
     nxt = (data or {}).get("next") or "/"
@@ -1059,6 +1076,54 @@ KIOSK_GET_PATHS = (
     "/api/stream",
     "/web/", "/static/",
 )
+
+
+# `web.public_view: true` lets anonymous LAN visitors READ the dashboard. It
+# must not also hand out the box's configuration, credentials or control
+# surface, so these GET prefixes still need a session even then. (The
+# dashboard/kiosk read endpoints - snapshot, devices, history, energy,
+# forecast/pv, weather/current, kiosk/config, stream, ... - stay readable.)
+PUBLIC_VIEW_DENY_PREFIXES = (
+    "/api/system/",        # backup (full DB + config.yaml), diagnostics, logs,
+                           # netsec, kiosk-tokens, integrations, update, ...
+    "/api/network",        # wifi scan/join, IP config
+    "/api/setup",          # device wizard: transports, BLE/USB scans
+    "/api/cloud",          # pairing state
+    "/api/exporters",      # MQTT / Prometheus config
+    "/api/forecast/config",
+    "/api/weather/config",
+    "/api/gps/config",
+    "/api/hotspot",
+    "/api/location",
+    "/api/mqtt_in",
+    "/api/alerts",         # rules + transports (webhook URLs, addresses)
+    "/api/devices/",       # only the /settings sub-resource, see below
+)
+# Under /api/system/ these stay readable in public view (dashboard widgets).
+PUBLIC_VIEW_SYSTEM_ALLOW = (
+    "/api/system/device-health", "/api/system/host-history",
+    "/api/system/auth-status", "/api/system/oidc-available",
+)
+
+
+def public_view_allows(method: str, path: str) -> bool:
+    """Whether an ANONYMOUS request is allowed under `web.public_view`.
+    Read-only methods only, minus the sensitive prefixes above."""
+    if method.upper() not in ("GET", "HEAD", "OPTIONS"):
+        return False
+    import re as _re
+    p = _re.sub(r"/{2,}", "/", path or "/")
+    if p.startswith("/api/system/") and p.startswith(PUBLIC_VIEW_SYSTEM_ALLOW):
+        return True
+    for pref in PUBLIC_VIEW_DENY_PREFIXES:
+        if pref == "/api/devices/":
+            if p.startswith(pref) and (p.rstrip("/").endswith("/settings")
+                                       or "/settings/" in p):
+                return False
+            continue
+        if p == pref.rstrip("/") or p.startswith(pref):
+            return False
+    return True
 
 
 def kiosk_scope_allows(method: str, path: str) -> bool:
@@ -1232,6 +1297,9 @@ def build_app(
     # displays use a kiosk token regardless. Genuine loopback
     # still bypasses; the first-run flow makes sure a password exists.
     _READONLY_PUBLIC = bool(getattr(config, "web", None) and config.web.public_view)
+    # `web.trust_loopback: false` for a reverse proxy on this same host.
+    _web_auth.set_trust_loopback(
+        getattr(getattr(config, "web", None), "trust_loopback", True))
 
     class _LocalAuthMiddleware:
         def __init__(self, app):
@@ -1290,7 +1358,7 @@ def build_app(
             method = scope.get("method", "GET").upper()
             # READONLY_PUBLIC bypass: allow GET reads on LAN without a
             # session, so kiosks-on-wifi keep working unchanged.
-            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS"):
+            if _READONLY_PUBLIC and public_view_allows(method, path):
                 await self.app(scope, receive, send)
                 return
             # Look up the session cookie.

@@ -13,6 +13,7 @@ acquiring without a daemon restart.
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import logging
 import shutil
@@ -53,9 +54,7 @@ def _save_config(config_path: str, mutator) -> None:
         raise RuntimeError("config mutator returned None")
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
 
 def gps_config_view(config: Config) -> dict[str, Any]:

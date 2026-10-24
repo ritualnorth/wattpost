@@ -71,6 +71,57 @@ Versions follow [Semantic Versioning].
   commands that already completed (remembered across restarts) are refused.
   Signatures now cover a domain tag so they cannot be confused with anything
   else the cloud's key signs. The cloud must be updated alongside.
+- **Commands are verified against this appliance's own id.** The id used to
+  verify a cloud command was read from the command itself, so a command
+  legitimately signed for another appliance was accepted. It now comes from
+  `cloud.appliance_id`; an unpaired appliance refuses every command.
+- **First-run password takeover closed.** `POST /api/setup/first-run-
+  password` stayed open after the owner had signed in with the generated
+  password, so any LAN client could set a new password and get a session.
+  The first successful login (or any existing local session) now clears the
+  first-run marker, and the endpoint shares the `/api/login` brute-force
+  backoff.
+- **A signed command's `queued_at` must be UTC.** The signature ignores the
+  timezone offset but the freshness check used it, so re-labelling a signed
+  command's offset stretched the 7-day replay window by up to 14 hours.
+  Commands with a non-zero offset are refused.
+- **A hostile or broken cloud reply can no longer wedge telemetry or the
+  command loop.** The live-lease interval is clamped to 2-60 s and the loop
+  never sleeps past the lease (NaN/inf are rejected); `acked_through` must
+  equal the newest bucket sent and a watermark in the future is ignored; at
+  most 20 commands per heartbeat are considered and an unknown signing key
+  forces at most one JWKS refetch per heartbeat and per minute.
+- **Cloud-supplied trust-anchor URLs are validated.** The JWKS, OIDC
+  discovery and redirect URLs in the identity reply are only saved when they
+  are https (http only for loopback in development) and on the host of the
+  configured cloud endpoint; otherwise the previous config is kept and a
+  warning logged. JWKS fetches no longer follow redirects to another host,
+  and `http://` cloud endpoints are rejected by `PUT /api/cloud/config` and
+  pairing unless the host is loopback. Already-saved OIDC config keeps
+  working.
+- **`web.public_view` no longer exposes configuration.** With public view
+  on, anonymous GETs reached everything, including `/api/system/backup` (the
+  whole database plus `config.yaml` with the cloud bearer token and
+  credentials), diagnostics and logs, network, setup and cloud endpoints.
+  Those prefixes now require a session even in public view; dashboard and
+  kiosk reads are unchanged.
+- **Loopback trust no longer assumes a header denylist is complete.** New
+  `web.trust_loopback` (default true) turns the "connection from this
+  machine is the owner" shortcut off, for installs that run a reverse proxy
+  on the same host; docs/security.md explains when to set it. A loopback
+  request is now also treated as proxied if it carries `Via`, `Forwarded`,
+  any `X-Forwarded-*` / `CF-*`, `X-Real-IP`, `True-Client-IP`, `X-Original-
+  Forwarded-For`, `X-Client-IP`, `Fastly-Client-IP` or `X-Cluster-Client-
+  IP`, or an `Origin`/`Referer` for a non-loopback host.
+- **Secret-bearing files are written 0600.** `config.yaml` (cloud bearer
+  token, SMTP/MQTT credentials) was left world-readable (0644) after every
+  settings save, and `sessions.json` (live session tokens) was written 0644.
+  All config writers now go through one atomic helper that creates the temp
+  file 0600, fsyncs and renames; `load_config`'s own rewrites (legacy-key
+  scrub, alert seeding, kiosk token) are atomic too.
+- The anonymous `/auth/lan/login` endpoint can no longer grow
+  `oidc_pending.json` without bound: pending OIDC flows are capped at 20
+  (oldest dropped first) and still expire after 5 minutes.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and
@@ -87,6 +138,26 @@ Versions follow [Semantic Versioning].
   `HTTPException` import) instead of returning a 4xx.
 - Fresh installs returned 500 on every request when `multidict` 7 was
   resolved (pinned `<6.7`; Litestar 2.25 cannot build `Headers` with it).
+- Unpairing from the cloud (`/api/cloud/unpair`) no longer kills the
+  heartbeat and telemetry loops with an `AttributeError`; they idle until
+  the daemon restarts.
+- Telemetry upload no longer stalls the appliance after a long outage.
+  Building a batch of closed 1-minute rollups aggregated the whole pending
+  range before applying the row limit (about 2 s per 5 000-row batch with a
+  day of 5 s data and 100 metrics, on the shared database connection); it
+  now aggregates in 2-hour windows and stops once the batch is full (about
+  0.2 s), with identical results.
+- The signed-command ledger (which stops a completed command being replayed)
+  is now fsynced, keeps a `.bak` of the previous good copy, and falls back
+  to it if the main file is corrupt after a power cut.
+- Telemetry upload is robust to bad rows now that the cloud drops them:
+  batches are sent as strict JSON (non-finite numbers dropped or nulled, NUL
+  characters stripped), a batch the cloud keeps refusing with a 4xx/5xx is
+  bisected so the good rows are delivered and the watermark moves past the
+  bad ones (never during an outage, nor for 401/408/429), the watermark is
+  reset when the appliance id or cloud endpoint changes, and views are built
+  once per run with a 20 s per-view timeout and their normal cadence while
+  someone is watching live.
 
 ## [0.1.188] - 2026-06-16
 

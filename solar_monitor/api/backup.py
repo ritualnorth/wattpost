@@ -11,6 +11,7 @@ back to where I was".
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import io
 import logging
@@ -425,6 +426,7 @@ def _stage_and_swap(
                     cfg_new.write_text(
                         _yaml.safe_dump(raw_restored, sort_keys=False)
                     )
+                    os.chmod(cfg_new, 0o600)
                     if dropped:
                         log.warning(
                             "restore: dropped %d unknown top-level config keys: %s",
@@ -844,9 +846,7 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
     raw["backup"] = backup_block
     bak = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, bak)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
     # Update the live Config object so subsequent restarts read the
     # right value, and re-wire the running BackupService's uploader.
@@ -913,9 +913,7 @@ async def discovery_toggle(request: Request, state: State) -> dict[str, Any]:
     raw["discovery"] = block
     bak = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, bak)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
     config = state.get("config")
     if config is not None:
@@ -962,9 +960,7 @@ async def local_telemetry_toggle(request: Request, state: State) -> dict[str, An
     raw["local_telemetry"] = block
     bak = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, bak)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
     config = state.get("config")
     if config is not None:

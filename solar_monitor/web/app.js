@@ -7444,7 +7444,7 @@ function renderIntegrationsPanel() {
       id: "cloud", name: "WattPost cloud", ok: cloudConfigured,
       status: cloudConfigured ? "paired" : "not paired",
       sub: cloudConfigured
-        ? `Heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""}`
+        ? `${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""} · heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.telemetry_sync === false ? "history upload off" : `uploading history every ${integrationsState.cloud.telemetry_minutes ?? 5}m`}`
         : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`,
       action: cloudConfigured ? "Edit" : "Pair", attr: "data-edit-cloud",
     }) +
@@ -7762,7 +7762,7 @@ function renderCloudForm(cc) {
         </label>
         <p class="settings-foot">
           Sign in at <a href="${endpoint}" target="_blank" rel="noopener">${endpoint.replace(/^https?:\/\//, "")}</a>,
-          click <strong>+ Add appliance</strong>, paste the 8-character code here, hit Pair.
+          click <strong>Pair an appliance</strong>, paste the 8-character code here, hit Pair.
           Codes expire after 10 minutes.
         </p>
         <div class="alerts-form-actions">

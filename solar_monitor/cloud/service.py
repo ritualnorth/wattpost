@@ -10,8 +10,10 @@ dashboard. Each failure is logged at WARNING for diagnostics.
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import logging
+import re
 import time
 from typing import Any
 
@@ -55,6 +57,36 @@ def _mark_tried_cmd(cmd_id: int) -> None:
         os.replace(tmp, p)
     except Exception:
         pass
+
+
+_VERSION_RE = re.compile(r"^v?[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}(?:[-+][0-9A-Za-z.\-]{1,16})?$")
+
+
+def _bad_version_field(cmd: dict[str, Any]) -> str | None:
+    """Why this command's version strings are unacceptable, or None."""
+    import json as _json
+    tv = cmd.get("target_version")
+    if tv not in (None, "") and not _VERSION_RE.match(str(tv)):
+        return "target_version is not a release version"
+    raw = cmd.get("payload_json")
+    if raw:
+        try:
+            payload = _json.loads(raw) if isinstance(raw, str) else dict(raw)
+        except Exception:
+            return "payload is not JSON"
+        if not isinstance(payload, dict):
+            return "payload is not an object"
+        for k in ("version", "image"):
+            v = payload.get(k)
+            if k == "version" and v not in (None, "") and not _VERSION_RE.match(str(v)):
+                return "payload version is not a release version"
+            if k == "image" and v not in (None, ""):
+                return "custom image references are not accepted"
+    return None
+
+
+# Upper bound on commands honoured from a single heartbeat reply.
+MAX_COMMANDS_PER_HEARTBEAT = 20
 
 
 class CloudService:
@@ -112,6 +144,13 @@ class CloudService:
             return self._config.cloud
         return self._direct_cfg
 
+    def _cfg_get(self, name: str, default):
+        """Read a cloud setting without assuming the cloud config exists:
+        /api/cloud/unpair sets `config.cloud = None` while the background
+        loops keep running."""
+        c = self.cfg
+        return getattr(c, name, default) if c is not None else default
+
     # Top-level Config.alerts (NOT a CloudCfg attribute, getattr
     # against self.cfg silently returns [] and every alert-related
     # cloud feature no-ops). All rule-unification paths (#261) read
@@ -157,15 +196,22 @@ class CloudService:
         from .views import ViewPublisher
         self._sync = RollupSync(
             store=self.scheduler.store,
-            endpoint=lambda: self.cfg.endpoint,
-            bearer=lambda: self.cfg.bearer_token,
+            endpoint=lambda: self._cfg_get("endpoint", ""),
+            bearer=lambda: self._cfg_get("bearer_token", ""),
             sign=self._signed_headers,
-            backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
+            backfill_hours=lambda: self._cfg_get("telemetry_backfill_hours", 24),
             views=ViewPublisher(self.scheduler.store, self.scheduler),
-            enabled=lambda: self.cfg.telemetry_sync,
+            # No cloud config (unpaired live) means uploads are off, not a crash.
+            enabled=lambda: bool(self._cfg_get("telemetry_sync", False)
+                                 and self._cfg_get("bearer_token", "")),
+            identity=lambda: (
+                f"{self._cfg_get('appliance_id', None)}|"
+                f"{str(self._cfg_get('endpoint', '')).rstrip('/').lower()}"
+                if self.cfg is not None else ""),
         )
         self._sync_task = asyncio.create_task(
-            self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),
+            self._sync.loop(self._stop,
+                            lambda: max(1, self._cfg_get("telemetry_minutes", 5)) * 60),
             name="cloud-rollup-sync")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
@@ -240,7 +286,8 @@ class CloudService:
                         )):
                             try:
                                 from ..auth import oidc_config as _oidc_cfg
-                                _oidc_cfg.save(
+                                _oidc_cfg.save_from_cloud(
+                                    endpoint=self.cfg.endpoint,
                                     client_id=body["oidc_client_id"],
                                     redirect_uri=body["oidc_redirect_uri"],
                                     jwks_url=body["jwks_url"],
@@ -306,7 +353,8 @@ class CloudService:
                 )):
                     try:
                         from ..auth import oidc_config as _oidc_cfg
-                        _oidc_cfg.save(
+                        _oidc_cfg.save_from_cloud(
+                            endpoint=self.cfg.endpoint,
                             client_id=body["oidc_client_id"],
                             redirect_uri=body["oidc_redirect_uri"],
                             jwks_url=body["jwks_url"],
@@ -374,6 +422,8 @@ class CloudService:
         round-trip doesn't half-execute a command. Each command's
         status transitions are PATCHed back to the cloud as the
         appliance progresses through pick-up → apply → terminal."""
+        if self.cfg is None:
+            return False              # unpaired while the loop was running
         payload = await self._build_payload()
         url = f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat"
         # Pre-serialize the body so the bytes we sign are the EXACT
@@ -443,16 +493,40 @@ class CloudService:
             # refused (see command_verify).
             from . import command_verify as _cverify
             from .. import signed_audit as _sa
+            if not isinstance(commands, list):
+                commands = []
+            if len(commands) > MAX_COMMANDS_PER_HEARTBEAT:
+                # Each unverifiable command costs a signed-audit write (and
+                # possibly a JWKS fetch); a hostile reply must not be able to
+                # make us do that thousands of times per heartbeat.
+                log.warning("cloud sent %d commands in one heartbeat; only the "
+                            "first %d are considered", len(commands),
+                            MAX_COMMANDS_PER_HEARTBEAT)
+                commands = commands[:MAX_COMMANDS_PER_HEARTBEAT]
+            jwks_refresh = {"done": False}      # at most one forced refetch per heartbeat
             for cmd in commands:
+                if not isinstance(cmd, dict):
+                    continue
                 try:
-                    # Each cmd carries its own appliance_id so the verifier
-                    # doesn't need an out-of-band hint. Parse INSIDE the try:
-                    # a malformed appliance_id must reject just this command,
-                    # not raise out of the loop and abort dispatch of the
-                    # whole batch plus the cloud-delivered settings
-                    # (branding/backup/channel) handled below it.
-                    appliance_id = int(cmd.get("appliance_id") or 0)
-                    ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
+                    # The id a command is verified against is THIS
+                    # appliance's own (from config), never the one the
+                    # command claims: otherwise a command legitimately
+                    # signed for another appliance would verify here.
+                    # Unpaired (no id) means refuse everything. Parsing
+                    # happens INSIDE the try so one malformed command
+                    # rejects just itself, not the batch.
+                    own_id = self.cfg.appliance_id
+                    if own_id is None:
+                        log.warning("cloud command %s refused: no appliance_id configured",
+                                    cmd.get("id"))
+                        ok = False
+                    else:
+                        claimed = cmd.get("appliance_id")
+                        if claimed is not None and str(claimed) != str(own_id):
+                            log.warning("cloud command %s claims appliance_id=%s, "
+                                        "this appliance is %s", cmd.get("id"), claimed, own_id)
+                        ok = await _cverify.verify_command(
+                            cmd, appliance_id=int(own_id), refresh_state=jwks_refresh)
                     if ok and self._ledger().seen(int(cmd.get("id") or 0)):
                         log.warning("command %s already ran; ignoring replay", cmd.get("id"))
                         ok = False
@@ -650,6 +724,16 @@ class CloudService:
         if cmd_id in self._dispatched_cmds:
             log.debug("cloud command %d already dispatched this session; skipping", cmd_id)
             return
+        # A signature says the cloud issued this command, not that its strings
+        # are sane. Version strings end up in an updater request and in
+        # subprocess arguments, so hold them to a release-version shape here
+        # no matter who signed them.
+        if kind in ("update", "rollback", "pin_image_tag"):
+            bad = _bad_version_field(cmd)
+            if bad:
+                log.warning("cloud command %d (%s) refused: %s", cmd_id, kind, bad)
+                await self._patch_command_status(cmd_id, "failed", error=f"refused: {bad}")
+                return
         # Bound the set so a long-lived appliance taking routine commands
         # (rule sync, backups, disk cleanup) for weeks doesn't grow it
         # without limit. Keep the most recent ids; cmd_ids only increase, so
@@ -1317,9 +1401,7 @@ class CloudService:
         ]
         backup = path.with_suffix(path.suffix + ".bak")
         shutil.copy2(path, backup)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-        tmp.replace(path)
+        _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
     def _reload_alerts_engine(self) -> None:
         """Hot-reload the alerts engine with the current config.alerts.
@@ -1934,13 +2016,17 @@ class CloudService:
             await self.heartbeat_once()
         except Exception as e:
             log.warning("initial cloud heartbeat failed: %s", e)
-        period_s = max(1, self.cfg.heartbeat_minutes) * 60
         while not self._stop.is_set():
+            # Re-read each cycle: the config can change (or vanish, after
+            # /api/cloud/unpair) while this task runs.
+            period_s = max(1, self._cfg_get("heartbeat_minutes", 5)) * 60
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=period_s)
                 return
             except asyncio.TimeoutError:
                 pass
+            if self.cfg is None or not self.cfg.bearer_token:
+                continue              # unpaired: idle until stopped
             try:
                 await self.heartbeat_once()
             except Exception as e:

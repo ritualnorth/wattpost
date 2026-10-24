@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
+from ..fsutil import atomic_write_text
 from nacl.signing import VerifyKey
 
 log = logging.getLogger(__name__)
@@ -50,6 +52,10 @@ JWKS_TTL_SECONDS = 60 * 60 * 24
 # State store TTL, the redirect round-trip should take <5min in
 # normal browsing. Anything older was abandoned + can be cleared.
 STATE_TTL_SECONDS = 60 * 5
+# /auth/lan/login is anonymous and every hit stashes a pending entry (and
+# rewrites the pending file). Cap the store so it cannot be grown without
+# bound; the oldest entries are dropped first.
+MAX_PENDING = 20
 
 
 # ---------------------------------------------------------------- #
@@ -99,13 +105,33 @@ def _disk_load_jwks() -> list[dict[str, Any]] | None:
 def _disk_save_jwks(keys: list[dict[str, Any]]) -> None:
     try:
         _KEY_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = JWKS_CACHE_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps({"keys": keys}, indent=2))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, JWKS_CACHE_PATH)
+        atomic_write_text(JWKS_CACHE_PATH, json.dumps({"keys": keys}, indent=2))
     except OSError as e:
         log.warning("oidc_rp: jwks disk-cache write failed (%s), "
                     "in-memory cache will still be used", e)
+
+
+MAX_JWKS_REDIRECTS = 3
+
+
+async def _get_same_host(client: httpx.AsyncClient, url: str) -> httpx.Response:
+    """GET `url`, following redirects only while they stay on the original
+    host and never downgrade to cleartext (http only for loopback). The JWKS
+    is a trust anchor; a redirect must not be able to move it elsewhere."""
+    from ..urlcheck import host_of, scheme_ok
+    origin = host_of(url)
+    for _ in range(MAX_JWKS_REDIRECTS + 1):
+        r = await client.get(url)
+        if not r.is_redirect:
+            return r
+        loc = r.headers.get("location")
+        if not loc:
+            return r
+        nxt = str(httpx.URL(url).join(loc))
+        if host_of(nxt) != origin or not scheme_ok(nxt):
+            raise RuntimeError(f"JWKS redirect to {nxt!r} refused (different host or scheme)")
+        url = nxt
+    raise RuntimeError("too many JWKS redirects")
 
 
 async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, Any]]:
@@ -121,8 +147,8 @@ async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, An
         return cache.keys
 
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            r = await client.get(jwks_url)
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
+            r = await _get_same_host(client, jwks_url)
             r.raise_for_status()
             body = r.json()
             keys = body.get("keys") or []
@@ -281,8 +307,7 @@ def _persist_pending() -> None:
     (typically 0-2 entries), so we just rewrite on every change."""
     try:
         _KEY_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = _PENDING_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps({
+        atomic_write_text(_PENDING_PATH, json.dumps({
             state: {
                 "pkce_verifier": v.pkce_verifier,
                 "nonce":         v.nonce,
@@ -291,8 +316,6 @@ def _persist_pending() -> None:
             }
             for state, v in _pending.items()
         }))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, _PENDING_PATH)
     except OSError as e:
         # Disk-full / RO-fs: keep going with in-memory state. A
         # restart will lose in-flight flows but we're not blocking
@@ -341,6 +364,9 @@ def stash_pending(*, pkce_verifier: str, nonce: str, return_to: str) -> str:
     """Generate a fresh state token, store the PKCE verifier + nonce
     + post-login return path against it, return the state value."""
     _gc_pending()
+    while len(_pending) >= MAX_PENDING:
+        oldest = min(_pending, key=lambda k: _pending[k].created_at)
+        _pending.pop(oldest, None)
     state = secrets.token_urlsafe(24)
     _pending[state] = _PendingAuth(
         pkce_verifier=pkce_verifier,

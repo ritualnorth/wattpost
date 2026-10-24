@@ -69,6 +69,44 @@ If you want full remote control of the appliance rather than a viewing
 copy, put it behind your own VPN / reverse proxy. See [Remote
 access](/docs/remote-access) for the unsupported options.
 
+## Reverse proxy on the same host: set `web.trust_loopback: false`
+
+The appliance treats a connection that comes from the machine itself
+(`127.0.0.1` / `::1`) as the owner sitting at the box, with no login. That is
+what lets the Pi's own kiosk browser, `curl` on the box and
+`wattpost-config` work. It is also why a **reverse proxy running on the same
+host** (nginx, Caddy, HAProxy, Traefik, a Cloudflare/Tailscale/ngrok client...)
+is dangerous: every request it relays reaches WattPost *from loopback*, so
+without further care anyone who can reach the proxy would be the "local owner".
+
+WattPost refuses to trust a loopback request that carries any proxy marker
+(`Via`, `Forwarded`, `X-Forwarded-*`, `X-Real-IP`, `True-Client-IP`,
+`X-Original-Forwarded-For`, `X-Client-IP`, `Fastly-Client-IP`,
+`X-Cluster-Client-IP`, `CF-*`, or an `Origin` / `Referer` naming a
+non-loopback host). A header list can never be complete, though: a default
+`proxy_pass` adds none of these, and any proxy can be configured to strip
+them. **If you put a reverse proxy on the same machine, turn the loopback
+shortcut off:**
+
+```yaml
+web:
+  trust_loopback: false
+```
+
+With it off, every client, including the Pi's own browser, signs in with the
+web password (use a kiosk token for a wall display). Restart the daemon after
+changing it. Leave it at the default (`true`) only when nothing on the host
+forwards traffic to WattPost.
+
+## `web.public_view`
+
+`web.public_view: true` lets anyone on the network *view* the dashboard
+without signing in. It covers dashboard reads only (live values, history,
+energy, forecast, kiosk). Configuration and anything that could expose
+credentials or control the box (backups, diagnostics, logs, network, setup,
+cloud pairing, integrations, alerts, device settings, kiosk tokens) still
+needs a login.
+
 ## Host firewall & SSH (Pi appliance)
 
 The SD-card (Pi) appliance ships with two host-level hardening switches,
