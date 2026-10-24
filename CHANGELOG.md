@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Fix: restart-in-place (Settings restart, restore from backup, restore from cloud) crashed with `attempted relative import with no known parent package` when the daemon had been started with `python -m solar_monitor.cli`, because the re-exec rebuilt the command line from `sys.argv`. It now re-runs the interpreter with its original arguments (`sys.orig_argv`). The packaged `solar-monitor` script was unaffected.
+
 - The login page no longer offers "Sign in with WattPost cloud" by default. That flow sends the browser back to a per-appliance callback host (`<slug>.wattpost.cloud`) that stopped resolving when the tunnel was removed, so it could not complete. It returns behind `web.cloud_signin: true` once the cloud hands out a callback that works without inbound access to the appliance. Local password login is unchanged.
 
 - History charts now show the range you picked. The Energy chart and the Detailed metrics chart fitted their x-axis to whatever data existed, so "30 days" with an hour of history drew an hour-wide axis and a new site looked like it had a month of data. The axis now covers the requested window, with the data sitting where it belongs inside it.

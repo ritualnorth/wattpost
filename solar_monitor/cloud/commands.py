@@ -4,6 +4,7 @@ bookkeeping (replay ledger, tried-commands file) and status reports."""
 from __future__ import annotations
 
 from ..fsutil import atomic_write_text as _atomic_write_text
+from ..procutil import reexec
 import asyncio
 import logging
 import re
@@ -629,7 +630,7 @@ class CommandsMixin:
         # it for the user-driven restore); the config path was pinned
         # onto the scheduler by build_app at startup.
         from pathlib import Path
-        import os, sys
+        import os
         store = getattr(self.scheduler, "store", None)
         store_path = (
             getattr(store, "_path", None) or getattr(store, "path", None)
@@ -684,7 +685,7 @@ class CommandsMixin:
                 await self.scheduler.stop()
             except Exception:
                 log.exception("scheduler stop failed before restore re-exec")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            reexec()
 
         self._spawn(_delayed_exec(), name="cloud-restore-exec")
 

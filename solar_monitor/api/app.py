@@ -11,8 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-import sys
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator
@@ -109,6 +107,7 @@ from .backup import (
     local_telemetry_state, local_telemetry_toggle,
 )
 from ..backup import BackupService
+from ..procutil import reexec
 from .auth_oidc import auth_callback, auth_lan_login, oidc_available
 
 import logging
@@ -591,7 +590,7 @@ async def restart_daemon(state: State) -> dict[str, Any]:
             await scheduler.stop()
         except Exception:
             pass
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        reexec()
 
     asyncio.create_task(_delayed_exec())
     return {"ok": True, "message": "restart scheduled"}
