@@ -88,6 +88,7 @@ class CommandsMixin:
         Handled kinds:
           update     , run wattpost-update (Pi installs only)
           backup_now , snapshot + upload to cloud (#165)
+          restart_poller , stop/start the poll loop in-process
 
         Unknown kinds get marked failed with a clear error message
         so they don't sit forever as 'queued' on the dashboard."""
@@ -192,6 +193,12 @@ class CommandsMixin:
         # watchdog when host_health.disk.percent ≥ 90.
         if kind == "disk_cleanup":
             await self._dispatch_disk_cleanup(cmd_id)
+            return
+
+        # Stop and start the poll loop in-process (reconnects BLE and
+        # serial transports) without restarting the daemon or the web UI.
+        if kind == "restart_poller":
+            await self._dispatch_restart_poller(cmd_id)
             return
 
         if kind != "update":
@@ -433,6 +440,25 @@ class CommandsMixin:
                 error=f"failed to start rollback: {type(e).__name__}: {e}",
             )
 
+
+    async def _dispatch_restart_poller(self, cmd_id: int) -> None:
+        """Cloud-triggered poller restart: scheduler stop() then start().
+        The usual fix for a wedged Bluetooth adapter or a transport that
+        stopped reconnecting. Needs no restart of the daemon."""
+        await self._patch_command_status(cmd_id, "picked_up")
+        await self._patch_command_status(cmd_id, "applying")
+        try:
+            await self.scheduler.stop()
+            await self.scheduler.start()
+        except Exception as e:
+            log.exception("cloud restart_poller: failed")
+            await self._patch_command_status(
+                cmd_id, "failed",
+                error=f"restart_poller failed: {type(e).__name__}: {e}",
+            )
+            return
+        log.info("cloud restart_poller cmd %d: poller restarted", cmd_id)
+        await self._patch_command_status(cmd_id, "success", error="poller restarted")
 
     async def _dispatch_disk_cleanup(self, cmd_id: int) -> None:
         """Cloud-triggered disk housekeeping (#279). Non-destructive:
