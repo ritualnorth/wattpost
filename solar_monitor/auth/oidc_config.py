@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ..fsutil import atomic_write_text
+
 log = logging.getLogger(__name__)
 
 _KEY_DIR = Path(os.environ.get("WATTPOST_KEYS_DIR", "/var/lib/wattpost/keys"))
@@ -94,10 +96,7 @@ def save(
         "discovery_url": cfg.discovery_url,
         "registered_at": cfg.registered_at,
     }, indent=2)
-    tmp = OIDC_CONFIG_PATH.with_suffix(".json.tmp")
-    tmp.write_text(payload)
-    os.chmod(tmp, 0o600)
-    os.replace(tmp, OIDC_CONFIG_PATH)
+    atomic_write_text(OIDC_CONFIG_PATH, payload)
     log.info("oidc_config: persisted client_id=%s redirect_uri=%s",
              client_id, redirect_uri)
     return cfg

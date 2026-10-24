@@ -12,6 +12,7 @@ Wired surface:
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import logging
 from typing import Any
 
@@ -295,9 +296,7 @@ async def patch_solar_pause(
         "pv_surplus_w":      new_cfg.pv_surplus_w,
         "cooldown_minutes":  new_cfg.cooldown_minutes,
     }
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
     scheduler.config.solar_pause = new_cfg
     log.info("solar_pause: settings updated (enabled=%s, target=%s, recover=%s)",
              new_cfg.enabled, new_cfg.target_soc, new_cfg.recover_soc)

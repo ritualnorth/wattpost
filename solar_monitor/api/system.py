@@ -7,6 +7,7 @@ right home for any future system-level handlers.
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import json
 import logging
@@ -436,9 +437,7 @@ def _persist_web_key(config_path: str, key: str, value) -> None:
     raw["web"] = web
     if path.exists():
         _shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
 
 def _netsec_state(state, *, firewall=None, ssh=None) -> dict[str, Any]:
@@ -549,9 +548,7 @@ async def set_update_channel(
     raw["update"] = upd
     backup = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
     log.info("update channel set to %s", channel)
 
     deployment = os.environ.get("WATTPOST_DEPLOYMENT", "pi")
@@ -887,9 +884,7 @@ async def patch_history_settings(
     raw["history"] = hist
     backup = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
     return _history_settings_payload(state)
 
@@ -941,9 +936,7 @@ async def reset_to_defaults(
 
     backup = path.with_suffix(path.suffix + ".bak")
     _shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(_yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, _yaml.safe_dump(raw, sort_keys=False))
 
     log.warning(
         "[reset] config wiped: %s; keep_cloud_pairing=%s",

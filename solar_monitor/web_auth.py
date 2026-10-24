@@ -177,9 +177,8 @@ def _persist_sessions_to_disk() -> None:
     import json as _json
     try:
         SESSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = SESSIONS_PATH.with_suffix(".json.tmp")
-        tmp.write_text(_json.dumps(_SESSIONS), encoding="utf-8")
-        tmp.replace(SESSIONS_PATH)
+        from .fsutil import atomic_write_text
+        atomic_write_text(SESSIONS_PATH, _json.dumps(_SESSIONS))   # live tokens: 0600
     except OSError:
         # Disk full, permissions, RO filesystem. Don't break login,
         # the user's session is still valid in memory for this run.
@@ -301,9 +300,8 @@ def _load_kiosk_tokens() -> list[dict]:
 
 def _save_kiosk_tokens(toks: list[dict]) -> None:
     KIOSK_TOKENS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = KIOSK_TOKENS_PATH.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(toks), encoding="utf-8")
-    tmp.replace(KIOSK_TOKENS_PATH)
+    from .fsutil import atomic_write_text
+    atomic_write_text(KIOSK_TOKENS_PATH, json.dumps(toks))
 
 
 def create_kiosk_token(name: str = "", skin: str = "") -> tuple[str, str]:

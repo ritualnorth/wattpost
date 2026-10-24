@@ -30,6 +30,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
+from ..fsutil import atomic_write_text
 from nacl.signing import VerifyKey
 
 log = logging.getLogger(__name__)
@@ -99,10 +101,7 @@ def _disk_load_jwks() -> list[dict[str, Any]] | None:
 def _disk_save_jwks(keys: list[dict[str, Any]]) -> None:
     try:
         _KEY_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = JWKS_CACHE_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps({"keys": keys}, indent=2))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, JWKS_CACHE_PATH)
+        atomic_write_text(JWKS_CACHE_PATH, json.dumps({"keys": keys}, indent=2))
     except OSError as e:
         log.warning("oidc_rp: jwks disk-cache write failed (%s), "
                     "in-memory cache will still be used", e)
@@ -304,8 +303,7 @@ def _persist_pending() -> None:
     (typically 0-2 entries), so we just rewrite on every change."""
     try:
         _KEY_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = _PENDING_PATH.with_suffix(".json.tmp")
-        tmp.write_text(json.dumps({
+        atomic_write_text(_PENDING_PATH, json.dumps({
             state: {
                 "pkce_verifier": v.pkce_verifier,
                 "nonce":         v.nonce,
@@ -314,8 +312,6 @@ def _persist_pending() -> None:
             }
             for state, v in _pending.items()
         }))
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, _PENDING_PATH)
     except OSError as e:
         # Disk-full / RO-fs: keep going with in-memory state. A
         # restart will lose in-flight flows but we're not blocking

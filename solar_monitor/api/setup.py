@@ -11,6 +11,7 @@ returns a flag the SPA uses to show the restart prompt.
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import logging
 import time
@@ -1604,9 +1605,7 @@ async def add_transport(data: AddTransportRequest, state: State) -> dict[str, An
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
     log.info("setup wizard: added transport %s type=%s address=%s label=%s",
              new_id, data.type, mac, label)
 
@@ -1716,9 +1715,7 @@ async def delete_device_by_label(
             raw["devices"] = kept
             backup = path.with_suffix(path.suffix + ".bak")
             shutil.copy2(path, backup)
-            tmp = path.with_suffix(path.suffix + ".tmp")
-            tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-            tmp.replace(path)
+            _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
             log.info("setup: removed device %r (transport=%s slave=%s)",
                      label, transport, slave_id)
 
@@ -1770,9 +1767,7 @@ async def delete_device(
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
     log.info("setup wizard: removed device slave_id=%d on transport=%s",
              slave_id, transport)
 
@@ -1881,9 +1876,7 @@ async def edit_setup_transport(
     target.update(changes)
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
     log.info("setup wizard: edited transport %s (changed: %s)",
              transport_id, ", ".join(changes.keys()))
     asyncio.create_task(_hot_reload_bg(state))
@@ -1924,9 +1917,7 @@ async def delete_setup_transport(
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
     log.info("setup wizard: removed transport %s (also dropped %d child devices)",
              transport_id, dropped)
 
@@ -2110,9 +2101,7 @@ async def add_device(data: AddDeviceRequest, state: State) -> dict[str, Any]:
 
     backup = path.with_suffix(path.suffix + ".bak")
     shutil.copy2(path, backup)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-    tmp.replace(path)
+    _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
     log.info("setup wizard: added %s/%s @ %s slave=%d label=%s",
              data.vendor, data.kind, data.transport, data.slave_id, label)
 

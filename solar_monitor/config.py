@@ -643,11 +643,14 @@ def _strip_legacy_cloud_keys(raw: Any) -> bool:
     return bool(found)
 
 
+from .fsutil import atomic_write_text  # noqa: E402
+
+
 def load_config(path: str | Path) -> Config:
     raw = yaml.safe_load(Path(path).read_text())
     if _strip_legacy_cloud_keys(raw):
         try:
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass  # in-memory drop is enough; retried on the next load
     cfg = msgspec.convert(raw, Config)
@@ -680,7 +683,7 @@ def load_config(path: str | Path) -> Config:
         try:
             raw["alerts"] = _DEFAULT_ALERT_RULES
             raw["alerts_seeded"] = True
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass
 
@@ -707,7 +710,7 @@ def load_config(path: str | Path) -> Config:
         cfg.cloud.kiosk_token = _secrets.token_urlsafe(24)
         try:
             raw.setdefault("cloud", {})["kiosk_token"] = cfg.cloud.kiosk_token
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             pass  # in-memory generation is fine for this run
 
@@ -715,7 +718,7 @@ def load_config(path: str | Path) -> Config:
         cfg.cloud.endpoint = "https://wattpost.cloud"
         try:
             raw["cloud"]["endpoint"] = "https://wattpost.cloud"
-            Path(path).write_text(yaml.safe_dump(raw, sort_keys=False))
+            atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
         except Exception:
             # Persist-back is best-effort. The in-memory upgrade above
             # is enough to make this run work; the next save (pair,

@@ -113,6 +113,12 @@ Versions follow [Semantic Versioning].
   any `X-Forwarded-*` / `CF-*`, `X-Real-IP`, `True-Client-IP`, `X-Original-
   Forwarded-For`, `X-Client-IP`, `Fastly-Client-IP` or `X-Cluster-Client-
   IP`, or an `Origin`/`Referer` for a non-loopback host.
+- **Secret-bearing files are written 0600.** `config.yaml` (cloud bearer
+  token, SMTP/MQTT credentials) was left world-readable (0644) after every
+  settings save, and `sessions.json` (live session tokens) was written 0644.
+  All config writers now go through one atomic helper that creates the temp
+  file 0600, fsyncs and renames; `load_config`'s own rewrites (legacy-key
+  scrub, alert seeding, kiosk token) are atomic too.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and

@@ -10,6 +10,7 @@ dashboard. Each failure is logged at WARNING for diagnostics.
 """
 from __future__ import annotations
 
+from ..fsutil import atomic_write_text as _atomic_write_text
 import asyncio
 import logging
 import re
@@ -1396,9 +1397,7 @@ class CloudService:
         ]
         backup = path.with_suffix(path.suffix + ".bak")
         shutil.copy2(path, backup)
-        tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(yaml.safe_dump(raw, sort_keys=False))
-        tmp.replace(path)
+        _atomic_write_text(path, yaml.safe_dump(raw, sort_keys=False))
 
     def _reload_alerts_engine(self) -> None:
         """Hot-reload the alerts engine with the current config.alerts.
