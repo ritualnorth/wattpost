@@ -113,7 +113,7 @@ class RollupSync:
         store,
         endpoint: Callable[[], str],
         bearer: Callable[[], str],
-        sign: Callable[[bytes], dict[str, str]],
+        sign: Callable[[bytes, str, str], dict[str, str]],
         backfill_hours: Callable[[], int],
         client_factory: Callable[[], httpx.AsyncClient] | None = None,
         views=None,
@@ -233,15 +233,14 @@ class RollupSync:
         raw = gzip.compress(
             json.dumps(scrub(body), separators=(",", ":"),
                        allow_nan=False, default=str).encode("utf-8"), compresslevel=6)
+        url = f"{self._endpoint().rstrip('/')}/api/ingest/rollups"
         headers = {
             "Authorization": f"Bearer {self._bearer()}",
             "Content-Type": "application/json",
             "Content-Encoding": "gzip",
-            **self._sign(raw),
+            **self._sign(raw, "POST", url),
         }
-        r = await client.post(
-            f"{self._endpoint().rstrip('/')}/api/ingest/rollups",
-            content=raw, headers=headers)
+        r = await client.post(url, content=raw, headers=headers)
         if r.status_code >= 400:
             raise HttpStatusError(r.status_code, r.text)
         return r.json()

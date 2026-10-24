@@ -40,7 +40,7 @@ def make_service(monkeypatch, reply, appliance_id):
         dispatched.append(cmd["id"])
 
     monkeypatch.setattr(s, "_build_payload", build)
-    monkeypatch.setattr(s, "_signed_headers", lambda b: {})
+    monkeypatch.setattr(s, "_signed_headers", lambda *a: {})
     monkeypatch.setattr(s, "_dispatch_command", dispatch)
     monkeypatch.setattr(s, "_ledger", lambda: SimpleNamespace(seen=lambda i: False))
 
