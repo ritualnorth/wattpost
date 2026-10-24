@@ -437,8 +437,8 @@ class CloudService:
             # #299, verify cloud-signed commands BEFORE dispatching.
             # Reject paths refuse to fire the command (it stays in the
             # cloud queue marked queued; cloud admins can investigate).
-            # Grandfather paths (unsigned cmd) log + dispatch with a
-            # warning so transitional appliances don't brick.
+            # Strict: unsigned, stale or already-completed commands are
+            # refused (see command_verify).
             from . import command_verify as _cverify
             from .. import signed_audit as _sa
             for cmd in commands:
@@ -451,6 +451,9 @@ class CloudService:
                     # (branding/backup/channel) handled below it.
                     appliance_id = int(cmd.get("appliance_id") or 0)
                     ok = await _cverify.verify_command(cmd, appliance_id=appliance_id)
+                    if ok and self._ledger().seen(int(cmd.get("id") or 0)):
+                        log.warning("command %s already ran; ignoring replay", cmd.get("id"))
+                        ok = False
                 except Exception:
                     log.exception("command verify raised, treating as untrusted")
                     ok = False
@@ -1323,6 +1326,12 @@ class CloudService:
         if engine is not None and hasattr(engine, "reload_rules"):
             engine.reload_rules(self._all_rules)
 
+    def _ledger(self):
+        from .command_verify import CommandLedger, default_ledger_path
+        if getattr(self, "_cmd_ledger", None) is None:
+            self._cmd_ledger = CommandLedger(default_ledger_path())
+        return self._cmd_ledger
+
     async def _patch_command_status(
         self, cmd_id: int, status: str, *, error: str | None = None,
     ) -> None:
@@ -1335,6 +1344,9 @@ class CloudService:
         body: dict[str, Any] = {"status": status}
         if error:
             body["error"] = error
+        if status in ("success", "failed"):
+            # Terminal: remember it so a replay of this signed command is refused.
+            self._ledger().record(cmd_id)
         headers = {
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
