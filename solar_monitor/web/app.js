@@ -7737,6 +7737,8 @@ function renderCloudForm(cc) {
         <div class="alerts-form-actions">
           <button type="submit" class="btn-action btn-action--primary">Save</button>
           <button type="button" class="btn-action" data-test-cloud>Send heartbeat now</button>
+          <button type="button" class="btn-action" data-retrust-cloud
+                  title="Only if you rebuilt the cloud on purpose: accept its current command-signing key">Re-trust cloud key</button>
           <button type="button" class="btn-action alerts-icon-btn--danger" data-unpair-cloud>Disable</button>
           <button type="button" class="btn-action" data-cancel-cloud>Cancel</button>
           <span class="alerts-form-status"></span>
@@ -7787,6 +7789,7 @@ function wireCloudForm() {
   });
   form.querySelector("[data-test-cloud]")?.addEventListener("click", () => testCloudHeartbeat(form));
   form.querySelector("[data-unpair-cloud]")?.addEventListener("click", () => unpairCloud(form));
+  form.querySelector("[data-retrust-cloud]")?.addEventListener("click", () => retrustCloudKey(form));
   form.querySelector("[data-repair-cloud]")?.addEventListener("click", () => repairCloud(form));
 }
 
@@ -7884,6 +7887,20 @@ async function testCloudHeartbeat(form) {
     if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
     if (d.ok) { status.textContent = "✓ Heartbeat accepted"; status.classList.add("ok"); }
     else      { status.textContent = "Cloud rejected the heartbeat. Check the daemon log"; status.classList.add("err"); }
+  } catch (e) { status.textContent = e.message; status.classList.add("err"); }
+}
+
+async function retrustCloudKey(form) {
+  const status = form.querySelector(".alerts-form-status");
+  if (!confirm("Accept the cloud's CURRENT command-signing key?\n\nThis appliance only runs commands signed by the key it remembered when it paired. " +
+               "Do this only if you rebuilt or moved the cloud on purpose. If you did not, something may be tampering with it.")) return;
+  status.textContent = "Fetching the cloud's keys…"; status.className = "alerts-form-status";
+  try {
+    const r = await fetch("/api/cloud/signing-key/retrust", { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || `${r.status} ${r.statusText}`);
+    status.textContent = `✓ Pinned ${d.kids?.length || 0} key${(d.kids?.length || 0) === 1 ? "" : "s"}`;
+    status.classList.add("ok");
   } catch (e) { status.textContent = e.message; status.classList.add("err"); }
 }
 
