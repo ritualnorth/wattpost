@@ -198,3 +198,16 @@ def test_ledger_survives_corrupt_file():
     assert not led.seen(1)
     led.record(1)
     assert cv.CommandLedger(p).seen(1)
+
+
+# ---- cross-repo golden vector (same one lives in wattpost-cloud) -------------
+
+def test_golden_vector_matches_the_cloud_byte_for_byte():
+    import hashlib
+    r = cv.canonical_repr(
+        cmd_id=42, appliance_id=7, kind="update", target_version="0.2.0", target_backup_id=None,
+        payload_json='{"a":"é"}',
+        queued_at=datetime(2026, 10, 24, 9, 30, 15, 123456, tzinfo=timezone.utc),
+        nonce="AAAAAAAAAAAAAAAAAAAAAA")
+    assert hashlib.sha256(cv.signing_input(r)).hexdigest() == \
+        "3e1d953f55c0c60d02c1521d51571c596b6cf8a9bb95426dacdcf1539e3b4e66"
