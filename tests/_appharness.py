@@ -49,4 +49,4 @@ def make_client(monkeypatch, tmp_path, *, web=None, password="correct-horse-1"):
     # on_startup (not run here) normally fills these in
     app.state["config"] = cfg
     app.state["config_path"] = str(cfg_path)
-    return TestClient(app)
+    return TestClient(app, raise_server_exceptions=False)

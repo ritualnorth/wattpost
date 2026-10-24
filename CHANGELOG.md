@@ -99,6 +99,12 @@ Versions follow [Semantic Versioning].
   and `http://` cloud endpoints are rejected by `PUT /api/cloud/config` and
   pairing unless the host is loopback. Already-saved OIDC config keeps
   working.
+- **`web.public_view` no longer exposes configuration.** With public view
+  on, anonymous GETs reached everything, including `/api/system/backup` (the
+  whole database plus `config.yaml` with the cloud bearer token and
+  credentials), diagnostics and logs, network, setup and cloud endpoints.
+  Those prefixes now require a session even in public view; dashboard and
+  kiosk reads are unchanged.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and

@@ -1078,6 +1078,54 @@ KIOSK_GET_PATHS = (
 )
 
 
+# `web.public_view: true` lets anonymous LAN visitors READ the dashboard. It
+# must not also hand out the box's configuration, credentials or control
+# surface, so these GET prefixes still need a session even then. (The
+# dashboard/kiosk read endpoints - snapshot, devices, history, energy,
+# forecast/pv, weather/current, kiosk/config, stream, ... - stay readable.)
+PUBLIC_VIEW_DENY_PREFIXES = (
+    "/api/system/",        # backup (full DB + config.yaml), diagnostics, logs,
+                           # netsec, kiosk-tokens, integrations, update, ...
+    "/api/network",        # wifi scan/join, IP config
+    "/api/setup",          # device wizard: transports, BLE/USB scans
+    "/api/cloud",          # pairing state
+    "/api/exporters",      # MQTT / Prometheus config
+    "/api/forecast/config",
+    "/api/weather/config",
+    "/api/gps/config",
+    "/api/hotspot",
+    "/api/location",
+    "/api/mqtt_in",
+    "/api/alerts",         # rules + transports (webhook URLs, addresses)
+    "/api/devices/",       # only the /settings sub-resource, see below
+)
+# Under /api/system/ these stay readable in public view (dashboard widgets).
+PUBLIC_VIEW_SYSTEM_ALLOW = (
+    "/api/system/device-health", "/api/system/host-history",
+    "/api/system/auth-status", "/api/system/oidc-available",
+)
+
+
+def public_view_allows(method: str, path: str) -> bool:
+    """Whether an ANONYMOUS request is allowed under `web.public_view`.
+    Read-only methods only, minus the sensitive prefixes above."""
+    if method.upper() not in ("GET", "HEAD", "OPTIONS"):
+        return False
+    import re as _re
+    p = _re.sub(r"/{2,}", "/", path or "/")
+    if p.startswith("/api/system/") and p.startswith(PUBLIC_VIEW_SYSTEM_ALLOW):
+        return True
+    for pref in PUBLIC_VIEW_DENY_PREFIXES:
+        if pref == "/api/devices/":
+            if p.startswith(pref) and (p.rstrip("/").endswith("/settings")
+                                       or "/settings/" in p):
+                return False
+            continue
+        if p == pref.rstrip("/") or p.startswith(pref):
+            return False
+    return True
+
+
 def kiosk_scope_allows(method: str, path: str) -> bool:
     """Whether a kiosk-credential request for (method, path) is permitted
     on this appliance. Read-only by construction — only safe
@@ -1307,7 +1355,7 @@ def build_app(
             method = scope.get("method", "GET").upper()
             # READONLY_PUBLIC bypass: allow GET reads on LAN without a
             # session, so kiosks-on-wifi keep working unchanged.
-            if _READONLY_PUBLIC and method in ("GET", "HEAD", "OPTIONS"):
+            if _READONLY_PUBLIC and public_view_allows(method, path):
                 await self.app(scope, receive, send)
                 return
             # Look up the session cookie.
