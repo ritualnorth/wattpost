@@ -12,6 +12,12 @@ appliance. Delivery is at-least-once and resumable:
   transit just means the same rows are sent again.
 * Failures back off exponentially with full jitter (cap 15 min) and never
   touch the local dashboard.
+* Live lease: while someone is watching the cloud dashboard, the cloud's
+  reply carries `live: {ttl_s, interval_s}`. The appliance then pushes a
+  fresh snapshot every `interval_s` seconds until the lease runs out (the
+  viewer keeps renewing it), and goes back to its normal cadence. The lease
+  is a duration, not a timestamp, so the appliance's clock doesn't matter.
+  The cloud never connects to the appliance: the appliance asks by polling.
 
 Bytes matter on cellular and Starlink links. A day of 100 metrics at
 1-minute resolution is ~144k rows; gzipped JSON with short repeated keys
@@ -39,6 +45,8 @@ BATCH_ROWS = 5000
 MAX_BATCHES_PER_RUN = 24          # ~120k rows; the rest waits for the next run
 BACKOFF_CAP_S = 15 * 60
 BACKOFF_BASE_S = 30
+LIVE_MIN_INTERVAL_S = 2           # whatever the cloud asks for, never faster than this
+LIVE_MAX_TTL_S = 300              # nor leased for longer than this per grant
 
 
 @dataclass
@@ -80,8 +88,33 @@ class RollupSync:
         self._client_factory = client_factory or (
             lambda: httpx.AsyncClient(timeout=30.0, follow_redirects=True))
         self.failures = 0
+        self._live_until_mono = 0.0     # monotonic deadline of the current lease
+        self._live_interval = 0.0
         self.last_ok_at: float | None = None
         self.last_error: str | None = None
+
+    def live_interval(self) -> float | None:
+        """Seconds between pushes while a viewer holds a lease, else None."""
+        if time.monotonic() < self._live_until_mono and self._live_interval > 0:
+            return self._live_interval
+        return None
+
+    def _note_lease(self, ack: dict) -> None:
+        live = ack.get("live")
+        if not isinstance(live, dict):
+            self._live_until_mono = 0.0
+            return
+        try:
+            ttl = min(float(live.get("ttl_s", 0)), LIVE_MAX_TTL_S)
+            interval = max(float(live.get("interval_s", 0)), LIVE_MIN_INTERVAL_S)
+        except (TypeError, ValueError):
+            self._live_until_mono = 0.0
+            return
+        if ttl <= 0:
+            self._live_until_mono = 0.0
+            return
+        self._live_until_mono = time.monotonic() + ttl
+        self._live_interval = interval
 
     async def _watermark(self, now: int) -> int:
         got = await self.store.kv_get(WATERMARK_KEY)
@@ -138,7 +171,8 @@ class RollupSync:
                     rows = await self.store.closed_rollups_after(
                         wm, now=now, limit=BATCH_ROWS)
                     devices, latest = await self._inventory()
-                    views = await self.views.due() if self.views is not None else {}
+                    views = (await self.views.due(live=self.live_interval() is not None)
+                             if self.views is not None else {})
                     if not rows and res.batches > 0:
                         res.caught_up = True
                         break
@@ -149,6 +183,7 @@ class RollupSync:
                         "rollups": rows, "latest": latest, "views": views})
                     if self.views is not None:
                         self.views.confirm(views)
+                    self._note_lease(ack)
                     res.batches += 1
                     res.sent_rows += len(rows)
                     if not rows:
@@ -197,10 +232,13 @@ class RollupSync:
                      res.sent_rows, res.batches,
                      res.error or ("caught up" if res.caught_up else "more pending"),
                      time.monotonic() - t0)
+            live = self.live_interval()
             if res.error:
                 delay = backoff_delay(self.failures)
             elif not res.caught_up:
                 delay = 1.0            # more backlog: keep draining
+            elif live is not None:
+                delay = live           # someone is watching
             else:
                 delay = period_s()
             if await wait(stop, delay):

@@ -239,3 +239,56 @@ def test_backoff_is_bounded_and_jittered():
     ceilings = [max(rs.backoff_delay(n, random.Random(i)) for i in range(200)) for n in (1, 3, 6)]
     assert ceilings[0] < ceilings[1] < ceilings[2]
     assert len({rs.backoff_delay(5, random.Random(i)) for i in range(20)}) > 10
+
+
+# ---- live lease -------------------------------------------------------------
+
+def test_lease_speeds_up_then_expires():
+    async def go():
+        st = await _store(seed_minutes=2)
+        cloud = FakeCloud()
+        sync = _sync(st, cloud)
+        assert sync.live_interval() is None
+        sync._note_lease({"live": {"ttl_s": 60, "interval_s": 5}})
+        assert sync.live_interval() == 5
+        sync._note_lease({"live": {"ttl_s": 60, "interval_s": 0.1}})     # floor
+        assert sync.live_interval() == rs.LIVE_MIN_INTERVAL_S
+        sync._note_lease({})                                              # cloud stops granting
+        assert sync.live_interval() is None
+        sync._note_lease({"live": {"ttl_s": -1, "interval_s": 5}})
+        assert sync.live_interval() is None
+        sync._note_lease({"live": {"ttl_s": "abc", "interval_s": 5}})     # junk from the cloud
+        assert sync.live_interval() is None
+        sync._note_lease({"live": {"ttl_s": 10**9, "interval_s": 5}})     # ttl is capped
+        assert sync._live_until_mono - __import__("time").monotonic() <= rs.LIVE_MAX_TTL_S + 1
+        await st.close()
+    _run(go())
+
+
+def test_loop_pushes_at_lease_interval_and_returns_to_normal():
+    async def go():
+        st = await _store(seed_minutes=2)
+        posts = []
+
+        def handler(req):
+            body = json.loads(gzip.decompress(req.content))
+            posts.append(body)
+            lease = {"live": {"ttl_s": 1.2, "interval_s": 2}} if len(posts) <= 2 else {}
+            top = max((r[0] for r in body["rollups"]), default=None)
+            return httpx.Response(200, json={"acked_through": top, **lease})
+
+        sync = rs.RollupSync(
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            backfill_hours=lambda: 1,
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        waits = []
+
+        async def fake_wait(ev, t):
+            waits.append(t)
+            return len(waits) >= 4           # stop after four sleeps
+
+        await sync.loop(asyncio.Event(), lambda: 300, sleep=fake_wait)
+        assert waits[0] == 2 and waits[1] == 2        # leased: short sleeps
+        assert waits[-1] == 300                       # lease lapsed: normal cadence
+        await st.close()
+    _run(go())

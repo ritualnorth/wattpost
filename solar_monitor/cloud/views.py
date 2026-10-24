@@ -67,10 +67,23 @@ class ViewPublisher:
                     lambda l=label: viewmodels.charger_stats(self.store, l))
         return out
 
-    async def due(self, now: float | None = None) -> dict[str, dict[str, Any]]:
+    async def due(self, now: float | None = None, *, live: bool = False) -> dict[str, dict[str, Any]]:
         """Views to upload now, as {name: body}. Call `confirm()` with the
-        returned names once the cloud has acked the batch."""
+        returned names once the cloud has acked the batch.
+
+        With `live=True` (a viewer holds a lease) only the snapshot is built:
+        it is what the dashboard animates from, and the analytics keep their
+        own slower cadence."""
         now = now if now is not None else time.time()
+        if live:
+            self._pending = {}
+            try:
+                body = await self.scheduler.build_snapshot()
+            except Exception:  # noqa: BLE001
+                log.exception("live snapshot failed to build")
+                return {}
+            self._pending["snapshot"] = _Sent("", now)
+            return {"snapshot": body}
         builders: dict[str, tuple[int, Callable[[], Awaitable[dict[str, Any]]]]] = {
             "snapshot": (SNAPSHOT_EVERY_S, self.scheduler.build_snapshot),
         }
