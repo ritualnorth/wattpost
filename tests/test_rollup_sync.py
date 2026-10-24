@@ -431,3 +431,114 @@ def test_future_watermark_does_not_silence_uploads():
         assert res.error is None and res.sent_rows == 10
         await st.close()
     _run(go())
+
+
+# ---- windowed aggregation == the old single-query result -------------------------
+
+async def _reference_closed_rollups_after(st, after_ts, *, now, limit):
+    """The pre-windowing implementation, verbatim: one GROUP BY over the whole range."""
+    newest_closed = (now // 60) * 60 - 60
+    start = (int(after_ts) // 60) * 60 + 60
+    if start > newest_closed:
+        return []
+    raw_floor = ((now - st._retention_raw_s) // 60) * 60 + 60
+    rows = []
+    if start < raw_floor:
+        async with st._db.execute(
+            "SELECT bucket_ts, device, metric, avg, min, max, n "
+            "FROM samples_1min WHERE bucket_ts >= ? AND bucket_ts < ? "
+            "ORDER BY bucket_ts, device, metric LIMIT ?",
+            (start, min(raw_floor, newest_closed + 60), limit + 1),
+        ) as cur:
+            rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
+                         async for a, b, c, d, e, f, g in cur])
+    if len(rows) <= limit and newest_closed >= raw_floor:
+        async with st._db.execute(
+            "SELECT (ts / 60) * 60 AS b, device, metric, "
+            "       AVG(value), MIN(value), MAX(value), COUNT(*) "
+            "FROM samples WHERE ts >= ? AND ts < ? "
+            "GROUP BY b, device, metric ORDER BY b, device, metric LIMIT ?",
+            (max(start, raw_floor), newest_closed + 60, limit + 1 - len(rows)),
+        ) as cur:
+            rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
+                         async for a, b, c, d, e, f, g in cur])
+    if len(rows) > limit:
+        last = rows[limit][0]
+        rows = [r for r in rows[:limit] if r[0] < last]
+        if not rows:
+            async with st._db.execute(
+                "SELECT (ts / 60) * 60 AS b, device, metric, "
+                "       AVG(value), MIN(value), MAX(value), COUNT(*) "
+                "FROM samples WHERE ts >= ? AND ts < ? "
+                "GROUP BY b, device, metric", (last, last + 60),
+            ) as cur:
+                rows = [(int(a), b, c, float(d), float(e), float(f), int(g))
+                        async for a, b, c, d, e, f, g in cur]
+    return rows
+
+
+async def _bulk_store(days, metrics, step=5, t_start=T0):
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    st = Store(path)
+    await st.open()
+    n = days * 86400 // step
+    names = [f"m{i:03d}" for i in range(metrics)]
+    batch = []
+    for k in range(n):
+        ts = t_start + k * step
+        for i, m in enumerate(names):
+            batch.append((ts, "bank", m, float((k * 7 + i) % 101)))
+        if len(batch) >= 100_000:
+            await st._db.executemany("INSERT INTO samples VALUES (?,?,?,?)", batch)
+            batch = []
+    if batch:
+        await st._db.executemany("INSERT INTO samples VALUES (?,?,?,?)", batch)
+    await st._db.commit()
+    return st
+
+
+def test_windowed_result_matches_the_single_query_result_over_days():
+    async def go():
+        st = await _bulk_store(days=3, metrics=3, step=15)
+        # make the window much narrower than the data so many windows are crossed
+        st.ROLLUP_WINDOW_S = 600
+        rng = random.Random(7)
+        now = T0 + 3 * 86400 + 1234
+        # a 1-min-table region too: roll up the first day and purge its raw rows
+        await st.rollup_and_purge(now=T0 + 86400)
+        cases = [(T0 - 60, 5000), (T0 - 60, 7), (T0 - 60, 1), (T0 + 86400, 100)]
+        cases += [(T0 + rng.randrange(0, 3 * 86400), rng.choice([1, 2, 3, 50, 999, 5000]))
+                  for _ in range(25)]
+        for after, limit in cases:
+            want = await _reference_closed_rollups_after(st, after, now=now, limit=limit)
+            got = await st.closed_rollups_after(after, now=now, limit=limit)
+            assert got == want, (after, limit)
+        # draining with the watermark protocol yields every bucket exactly once
+        seen, wm = [], T0 - 60
+        for _ in range(10_000):
+            b = await st.closed_rollups_after(wm, now=now, limit=500)
+            if not b:
+                break
+            seen += b
+            wm = b[-1][0]
+        assert len({(r[0], r[1], r[2]) for r in seen}) == len(seen)
+        full = await _reference_closed_rollups_after(st, T0 - 60, now=now, limit=10**9)
+        assert seen == full
+        await st.close()
+    _run(go())
+
+
+def test_first_batch_is_fast_with_a_day_of_5s_data_and_100_metrics():
+    import time as _t
+
+    async def go():
+        st = await _bulk_store(days=1, metrics=100, step=5)
+        now = T0 + 86400 + 120
+        t = _t.perf_counter()
+        rows = await st.closed_rollups_after(T0 - 60, now=now, limit=5000)
+        took = _t.perf_counter() - t
+        assert len(rows) == 5000
+        assert took < 1.0, f"first batch took {took:.2f}s"
+        await st.close()
+    _run(go())

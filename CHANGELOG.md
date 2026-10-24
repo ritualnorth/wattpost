@@ -118,6 +118,12 @@ Versions follow [Semantic Versioning].
 - Unpairing from the cloud (`/api/cloud/unpair`) no longer kills the
   heartbeat and telemetry loops with an `AttributeError`; they idle until
   the daemon restarts.
+- Telemetry upload no longer stalls the appliance after a long outage.
+  Building a batch of closed 1-minute rollups aggregated the whole pending
+  range before applying the row limit (about 2 s per 5 000-row batch with a
+  day of 5 s data and 100 metrics, on the shared database connection); it
+  now aggregates in 2-hour windows and stops once the batch is full (about
+  0.2 s), with identical results.
 
 ## [0.1.188] - 2026-06-16
 
