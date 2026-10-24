@@ -243,7 +243,8 @@ function copyToClipboard(text, btn) {
   }
   _legacyCopy(text) ? ok() : fail();
 }
-const _escHtmlMini = (s) => String(s).replace(/[<&>]/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;"}[c]));
+// Escapes text for HTML content AND for double- or single-quoted attribute values.
+const _escHtmlMini = (s) => String(s).replace(/[<&>"']/g, c => ({"<":"&lt;","&":"&amp;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function loadKioskTokens() {
   const host = document.getElementById("kiosk-token-list");
   if (!host) return;

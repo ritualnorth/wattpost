@@ -181,7 +181,6 @@ function renderHero() {
   //     show the model.
   //   * Standard BMS install, "3× RBT100LFP12S-G1".
   const shortModel = (bank.model || "")
-    .replace(/^RBT/, "RBT")
     .replace(/-G\d$/, "");
   $("#bank-meta").textContent = bank.packs > 0
     ? `${bank.packs}× ${shortModel}`

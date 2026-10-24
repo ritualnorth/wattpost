@@ -453,9 +453,9 @@ function _onFlowSvgClick(e) {
   if (!node) return;
   const dest = node.getAttribute("data-flow-drill");
   if (!dest) return;
-  // Hash navigation only, see drillTargetFor for why.
+  // Hash navigation only, see drillTargetFor for why. Anything else is ignored
+  // rather than assigned to location.href (a javascript: value would run).
   if (dest.startsWith("#")) location.hash = dest.slice(1);
-  else                       location.href = dest;
 }
 
 function addFlowGradient(defs, id, x1, y1, x2, y2, fromColor, toColor) {

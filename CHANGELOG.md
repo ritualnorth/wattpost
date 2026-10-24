@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Security hardening in the UI scripts flagged by CodeQL: the HTML escape used for attribute values now escapes quotes (it covered `<`, `>` and `&` only, so a USB port name or kiosk-token id containing a quote could break out of its attribute), and the power-flow click handler no longer assigns arbitrary values to `location.href`. Also removed a replace-with-itself no-op.
+
 - Fix: restart-in-place (Settings restart, restore from backup, restore from cloud) crashed with `attempted relative import with no known parent package` when the daemon had been started with `python -m solar_monitor.cli`, because the re-exec rebuilt the command line from `sys.argv`. It now re-runs the interpreter with its original arguments (`sys.orig_argv`). The packaged `solar-monitor` script was unaffected.
 
 - Internal: the 12,400-line `web/app.js` is now 14 plain scripts under `web/js/` (largest 1,459 lines), loaded in order by `index.html` and precached by the service worker. No behaviour change. The package data now includes `web/js/`, the vendored Leaflet files and the font (the Leaflet map and font were missing from wheel installs), and a test fails if a page loads an asset the wheel would not ship.
