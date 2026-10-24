@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Fix: restart-in-place (Settings restart, restore from backup, restore from cloud) crashed with `attempted relative import with no known parent package` when the daemon had been started with `python -m solar_monitor.cli`, because the re-exec rebuilt the command line from `sys.argv`. It now re-runs the interpreter with its original arguments (`sys.orig_argv`). The packaged `solar-monitor` script was unaffected.
+
 - History charts now show the range you picked. The Energy chart and the Detailed metrics chart fitted their x-axis to whatever data existed, so "30 days" with an hour of history drew an hour-wide axis and a new site looked like it had a month of data. The axis now covers the requested window, with the data sitting where it belongs inside it.
 
 - Fix: a newly paired appliance refused every cloud command. The cloud's per-appliance callback URL (`<slug>.wattpost.cloud`) failed the same-host check added with the OIDC URL validation, and that check discarded the whole config including the JWKS URL commands are verified against. Only the JWKS and discovery URLs must be on the cloud host now; the callback may be a subdomain, and if it fits neither it is blanked instead of taking the JWKS with it. The signing-key pin is also tied to the cloud's host, so re-pairing to a different cloud no longer inherits the old cloud's pin.

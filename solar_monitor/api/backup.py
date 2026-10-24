@@ -12,13 +12,13 @@ back to where I was".
 from __future__ import annotations
 
 from ..fsutil import atomic_write_text as _atomic_write_text
+from ..procutil import reexec
 import asyncio
 import io
 import logging
 import os
 import shutil
 import sqlite3
-import sys
 import tarfile
 import tempfile
 import time
@@ -604,7 +604,7 @@ async def import_backup(
                 await scheduler.stop()
         except Exception:
             log.exception("scheduler stop failed before restart")
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        reexec()
 
     asyncio.create_task(_delayed_exec())
 
@@ -1045,7 +1045,7 @@ async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
                 await scheduler.stop()
         except Exception:
             log.exception("scheduler stop failed before cloud-restore exec")
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        reexec()
 
     asyncio.create_task(_delayed_exec())
     return {
