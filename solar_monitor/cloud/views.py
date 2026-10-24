@@ -22,6 +22,9 @@ from typing import Any, Awaitable, Callable
 
 from .. import viewmodels
 from ..api.energy import compute_energy
+from ..api.forecast_admin import build_forecast_accuracy, build_pv_forecast
+from ..api.weather_admin import build_current_weather
+from ..api.weather_history import build_weather_history
 
 log = logging.getLogger(__name__)
 
@@ -29,6 +32,10 @@ SNAPSHOT_EVERY_S = 0            # every sync
 ANALYTICS_EVERY_S = 15 * 60     # battery health, heatmap, runtime, per-device stats
 BUILDER_TIMEOUT_S = 20          # one slow view must not stall the whole sync
 ENERGY_TODAY_EVERY_S = 5 * 60   # the "Energy today" chart moves faster than the rest
+MAX_VIEWS_PER_BATCH = 32        # the cloud's ingest limit; the rest wait for the next sync
+FORECAST_EVERY_S = 30 * 60      # PV forecast + yesterday's accuracy move slowly
+WEATHER_CURRENT_EVERY_S = 10 * 60
+WEATHER_HISTORY_EVERY_S = 30 * 60   # each build is an Open-Meteo call, one per range
 
 # The History page's range buttons: bucket size (seconds) -> span (None = midnight to now).
 # Mirrors ENERGY_RANGES in web/app.js; the cloud serves /api/energy/today?bucket=N from
@@ -102,9 +109,29 @@ class ViewPublisher:
                     self.store, since=(int(time.time()) - sp) if sp else None, bucket=b),
             )
 
+        # Forecast and weather panels. Each reuses the builder behind the
+        # appliance's own /api endpoint; when the integration is not set up
+        # the builder returns its "nothing here" shape, which the cloud
+        # serves as-is (so removing an integration also clears the panel).
+        config = getattr(self.scheduler, "config", None)
+        builders["forecast/pv"] = (FORECAST_EVERY_S, lambda: build_pv_forecast(self.store))
+        if config is not None:
+            builders["forecast/accuracy"] = (
+                FORECAST_EVERY_S, lambda: build_forecast_accuracy(config, self.store, 1))
+        builders["weather/current"] = (
+            WEATHER_CURRENT_EVERY_S, lambda: build_current_weather(self.store))
+        if config is not None:
+            wcfg = config.weather
+            for bucket, span in ENERGY_RANGES.items():
+                builders[f"weather/history/b{bucket}"] = (
+                    WEATHER_HISTORY_EVERY_S,
+                    lambda b=bucket, sp=span, w=wcfg: _weather_history(config, self.store, b, sp, w))
+
         out: dict[str, dict[str, Any]] = {}
         self._pending: dict[str, _Sent] = {}
         for name, (every, fn) in builders.items():
+            if len(out) >= MAX_VIEWS_PER_BATCH:
+                break
             prev = self._sent.get(name)
             if prev is not None and every and now - prev.at < every:
                 continue
@@ -139,6 +166,16 @@ class ViewPublisher:
         for n in names:
             if n in self._pending:
                 self._sent[n] = self._pending[n]
+
+
+async def _weather_history(config, store, bucket: int, span: int | None, wcfg) -> dict[str, Any]:
+    """The Energy chart's cloud-cover overlay for one range button. Without a
+    weather location there is no series to send, so skip the (large) empty
+    grid and say so."""
+    if wcfg is None or wcfg.lat is None or wcfg.lon is None:
+        return {"configured": False, "available": False, "series": {"ts": [], "cloud_cover_pct": []}}
+    since = (int(time.time()) - span) if span else None
+    return await build_weather_history(config, store, since=since, bucket=bucket)
 
 
 def _stable(body: dict[str, Any]) -> dict[str, Any]:

@@ -70,30 +70,17 @@ def _save_config(config_path: str, mutator) -> None:
 
 # ---------- routes ----------
 
-@get("/api/forecast/accuracy")
-async def get_forecast_accuracy(
-    state: State,
-    day_offset: int = 1,
+async def build_forecast_accuracy(
+    config: Config, store: Store, day_offset: int = 1,
 ) -> dict[str, Any]:
     """Compare a past day's PV forecast against the actual energy the
-    charge_controller(s) recorded.
+    charge_controller(s) recorded. Shared by the HTTP route below and the
+    cloud view publisher (cloud/views.py).
 
-    `day_offset=1` (default) = yesterday; 2 = day-before-yesterday, etc.
-    Capped at 30 to match the forecast_history retention window.
-
-    The endpoint never errors when there's no data, it returns a
-    `{ok: false}` shape that the UI treats as "hide this widget."
+    `day_offset=1` = yesterday; 2 = day-before-yesterday, etc. Callers
+    validate the 1..30 range. Never raises when there's no data, it returns
+    a `{ok: false}` shape that the UI treats as "hide this widget."
     """
-    from ..storage.sqlite import Store
-    config: Config = state["config"]
-    store: Store = state["store"]
-
-    if day_offset < 1 or day_offset > 30:
-        raise HTTPException(
-            status_code=400,
-            detail="day_offset must be between 1 and 30",
-        )
-
     # Local-midnight of the target day. Done server-side so timezone
     # interpretation matches the SQL we wrote against the same
     # timestamps in the maintenance + archive paths.
@@ -117,12 +104,22 @@ async def get_forecast_accuracy(
     return {"ok": True, **result}
 
 
-@get("/api/forecast/pv")
-async def get_pv_forecast(state: State) -> dict[str, Any]:
-    """Return the latest cached forecast or a 204-shaped empty payload.
-    The UI treats `points: []` as "not configured / not fetched yet"
-    so the History overlay code can render cleanly without a forecast."""
-    store: Store = state["store"]
+@get("/api/forecast/accuracy")
+async def get_forecast_accuracy(
+    state: State,
+    day_offset: int = 1,
+) -> dict[str, Any]:
+    """Capped at 30 to match the forecast_history retention window."""
+    if day_offset < 1 or day_offset > 30:
+        raise HTTPException(
+            status_code=400,
+            detail="day_offset must be between 1 and 30",
+        )
+    return await build_forecast_accuracy(state["config"], state["store"], day_offset)
+
+
+async def build_pv_forecast(store: Store) -> dict[str, Any]:
+    """Latest cached forecast or the empty shape. Shared with cloud/views.py."""
     cached = await store.kv_get(CACHE_KEY)
     if cached is None:
         return {"points": [], "fetched_at": None, "provider": None}
@@ -135,6 +132,14 @@ async def get_pv_forecast(state: State) -> dict[str, Any]:
         return {"points": [], "fetched_at": None, "provider": None}
     payload.setdefault("fetched_at", updated_at)
     return payload
+
+
+@get("/api/forecast/pv")
+async def get_pv_forecast(state: State) -> dict[str, Any]:
+    """Return the latest cached forecast or a 204-shaped empty payload.
+    The UI treats `points: []` as "not configured / not fetched yet"
+    so the History overlay code can render cleanly without a forecast."""
+    return await build_pv_forecast(state["store"])
 
 
 def forecast_config_view(config: Config) -> dict[str, Any]:
