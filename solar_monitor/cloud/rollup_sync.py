@@ -45,6 +45,7 @@ BATCH_ROWS = 5000
 MAX_BATCHES_PER_RUN = 24          # ~120k rows; the rest waits for the next run
 BACKOFF_CAP_S = 15 * 60
 BACKOFF_BASE_S = 30
+SWITCH_POLL_S = 10                # how often a sleeping loop re-reads the Settings switch
 LIVE_MIN_INTERVAL_S = 2           # whatever the cloud asks for, never faster than this
 LIVE_MAX_TTL_S = 300              # nor leased for longer than this per grant
 
@@ -214,17 +215,28 @@ class RollupSync:
         sleep: Callable[[asyncio.Event, float], Awaitable[bool]] | None = None,
     ) -> None:
         async def _wait(ev: asyncio.Event, t: float) -> bool:
-            try:
-                await asyncio.wait_for(ev.wait(), timeout=t)
-                return True
-            except asyncio.TimeoutError:
-                return False
+            """Sleep up to `t` seconds, but in slices, waking early when the
+            Settings switch flips so turning uploads back on takes effect
+            within seconds instead of at the end of the (up to 60 min) period."""
+            was = self._enabled()
+            left = t
+            while left > 0:
+                step = min(left, SWITCH_POLL_S)
+                try:
+                    await asyncio.wait_for(ev.wait(), timeout=step)
+                    return True
+                except asyncio.TimeoutError:
+                    pass
+                left -= step
+                if self._enabled() != was:
+                    return False
+            return False
         wait = sleep or _wait
         while not stop.is_set():
             if not self._enabled():
                 # Uploads switched off: do nothing, but keep checking so
                 # switching them back on takes effect without a restart.
-                if await wait(stop, 15.0):
+                if await wait(stop, SWITCH_POLL_S):
                     return
                 continue
             t0 = time.monotonic()

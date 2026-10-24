@@ -314,7 +314,47 @@ def test_uploads_switched_off_send_nothing_and_resume_when_switched_on():
             return len(waits) >= 4
 
         await sync.loop(asyncio.Event(), lambda: 300, sleep=fake_wait)
-        assert waits[:2] == [15.0, 15.0]     # off: only polling the switch
+        assert waits[:2] == [rs.SWITCH_POLL_S, rs.SWITCH_POLL_S]   # off: only polling the switch
         assert len(cloud.batches) >= 1       # on: uploads resume, no restart needed
+        await st.close()
+    _run(go())
+
+
+def test_switching_uploads_back_on_wakes_a_sleeping_loop_quickly():
+    """The loop sleeps for the whole upload period (minutes). It must notice the
+    Settings switch flipping without waiting that period out."""
+    import time as _t
+
+    async def go():
+        st = await _store(seed_minutes=2)
+        cloud = FakeCloud()
+        flag = {"on": False}
+        old = rs.SWITCH_POLL_S
+        rs.SWITCH_POLL_S = 0.05
+        try:
+            sync = rs.RollupSync(
+                store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
+                sign=lambda b: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+                enabled=lambda: flag["on"],
+                client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
+            stop = asyncio.Event()
+            task = asyncio.create_task(sync.loop(stop, lambda: 300))     # 5 min period
+            await asyncio.sleep(0.2)
+            assert cloud.batches == []                                    # off: nothing sent
+            t0 = _t.monotonic()
+            flag["on"] = True
+            while not cloud.batches and _t.monotonic() - t0 < 3:
+                await asyncio.sleep(0.05)
+            assert cloud.batches, "never resumed"
+            assert _t.monotonic() - t0 < 1.5
+            # and switching off while it sleeps the long period just stops further sends
+            sent = len(cloud.batches)
+            flag["on"] = False
+            await asyncio.sleep(0.3)
+            stop.set()
+            await asyncio.wait_for(task, 2)
+            assert len(cloud.batches) <= sent + 1
+        finally:
+            rs.SWITCH_POLL_S = old
         await st.close()
     _run(go())
