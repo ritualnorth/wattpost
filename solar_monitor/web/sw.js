@@ -18,7 +18,7 @@
 // the inner cache-busters (?v=NN) don't help if the cached index.html
 // itself is what's stale. Suffix corresponds to the current app.js
 // version so future-me can see at a glance what's pinned.
-const CACHE_VERSION = 'wattpost-v181-app287-css192';
+const CACHE_VERSION = 'wattpost-v182-app288-css193';
 const SHELL = [
   '/',
   '/web/styles.css',
@@ -76,8 +76,7 @@ self.addEventListener('fetch', (event) => {
   // Navigation requests: network-first. A cache-first navigation hands
   // the browser the *previous* index.html, which references the
   // *previous* app.js?v=N cache-buster, which is also still cached,
-  // so a stale shell self-perpetuates and any client-side fix (like
-  // the broker-view SSE skip) never reaches the device. Going to
+  // so a stale shell self-perpetuates and any client-side fix never reaches the device. Going to
   // network first means an online client always gets the latest shell;
   // the cached copy survives only as the offline fallback.
   if (request.mode === 'navigate') {

@@ -32,7 +32,6 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 #     with network_mode: host).
 #   - libffi8: argon2-cffi runtime.
 #   - ca-certificates: HTTPS to alert webhooks / Solcast / Open-Meteo.
-#   - curl: only needed to fetch cloudflared in the next layer.
 #   - network-manager: the `nmcli` client for the WiFi hotspot
 #     (appliance-as-AP). In host-network + /run/dbus-mount mode it
 #     drives the host's NetworkManager; the in-container NM daemon is
@@ -40,7 +39,7 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 #   - iw: best-effort connected-client count for the hotspot status.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-        bluez bluez-tools libffi8 ca-certificates dbus curl \
+        bluez bluez-tools libffi8 ca-certificates dbus \
         network-manager iw \
  && rm -rf /var/lib/apt/lists/*
 
@@ -51,20 +50,6 @@ RUN apt-get update \
 # bare "could not reach". Pin IPv4 ahead of IPv6 in the resolver; v6-only
 # destinations still use v6. Mirrors packaging/install.sh on the Pi image.
 RUN echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
-
-# cloudflared — Cloudflare Tunnel client. Used by the paired-cloud
-# flow to expose this appliance's dashboard at <slug>.wattpost.io
-# without the user having to port-forward or run a reverse proxy.
-# Pi installs get it from the SD image's apt setup; for Docker we
-# pin a known-good static binary so the tunnel feature works
-# identically across both deployment types. Architecture detected
-# from dpkg so the multi-arch image picks the right one.
-ARG CLOUDFLARED_VERSION=2024.12.2
-RUN ARCH=$(dpkg --print-architecture) \
- && curl -fsSL -o /usr/local/bin/cloudflared \
-      "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-${ARCH}" \
- && chmod +x /usr/local/bin/cloudflared \
- && /usr/local/bin/cloudflared --version
 
 WORKDIR /app
 

@@ -81,8 +81,7 @@ up on a manually-installed Pi.
 | `python3`, `python3-venv`, `python3-pip` | apt: pi-gen's `00-packages` | Daemon runtime |
 | `bluez`, `bluez-tools`, `bluetoothctl`   | apt: pi-gen's `00-packages` | BLE comms with Renogy / Victron / JK-BMS dongles + the BlueZ-disconnect fallback in `transport/ble_modbus.py` |
 | `ca-certificates`       | apt: pi-gen's `00-packages` | TLS verification on every outbound HTTPS call (Solcast, Open-Meteo, cloud) |
-| `curl`, `gnupg`, `lsb-release` | apt: pi-gen's `00-packages` | Required by `install.sh` to add Cloudflare's signed apt repo |
-| `cloudflared`           | apt: `install.sh` adds Cloudflare's signed repo, then `apt install cloudflared` | Cloud tunnel that exposes the local dashboard at `<slug>.wattpost.io` once the appliance is paired and the cloud has provisioned a tunnel |
+| `curl`, `gnupg`, `lsb-release` | apt: pi-gen's `00-packages` | General tooling used by `install.sh` |
 | `wattpost` daemon       | pip: `install.sh` does `pip install -e ${WATTPOST_SOURCE}` into `/opt/wattpost/venv` | The appliance itself |
 | `wattpost.service`      | `install.sh` drops a unit at `/etc/systemd/system/wattpost.service` | systemd lifecycle |
 | `/etc/wattpost/config.yaml` | Seeded from `config.example.yaml` (only on fresh install — re-runs preserve) | User config |
@@ -93,7 +92,7 @@ up on a manually-installed Pi.
 
 The full requirements set is the union of:
 - `packaging/pi-gen/stage-wattpost/01-install/00-packages` (apt)
-- `packaging/install.sh` (Cloudflare apt repo + cloudflared)
+- `packaging/install.sh`
 - `pyproject.toml`'s `[project] dependencies` block (pip)
 
 If any new daemon-side capability needs a system package or a CLI

@@ -34,6 +34,9 @@ log = logging.getLogger(__name__)
 class CloudConfigPayload(msgspec.Struct, kw_only=True):
     endpoint:          str = "https://wattpost.cloud"
     heartbeat_minutes: int = 5
+    # Telemetry upload (history for the cloud dashboard). None = leave as is.
+    telemetry_sync:    bool | None = None
+    telemetry_minutes: int | None = None
 
 
 class PairPayload(msgspec.Struct, kw_only=True):
@@ -67,6 +70,8 @@ def cloud_config_view(config: Config) -> dict[str, Any]:
             "configured":        False,
             "endpoint":          c.endpoint if c else "https://wattpost.cloud",
             "heartbeat_minutes": c.heartbeat_minutes if c else 5,
+            "telemetry_sync":    c.telemetry_sync if c else True,
+            "telemetry_minutes": c.telemetry_minutes if c else 5,
             "appliance_id":      None,
             "label":             "",
         }
@@ -74,17 +79,12 @@ def cloud_config_view(config: Config) -> dict[str, Any]:
         "configured":        True,
         "endpoint":          c.endpoint,
         "heartbeat_minutes": c.heartbeat_minutes,
+        "telemetry_sync":    c.telemetry_sync,
+        "telemetry_minutes": c.telemetry_minutes,
         "appliance_id":      c.appliance_id,
         "label":             c.label,
         # Token is intentionally masked, the UI never gets the real one.
         "bearer_token":      "****",
-        # Tunnel surface: hostname is shown on Integrations so the
-        # operator can copy/click it; tunnel_enabled is true once a
-        # token has been issued at pair time (CF creds were configured
-        # on the cloud), false for older/legacy pairings that need a
-        # re-pair to pick up a token.
-        "tunnel_enabled":    bool(c.tunnel_token),
-        "tunnel_hostname":   c.tunnel_hostname or None,
     }
 
 
@@ -110,35 +110,39 @@ async def update_cloud_config(
         raise HTTPException(
             status_code=400, detail="endpoint must be http(s) URL",
         )
+    if data.telemetry_minutes is not None and not (1 <= data.telemetry_minutes <= 60):
+        raise HTTPException(
+            status_code=400, detail="telemetry_minutes must be between 1 and 60",
+        )
     existing = config.cloud
-    # IMPORTANT: preserve every existing field on edit. Earlier
-    # versions of this handler only carried bearer_token + appliance_id
-    # + label across, which silently wiped tunnel_token,
-    # tunnel_hostname, and sso_secret every time the user clicked
-    # Save in Settings → Cloud. Seen after a v0.0.38 pull:
-    # heartbeat populated sso_secret, then Settings-save reset it,
-    # then SSO redirects failed with 401 because the appliance had
-    # no key to verify against.
-    new_c = CloudCfg(
-        endpoint=data.endpoint,
-        bearer_token=existing.bearer_token if existing else "",
-        appliance_id=existing.appliance_id if existing else None,
-        label=existing.label if existing else "",
-        heartbeat_minutes=data.heartbeat_minutes,
-        tunnel_token=existing.tunnel_token if existing else "",
-        tunnel_hostname=existing.tunnel_hostname if existing else "",
-        sso_secret=existing.sso_secret if existing else "",
-        kiosk_token=existing.kiosk_token if existing else "",
-    )
+    # IMPORTANT: preserve every existing field on edit. `replace` keeps
+    # every field we aren't changing, including ones added after this
+    # handler was written. (Hand-copying fields here is how the
+    # telemetry settings once got silently reset.)
+    changes: dict[str, Any] = {
+        "endpoint": data.endpoint,
+        "heartbeat_minutes": data.heartbeat_minutes,
+    }
+    if data.telemetry_sync is not None:
+        changes["telemetry_sync"] = data.telemetry_sync
+    if data.telemetry_minutes is not None:
+        changes["telemetry_minutes"] = data.telemetry_minutes
+    new_c = msgspec.structs.replace(
+        existing if existing is not None else CloudCfg(), **changes)
     config.cloud = new_c
 
     def _mutate(raw):
         raw["cloud"] = _serialize_cloud(new_c)
         return raw
     _save_config(config_path, _mutate)
-    log.info("cloud config updated (endpoint=%s, every %dm)",
-             new_c.endpoint, new_c.heartbeat_minutes)
-    return {"ok": True, "restart_required": True}
+    log.info("cloud config updated (endpoint=%s, every %dm, telemetry=%s/%dm)",
+             new_c.endpoint, new_c.heartbeat_minutes,
+             "on" if new_c.telemetry_sync else "off", new_c.telemetry_minutes)
+    # The telemetry settings are read live by the sync loop; only the endpoint
+    # and heartbeat cadence need a restart to take effect.
+    restart = (existing is None or existing.endpoint != new_c.endpoint
+               or existing.heartbeat_minutes != new_c.heartbeat_minutes)
+    return {"ok": True, "restart_required": restart}
 
 
 @post("/api/cloud/pair")
@@ -178,20 +182,15 @@ async def pair_appliance(
         raise HTTPException(status_code=502, detail=f"pairing failed: {detail}")
 
     body = r.json()
-    new_c = CloudCfg(
+    # Start from the existing config so a re-pair keeps everything it does not
+    # own (heartbeat cadence, telemetry settings, kiosk token so share URLs
+    # survive). Only the credentials the cloud just issued are replaced.
+    new_c = msgspec.structs.replace(
+        config.cloud if config.cloud else CloudCfg(),
         endpoint=data.endpoint,
         bearer_token=body["bearer_token"],
         appliance_id=body.get("appliance_id"),
         label=body.get("label") or "",
-        heartbeat_minutes=(config.cloud.heartbeat_minutes if config.cloud else 5),
-        tunnel_token=body.get("tunnel_token") or "",
-        tunnel_hostname=body.get("tunnel_hostname") or "",
-        sso_secret=body.get("sso_secret") or "",
-        # Preserve kiosk_token across a re-pair so existing share
-        # URLs don't break. If the previous CloudCfg had one set,
-        # carry it forward; otherwise load_config will generate
-        # one lazily on the next start.
-        kiosk_token=(config.cloud.kiosk_token if config.cloud else ""),
     )
     config.cloud = new_c
 
@@ -201,7 +200,7 @@ async def pair_appliance(
     _save_config(config_path, _mutate)
     log.info("paired with cloud (appliance_id=%s)", new_c.appliance_id)
 
-    # Hot-start the cloud + tunnel services in the live daemon so the
+    # Hot-start the cloud service in the live daemon so the
     # first heartbeat fires NOW, not after a manual restart. Previously
     # the only way to "complete" pairing was to restart wattpost,
     # confusing UX since the user already clicked Save. We still flag
@@ -221,7 +220,7 @@ async def pair_appliance(
 
 
 async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
-    """Spin up CloudService + TunnelService against the live scheduler
+    """Spin up CloudService against the live scheduler
     after a successful pair. Returns True iff at least the heartbeat
     service is up; False (with a logged exception) tells the caller to
     still ask the user to restart.
@@ -230,7 +229,6 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
     pull in the full scheduler graph."""
     try:
         from ..cloud.service import CloudService
-        from ..tunnel.service import TunnelService
     except Exception:
         log.exception("hot-start: failed to import service modules")
         return False
@@ -256,20 +254,6 @@ async def _hot_start_cloud(scheduler, cfg: CloudCfg) -> bool:
     except Exception:
         log.exception("hot-start: cloud heartbeat service failed to start")
         return False
-    # Tunnel, best-effort; success here is bonus, not required.
-    try:
-        if TunnelService.is_available(cfg):
-            old_t = getattr(scheduler, "_tunnel", None)
-            if old_t is not None:
-                try:
-                    await old_t.stop()
-                except Exception:
-                    log.warning("hot-start: stopping old tunnel raised", exc_info=True)
-            t = TunnelService(cfg)
-            scheduler._tunnel = t
-            await t.start()
-    except Exception:
-        log.exception("hot-start: tunnel service failed to start (non-fatal)")
     log.info("hot-start: cloud heartbeat live without daemon restart")
     return True
 
@@ -324,7 +308,7 @@ def persist_cloud_cfg(cfg: CloudCfg, config_path: str | None = None) -> None:
     """Background-write helper. Looks up the active config.yaml path
     (the daemon's --config arg) and rewrites it with the serialised
     `cfg`. Used by the cloud heartbeat service when the cloud pushes
-    a new sso_secret to a not-yet-migrated appliance.
+    new pairing state (e.g. a changed label or telemetry settings).
 
     `config_path` overrides the path lookup; defaults to the
     environment variable WATTPOST_CONFIG which the systemd unit /
@@ -337,22 +321,16 @@ def persist_cloud_cfg(cfg: CloudCfg, config_path: str | None = None) -> None:
     _save_config(path, _mutate)
 
 
+_CLOUD_ALWAYS = ("endpoint", "bearer_token", "appliance_id", "label", "heartbeat_minutes")
+
+
 def _serialize_cloud(c: CloudCfg) -> dict[str, Any]:
-    out: dict[str, Any] = {
-        "endpoint":          c.endpoint,
-        "bearer_token":      c.bearer_token,
-        "appliance_id":      c.appliance_id,
-        "label":             c.label,
-        "heartbeat_minutes": c.heartbeat_minutes,
+    """Every CloudCfg field, so a field added later is persisted without
+    anyone remembering to list it here. Fields still at their default are
+    left out (keeps config.yaml free of empty placeholders) except the core
+    pairing fields, which are always written."""
+    defaults = msgspec.structs.asdict(CloudCfg())
+    return {
+        k: v for k, v in msgspec.structs.asdict(c).items()
+        if k in _CLOUD_ALWAYS or v != defaults[k]
     }
-    # Only persist tunnel fields when they're set, keeps existing
-    # config.yaml files free of empty placeholders.
-    if c.tunnel_token:
-        out["tunnel_token"]    = c.tunnel_token
-    if c.tunnel_hostname:
-        out["tunnel_hostname"] = c.tunnel_hostname
-    if c.sso_secret:
-        out["sso_secret"]      = c.sso_secret
-    if c.kiosk_token:
-        out["kiosk_token"]     = c.kiosk_token
-    return out

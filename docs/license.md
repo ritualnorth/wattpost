@@ -31,8 +31,8 @@ grant.
 
 ## The cloud tier
 
-The code at `wattpost.cloud` (multi-site dashboard, heartbeat ingest,
-Cloudflare tunnel provisioning, REST API server, billing) is **not**
+The code at `wattpost.cloud` (multi-site dashboard, heartbeat and telemetry ingest,
+REST API server, billing) is **not**
 distributed and **not** covered by this licence. It's private to
 Ritual North. This licence covers the appliance in this repository only.
 

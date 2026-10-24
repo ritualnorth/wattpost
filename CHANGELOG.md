@@ -8,6 +8,86 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+### Removed
+- **The Cloudflare tunnel.** The appliance no longer runs `cloudflared`, and
+  `<slug>.wattpost.cloud` no longer proxies to your dashboard. The
+  `solar_monitor/tunnel/` package, the `cloudflared` install in `install.sh`
+  and the Docker image, and the "Tunnel" line in the MOTD are gone.
+- **Cloud-to-appliance sign-in.** The `/sso` route, the signed
+  `X-WP-Broker-Auth` header, "SSO" and "broker" session origins, the
+  tunnel-only login page and the broker-auth diagnostics ring
+  (`/api/diagnostics/broker-auth`) are removed, along with the cloud kiosk
+  "broker scope" handling. The kiosk allow-list now only serves LAN kiosk
+  tokens and kiosk sessions.
+- **Config keys** `cloud.tunnel_token`, `cloud.tunnel_hostname` and
+  `cloud.sso_secret`. An existing `config.yaml` that still has them loads
+  fine: the keys are ignored, scrubbed from the file on load, and never
+  written back.
+- Heartbeat field `local_port` and the deprecated `kiosk_token` extra, which
+  only existed to route the tunnel and build broker share URLs.
+- `tunnel_enabled` / `tunnel_hostname` from `GET /api/cloud/config`.
+
+### Changed
+- **Cloud push model.** Remote access now means wattpost.cloud shows a copy of
+  the data the appliance pushes to it (heartbeat plus 1-minute telemetry
+  rollups and a few summary views), rendered with the same UI. The appliance
+  never accepts inbound connections from the cloud. The cloud view is
+  read-only; settings and setup stay on the appliance. Telemetry upload can be
+  turned off in Settings (`cloud.telemetry_sync`) while staying paired.
+- **Loopback trust is stricter.** A request from `127.0.0.1` / `::1` is only
+  treated as local when it carries no reverse-proxy headers
+  (`X-Forwarded-*`, `X-Real-IP`, `Forwarded`, `CF-*`). Previously only the
+  Cloudflare headers were checked. LAN auth, kiosk tokens and the first-run
+  password flow are unchanged.
+- Docs and README no longer claim "your data never leaves your network": the
+  appliance is local-first and works fully with no account, but once paired it
+  pushes telemetry to your wattpost.cloud account.
+
+### Added
+- **Telemetry push.** A paired appliance uploads closed 1-minute rollups
+  (avg/min/max/count per device and metric), its device list, latest values
+  and a few finished view-models (snapshot, battery health, load heatmap,
+  runtime forecast, per-device lifetime/efficiency/charger stats, energy
+  ranges) to wattpost.cloud. Uploads are gzipped, ed25519-signed, resumable
+  after a restart or a long outage (watermark kept locally), idempotent on the
+  cloud side, and back off with jitter when the link is bad.
+- **Live view.** While someone has the cloud dashboard open, the cloud asks
+  the appliance (in its reply to an upload it already makes) to push a
+  snapshot every few seconds. The lease is a duration and lapses on its own;
+  the appliance never accepts a connection from the cloud.
+- **Settings -> Integrations -> Cloud**: a switch to stop uploading history
+  (and the upload cadence). Takes effect immediately; the heartbeat and
+  command channel stay on.
+- **Cloud view mode** in the web UI (`window.WP_CLOUD`): the same dashboard,
+  read-only, with staleness measured against the snapshot's own time.
+- Tests for the vendor drivers (fuzzed register contents, known-answer Rover
+  and Modbus vectors, poll-level failure handling).
+
+### Security
+- **Cloud commands must be signed.** Previously a command with no signature
+  was accepted ("grandfathered"), which is exactly what someone with write
+  access to the cloud database could queue (`update`, `restore_from_cloud`).
+  Unsigned commands, commands older than 7 days or dated in the future, and
+  commands that already completed (remembered across restarts) are refused.
+  Signatures now cover a domain tag so they cannot be confused with anything
+  else the cloud's key signs. The cloud must be updated alongside.
+
+### Fixed
+- **"Into battery" was roughly doubled** on any rig with both a shunt and
+  BMS packs: the flow model summed the shunt and every pack. It now uses the
+  bank aggregate (one authoritative source), matching the hero ring.
+- **Modbus replies of the wrong shape.** `verify_response` accepted a
+  CRC-clean reply of the wrong length or with a byte count that disagreed with
+  the frame; the parser then indexed past its data and the resulting
+  `IndexError` escaped `poll()`. Replies must now match the request, and a
+  parser that crashes anyway is contained to its section.
+- **Settings-save and re-pair dropped config fields** added after those
+  handlers were written (they copied `CloudCfg` field by field).
+- The device-settings API's error paths raised `NameError` (missing
+  `HTTPException` import) instead of returning a 4xx.
+- Fresh installs returned 500 on every request when `multidict` 7 was
+  resolved (pinned `<6.7`; Litestar 2.25 cannot build `Headers` with it).
+
 ## [0.1.188] - 2026-06-16
 
 ### Fixed

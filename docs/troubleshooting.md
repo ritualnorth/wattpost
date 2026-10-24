@@ -47,16 +47,16 @@ On the Pi's console, or over SSH if you enabled it in Pi Imager (logging in with
 
 Lost SSH too? Re-flash the SD image, copy your `config.yaml` and `solar-monitor.db` back. The cloud pairing is preserved.
 
-## "Tunnel URL is dead / 404"
+## "Cloud dashboard shows Offline or stale data"
 
-The Cloudflare tunnel needs the appliance to be online and `cloudflared` running. Check with:
+The cloud dashboard is a copy of what the appliance last pushed, so it needs the appliance to be online and able to reach `wattpost.cloud` over outbound HTTPS. Check with:
 
 ```
 sudo systemctl status wattpost
-ps aux | grep cloudflared
+journalctl -u wattpost | grep -i cloud
 ```
 
-If cloudflared is missing entirely, run install.sh again. It apt-installs the package. If it's running but the URL still 404s, the cloud's tunnel config got out of sync; unpair + re-pair to reissue.
+If the daemon is running but the cloud still looks stale, confirm the appliance has internet access and that **Settings → Integrations → WattPost cloud** shows it as paired and telemetry sync is on. Unpair + re-pair if the pairing got out of sync.
 
 ## "Setting forecast / weather but no data"
 

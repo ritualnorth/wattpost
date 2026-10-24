@@ -62,38 +62,15 @@ def _proc_uptime_seconds() -> float | None:
 
 
 @get("/api/system/auth-status")
-async def auth_status(request: Request, state: State) -> dict[str, Any]:
-    """Read-only signal of whether the current request is authed,
-    and by what mechanism. Three positive cases:
+async def auth_status(request: Request) -> dict[str, Any]:
+    """Read-only signal of whether the current request carries a valid
+    local session cookie (set by /api/login after a password sign-in,
+    or by /api/kiosk/claim for a read-only kiosk session).
 
-      1. Local session cookie, set by /api/login after a password
-         sign-in. origin="local".
-      2. SSO session cookie, set by /sso after a cloud-minted token
-         (e.g. dashboard "Open" button → broker-redirect-with-token).
-         origin="sso".
-      3. Broker HMAC header, every request via the cloud broker
-         (<slug>.wattpost.cloud) carries X-WP-Broker-Auth signed by
-         the per-appliance sso_secret. Stateless, per-request.
-         origin="broker".
-
-    The SPA uses this to gate Settings/Setup (skip the bounce-to-
-    /login redirect when the request is already broker-authed) and
-    to decide whether to show a Sign Out button.
-
-    Required for cloud broker UX: without case 3, broker-authed
-    users would be bounced to /login by the SPA gate, hit a dead
-    end (login-tunnel.html says "sign in via wattpost.cloud"), and
-    be stuck.
+    The SPA uses this to gate Settings/Setup and to decide whether to
+    show a Sign Out button.
     """
     from .. import web_auth as _wa
-    # Broker first: cheap header check, no DB roundtrip.
-    broker_header = request.headers.get("x-wp-broker-auth")
-    if broker_header:
-        cfg = state.get("config") if hasattr(state, "get") else state["config"]
-        sso = (cfg.cloud.sso_secret if (cfg and cfg.cloud) else "") or ""
-        if sso and _wa.verify_broker_auth(broker_header, sso):
-            return {"authed": True, "origin": "broker"}
-    # Cookie-based session (local password OR cloud SSO redirect).
     token = request.cookies.get(_wa.SESSION_COOKIE_NAME)
     if not token:
         return {"authed": False, "origin": None, "first_run": _wa.is_first_run()}
@@ -107,7 +84,7 @@ async def auth_status(request: Request, state: State) -> dict[str, Any]:
 
 
 _SECRET_KEYS = {
-    "bearer_token", "tunnel_token", "sso_secret",
+    "bearer_token",
     "api_key", "secret", "password", "smtp_password",
     "vapid_private_key",
 }
@@ -185,7 +162,6 @@ async def diagnostics_bundle(state: State) -> Response:
             "device_count": len(last_result.get("devices") or []) if last_result else 0,
         },
         "log_tail":       _diag.LOG_RING.lines(),
-        "broker_auth":    _diag.recent_broker_auth(),
     }
     body = json.dumps(bundle, indent=2, default=str)
     fname = f"wattpost-diagnostics-{__version__}-{int(time.time())}.json"
@@ -194,28 +170,6 @@ async def diagnostics_bundle(state: State) -> Response:
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{fname}"'},
     )
-
-
-@get("/api/diagnostics/broker-auth")
-async def broker_auth_log() -> dict[str, Any]:
-    """Return the recent broker-auth verify ring (last ~200 hits).
-
-    Each entry: `ts`, `path`, `method`, `verdict`, `header_age_s`,
-    `cf_ray`. Verdicts: ok / no-secret / bad-format / expired / bad-mac.
-
-    Use during white-page-on-broker incidents: gaps in the timeline =
-    requests not reaching the appliance (Caddy/CF problem upstream);
-    a flood of `expired` = clock drift; `bad-mac` = sso_secret drift
-    (#148-class bug); `ok` for the failing path = bug post-auth.
-
-    Lives under /api/diagnostics/ not /api/system/ to keep the
-    Diagnostics UI page from having to also gate by admin role,
-    middleware applies the same session/broker rules as everything
-    else; on the broker side the user already authenticated cloud-
-    side to reach here.
-    """
-    from .. import diagnostics as _diag
-    return {"items": _diag.recent_broker_auth()}
 
 
 @get("/api/system/info")

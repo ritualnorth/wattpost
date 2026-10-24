@@ -117,7 +117,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
     # used to do this, but Docker installs never ran install.sh and so
     # shipped with no password, combined with the auth middleware's
     # "no password = bypass" rule that left the dashboard wide open to
-    # anyone who could reach it (incl. via the cloud tunnel). Idempotent:
+    # anyone who could reach it. Idempotent:
     # once the hash file exists this is a no-op.
     from . import web_auth as _wa
     _wa.ensure_first_boot_password()
@@ -145,8 +145,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
         access_log=False,
         # Bound graceful shutdown. Without this uvicorn waits *forever* for
         # in-flight connections to close on SIGTERM ("Waiting for connections
-        # to close"), so a single long-lived client (SSE/keepalive/broker
-        # tunnel) makes every restart hang until systemd SIGKILLs at
+        # to close"), so a single long-lived client (SSE/keepalive) makes every restart hang until systemd SIGKILLs at
         # TimeoutStopSec=15s. The hard kill then trips the start-limit on
         # rapid restarts and fires a spurious auto-rollback. 5s gives real
         # requests time to finish, then lingering connections are force-closed

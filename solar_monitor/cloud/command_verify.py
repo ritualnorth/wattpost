@@ -11,28 +11,45 @@ byte-for-byte. Any drift means every cloud-signed command fails
 verify here, treat the two functions as one logical unit when
 making changes.
 
-Behaviour:
-  * Signed cmd, sig verifies → ok, dispatch
-  * Signed cmd, sig FAILS    → reject, refuse to dispatch, log
-                                + signed_audit.write_event so
-                                the rejection becomes a tamper-
-                                evident record
-  * Unsigned cmd (no kid/sig/nonce, pre-rollout cloud, or a row
-    inserted before migration 0052) → grandfather: dispatch with a
-    warning. Once the cloud has rolled out 0052 + signing for ~1
-    deploy cycle, we can flip the default to reject-unsigned.
+Behaviour (strict: there is no grandfathering):
+  * Signature verifies, command is fresh, targets this appliance  -> dispatch
+  * Anything else -> refuse, log, and write a signed-audit event so the
+    rejection becomes a tamper-evident record. That includes commands with
+    no signature at all: the threat this exists for is somebody who can
+    write rows into the cloud database, and such a row is exactly an
+    unsigned command, so accepting those would defeat the whole check.
+  * A command older than MAX_AGE, or stamped in the future, is refused, so
+    a captured signed command can't be replayed at will.
+  * A command that already finished (CommandLedger) is refused, so a
+    completed `restore_from_cloud` can't be re-run after a restart.
 """
 from __future__ import annotations
 
 import base64
 import json
 import logging
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from ..auth import oidc_config, oidc_rp
 
 log = logging.getLogger(__name__)
+
+# Domain separation: the cloud signs OIDC tokens with the same ed25519 key,
+# so commands carry a fixed prefix that no JWT signing input can have.
+DOMAIN = b"wattpost-cmd-v2\n"
+
+# A command may legitimately wait while the appliance is offline, but not
+# indefinitely. Clock skew allowance covers an appliance with a drifting RTC.
+MAX_AGE = timedelta(days=7)
+MAX_FUTURE = timedelta(minutes=5)
+
+
+def signing_input(repr_str: str) -> bytes:
+    """Bytes that are actually signed: domain tag + canonical JSON.
+    Mirror in cloud command_signing.py."""
+    return DOMAIN + repr_str.encode("utf-8")
 
 
 def canonical_repr(
@@ -95,15 +112,10 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
     nonce     = cmd.get("nonce")
     queued_at = cmd.get("queued_at")
 
-    # Grandfather path, fully unsigned command. Common during the
-    # transition; warn but allow.
     if not (sig_b64 or kid or nonce):
-        log.warning(
-            "command_verify: cmd id=%s has NO signature, grandfathering "
-            "(cloud pre-0.1.105 or signing key absent)",
-            cmd.get("id"),
-        )
-        return True
+        log.warning("command_verify: cmd id=%s is UNSIGNED, refusing dispatch",
+                    cmd.get("id"))
+        return False
 
     # Partial signature → refuse.
     if not (sig_b64 and kid and nonce and queued_at):
@@ -116,14 +128,11 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
 
     cfg = oidc_config.load()
     if cfg is None:
-        # Appliance pre-upgrade or post-pair-but-no-OIDC-yet. We have
-        # no JWKS to verify against. Grandfather rather than refuse,
-        # the alternative is bricking commands on transitional boxes.
-        log.warning(
-            "command_verify: no oidc_config (pre-upgrade?), "
-            "grandfathering cmd id=%s", cmd.get("id"),
-        )
-        return True
+        # No JWKS to verify against, so nothing can be trusted. The
+        # appliance registers its identity before its first heartbeat, so
+        # this only happens before pairing completes.
+        log.warning("command_verify: no oidc_config, refusing cmd id=%s", cmd.get("id"))
+        return False
 
     try:
         qat_dt = datetime.fromisoformat(str(queued_at))
@@ -131,6 +140,16 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
             qat_dt = qat_dt.replace(tzinfo=timezone.utc)
     except ValueError:
         log.warning("command_verify: cmd id=%s malformed queued_at", cmd.get("id"))
+        return False
+
+    now = datetime.now(timezone.utc)
+    if now - qat_dt > MAX_AGE:
+        log.warning("command_verify: cmd id=%s is %s old (max %s), refusing",
+                    cmd.get("id"), now - qat_dt, MAX_AGE)
+        return False
+    if qat_dt - now > MAX_FUTURE:
+        log.warning("command_verify: cmd id=%s is dated %s in the future, refusing",
+                    cmd.get("id"), qat_dt - now)
         return False
 
     repr_str = canonical_repr(
@@ -168,7 +187,7 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
     try:
         pad = "=" * ((4 - len(sig_b64) % 4) % 4)
         sig = base64.urlsafe_b64decode(sig_b64 + pad)
-        vk.verify(repr_str.encode("utf-8"), sig)
+        vk.verify(signing_input(repr_str), sig)
     except Exception as e:
         log.warning("command_verify: sig verify FAILED for cmd id=%s (%s), refusing",
                     cmd.get("id"), e)
@@ -176,3 +195,54 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
 
     log.debug("command_verify: cmd id=%s sig ok (kid=%s)", cmd.get("id"), kid[:8])
     return True
+
+
+class CommandLedger:
+    """Ids of commands that have run to a terminal state, persisted so a
+    restart doesn't forget them.
+
+    Signature + freshness stop forgery and stale replay; the ledger stops
+    replay of a command that already completed (a signed `restore_from_cloud`
+    is valid for 7 days, and re-running it after a restart would roll the
+    appliance back again). Commands still in flight are deliberately NOT
+    recorded, so the cloud can keep re-presenting one that is mid-update.
+
+    Bounded: it keeps the newest `cap` ids. Anything older than the oldest
+    remembered id is refused too once the ledger is full, so eviction can't
+    be used to re-open an old command.
+    """
+
+    def __init__(self, path: str, cap: int = 1000) -> None:
+        self.path = path
+        self.cap = cap
+        self._ids: list[int] = self._read()
+
+    def _read(self) -> list[int]:
+        try:
+            with open(self.path) as f:
+                return sorted({int(x) for x in json.load(f)})[-self.cap:]
+        except (OSError, ValueError, TypeError):
+            return []
+
+    def seen(self, cmd_id: int) -> bool:
+        if cmd_id in self._ids:
+            return True
+        return len(self._ids) >= self.cap and cmd_id < self._ids[0]
+
+    def record(self, cmd_id: int) -> None:
+        if cmd_id in self._ids:
+            return
+        self._ids = sorted(set(self._ids) | {int(cmd_id)})[-self.cap:]
+        try:
+            tmp = self.path + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(self._ids, f)
+            os.replace(tmp, self.path)
+        except OSError:
+            log.exception("command ledger: could not persist")
+
+
+def default_ledger_path() -> str:
+    db = os.environ.get("WATTPOST_DB", "")
+    base = os.path.dirname(db) if db else "/var/lib/wattpost"
+    return os.path.join(base, "cloud_command_ledger.json")

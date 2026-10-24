@@ -8,6 +8,7 @@ dependencies = [
     "pyserial>=3.5",
     "pyyaml>=6.0",
     "msgspec>=0.19",
+    "multidict<6.7",   # litestar 2.25 fails every request on multidict 7
     # Base litestar, NOT [standard]: that extra dragged in uvicorn[standard]'s
     # uvloop + httptools + websockets + watchfiles (plus jinja2/rich/click),
     # none of which the appliance uses — it serves SSE not websockets, uses

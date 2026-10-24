@@ -4,7 +4,7 @@
 
 Yes. The appliance is local-first. Bluetooth polling, dashboard, history, local alerts (ntfy/Discord/Pushover via your LAN, MQTT to a local broker, email via your relay). All work without an internet connection.
 
-The cloud tier is strictly additive: lose internet and you lose multi-site / heartbeat alerts / remote tunnel, but the local appliance keeps running.
+The cloud tier is strictly additive: lose internet and you lose multi-site / heartbeat alerts / the cloud dashboard, but the local appliance keeps running.
 
 ## Do I have to subscribe to anything?
 
@@ -32,11 +32,11 @@ Yes. On a Linux host with BLE (laptop, mini PC, Synology, Unraid, etc), `docker 
 
 Yes. WattPost is **open source under the Apache License 2.0**. The full appliance source ships on the device — `/opt/wattpost-src` on the SD image, `/app/solar_monitor` in the Docker image — so you can audit, modify, fork, and even build a commercial product on exactly what runs on your hardware. See [License](/docs/license) for the plain-English summary.
 
-Only the cloud-tier code (multi-site dashboard, heartbeat ingest, tunnel provisioning) is private and outside that licence; the appliance in this repository is fully open.
+Only the cloud-tier code (multi-site dashboard, heartbeat and telemetry ingest) is private and outside that licence; the appliance in this repository is fully open.
 
 ## Is the cloud data private?
 
-The cloud receives **heartbeats only**. SoC + net power + a tiny extras blob (alert count, today's energy), every ~5 minutes. Per-poll detail, individual cell voltages, full history. All stay on your Pi. We never see your raw telemetry stream.
+Once paired, the appliance pushes a heartbeat (SoC, net power, a small extras blob such as alert count and today's energy) every ~5 minutes, plus **1-minute telemetry rollups** and a few summary views so the cloud dashboard has history. Per-poll detail and the raw device stream stay on your Pi. You can turn the rollup upload off in Settings → Integrations → WattPost cloud, and an unpaired appliance sends nothing. See [Privacy & telemetry](privacy-and-telemetry.md).
 
 Unpairing from `wattpost.cloud` deletes the appliance row + all stored heartbeats from our DB.
 
@@ -44,7 +44,7 @@ Unpairing from `wattpost.cloud` deletes the appliance row + all stored heartbeat
 
 Off-grid solar exists *because* people don't trust the grid + commercial systems. A monitor that breaks when the internet goes down isn't acceptable in that world. WattPost stays useful in a blackout, in the woods, on a boat. Anywhere your inverter is.
 
-The cloud tier is for the things only a remote watcher can do: tell you the appliance itself is dead, give you a remote-access URL, escalate via SMS.
+The cloud tier is for the things only a remote watcher can do: tell you the appliance itself is dead, show you a copy of your data away from home, escalate via SMS.
 
 ## What's the difference between WattPost and \<some vendor app\>?
 

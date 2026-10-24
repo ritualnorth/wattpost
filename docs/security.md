@@ -26,10 +26,11 @@ real cert.
 
 Two ways, in order of difficulty:
 
-1. **Pair with wattpost.cloud** (recommended).
-   The cloud broker gives you `https://<slug>.wattpost.cloud/` with
-   a real Let's Encrypt cert maintained by us. See [Remote
-   access](/docs/remote-access) for pairing.
+1. **Pair with wattpost.cloud** (recommended for remote viewing).
+   The cloud dashboard at `https://wattpost.cloud/` has a real cert
+   maintained by us and shows a read-only copy of the data your
+   appliance pushes. It does not change the LAN page itself. See
+   [Remote access](/docs/remote-access) for pairing.
 
 2. **Browser exceptions**.
    If you'd rather keep using `http://<pi-ip>/`, every browser
@@ -46,32 +47,27 @@ Two ways, in order of difficulty:
   exist. Let's Encrypt and the public CAs only issue for public
   DNS names.
 
-## How the cloud broker authenticates requests
+## How the cloud connection works
 
-Once you pair, requests to `https://<slug>.wattpost.cloud/` are
-proxied through our broker before they hit your appliance's tunnel.
-The broker enforces:
+Once you pair, the appliance **pushes** data to wattpost.cloud over
+outbound HTTPS. The cloud never connects to your appliance:
 
-- **HMAC-signed request headers.** Every browser request carries a
-  short-lived `X-WP-Broker-Auth` header signed against a per-site
-  secret. Replay window is tight (seconds, not minutes), and the
-  scope tag (`user` vs `kiosk`) is part of what's signed, so an
-  attacker who scrapes a kiosk header can't strip the tag and
-  promote it to full access.
-- **`owner_id` check.** The broker verifies the logged-in cloud
-  user owns this appliance before forwarding any request. A leaked
-  pairing code or stolen tunnel URL doesn't grant access on its own.
-- **Kiosk shares are read-only.** A `wattpost.cloud/k/<token>` URL
-  is scoped to a fixed allow-list of GET endpoints, they can never
-  POST to `/api/system/restart`, `/api/devices`, or anything that
-  writes config. The token exchanges for a short cookie on first
-  load and never appears in subsequent URLs (so it doesn't end up
-  in your browser history / server logs).
+- **No inbound path.** There is no tunnel, no reverse proxy and no
+  remote login. The firewall (below) keeps dropping unsolicited inbound
+  traffic, and the cloud has nothing it could connect to.
+- **Bearer-token authenticated uploads.** Heartbeats and telemetry are
+  sent with a per-appliance token issued at pairing. Unpairing (or
+  deleting the site in the cloud) revokes it.
+- **Account-gated viewing.** The cloud dashboard is only shown to the
+  signed-in account that owns the appliance. It is a read-only view of
+  uploaded data: it cannot change config, restart the daemon or touch
+  your devices.
+- **You choose what leaves.** Telemetry upload can be switched off in
+  Settings while staying paired, and location sharing is off by default.
 
-If you'd rather skip the broker entirely, the appliance still binds
-`0.0.0.0:<port>` on your LAN, put it behind your own VPN / reverse
-proxy. See [Remote access](/docs/remote-access) for the unsupported
-options.
+If you want full remote control of the appliance rather than a viewing
+copy, put it behind your own VPN / reverse proxy. See [Remote
+access](/docs/remote-access) for the unsupported options.
 
 ## Host firewall & SSH (Pi appliance)
 
@@ -145,8 +141,9 @@ SSH is closed unless you turn it on. Everything else inbound is dropped by
 the firewall.
 
 The one thing that doesn't change: **LAN traffic is plain HTTP**. On a
-network you don't fully trust, reach the appliance over the **cloud tunnel**
-(HTTPS) rather than its LAN IP, so your login isn't sent in the clear.
+network you don't fully trust, put the appliance on its own segment (see
+below) or reach it over a VPN of your own, so your login isn't sent in the
+clear.
 
 ## The real lateral-movement control: network segmentation
 
@@ -170,7 +167,7 @@ from your trusted machines** (laptops, phones, NAS, work devices):
 Either way, if any device on that segment is ever compromised, it can't
 pivot to your laptop or NAS. A host firewall can't substitute for this —
 they solve different problems, and segmentation is the one that *contains*
-a breach. (Trade-off: with the appliance on an isolated segment, browse it
-via the cloud tunnel, or hop onto the same segment when you want local
-access — cross-segment LAN browsing is what the isolation deliberately
-blocks.)
+a breach. (Trade-off: with the appliance on an isolated segment, hop onto the same
+segment when you want local access — cross-segment LAN browsing is what the
+isolation deliberately blocks. The cloud dashboard still works, because the
+appliance pushes to it outbound.)

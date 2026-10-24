@@ -33,9 +33,8 @@ else
     DAEMON="${RED}○ stopped${RESET}"
 fi
 
-# --- cloud + tunnel (best-effort, swallow errors) ---
+# --- cloud (best-effort, swallow errors) ---
 CLOUD="${GREY}not paired${RESET} ${DIM}(pair at https://wattpost.cloud/app/pair)${RESET}"
-TUNNEL="${GREY}─${RESET}"
 DASH_URL="http://wattpost.local"
 
 CFG=/etc/wattpost/config.yaml
@@ -43,10 +42,6 @@ if [ -r "$CFG" ]; then
     if grep -qE '^  bearer_token:' "$CFG"; then
         LABEL="$(awk '/^cloud:/{f=1} f && /^  label:/{print substr($0, index($0,$2)); exit}' "$CFG" 2>/dev/null | tr -d '"')"
         CLOUD="${GREEN}● paired${RESET}${LABEL:+ ${DIM}($LABEL)${RESET}}"
-    fi
-    if grep -qE '^  tunnel_hostname:' "$CFG"; then
-        HOST="$(awk '/^cloud:/{f=1} f && /^  tunnel_hostname:/{print $2; exit}' "$CFG" 2>/dev/null | tr -d '"')"
-        TUNNEL="${GREEN}● ${HOST}${RESET}"
     fi
 fi
 
@@ -79,7 +74,6 @@ ${AMBER}${BOLD}  WattPost${RESET} ${DIM}v${VERSION}${RESET}    ${DIM}uptime: ${U
   Dashboard:  ${BOLD}${DASH_URL}${RESET}
 $(printf "${WEB_PASS_LINE}")  Daemon:     ${DAEMON}
   Cloud:      ${CLOUD}
-  Tunnel:     ${TUNNEL}
 
   Type ${BOLD}wattpost-config${RESET} for the setup menu.
 

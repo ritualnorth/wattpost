@@ -1,6 +1,6 @@
 # Pair an appliance
 
-Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the multi-site dashboard, posts heartbeats, and gets a `<slug>.wattpost.io` remote-access URL.
+Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the multi-site dashboard, posts heartbeats, and pushes telemetry for the cloud dashboard.
 
 ## Steps
 
@@ -9,34 +9,22 @@ Connect a WattPost Pi to your `wattpost.cloud` account so it appears in the mult
 3. On your Pi's dashboard, go to **Settings → Integrations → WattPost cloud** and paste the code into the pairing field.
 4. Hit **Pair**. Within a few seconds the appliance:
    - exchanges the code for a long-lived bearer token
-   - gets assigned a unique slug like `<slug>.wattpost.io`
-   - starts a [Cloudflare tunnel](#how-the-tunnel-works) for the remote-access URL
    - posts its first heartbeat
+   - starts pushing 1-minute telemetry rollups (a recent backfill first)
 5. Refresh `wattpost.cloud`. Your appliance is there, online.
 
 ## What pairing actually does
 
 - The appliance saves the bearer token to `/etc/wattpost/config.yaml` under `cloud:`
-- The cloud creates a Cloudflare Tunnel + DNS record for the slug
-- The appliance launches a `cloudflared` daemon to maintain that tunnel
 - Heartbeats post every ~5 minutes (configurable)
+- Closed 1-minute telemetry rollups and a few summary views are pushed to your account every few minutes. The cloud dashboard is rendered from this data.
+- You can stop the telemetry upload in **Settings → Integrations → WattPost cloud** (the heartbeat continues), or unpair to stop everything.
 
-No port-forwarding, no inbound network changes. The tunnel is outbound-only from your network.
-
-## How the tunnel works
-
-Clicking **Open site →** on a card at `wattpost.cloud`:
-
-1. Browser navigates to `https://<slug>.wattpost.io`
-2. Cloudflare routes the request through the tunnel
-3. `cloudflared` on the appliance proxies it to `localhost:80`
-4. The appliance's daemon serves the same dashboard you'd see on the LAN
-
-No second login: the cloud already authenticated you when you signed in, and the appliance trusts loopback traffic (the request reaches it from `127.0.0.1` via cloudflared). See [Local web password](/docs/local-password) for the full trust model.
+Everything is **outbound HTTPS from the appliance**. No port-forwarding, no inbound network changes, and the appliance never accepts inbound connections from the cloud. The cloud view is read-only; settings and device control stay on the appliance.
 
 ## Unpair
 
-**Settings → Integrations → WattPost cloud → Edit → Unpair**, or use `wattpost-config → Unpair from cloud` from SSH. The appliance immediately stops heartbeats and removes the tunnel; on the cloud side, the site row stays until you delete it from the dashboard (so heartbeat history is preserved if you want to re-pair the same Pi).
+**Settings → Integrations → WattPost cloud → Edit → Unpair**, or use `wattpost-config → Unpair from cloud` from SSH. The appliance immediately stops heartbeats and telemetry; on the cloud side, the site row stays until you delete it from the dashboard (so heartbeat history is preserved if you want to re-pair the same Pi).
 
 ## Re-pair to a different account
 
@@ -46,4 +34,4 @@ Unpair first, then run the pair flow with a fresh code from the new account. Eac
 
 - **"Pair failed: 410 Gone"**. The code expired. Generate a fresh one (codes are good for 10 minutes).
 - **Paired but cloud shows Offline**. The heartbeat service initialises on daemon boot. Restart the wattpost service or click **Send heartbeat now** in the appliance UI.
-- **No tunnel URL on the cloud card**. The appliance was paired before the cloud's tunnel provisioning was configured. Unpair + re-pair to get a tunnel issued.
+- **Paired but the cloud dashboard has no history**. Telemetry is pushed every few minutes after pairing; check that `telemetry_sync` is not turned off in Settings → Integrations → WattPost cloud.

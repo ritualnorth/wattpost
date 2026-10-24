@@ -2272,6 +2272,69 @@ class Store:
             "reliable":          reliable,
         }
 
+    async def closed_rollups_after(
+        self, after_ts: int, *, now: int | None = None, limit: int = 5000,
+    ) -> list[tuple[int, str, str, float, float, float, int]]:
+        """Closed 1-minute buckets strictly newer than `after_ts`, oldest
+        first, as `(bucket_ts, device, metric, avg, min, max, n)`.
+
+        Used by the cloud rollup sync. Two details matter for correctness:
+
+        * A bucket is only returned once its minute is fully in the past.
+          `rollup_and_purge` re-rolls the still-open minute into
+          `samples_1min` as a partial row, so reading that table directly
+          could ship half a bucket and advance the watermark past it.
+          Recent buckets are therefore aggregated from raw `samples`.
+        * Buckets older than raw retention only exist in `samples_1min`
+          (an appliance that was offline for more than a week), so those
+          come from there.
+
+        `limit` caps rows. When it bites, the trailing bucket is dropped
+        so a bucket is never split across batches: the caller can always
+        advance its watermark to the last returned `bucket_ts`.
+        """
+        if self._db is None:
+            raise RuntimeError("Store not open")
+        now = now if now is not None else int(time.time())
+        newest_closed = (now // 60) * 60 - 60          # last fully elapsed minute
+        start = (int(after_ts) // 60) * 60 + 60
+        if start > newest_closed:
+            return []
+        raw_floor = ((now - self._retention_raw_s) // 60) * 60 + 60
+        rows: list[tuple[int, str, str, float, float, float, int]] = []
+        if start < raw_floor:
+            async with self._db.execute(
+                "SELECT bucket_ts, device, metric, avg, min, max, n "
+                "FROM samples_1min WHERE bucket_ts >= ? AND bucket_ts < ? "
+                "ORDER BY bucket_ts, device, metric LIMIT ?",
+                (start, min(raw_floor, newest_closed + 60), limit + 1),
+            ) as cur:
+                rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
+                             async for a, b, c, d, e, f, g in cur])
+        if len(rows) <= limit and newest_closed >= raw_floor:
+            async with self._db.execute(
+                "SELECT (ts / 60) * 60 AS b, device, metric, "
+                "       AVG(value), MIN(value), MAX(value), COUNT(*) "
+                "FROM samples WHERE ts >= ? AND ts < ? "
+                "GROUP BY b, device, metric ORDER BY b, device, metric LIMIT ?",
+                (max(start, raw_floor), newest_closed + 60, limit + 1 - len(rows)),
+            ) as cur:
+                rows.extend([(int(a), b, c, float(d), float(e), float(f), int(g))
+                             async for a, b, c, d, e, f, g in cur])
+        if len(rows) > limit:
+            last = rows[limit][0]
+            rows = [r for r in rows[:limit] if r[0] < last]
+            if not rows:           # one bucket wider than the limit: ship it whole
+                async with self._db.execute(
+                    "SELECT (ts / 60) * 60 AS b, device, metric, "
+                    "       AVG(value), MIN(value), MAX(value), COUNT(*) "
+                    "FROM samples WHERE ts >= ? AND ts < ? "
+                    "GROUP BY b, device, metric", (last, last + 60),
+                ) as cur:
+                    rows = [(int(a), b, c, float(d), float(e), float(f), int(g))
+                            async for a, b, c, d, e, f, g in cur]
+        return rows
+
     async def last_poll_run(self) -> dict[str, Any] | None:
         if self._db is None:
             raise RuntimeError("Store not open")

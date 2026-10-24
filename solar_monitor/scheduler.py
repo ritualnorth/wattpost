@@ -20,7 +20,6 @@ from .weather import WeatherService
 from .cloud import CloudService
 from .gps import GpsService
 from .mqtt_in import MqttInService
-from .tunnel import TunnelService
 from .hotspot import HotspotService, AutoHandoffMonitor
 from .update import UpdateChecker
 from .config import Config, HotspotCfg
@@ -168,17 +167,6 @@ class PollScheduler:
                 self._cloud = CloudService(config, self)
             except Exception:
                 log.exception("cloud heartbeat service failed to initialise")
-
-        # Outbound Cloudflare Tunnel, exposes the local dashboard at
-        # `<slug>.wattpost.io`. Only spun up when the cloud has issued
-        # a tunnel token at pair time AND cloudflared is on PATH.
-        # Off entirely otherwise; appliance keeps working locally.
-        self._tunnel: TunnelService | None = None
-        if config.cloud is not None and TunnelService.is_available(config.cloud):
-            try:
-                self._tunnel = TunnelService(config.cloud)
-            except Exception:
-                log.exception("tunnel service failed to initialise")
 
         # Self-update *check*, polls the cloud's release manifest
         # daily and exposes the result on /api/system/update so the
@@ -486,8 +474,6 @@ class PollScheduler:
             await self._cloud.start()
         if self._mqtt_in is not None:
             await self._mqtt_in.start()
-        if self._tunnel is not None:
-            await self._tunnel.start()
         if self._hotspot is not None:
             await self._hotspot.start()
         if self._hotspot_handoff is not None:
@@ -569,8 +555,6 @@ class PollScheduler:
             await self._cloud.stop()
         if self._mqtt_in is not None:
             await self._mqtt_in.stop()
-        if self._tunnel is not None:
-            await self._tunnel.stop()
         if self._hotspot_handoff is not None:
             await self._hotspot_handoff.stop()
         if self._hotspot is not None:
