@@ -273,7 +273,7 @@ def test_loop_pushes_at_lease_interval_and_returns_to_normal():
         def handler(req):
             body = json.loads(gzip.decompress(req.content))
             posts.append(body)
-            lease = {"live": {"ttl_s": 1.2, "interval_s": 2}} if len(posts) <= 2 else {}
+            lease = {"live": {"ttl_s": 30, "interval_s": 2}} if len(posts) <= 2 else {}
             top = max((r[0] for r in body["rollups"]), default=None)
             return httpx.Response(200, json={"acked_through": top, **lease})
 
@@ -356,5 +356,78 @@ def test_switching_uploads_back_on_wakes_a_sleeping_loop_quickly():
             assert len(cloud.batches) <= sent + 1
         finally:
             rs.SWITCH_POLL_S = old
+        await st.close()
+    _run(go())
+
+
+# ---- hostile / broken cloud replies -------------------------------------------
+
+def test_lease_interval_is_clamped_and_non_finite_values_are_rejected():
+    async def go():
+        st = await _store(seed_minutes=2)
+        sync = _sync(st, FakeCloud())
+        sync._note_lease({"live": {"ttl_s": 60, "interval_s": 10**9}})
+        assert sync.live_interval() == rs.LIVE_MAX_INTERVAL_S
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            sync._note_lease({"live": {"ttl_s": 60, "interval_s": bad}})
+            assert sync.live_interval() is None, bad
+            sync._note_lease({"live": {"ttl_s": bad, "interval_s": 5}})
+            assert sync.live_interval() is None, bad
+        await st.close()
+    _run(go())
+
+
+def test_loop_never_sleeps_past_the_lease():
+    async def go():
+        st = await _store(seed_minutes=2)
+
+        def handler(req):
+            body = json.loads(gzip.decompress(req.content))
+            top = max((r[0] for r in body["rollups"]), default=None)
+            return httpx.Response(200, json={
+                "acked_through": top, "live": {"ttl_s": 5, "interval_s": 10**9}})
+
+        sync = rs.RollupSync(
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            backfill_hours=lambda: 1,
+            client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+        waits = []
+
+        async def fake_wait(ev, t):
+            waits.append(t)
+            return True
+
+        await sync.loop(asyncio.Event(), lambda: 300, sleep=fake_wait)
+        assert waits and waits[0] <= 5.0 and waits[0] <= rs.LIVE_MAX_INTERVAL_S
+        await st.close()
+    _run(go())
+
+
+def test_ack_beyond_the_batch_is_an_error_and_never_persisted():
+    async def go():
+        st = await _store(seed_minutes=5)
+        cloud = FakeCloud()
+        cloud.ack_override = T0 + 10**9        # cloud claims far more than was sent
+        res = await _sync(st, cloud).run_once(now=T0 + 400)
+        assert res.error and "acked" in res.error
+        assert await st.kv_get(rs.WATERMARK_KEY) is None
+        for junk in ("12", 1.5, True, [1]):
+            cloud.ack_override = junk
+            res = await _sync(st, cloud).run_once(now=T0 + 400)
+            assert res.error, junk
+            assert await st.kv_get(rs.WATERMARK_KEY) is None
+        await st.close()
+    _run(go())
+
+
+def test_future_watermark_does_not_silence_uploads():
+    async def go():
+        st = await _store(seed_minutes=5)
+        await st.kv_set(rs.WATERMARK_KEY, str(T0 + 10 * 365 * 86400))
+        cloud = FakeCloud()
+        sync = _sync(st, cloud)
+        assert await sync._watermark(T0 + 400) <= T0 + 400
+        res = await sync.run_once(now=T0 + 400)
+        assert res.error is None and res.sent_rows == 10
         await st.close()
     _run(go())

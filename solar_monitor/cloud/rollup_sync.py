@@ -30,6 +30,7 @@ import asyncio
 import gzip
 import json
 import logging
+import math
 import random
 import time
 import uuid
@@ -47,6 +48,7 @@ BACKOFF_CAP_S = 15 * 60
 BACKOFF_BASE_S = 30
 SWITCH_POLL_S = 10                # how often a sleeping loop re-reads the Settings switch
 LIVE_MIN_INTERVAL_S = 2           # whatever the cloud asks for, never faster than this
+LIVE_MAX_INTERVAL_S = 60          # nor slower: a hostile reply must not park the loop
 LIVE_MAX_TTL_S = 300              # nor leased for longer than this per grant
 
 
@@ -102,17 +104,26 @@ class RollupSync:
             return self._live_interval
         return None
 
+    def live_remaining(self) -> float:
+        """Seconds left on the current lease (0.0 when none)."""
+        return max(0.0, self._live_until_mono - time.monotonic())
+
     def _note_lease(self, ack: dict) -> None:
         live = ack.get("live")
         if not isinstance(live, dict):
             self._live_until_mono = 0.0
             return
         try:
-            ttl = min(float(live.get("ttl_s", 0)), LIVE_MAX_TTL_S)
-            interval = max(float(live.get("interval_s", 0)), LIVE_MIN_INTERVAL_S)
+            ttl = float(live.get("ttl_s", 0))
+            interval = float(live.get("interval_s", 0))
         except (TypeError, ValueError):
             self._live_until_mono = 0.0
             return
+        if not (math.isfinite(ttl) and math.isfinite(interval)):
+            self._live_until_mono = 0.0          # NaN / inf from the cloud
+            return
+        ttl = min(ttl, LIVE_MAX_TTL_S)
+        interval = min(max(interval, LIVE_MIN_INTERVAL_S), LIVE_MAX_INTERVAL_S)
         if ttl <= 0:
             self._live_until_mono = 0.0
             return
@@ -123,7 +134,15 @@ class RollupSync:
         got = await self.store.kv_get(WATERMARK_KEY)
         if got is not None:
             try:
-                return int(got[0])
+                wm = int(got[0])
+                if wm <= now:
+                    return wm
+                # A watermark in the future (clock stepped forward, or a bad
+                # ack got persisted) would silence uploads until real time
+                # catches up. Never trust it: re-send the backfill window
+                # (the cloud upserts, so this is idempotent).
+                log.warning("rollup sync: watermark %d is in the future (now %d), "
+                            "restarting backfill", wm, now)
             except ValueError:
                 log.warning("rollup sync: bad watermark %r, restarting backfill", got[0])
         return (now - self._backfill_hours() * 3600) // 60 * 60 - 60
@@ -192,11 +211,16 @@ class RollupSync:
                     if not rows:
                         res.caught_up = True
                         break
+                    # The cloud acks the newest bucket of THIS batch, exactly.
+                    # Less means it stored only part; more means a bad or
+                    # hostile reply that would skip data (and, persisted, park
+                    # the watermark in the future).
                     top = ack.get("acked_through")
-                    if top is None or int(top) < rows[-1][0]:
+                    if (not isinstance(top, int) or isinstance(top, bool)
+                            or top != rows[-1][0]):
                         raise RuntimeError(
-                            f"cloud acked {top}, expected >= {rows[-1][0]}")
-                    wm = int(top)
+                            f"cloud acked {top!r}, expected exactly {rows[-1][0]}")
+                    wm = top
                     await self.store.kv_set(WATERMARK_KEY, str(wm))
                 else:
                     res.caught_up = False
@@ -258,7 +282,8 @@ class RollupSync:
             elif not res.caught_up:
                 delay = 1.0            # more backlog: keep draining
             elif live is not None:
-                delay = live           # someone is watching
+                # someone is watching; never sleep past the end of the lease
+                delay = min(live, max(self.live_remaining(), 0.1))
             else:
                 delay = period_s()
             if await wait(stop, delay):

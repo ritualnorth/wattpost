@@ -84,6 +84,10 @@ def _bad_version_field(cmd: dict[str, Any]) -> str | None:
     return None
 
 
+# Upper bound on commands honoured from a single heartbeat reply.
+MAX_COMMANDS_PER_HEARTBEAT = 20
+
+
 class CloudService:
     def __init__(self, config_or_cfg, scheduler) -> None:
         """Accepts either a Config (preferred) or a bare CloudCfg
@@ -139,6 +143,13 @@ class CloudService:
             return self._config.cloud
         return self._direct_cfg
 
+    def _cfg_get(self, name: str, default):
+        """Read a cloud setting without assuming the cloud config exists:
+        /api/cloud/unpair sets `config.cloud = None` while the background
+        loops keep running."""
+        c = self.cfg
+        return getattr(c, name, default) if c is not None else default
+
     # Top-level Config.alerts (NOT a CloudCfg attribute, getattr
     # against self.cfg silently returns [] and every alert-related
     # cloud feature no-ops). All rule-unification paths (#261) read
@@ -184,15 +195,18 @@ class CloudService:
         from .views import ViewPublisher
         self._sync = RollupSync(
             store=self.scheduler.store,
-            endpoint=lambda: self.cfg.endpoint,
-            bearer=lambda: self.cfg.bearer_token,
+            endpoint=lambda: self._cfg_get("endpoint", ""),
+            bearer=lambda: self._cfg_get("bearer_token", ""),
             sign=self._signed_headers,
-            backfill_hours=lambda: self.cfg.telemetry_backfill_hours,
+            backfill_hours=lambda: self._cfg_get("telemetry_backfill_hours", 24),
             views=ViewPublisher(self.scheduler.store, self.scheduler),
-            enabled=lambda: self.cfg.telemetry_sync,
+            # No cloud config (unpaired live) means uploads are off, not a crash.
+            enabled=lambda: bool(self._cfg_get("telemetry_sync", False)
+                                 and self._cfg_get("bearer_token", "")),
         )
         self._sync_task = asyncio.create_task(
-            self._sync.loop(self._stop, lambda: max(1, self.cfg.telemetry_minutes) * 60),
+            self._sync.loop(self._stop,
+                            lambda: max(1, self._cfg_get("telemetry_minutes", 5)) * 60),
             name="cloud-rollup-sync")
         log.info("cloud heartbeat service started (endpoint=%s, every %dm)",
                  self.cfg.endpoint, self.cfg.heartbeat_minutes)
@@ -401,6 +415,8 @@ class CloudService:
         round-trip doesn't half-execute a command. Each command's
         status transitions are PATCHed back to the cloud as the
         appliance progresses through pick-up → apply → terminal."""
+        if self.cfg is None:
+            return False              # unpaired while the loop was running
         payload = await self._build_payload()
         url = f"{self.cfg.endpoint.rstrip('/')}/api/heartbeat"
         # Pre-serialize the body so the bytes we sign are the EXACT
@@ -470,7 +486,20 @@ class CloudService:
             # refused (see command_verify).
             from . import command_verify as _cverify
             from .. import signed_audit as _sa
+            if not isinstance(commands, list):
+                commands = []
+            if len(commands) > MAX_COMMANDS_PER_HEARTBEAT:
+                # Each unverifiable command costs a signed-audit write (and
+                # possibly a JWKS fetch); a hostile reply must not be able to
+                # make us do that thousands of times per heartbeat.
+                log.warning("cloud sent %d commands in one heartbeat; only the "
+                            "first %d are considered", len(commands),
+                            MAX_COMMANDS_PER_HEARTBEAT)
+                commands = commands[:MAX_COMMANDS_PER_HEARTBEAT]
+            jwks_refresh = {"done": False}      # at most one forced refetch per heartbeat
             for cmd in commands:
+                if not isinstance(cmd, dict):
+                    continue
                 try:
                     # The id a command is verified against is THIS
                     # appliance's own (from config), never the one the
@@ -489,7 +518,8 @@ class CloudService:
                         if claimed is not None and str(claimed) != str(own_id):
                             log.warning("cloud command %s claims appliance_id=%s, "
                                         "this appliance is %s", cmd.get("id"), claimed, own_id)
-                        ok = await _cverify.verify_command(cmd, appliance_id=int(own_id))
+                        ok = await _cverify.verify_command(
+                            cmd, appliance_id=int(own_id), refresh_state=jwks_refresh)
                     if ok and self._ledger().seen(int(cmd.get("id") or 0)):
                         log.warning("command %s already ran; ignoring replay", cmd.get("id"))
                         ok = False
@@ -1981,13 +2011,17 @@ class CloudService:
             await self.heartbeat_once()
         except Exception as e:
             log.warning("initial cloud heartbeat failed: %s", e)
-        period_s = max(1, self.cfg.heartbeat_minutes) * 60
         while not self._stop.is_set():
+            # Re-read each cycle: the config can change (or vanish, after
+            # /api/cloud/unpair) while this task runs.
+            period_s = max(1, self._cfg_get("heartbeat_minutes", 5)) * 60
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=period_s)
                 return
             except asyncio.TimeoutError:
                 pass
+            if self.cfg is None or not self.cfg.bearer_token:
+                continue              # unpaired: idle until stopped
             try:
                 await self.heartbeat_once()
             except Exception as e:

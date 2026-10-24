@@ -85,6 +85,12 @@ Versions follow [Semantic Versioning].
   timezone offset but the freshness check used it, so re-labelling a signed
   command's offset stretched the 7-day replay window by up to 14 hours.
   Commands with a non-zero offset are refused.
+- **A hostile or broken cloud reply can no longer wedge telemetry or the
+  command loop.** The live-lease interval is clamped to 2-60 s and the loop
+  never sleeps past the lease (NaN/inf are rejected); `acked_through` must
+  equal the newest bucket sent and a watermark in the future is ignored; at
+  most 20 commands per heartbeat are considered and an unknown signing key
+  forces at most one JWKS refetch per heartbeat and per minute.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and
@@ -101,6 +107,9 @@ Versions follow [Semantic Versioning].
   `HTTPException` import) instead of returning a 4xx.
 - Fresh installs returned 500 on every request when `multidict` 7 was
   resolved (pinned `<6.7`; Litestar 2.25 cannot build `Headers` with it).
+- Unpairing from the cloud (`/api/cloud/unpair`) no longer kills the
+  heartbeat and telemetry loops with an `AttributeError`; they idle until
+  the daemon restarts.
 
 ## [0.1.188] - 2026-06-16
 

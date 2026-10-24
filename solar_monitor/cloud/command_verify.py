@@ -29,6 +29,7 @@ import base64
 import json
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -44,6 +45,19 @@ DOMAIN = b"wattpost-cmd-v2\n"
 # indefinitely. Clock skew allowance covers an appliance with a drifting RTC.
 MAX_AGE = timedelta(days=7)
 MAX_FUTURE = timedelta(minutes=5)
+
+
+# A command naming a kid we don't have forces a JWKS refetch (key rotation).
+# Without a limit, a stream of commands with made-up kids turns every
+# heartbeat into a pile of outbound fetches. At most one forced refetch per
+# heartbeat (the caller's `refresh_state`) and one per minute overall.
+FORCE_REFRESH_MIN_INTERVAL_S = 60.0
+_last_forced_refresh: float | None = None
+
+
+def reset_refresh_limiter() -> None:
+    global _last_forced_refresh
+    _last_forced_refresh = None
 
 
 def signing_input(repr_str: str) -> bytes:
@@ -87,7 +101,8 @@ class CommandVerifyError(Exception):
     MUST NOT dispatch this command."""
 
 
-async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
+async def verify_command(cmd: dict[str, Any], *, appliance_id: int,
+                         refresh_state: dict | None = None) -> bool:
     """Return True when the command is safe to dispatch.
 
     True paths:
@@ -176,6 +191,19 @@ async def verify_command(cmd: dict[str, Any], *, appliance_id: int) -> bool:
         keys = await oidc_rp.fetch_jwks(cfg.jwks_url)
         match = next((k for k in keys if k.get("kid") == kid), None)
         if match is None:
+            global _last_forced_refresh
+            now_m = time.monotonic()
+            spent = refresh_state is not None and refresh_state.get("done")
+            too_soon = (_last_forced_refresh is not None
+                        and now_m - _last_forced_refresh < FORCE_REFRESH_MIN_INTERVAL_S)
+            if spent or too_soon:
+                log.warning("command_verify: unknown kid %r for cmd id=%s and a JWKS "
+                            "refresh was already done recently, refusing",
+                            kid, cmd.get("id"))
+                return False
+            _last_forced_refresh = now_m
+            if refresh_state is not None:
+                refresh_state["done"] = True
             keys = await oidc_rp.fetch_jwks(cfg.jwks_url, force=True)
             match = next((k for k in keys if k.get("kid") == kid), None)
     except Exception as e:
