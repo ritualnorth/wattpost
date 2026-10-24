@@ -43,6 +43,51 @@ Versions follow [Semantic Versioning].
   appliance is local-first and works fully with no account, but once paired it
   pushes telemetry to your wattpost.cloud account.
 
+### Added
+- **Telemetry push.** A paired appliance uploads closed 1-minute rollups
+  (avg/min/max/count per device and metric), its device list, latest values
+  and a few finished view-models (snapshot, battery health, load heatmap,
+  runtime forecast, per-device lifetime/efficiency/charger stats, energy
+  ranges) to wattpost.cloud. Uploads are gzipped, ed25519-signed, resumable
+  after a restart or a long outage (watermark kept locally), idempotent on the
+  cloud side, and back off with jitter when the link is bad.
+- **Live view.** While someone has the cloud dashboard open, the cloud asks
+  the appliance (in its reply to an upload it already makes) to push a
+  snapshot every few seconds. The lease is a duration and lapses on its own;
+  the appliance never accepts a connection from the cloud.
+- **Settings -> Integrations -> Cloud**: a switch to stop uploading history
+  (and the upload cadence). Takes effect immediately; the heartbeat and
+  command channel stay on.
+- **Cloud view mode** in the web UI (`window.WP_CLOUD`): the same dashboard,
+  read-only, with staleness measured against the snapshot's own time.
+- Tests for the vendor drivers (fuzzed register contents, known-answer Rover
+  and Modbus vectors, poll-level failure handling).
+
+### Security
+- **Cloud commands must be signed.** Previously a command with no signature
+  was accepted ("grandfathered"), which is exactly what someone with write
+  access to the cloud database could queue (`update`, `restore_from_cloud`).
+  Unsigned commands, commands older than 7 days or dated in the future, and
+  commands that already completed (remembered across restarts) are refused.
+  Signatures now cover a domain tag so they cannot be confused with anything
+  else the cloud's key signs. The cloud must be updated alongside.
+
+### Fixed
+- **"Into battery" was roughly doubled** on any rig with both a shunt and
+  BMS packs: the flow model summed the shunt and every pack. It now uses the
+  bank aggregate (one authoritative source), matching the hero ring.
+- **Modbus replies of the wrong shape.** `verify_response` accepted a
+  CRC-clean reply of the wrong length or with a byte count that disagreed with
+  the frame; the parser then indexed past its data and the resulting
+  `IndexError` escaped `poll()`. Replies must now match the request, and a
+  parser that crashes anyway is contained to its section.
+- **Settings-save and re-pair dropped config fields** added after those
+  handlers were written (they copied `CloudCfg` field by field).
+- The device-settings API's error paths raised `NameError` (missing
+  `HTTPException` import) instead of returning a 4xx.
+- Fresh installs returned 500 on every request when `multidict` 7 was
+  resolved (pinned `<6.7`; Litestar 2.25 cannot build `Headers` with it).
+
 ## [0.1.188] - 2026-06-16
 
 ### Fixed
