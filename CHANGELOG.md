@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Tests: node-based tests for the chart logic (`tests/js/`, run from pytest): x-axis window, range stats, forecast interpolation, unit labels. Skipped where node isn't installed.
 - Internal: split UI script `08-network-system.js` into `08-network.js` and `08b-system.js` (cache-buster bumped to 290). No behaviour change.
 - Internal: split `api/app.py` (per-device routes into `devices_api.py`, HTML pages and login into `pages_auth.py`). No behaviour change; function bodies and the route table are identical.
 - Internal: split `storage/sqlite.py` (analytics and outputs into mixin modules) and `api/setup.py` (device discovery scans into `setup_scan.py`). No behaviour change; function bodies and the route table are identical.
