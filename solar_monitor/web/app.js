@@ -1527,25 +1527,12 @@ function buildFlowModel() {
       return "Silent, no broadcast since restart";
     })();
 
-    if (mapping.battery) {
-      // Smart batteries: sum V × I across packs. Shunts: power_w
-      // (already V × I aggregated by the driver). Hybrid inverters
-      // pass `battery: { vMetric, aMetric, pMetric }` so the flow
-      // model knows to read their per-domain battery fields rather
-      // than the generic voltage_v / current_a (which would clash
-      // with the inverter's ac_output_voltage_v on the same device).
-      const overrides = (typeof mapping.battery === "object") ? mapping.battery : null;
-      const vKey = overrides?.vMetric || "voltage_v";
-      const aKey = overrides?.aMetric || "current_a";
-      const pKey = overrides?.pMetric || "power_w";
-      if (isSilent) {
-        // pass, stale battery contributes nothing
-      } else if (typeof l[vKey] === "number" && typeof l[aKey] === "number") {
-        batteryNetW += l[vKey] * l[aKey];
-      } else if (typeof l[pKey] === "number") {
-        batteryNetW += l[pKey];
-      }
-    }
+    // Battery power is deliberately not accumulated per device here: a shunt
+    // and the BMS packs measure the same current, so summing every
+    // battery-mapped device double-counted it on any rig with both (~2x "Into
+    // battery"). The bank's net power comes from aggregateBank() below, which
+    // picks one authoritative source (shunt, else BMS packs, else inverter)
+    // and skips stale devices.
     // Sources: ALWAYS render configured sources, even when they're at 0 W.
     // A user who's set up an MPPT wants to see it on the dashboard at all
     // times, "0 W idle" is informative; hiding the tile makes the system
@@ -1623,6 +1610,7 @@ function buildFlowModel() {
   }
 
   const bank = aggregateBank();
+  batteryNetW = bank ? bank.netW : 0;
 
   // Energy-balance inference: anything the bank is gaining/losing that we
   // can't account for from visible sources/loads is an unmeasured load
