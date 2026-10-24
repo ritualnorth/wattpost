@@ -181,3 +181,14 @@ def test_view_batch_never_exceeds_cloud_limit():
         assert any(k.startswith("device/") for k in second)    # the overflow follows
         await st.close()
     asyncio.run(go())
+
+
+def test_a_moving_wall_clock_window_does_not_look_like_a_change():
+    """The heatmap's since_ts/until_ts tick every second; the hash must ignore
+    them or the view is re-uploaded every interval (and this suite flakes
+    whenever a second boundary falls between two builds)."""
+    from solar_monitor.cloud.views import _stable
+    a = {"since_ts": 1, "until_ts": 100, "cells": [1, 2]}
+    b = {"since_ts": 2, "until_ts": 101, "cells": [1, 2]}
+    assert _stable(a) == _stable(b)
+    assert _stable(a) != _stable({**b, "cells": [1, 3]})

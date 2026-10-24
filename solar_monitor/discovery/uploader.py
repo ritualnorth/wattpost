@@ -80,15 +80,19 @@ async def push_observations(
     if not body:
         return True
     url = f"{endpoint.rstrip('/')}/api/internal/discovery"
+    import json as _json
+    from ..cloud import request_sign as _rs
+    raw = _json.dumps({"items": body}, separators=(",", ":")).encode("utf-8")
     headers = {
         "Authorization": f"Bearer {bearer_token}",
         "Content-Type":  "application/json",
     }
+    headers.update(_rs.signed_headers("POST", url, raw))
     try:
         async with httpx.AsyncClient(
             timeout=timeout, follow_redirects=True,
         ) as client:
-            r = await client.post(url, headers=headers, json={"items": body})
+            r = await client.post(url, headers=headers, content=raw)
         if 200 <= r.status_code < 300:
             log.info("discovery: pushed %d fingerprints to cloud", len(body))
             return True

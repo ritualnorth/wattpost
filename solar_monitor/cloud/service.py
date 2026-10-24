@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 
 from ..config import CloudCfg
+from . import request_sign as _request_sign
 
 log = logging.getLogger(__name__)
 
@@ -389,30 +390,15 @@ class CloudService:
             log.warning("identity v2: cloud round-trip failed: %s, "
                         "will retry on next boot", e)
 
-    def _signed_headers(self, body: bytes) -> dict[str, str]:
-        """ed25519 request-signature headers for `body`.
+    def _signed_headers(self, body: bytes, method: str, url: str) -> dict[str, str]:
+        """ed25519 request-signature headers (scheme v2) for one request.
 
-        Signed form is `"v1\n<ts>\n<body>"`: the version tag is pinned so a
-        future scheme can be told apart, and the cloud checks `ts` is fresh
-        (5 min) to cap replay. With these headers a leaked bearer token alone
-        can't forge requests. Best effort: a keypair load failure returns no
-        headers (the cloud refuses unsigned ingest; the heartbeat still
-        grandfathers it)."""
-        try:
-            from datetime import datetime, timezone
-            from ..auth import keypair as _kp
-            import base64 as _b64
-            kp = _kp.load_or_create()
-            ts = datetime.now(timezone.utc).isoformat()
-            sig = kp.sign(b"v1\n" + ts.encode("ascii") + b"\n" + body)
-            return {
-                "X-WP-Heartbeat-Ts":  ts,
-                "X-WP-Heartbeat-Fp":  kp.fingerprint,
-                "X-WP-Heartbeat-Sig": _b64.urlsafe_b64encode(sig).rstrip(b"=").decode("ascii"),
-            }
-        except Exception:
-            log.exception("request signing skipped")
-            return {}
+        The method and request target (path + query) are inside the signed
+        bytes, so a captured signed body can't be replayed at another
+        endpoint, and a leaked bearer token alone can't act as this
+        appliance. See request_sign.py. Best effort: a keypair load failure
+        returns no headers and the cloud refuses the request."""
+        return _request_sign.signed_headers(method, url, body)
 
     async def heartbeat_once(self) -> bool:
         """Build + send one heartbeat. Returns True on 2xx, False on
@@ -438,7 +424,7 @@ class CloudService:
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
         }
-        headers.update(self._signed_headers(body_bytes))
+        headers.update(self._signed_headers(body_bytes, "POST", url))
         try:
             # follow_redirects=True so an appliance still pointing at
             # an older hostname (e.g. https://wattpost.io after we
@@ -1162,6 +1148,7 @@ class CloudService:
         url = (f"{self.cfg.endpoint.rstrip('/')}/api/internal/backups/"
                f"{backup_id}/download")
         headers = {"Authorization": f"Bearer {self.cfg.bearer_token}"}
+        headers.update(self._signed_headers(b"", "GET", url))
         try:
             async with httpx.AsyncClient(
                 timeout=300, follow_redirects=True,
@@ -1442,15 +1429,19 @@ class CloudService:
         if status in ("success", "failed"):
             # Terminal: remember it so a replay of this signed command is refused.
             self._ledger().record(cmd_id)
+        # Pre-serialise: the signature covers the exact bytes sent.
+        import json as _json
+        body_bytes = _json.dumps(body, separators=(",", ":")).encode("utf-8")
         headers = {
             "Authorization": f"Bearer {self.cfg.bearer_token}",
             "Content-Type":  "application/json",
         }
+        headers.update(self._signed_headers(body_bytes, "PATCH", url))
         try:
             async with httpx.AsyncClient(
                 timeout=10.0, follow_redirects=True,
             ) as client:
-                r = await client.patch(url, json=body, headers=headers)
+                r = await client.patch(url, content=body_bytes, headers=headers)
             if r.status_code >= 400:
                 log.warning(
                     "cloud command status PATCH HTTP %s for cmd %d→%s: %s",

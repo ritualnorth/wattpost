@@ -73,7 +73,7 @@ class FakeCloud:
 def _sync(store, cloud, backfill_h=1):
     return rs.RollupSync(
         store=store, endpoint=lambda: "https://cloud.test", bearer=lambda: "tok",
-        sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: backfill_h,
+        sign=lambda raw, *a: {"x-test-sig": "ok"}, backfill_hours=lambda: backfill_h,
         client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)),
     )
 
@@ -293,7 +293,7 @@ def test_loop_pushes_at_lease_interval_and_returns_to_normal():
             return httpx.Response(200, json={"acked_through": top, **lease})
 
         sync = rs.RollupSync(
-            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b, *a: {},
             backfill_hours=lambda: 1,
             client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
         waits = []
@@ -317,7 +317,7 @@ def test_uploads_switched_off_send_nothing_and_resume_when_switched_on():
         cloud = FakeCloud()
         flag = {"on": False}
         sync = rs.RollupSync(
-            store=st, endpoint=lambda: "https://c", bearer=lambda: "tok", sign=lambda b: {"x-test-sig": "ok"},
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "tok", sign=lambda b, *a: {"x-test-sig": "ok"},
             backfill_hours=lambda: 1, enabled=lambda: flag["on"],
             client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
         waits = []
@@ -349,7 +349,7 @@ def test_switching_uploads_back_on_wakes_a_sleeping_loop_quickly():
         try:
             sync = rs.RollupSync(
                 store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
-                sign=lambda b: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+                sign=lambda b, *a: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
                 enabled=lambda: flag["on"],
                 client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
             stop = asyncio.Event()
@@ -403,7 +403,7 @@ def test_loop_never_sleeps_past_the_lease():
                 "acked_through": top, "live": {"ttl_s": 5, "interval_s": 10**9}})
 
         sync = rs.RollupSync(
-            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b, *a: {},
             backfill_hours=lambda: 1,
             client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
         waits = []
@@ -583,7 +583,7 @@ def test_post_body_is_strict_json_even_with_nan_in_views():
             def confirm(self, names): pass
 
         sync = rs.RollupSync(
-            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b: {},
+            store=st, endpoint=lambda: "https://c", bearer=lambda: "t", sign=lambda b, *a: {},
             backfill_hours=lambda: 1, views=V(),
             client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(handler)))
         res = await sync.run_once(now=T0 + 400)
@@ -695,7 +695,7 @@ def test_watermark_is_reset_when_appliance_or_endpoint_changes():
         def mk():
             return rs.RollupSync(
                 store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
-                sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+                sign=lambda raw, *a: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
                 identity=lambda: ident["v"],
                 client_factory=lambda: httpx.AsyncClient(
                     transport=httpx.MockTransport(cloud.handler)))
@@ -722,7 +722,7 @@ def test_legacy_watermark_without_identity_is_kept():
         cloud = FakeCloud()
         sync = rs.RollupSync(
             store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
-            sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
+            sign=lambda raw, *a: {"x-test-sig": "ok"}, backfill_hours=lambda: 1,
             identity=lambda: "7|https://a",
             client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
         await sync.run_once(now=T0 + 400)
@@ -801,7 +801,7 @@ def test_views_are_built_once_per_run_not_per_batch():
             cloud = FakeCloud()
             sync = rs.RollupSync(
                 store=st, endpoint=lambda: "https://c", bearer=lambda: "tok",
-                sign=lambda raw: {"x-test-sig": "ok"}, backfill_hours=lambda: 1, views=V(),
+                sign=lambda raw, *a: {"x-test-sig": "ok"}, backfill_hours=lambda: 1, views=V(),
                 client_factory=lambda: httpx.AsyncClient(transport=httpx.MockTransport(cloud.handler)))
             res = await sync.run_once(now=T0 + 400)
         finally:

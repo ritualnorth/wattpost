@@ -65,6 +65,10 @@ def make_uploader(
                 "cloud backup: signing skipped (%s), uploading "
                 "unsigned; restore from this row will warn", e,
             )
+        # The request signature (method + path + body) is separate from the
+        # archive signature above: it proves this request came from us.
+        from ..cloud import request_sign as _rs
+        headers.update(await asyncio.to_thread(_rs.signed_headers, "POST", url, data))
         async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT_S) as client:
             r = await client.post(url, content=data, headers=headers)
         if r.status_code == 402:

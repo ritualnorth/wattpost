@@ -180,5 +180,7 @@ async def _weather_history(config, store, bucket: int, span: int | None, wcfg) -
 
 def _stable(body: dict[str, Any]) -> dict[str, Any]:
     """Drop fields that change every call but carry no information, so the
-    change-detection hash does not fire on a ticking clock."""
-    return {k: v for k, v in body.items() if k not in ("ts", "now_ts")}
+    change-detection hash does not fire on a ticking clock. `since_ts` /
+    `until_ts` are the heatmap's wall-clock window bounds: they move every
+    second while the data under them has not changed."""
+    return {k: v for k, v in body.items() if k not in ("ts", "now_ts", "since_ts", "until_ts")}

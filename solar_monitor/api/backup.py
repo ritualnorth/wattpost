@@ -750,6 +750,13 @@ def _cloud_creds(state: State) -> tuple[str, str]:
     return cfg.cloud.endpoint.rstrip("/"), cfg.cloud.bearer_token
 
 
+def _cloud_headers(token: str, url: str) -> dict[str, str]:
+    """Bearer plus the request signature for a bodiless GET to `url`."""
+    from ..cloud import request_sign
+    return {"Authorization": f"Bearer {token}",
+            **request_sign.signed_headers("GET", url, b"")}
+
+
 @get("/api/system/backup/cloud-list")
 async def backup_cloud_list(state: State) -> dict[str, Any]:
     """List the appliance's cloud-side backups. Bare proxy through
@@ -768,7 +775,7 @@ async def backup_cloud_list(state: State) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{endpoint}/api/internal/backups/list",
-            headers={"Authorization": f"Bearer {token}"},
+            headers=_cloud_headers(token, f"{endpoint}/api/internal/backups/list"),
         )
     if r.status_code == 404:
         return {"backups": [], "not_yet_available": True}
@@ -810,7 +817,7 @@ async def backup_cloud_toggle(request: Request, state: State) -> dict[str, Any]:
         async with _httpx.AsyncClient(timeout=15) as client:
             r = await client.get(
                 f"{endpoint}/api/internal/backups/list",
-                headers={"Authorization": f"Bearer {token}"},
+                headers=_cloud_headers(token, f"{endpoint}/api/internal/backups/list"),
             )
         if r.status_code == 402:
             raise HTTPException(
@@ -990,7 +997,8 @@ async def backup_cloud_restore(backup_id: int, state: State) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=300) as client:
         r = await client.get(
             f"{endpoint}/api/internal/backups/{backup_id}/download",
-            headers={"Authorization": f"Bearer {token}"},
+            headers=_cloud_headers(
+                token, f"{endpoint}/api/internal/backups/{backup_id}/download"),
         )
     if r.status_code >= 400:
         raise HTTPException(status_code=r.status_code, detail=r.text[:300])

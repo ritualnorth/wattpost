@@ -215,9 +215,14 @@ async def ensure_cert(*, endpoint: str, bearer_token: str) -> bool:
         "Authorization": f"Bearer {bearer_token}",
         "Content-Type":  "application/json",
     }
+    # The cloud wants this signed (it already holds our public key from
+    # /upgrade). Pre-serialise: the signature covers the exact bytes sent.
+    req_body = b"{}"
+    from . import request_sign as _rs
+    headers.update(_rs.signed_headers("POST", url, req_body))
     try:
         async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
-            r = await client.post(url, json={}, headers=headers)
+            r = await client.post(url, content=req_body, headers=headers)
     except Exception as e:
         log.warning("mtls: /issue request failed: %s, will retry next boot", e)
         return False
