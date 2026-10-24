@@ -108,6 +108,29 @@ def _disk_save_jwks(keys: list[dict[str, Any]]) -> None:
                     "in-memory cache will still be used", e)
 
 
+MAX_JWKS_REDIRECTS = 3
+
+
+async def _get_same_host(client: httpx.AsyncClient, url: str) -> httpx.Response:
+    """GET `url`, following redirects only while they stay on the original
+    host and never downgrade to cleartext (http only for loopback). The JWKS
+    is a trust anchor; a redirect must not be able to move it elsewhere."""
+    from ..urlcheck import host_of, scheme_ok
+    origin = host_of(url)
+    for _ in range(MAX_JWKS_REDIRECTS + 1):
+        r = await client.get(url)
+        if not r.is_redirect:
+            return r
+        loc = r.headers.get("location")
+        if not loc:
+            return r
+        nxt = str(httpx.URL(url).join(loc))
+        if host_of(nxt) != origin or not scheme_ok(nxt):
+            raise RuntimeError(f"JWKS redirect to {nxt!r} refused (different host or scheme)")
+        url = nxt
+    raise RuntimeError("too many JWKS redirects")
+
+
 async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, Any]]:
     """Return the current JWKS keys list. Cached in-memory + on-disk.
 
@@ -121,8 +144,8 @@ async def fetch_jwks(jwks_url: str, *, force: bool = False) -> list[dict[str, An
         return cache.keys
 
     try:
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            r = await client.get(jwks_url)
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
+            r = await _get_same_host(client, jwks_url)
             r.raise_for_status()
             body = r.json()
             keys = body.get("keys") or []

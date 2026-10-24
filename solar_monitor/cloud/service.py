@@ -281,7 +281,8 @@ class CloudService:
                         )):
                             try:
                                 from ..auth import oidc_config as _oidc_cfg
-                                _oidc_cfg.save(
+                                _oidc_cfg.save_from_cloud(
+                                    endpoint=self.cfg.endpoint,
                                     client_id=body["oidc_client_id"],
                                     redirect_uri=body["oidc_redirect_uri"],
                                     jwks_url=body["jwks_url"],
@@ -347,7 +348,8 @@ class CloudService:
                 )):
                     try:
                         from ..auth import oidc_config as _oidc_cfg
-                        _oidc_cfg.save(
+                        _oidc_cfg.save_from_cloud(
+                            endpoint=self.cfg.endpoint,
                             client_id=body["oidc_client_id"],
                             redirect_uri=body["oidc_redirect_uri"],
                             jwks_url=body["jwks_url"],

@@ -106,10 +106,10 @@ async def update_cloud_config(
             status_code=400,
             detail="heartbeat_minutes must be between 1 and 60",
         )
-    if not data.endpoint.startswith(("http://", "https://")):
-        raise HTTPException(
-            status_code=400, detail="endpoint must be http(s) URL",
-        )
+    from ..urlcheck import endpoint_problem
+    problem = endpoint_problem(data.endpoint)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
     if data.telemetry_minutes is not None and not (1 <= data.telemetry_minutes <= 60):
         raise HTTPException(
             status_code=400, detail="telemetry_minutes must be between 1 and 60",
@@ -158,6 +158,10 @@ async def pair_appliance(
     code = (data.code or "").strip().upper()
     if not code:
         raise HTTPException(status_code=400, detail="code is required")
+    from ..urlcheck import endpoint_problem
+    problem = endpoint_problem(data.endpoint)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
 
     url = f"{data.endpoint.rstrip('/')}/api/pair/exchange"
     try:

@@ -91,6 +91,14 @@ Versions follow [Semantic Versioning].
   equal the newest bucket sent and a watermark in the future is ignored; at
   most 20 commands per heartbeat are considered and an unknown signing key
   forces at most one JWKS refetch per heartbeat and per minute.
+- **Cloud-supplied trust-anchor URLs are validated.** The JWKS, OIDC
+  discovery and redirect URLs in the identity reply are only saved when they
+  are https (http only for loopback in development) and on the host of the
+  configured cloud endpoint; otherwise the previous config is kept and a
+  warning logged. JWKS fetches no longer follow redirects to another host,
+  and `http://` cloud endpoints are rejected by `PUT /api/cloud/config` and
+  pairing unless the host is loopback. Already-saved OIDC config keeps
+  working.
 
 ### Fixed
 - **"Into battery" was roughly doubled** on any rig with both a shunt and

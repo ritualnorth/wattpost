@@ -46,4 +46,7 @@ def make_client(monkeypatch, tmp_path, *, web=None, password="correct-horse-1"):
     if password is not None:
         wa.write_password_hash(password)
     app = build_app(cfg, str(tmp_path / "db.sqlite"), config_path=str(cfg_path))
+    # on_startup (not run here) normally fills these in
+    app.state["config"] = cfg
+    app.state["config_path"] = str(cfg_path)
     return TestClient(app)
