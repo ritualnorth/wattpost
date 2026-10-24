@@ -69,8 +69,15 @@ def expected_read_response_len(word_count: int) -> int:
 EXPECTED_WRITE_SINGLE_RESPONSE_LEN = 8
 
 
-def verify_response(resp: bytes, slave_id: int, expected_fc: int = 3) -> None:
+def verify_response(
+    resp: bytes, slave_id: int, expected_fc: int = 3, expected_len: int | None = None,
+) -> None:
     """Raise ValueError if the response doesn't look like a clean reply.
+
+    With `expected_len` (read replies) the frame must be exactly that long and
+    its byte-count field must agree. CRC alone isn't enough: a valid reply to
+    a different request, or a shorter one, is CRC-clean but would send a
+    parser indexing past the end of the data.
 
     `expected_fc` defaults to 3 (read holding) for backwards compat with
     every existing caller; pass 6 for FC06 write-single. Exception
@@ -89,3 +96,8 @@ def verify_response(resp: bytes, slave_id: int, expected_fc: int = 3) -> None:
     # CRC verify (optional, most transports already do this implicitly)
     if crc16(resp[:-2]) != resp[-2:]:
         raise ValueError("CRC mismatch")
+    if expected_len is not None:
+        if len(resp) != expected_len:
+            raise ValueError(f"reply is {len(resp)} bytes, expected {expected_len}")
+        if resp[2] != expected_len - 5:
+            raise ValueError(f"byte count {resp[2]} disagrees with frame ({expected_len - 5} data bytes)")

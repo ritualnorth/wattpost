@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import abc
 import asyncio
+import logging
 from typing import Callable, Sequence
 
 import msgspec
@@ -28,6 +29,9 @@ from ..modbus import (
     verify_response,
 )
 from ..transport import Transport, TransportError
+
+
+log = logging.getLogger(__name__)
 
 
 class Section(msgspec.Struct, frozen=True):
@@ -153,10 +157,15 @@ class DeviceDriver(abc.ABC):
             expected = expected_read_response_len(section.word_count)
             try:
                 resp = await transport.request(frame, expected, timeout=5.0)
-                verify_response(resp, self.slave_id, expected_fc=fc)
+                verify_response(resp, self.slave_id, expected_fc=fc, expected_len=expected)
                 result.update(section.parser(resp))
             except (TransportError, ValueError) as e:
                 result.setdefault("_errors", []).append(
                     f"section {section.name or section.register}: {e}"
+                )
+            except Exception as e:  # noqa: BLE001 — a parser bug must not kill the whole poll
+                log.exception("%s: parser for section %s crashed", self.label, section.name or section.register)
+                result.setdefault("_errors", []).append(
+                    f"section {section.name or section.register}: parser error ({type(e).__name__})"
                 )
         return result
