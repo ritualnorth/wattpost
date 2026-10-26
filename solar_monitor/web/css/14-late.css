@@ -19,8 +19,18 @@ a { color: var(--accent); }
   }
   .help-btn { min-width: 44px; }
   .set-back { padding: .6rem .4rem .6rem 0; }
-  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; }  /* WCAG 2.2 minimum target */
   .settings-toggle, label.settings-toggle { min-height: 44px; }
+  /* The :where(select) default below has the same (zero) specificity and comes later, so it
+     won this; real specificity here. Text inputs, action links and the dismissible tip too. */
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  .btn-action, .alerts-add-btn, .tomorrow-empty-cta, .tomorrow-empty-close, .dev-card-del {
+    min-height: 44px;
+  }
+  .btn-action, .alerts-add-btn, .tomorrow-empty-cta { display: inline-flex; align-items: center; justify-content: center; }
+  .tomorrow-empty-close, .dev-card-del { min-width: 44px; }
+  button[data-range] { min-width: 44px; }
 }
 
 /* Cards that should span the whole row of an .ar-card grid (quiet hours). */
