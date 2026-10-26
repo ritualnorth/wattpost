@@ -1,27 +1,27 @@
 /* ---------------- history chart ---------------- */
-.chart-controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.chart-controls { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; }
 .chart-controls label {
-  font-size: .78rem; color: var(--text-2);
+  font-size: var(--fs-xs); color: var(--text-2);
   display: flex; align-items: center; gap: .4rem;
 }
 .chart-controls select {
   background: var(--surface-2); color: var(--text);
   border: 1px solid var(--border);
   padding: .35rem .55rem; border-radius: var(--r-sm);
-  font-size: .85rem; font-family: inherit;
+  font-size: var(--fs-md); font-family: inherit;
 }
-.range-btns { display: flex; gap: .25rem; }
+.range-btns { display: flex; gap: var(--sp-1); }
 .range-btns button {
   background: var(--surface-2); color: var(--text-2);
   border: 1px solid var(--border);
   padding: .35rem .65rem;
   border-radius: var(--r-sm);
-  font-size: .8rem; font-family: inherit;
+  font-size: var(--fs-sm); font-family: inherit;
   cursor: pointer; font-variant-numeric: tabular-nums;
 }
 .range-btns button:hover { color: var(--text); border-color: var(--border-2); }
 .range-btns button.active {
-  color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
+  color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .chart-compare { user-select: none; cursor: pointer; }
 .chart-compare input { margin: 0; cursor: pointer; }
@@ -33,7 +33,7 @@
   border: 1px solid var(--border);
   padding: .35rem .65rem;
   border-radius: var(--r-sm);
-  font-size: .8rem; font-family: inherit;
+  font-size: var(--fs-sm); font-family: inherit;
   cursor: pointer;
   margin-left: auto; /* push to right end of chart-controls */
 }
@@ -50,7 +50,7 @@
   border: 1px solid var(--border);
   padding: .42rem .65rem;
   border-radius: var(--r-sm);
-  font-size: .85rem;
+  font-size: var(--fs-md);
   font-family: inherit;
   min-width: 0;
   max-width: 180px;
@@ -65,8 +65,8 @@
   gap: .65rem;
   flex-wrap: wrap;
   align-items: center;
-  margin: 0 0 1rem;
-  padding: .65rem .75rem;
+  margin: 0 0 var(--sp-4);
+  padding: .65rem var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -78,11 +78,11 @@
 }
 .custom-range label {
   display: flex; flex-direction: column; gap: .2rem;
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: .06em;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .custom-range input[type="datetime-local"] {
   background: var(--surface-3);
@@ -90,7 +90,7 @@
   border: 1px solid var(--border);
   padding: .35rem .55rem;
   border-radius: var(--r-sm);
-  font-size: .85rem;
+  font-size: var(--fs-md);
   font-family: var(--mono);
   color-scheme: dark;  /* dark-mode native picker on Chromium */
   min-width: 170px;
@@ -100,9 +100,9 @@
 .chart-statstrip {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: .5rem;
-  margin: 0 0 1rem;
-  padding: .6rem .5rem;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  padding: .6rem var(--sp-2);
   background: linear-gradient(180deg, var(--surface-2), transparent);
   border: 1px solid var(--border);
   border-radius: var(--r);
@@ -110,24 +110,24 @@
 .cs-cell {
   display: flex; flex-direction: column;
   min-width: 0;
-  padding: 0 .5rem;
+  padding: 0 var(--sp-2);
 }
 .cs-cell + .cs-cell { border-left: 1px solid var(--border-2); }
 .cs-cell .cs-k {
-  font-size: .65rem; color: var(--text-3);
-  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+  font-size: var(--fs-2xs); color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: var(--fw-semibold);
   margin-bottom: .15rem;
 }
 .cs-cell .cs-v {
   font-family: var(--mono);
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cs-cell--now .cs-v { color: var(--accent); font-size: 1.15rem; }
+.cs-cell--now .cs-v { color: var(--accent); font-size: var(--fs-xl); }
 @media (max-width: 720px) {
   .chart-statstrip { grid-template-columns: repeat(2, 1fr); gap: .35rem; }
   .cs-cell + .cs-cell { border-left: none; }
@@ -139,9 +139,9 @@
    / 1-day avg) and how many points are visible. Used to live in the
    stat strip but it's debug context, not a stat. */
 .chart-resbar {
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
-  margin: .25rem 0 .5rem;
+  margin: var(--sp-1) 0 var(--sp-2);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -154,9 +154,9 @@
   pointer-events: none;
   background: var(--surface-2, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   padding: .45rem .65rem;
-  font-size: .76rem;
+  font-size: var(--fs-xs);
   line-height: 1.45;
   color: var(--text);
   box-shadow: 0 6px 18px rgba(0,0,0,0.35);
@@ -166,28 +166,28 @@
 }
 .chart-value-tip strong {
   display: block; margin-bottom: .3rem;
-  font-size: .72rem; color: var(--text-2);
+  font-size: var(--fs-xs); color: var(--text-2);
   text-transform: uppercase; letter-spacing: .04em;
 }
 .chart-value-tip div { color: var(--text-2); }
 .chart-value-tip em {
-  font-style: normal; font-weight: 700; color: var(--text);
+  font-style: normal; font-weight: var(--fw-bold); color: var(--text);
 }
 .chart-value-tip-sw {
-  display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  display: inline-block; width: 8px; height: 8px; border-radius: var(--r-2xs);
   margin-right: .35rem; vertical-align: middle;
 }
 
 /* ----- The chart itself ----- */
 .chart-host {
   min-height: 380px;
-  padding-bottom: .5rem;
+  padding-bottom: var(--sp-2);
 }
 /* Style uPlot's own legend + crosshair to feel like part of the design */
 .u-legend {
-  margin-top: .5rem !important;
+  margin-top: var(--sp-2) !important;
   font-family: var(--font) !important;
-  font-size: .82rem !important;
+  font-size: var(--fs-sm) !important;
   color: var(--text-2) !important;
 }
 .u-legend .u-label, .u-legend .u-value { color: var(--text) !important; }

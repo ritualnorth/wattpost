@@ -1,5 +1,5 @@
 /* ---------------- setup wizard ---------------- */
-.wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0; }
+.wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: var(--sp-1) 0; }
 .wiz-step { display: flex; flex-direction: column; gap: 0.6rem; }
 
 /* BLE-adapter status banner at the top of the wizard. Lights up
@@ -9,8 +9,8 @@
 .wiz-ble-status {
   display: flex; align-items: center; gap: .55rem;
   padding: .55rem .8rem;
-  border-radius: 8px;
-  font-size: .9rem;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-base);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
@@ -19,45 +19,45 @@
   background: var(--text-3);
   flex-shrink: 0;
 }
-.wiz-ble-status.wiz-ble-ok   { border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.08); }
-.wiz-ble-status.wiz-ble-ok   .wiz-ble-dot { background: #3fb950; }
-.wiz-ble-status.wiz-ble-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.08); }
-.wiz-ble-status.wiz-ble-warn .wiz-ble-dot { background: #d29922; }
-.wiz-ble-status.wiz-ble-bad  { border-color: rgba(248, 81, 73, 0.4); background: rgba(248, 81, 73, 0.08); }
-.wiz-ble-status.wiz-ble-bad  .wiz-ble-dot { background: #f85149; }
-.wiz-ble-warn-text { color: #d29922; }
+.wiz-ble-status.wiz-ble-ok   { border-color: color-mix(in srgb, var(--green) 40%, transparent); background: color-mix(in srgb, var(--green) 8%, transparent); }
+.wiz-ble-status.wiz-ble-ok   .wiz-ble-dot { background: var(--green); }
+.wiz-ble-status.wiz-ble-warn { border-color: color-mix(in srgb, var(--amber) 40%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+.wiz-ble-status.wiz-ble-warn .wiz-ble-dot { background: var(--amber); }
+.wiz-ble-status.wiz-ble-bad  { border-color: color-mix(in srgb, var(--red) 40%, transparent); background: color-mix(in srgb, var(--red) 8%, transparent); }
+.wiz-ble-status.wiz-ble-bad  .wiz-ble-dot { background: var(--red); }
+.wiz-ble-warn-text { color: var(--amber); }
 .wiz-ble-status code { background: transparent; padding: 0; font-size: .85em; }
 
 /* BLE diagnostic widget (#158). Sits below the status pill, expands
  * into a counts + verdict box when the user clicks Run diagnostics.
  * Colour tracks the verdict similar to the status pill. */
-.wiz-ble-diag-row { margin: -.4rem 0 .85rem .25rem; display: flex; align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
-.wiz-ble-diag-row .btn-sm { font-size: .78rem; padding: .2rem .6rem; }
+.wiz-ble-diag-row { margin: -.4rem 0 .85rem var(--sp-1); display: flex; align-items: flex-start; gap: var(--sp-3); flex-wrap: wrap; }
+.wiz-ble-diag-row .btn-sm { font-size: var(--fs-xs); padding: .2rem .6rem; }
 .wiz-ble-diag-out {
   flex: 1 1 240px; min-width: 240px;
-  font-size: .85rem; line-height: 1.35;
-  padding: .55rem .75rem; border: 1px solid var(--surface-3);
-  border-radius: 8px; background: var(--surface-1);
+  font-size: var(--fs-md); line-height: 1.35;
+  padding: .55rem var(--sp-3); border: 1px solid var(--surface-3);
+  border-radius: var(--r-sm); background: var(--surface-1);
 }
-.wiz-ble-diag-counts { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.wiz-ble-diag-counts { display: flex; gap: var(--sp-2); align-items: center; flex-wrap: wrap; }
 .wiz-ble-diag-suggest { margin-top: .4rem; opacity: .85; }
-.wiz-ble-diag-err { color: #f85149; }
+.wiz-ble-diag-err { color: var(--red); }
 .wiz-ble-diag-running { color: var(--text-muted); }
-.wiz-ble-diag-ok   { border-color: rgba(63, 185, 80, 0.4);  background: rgba(63, 185, 80, 0.06); }
-.wiz-ble-diag-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
-.wiz-ble-diag-bad  { border-color: rgba(248, 81, 73, 0.4);  background: rgba(248, 81, 73, 0.06); }
+.wiz-ble-diag-ok   { border-color: color-mix(in srgb, var(--green) 40%, transparent);  background: color-mix(in srgb, var(--green) 6%, transparent); }
+.wiz-ble-diag-warn { border-color: color-mix(in srgb, var(--amber) 40%, transparent); background: color-mix(in srgb, var(--amber) 6%, transparent); }
+.wiz-ble-diag-bad  { border-color: color-mix(in srgb, var(--red) 40%, transparent);  background: color-mix(in srgb, var(--red) 6%, transparent); }
 
 /* History & polling editor (#172). Two-column form rows; numeric input
  * with a unit suffix on the right. Match the dashboard's settings-row
  * grammar so the new tile sits naturally beside the existing rows. */
-.hist-form { display: flex; flex-direction: column; gap: .5rem; }
-.hist-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .9rem; min-width: 0; }
+.hist-form { display: flex; flex-direction: column; gap: var(--sp-2); }
+.hist-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-base); min-width: 0; }
 .hist-row > span:first-child { color: var(--text-muted); min-width: 0; }
 .hist-input { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; max-width: 100%; }
 .hist-input input {
   width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums;
-  padding: .25rem .4rem; border: 1px solid var(--surface-3);
-  border-radius: 6px; background: var(--surface-1); color: inherit;
+  padding: var(--sp-1) .4rem; border: 1px solid var(--surface-3);
+  border-radius: var(--r-xs); background: var(--surface-1); color: inherit;
 }
 /* Free-text settings fields (hotspot SSID / WPA password) — fill the row
    and left-align, instead of the narrow right-aligned numeric default, so
@@ -78,23 +78,23 @@
   max-width: 14rem;
   min-width: 0;
   text-overflow: ellipsis;
-  padding: .25rem .4rem; border: 1px solid var(--surface-3);
-  border-radius: 6px; background: var(--surface-1); color: inherit;
+  padding: var(--sp-1) .4rem; border: 1px solid var(--surface-3);
+  border-radius: var(--r-xs); background: var(--surface-1); color: inherit;
   font: inherit;
 }
-.hist-input .hist-unit { color: var(--text-muted); font-size: .82rem; min-width: 3.5rem; }
+.hist-input .hist-unit { color: var(--text-muted); font-size: var(--fs-sm); min-width: 3.5rem; }
 .hist-actions { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-top: .35rem; }
 .hist-status { margin: 0; }
-.hist-status--ok  { color: var(--success, #3fb950); }
-.hist-status--err { color: #f85149; }
+.hist-status--ok  { color: var(--success, var(--green)); }
+.hist-status--err { color: var(--red); }
 
 /* "Find my dongle" result rows. Each is a flex card with the device
  * name + MAC on the left and a "Use this" button on the right. */
 .wiz-result-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem;
+  gap: var(--sp-4);
   padding: .65rem .8rem;
-  border: 1px solid var(--border); border-radius: 8px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface-2);
   margin-top: .55rem;
 }
@@ -118,15 +118,15 @@
   width: 36px;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   color: var(--text-3);
   cursor: pointer;
   transition: color .12s, border-color .12s, background .12s;
 }
 .wiz-transport-del:hover {
-  color: #f85149;
-  border-color: rgba(248, 81, 73, 0.6);
-  background: rgba(248, 81, 73, 0.08);
+  color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 60%, transparent);
+  background: color-mix(in srgb, var(--red) 8%, transparent);
 }
 .wiz-transport-del svg { width: 16px; height: 16px; }
 /* On narrow viewports the trash + pencil buttons crowd the
@@ -134,7 +134,7 @@
  * a notch so a 390 px iPhone still fits id + pill + 2 action
  * buttons on one line. */
 @media (max-width: 420px) {
-  .wiz-transport-row { gap: .25rem; }
+  .wiz-transport-row { gap: var(--sp-1); }
   .wiz-transport-del { width: 32px; }
   .wiz-transport-del svg { width: 14px; height: 14px; }
 }
@@ -145,8 +145,8 @@
  * a minute ago, where is it?". Amber tint = informational, not
  * an error. */
 .wiz-missing {
-  border: 1px solid rgba(210, 153, 34, 0.35);
-  background: rgba(210, 153, 34, 0.08);
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
   border-radius: var(--r);
   padding: .65rem .8rem;
   margin: 0 0 .65rem;
@@ -156,19 +156,19 @@
   align-items: baseline;
   margin-bottom: .35rem;
   color: var(--text);
-  font-size: .88rem;
+  font-size: var(--fs-md);
 }
 .wiz-missing-row {
-  display: flex; gap: .75rem;
+  display: flex; gap: var(--sp-3);
   align-items: flex-start; justify-content: space-between;
   padding: .35rem 0;
-  border-top: 1px dashed rgba(210, 153, 34, 0.20);
-  font-size: .85rem;
+  border-top: 1px dashed color-mix(in srgb, var(--amber) 20%, transparent);
+  font-size: var(--fs-md);
 }
 .wiz-missing-row:first-of-type { border-top: none; }
 .wiz-missing-cause {
   color: var(--text-2);
-  font-size: .78rem;
+  font-size: var(--fs-xs);
   text-align: right;
   max-width: 55%;
   line-height: 1.4;
@@ -178,15 +178,15 @@
   display: inline-block;
   margin-left: .4rem;
   padding: 1px 7px;
-  font-size: .72rem;
-  border-radius: 999px;
-  background: rgba(63, 185, 80, 0.12);
-  color: #3fb950;
-  border: 1px solid rgba(63, 185, 80, 0.32);
+  font-size: var(--fs-xs);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  color: var(--green);
+  border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
 }
 .wiz-step-head {
   display: inline-flex; align-items: center; gap: 0.55rem;
-  font-weight: 600; color: var(--text);
+  font-weight: var(--fw-semibold); color: var(--text);
 }
 .wiz-num {
   width: 22px; height: 22px;
@@ -194,10 +194,10 @@
   border-radius: 50%;
   background: var(--accent);
   color: var(--bg);
-  font-size: 0.78rem; font-weight: 700;
+  font-size: var(--fs-xs); font-weight: var(--fw-bold);
 }
-.wiz-help { color: var(--text-2); font-size: 0.88rem; margin: 0; }
-.wiz-transports { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-help { color: var(--text-2); font-size: var(--fs-md); margin: 0; }
+.wiz-transports { display: flex; flex-direction: column; gap: var(--sp-2); }
 .wiz-transport {
   display: flex; align-items: center; justify-content: space-between;
   gap: 0.6rem;
@@ -217,8 +217,8 @@
   background: var(--surface-3);
 }
 .wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
-.wiz-transport-id { font-weight: 600; }
-.wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
+.wiz-transport-id { font-weight: var(--fw-semibold); }
+.wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: var(--fs-xs); }
 /* Status pill on each transport row, one-line nowrap, ellipsis if
  * something larger ever lands. Previous copy "offline · will
  * reconnect on scan" was misleading (the daemon auto-retries every
@@ -230,19 +230,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 14rem;
-  font-size: 0.72rem; font-weight: 600;
-  padding: 0.15rem 0.55rem; border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  padding: 0.15rem 0.55rem; border-radius: var(--r-pill);
   text-transform: uppercase; letter-spacing: 0.06em;
 }
-.wiz-transport-state.on  { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-transport-state.on  { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
 .wiz-transport-state.off { background: rgba(107,118,137,0.12); color: var(--text-3); }
-.wiz-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
-.wiz-status { color: var(--text-2); font-size: 0.88rem; }
-.wiz-results { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-controls { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.wiz-status { color: var(--text-2); font-size: var(--fs-md); }
+.wiz-results { display: flex; flex-direction: column; gap: var(--sp-2); }
 .wiz-empty {
   color: var(--text-3);
-  font-size: 0.88rem;
-  padding: 0.85rem 1rem;
+  font-size: var(--fs-md);
+  padding: 0.85rem var(--sp-4);
   background: var(--surface-2);
   border: 1px dashed var(--border);
   border-radius: var(--r);
@@ -252,7 +252,7 @@
    * compete for attention while live results stream in below it. */
   background: transparent;
   border: 0;
-  padding: 0.5rem 0;
+  padding: var(--sp-2) 0;
   color: var(--text-3);
   font-style: italic;
 }
@@ -271,7 +271,7 @@
 }
 .wiz-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--sp-3);
   padding: 0.65rem 0.85rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -279,22 +279,22 @@
   transition: background 0.15s, opacity 0.2s;
 }
 .wiz-row.known { opacity: 0.65; }
-.wiz-row-main { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1 1 0; }
-.wiz-row-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.wiz-row-main { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; flex: 1 1 0; }
+.wiz-row-title { display: flex; align-items: baseline; gap: var(--sp-2); }
 .wiz-row-slave {
-  font-family: var(--mono); font-weight: 600; color: var(--text-3);
-  font-size: 0.82rem;
+  font-family: var(--mono); font-weight: var(--fw-semibold); color: var(--text-3);
+  font-size: var(--fs-sm);
 }
-.wiz-row-model { font-weight: 600; color: var(--text); }
+.wiz-row-model { font-weight: var(--fw-semibold); color: var(--text); }
 .wiz-row-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .wiz-tag {
-  font-size: 0.72rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
+  font-size: var(--fs-xs);
+  padding: 0.1rem var(--sp-2);
+  border-radius: var(--r-pill);
   background: var(--surface-3);
   color: var(--text-2);
 }
-.wiz-tag--known { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-tag--known { background: color-mix(in srgb, var(--green) 12%, transparent); color: var(--green); }
 .wiz-row-action { flex-shrink: 0; }
 .wiz-add-form {
   display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
@@ -307,26 +307,26 @@
   border-radius: var(--r-sm);
   font: inherit;
   font-family: var(--mono);
-  font-size: 0.85rem;
+  font-size: var(--fs-md);
   min-width: 10rem;
 }
 .wiz-saved {
-  font-size: 0.82rem;
+  font-size: var(--fs-sm);
   color: var(--green);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .wiz-error {
   flex-basis: 100%;
   color: var(--red);
-  font-size: 0.82rem;
-  margin-top: 0.25rem;
+  font-size: var(--fs-sm);
+  margin-top: var(--sp-1);
 }
 .wiz-restart {
   display: flex; align-items: center; gap: 0.7rem;
-  margin: 0.5rem 0 1rem;
+  margin: var(--sp-2) 0 var(--sp-4);
   padding: 0.7rem 0.95rem;
-  background: rgba(210,153,34,0.10);
-  border: 1px solid rgba(210,153,34,0.45);
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   border-radius: var(--r);
   color: var(--text);
 }

@@ -2,34 +2,34 @@
 /* Per-device output panel: lives on the device detail page under the
  * vendor-specific data panels. Toggle + state pill + audit footer. */
 .output-panel {
-  --panel-tint: linear-gradient(135deg, rgba(63,185,80,0.05), transparent 65%);
+  --panel-tint: linear-gradient(135deg, color-mix(in srgb, var(--green) 5%, transparent), transparent 65%);
 }
 .output-state-pill {
   display: inline-flex; align-items: center; gap: .35rem;
-  padding: .15rem .55rem; border-radius: 999px;
+  padding: .15rem .55rem; border-radius: var(--r-pill);
   font-family: var(--mono);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   background: var(--surface-2);
   border: 1px solid var(--border);
 }
-.output-on  { color: var(--green, #3fb950); border-color: rgba(63,185,80,0.45); }
+.output-on  { color: var(--green, var(--green)); border-color: color-mix(in srgb, var(--green) 45%, transparent); }
 .output-off { color: var(--text-3); }
 .output-unknown { color: var(--text-3); font-style: italic; }
 
 .output-safety {
-  margin: .25rem 0 .75rem;
-  padding: .75rem .85rem;
-  background: rgba(210,153,34,0.08);
-  border: 1px solid rgba(210,153,34,0.35);
+  margin: var(--sp-1) 0 var(--sp-3);
+  padding: var(--sp-3) .85rem;
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
   border-radius: var(--r);
-  font-size: .9rem; color: var(--text-2); line-height: 1.45;
+  font-size: var(--fs-base); color: var(--text-2); line-height: 1.45;
 }
 .output-safety strong { color: var(--text); }
 .output-safety .btn-action { margin-top: .65rem; }
 
 .output-controls {
-  display: flex; align-items: center; gap: 1rem;
-  padding: .5rem 0 .25rem;
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-2) 0 var(--sp-1);
 }
 /* The toggle is a chunky on/off switch with a sliding thumb, same
  * pattern as Settings → Kiosk view, just wider so it reads as the
@@ -38,10 +38,10 @@
   position: relative;
   display: inline-flex; align-items: center;
   width: 96px; height: 34px;
-  padding: 0 .6rem; gap: .5rem;
+  padding: 0 .6rem; gap: var(--sp-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
@@ -51,41 +51,41 @@
   position: absolute; top: 3px; left: 3px;
   width: 26px; height: 26px;
   background: var(--text-3);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   transition: left .18s, background .18s;
 }
 .output-toggle.is-on {
-  background: rgba(63,185,80,0.18);
-  border-color: rgba(63,185,80,0.55);
+  background: color-mix(in srgb, var(--green) 18%, transparent);
+  border-color: color-mix(in srgb, var(--green) 55%, transparent);
 }
 .output-toggle.is-on .output-toggle-thumb {
   left: 67px;
-  background: var(--green, #3fb950);
+  background: var(--green, var(--green));
 }
 .output-toggle-label {
   margin-left: auto;
   font-family: var(--mono);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   color: var(--text-2);
 }
-.output-toggle.is-on .output-toggle-label { color: var(--green, #3fb950); }
+.output-toggle.is-on .output-toggle-label { color: var(--green, var(--green)); }
 .output-busy {
-  font-size: .8rem; color: var(--text-3);
+  font-size: var(--fs-sm); color: var(--text-3);
   font-family: var(--mono);
 }
 .output-foot {
   margin-top: .65rem;
   padding-top: .55rem;
   border-top: 1px dashed var(--border);
-  font-size: .78rem;
+  font-size: var(--fs-xs);
 }
-.output-foot strong { color: var(--text-2); font-weight: 600; }
+.output-foot strong { color: var(--text-2); font-weight: var(--fw-semibold); }
 
 /* Schedules section (#117). Collapsible <details> tucked under the
  * output controls. Default-closed so the panel reads cleanly when
  * the user just wants to flip the toggle. */
 .output-schedules {
-  margin-top: .75rem;
+  margin-top: var(--sp-3);
   padding-top: .55rem;
   border-top: 1px dashed var(--border);
 }
@@ -93,7 +93,7 @@
   cursor: pointer;
   display: flex; align-items: center; gap: .4rem;
   list-style: none;
-  font-size: .9rem; color: var(--text-2);
+  font-size: var(--fs-base); color: var(--text-2);
   user-select: none;
 }
 .output-schedules > summary::-webkit-details-marker { display: none; }
@@ -107,7 +107,7 @@
   transition: transform .15s;
 }
 .output-schedules[open] > summary::after { transform: rotate(90deg); }
-.output-schedules-count { font-size: .8rem; color: var(--text-3); }
+.output-schedules-count { font-size: var(--fs-sm); color: var(--text-3); }
 .output-schedules-list {
   margin-top: .55rem;
   display: flex; flex-direction: column; gap: .4rem;
@@ -115,7 +115,7 @@
 
 .schedule-row {
   display: flex; align-items: center; gap: .65rem;
-  padding: .5rem .65rem;
+  padding: var(--sp-2) .65rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -123,20 +123,20 @@
 .schedule-enabled { display: flex; align-items: center; }
 .schedule-info { flex: 1; min-width: 0; }
 .schedule-summary {
-  font-size: .9rem; color: var(--text);
+  font-size: var(--fs-base); color: var(--text);
   line-height: 1.3;
 }
 .schedule-last {
-  font-size: .75rem; margin-top: .15rem;
+  font-size: var(--fs-xs); margin-top: .15rem;
   font-family: var(--mono);
 }
 
 /* Inline "add schedule" form. Renders into the same host slot as
  * the "+ Add schedule" button, replacing it on click and restoring
  * the button on cancel. */
-.schedule-add-host { margin-top: .25rem; }
+.schedule-add-host { margin-top: var(--sp-1); }
 .schedule-form {
-  padding: .65rem .75rem;
+  padding: .65rem var(--sp-3);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -147,16 +147,16 @@
   flex-wrap: wrap;
 }
 .schedule-form-label {
-  font-size: .8rem; color: var(--text-3);
+  font-size: var(--fs-sm); color: var(--text-3);
   min-width: 130px;
 }
 .schedule-form-group {
   display: flex; gap: .85rem; flex-wrap: wrap;
-  font-size: .85rem;
+  font-size: var(--fs-md);
 }
 .schedule-form input[type="time"],
 .schedule-form input[type="number"] {
-  padding: .25rem .4rem;
+  padding: var(--sp-1) .4rem;
   background: var(--surface-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -167,17 +167,17 @@
 .schedule-day {
   display: inline-flex; align-items: center; gap: .2rem;
   padding: .15rem .35rem;
-  font-size: .8rem;
+  font-size: var(--fs-sm);
   background: var(--surface-3);
   border-radius: var(--r-sm);
   font-family: var(--mono);
   min-width: 28px; justify-content: center;
 }
 .schedule-form-actions {
-  display: flex; align-items: center; gap: .55rem; margin-top: .25rem;
+  display: flex; align-items: center; gap: .55rem; margin-top: var(--sp-1);
 }
-.schedule-form-status { font-size: .8rem; color: var(--text-3); }
-.schedule-form-status.err { color: var(--red, #f85149); }
+.schedule-form-status { font-size: var(--fs-sm); color: var(--text-3); }
+.schedule-form-status.err { color: var(--red, var(--red)); }
 
 /* ───────────── In-WattPost-app shell: strip our chrome ─────────────
    When the appliance dashboard renders inside the WattPost native
@@ -206,42 +206,42 @@ html.in-wattpost-app .container {
   padding: .6rem .7rem;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
-.bank-sum-v { font-size: 1.05rem; color: var(--text); }
+.bank-sum-v { font-size: var(--fs-lg); color: var(--text); }
 
 .pack-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: .75rem;
+  gap: var(--sp-3);
 }
 .pack-card {
   display: flex; flex-direction: column;
   gap: .35rem;
-  padding: .75rem .85rem;
+  padding: var(--sp-3) .85rem;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r);
   text-decoration: none;
   color: var(--text);
   transition: border-color 120ms ease, transform 120ms ease;
 }
 .pack-card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .pack-card-head {
-  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2);
 }
 .pack-card-name {
-  font-weight: 600; font-size: .9rem;
+  font-weight: var(--fw-semibold); font-size: var(--fs-base);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pack-card-soc { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+.pack-card-soc { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--accent); }
 .pack-card-meta {
-  display: flex; gap: .75rem;
-  font-size: .82rem; color: var(--text-2);
+  display: flex; gap: var(--sp-3);
+  font-size: var(--fs-sm); color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 .pack-card-drift {
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: .04em;
   padding-top: .15rem;
@@ -254,44 +254,44 @@ html.in-wattpost-app .container {
 
 /* ---- Alert-rule cards (Settings → Alerts redesign) ---- */
 .ar-card { background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: .9rem 1rem; margin-bottom: .7rem; }
+  border-radius: var(--r-lg); padding: .9rem var(--sp-4); margin-bottom: .7rem; }
 .ar-card.is-on { border-color: var(--border-2); }
 .ar-head { display: flex; align-items: flex-start; gap: .65rem; }
-.ar-ico { width: 32px; height: 32px; border-radius: 9px; background: var(--surface-2);
+.ar-ico { width: 32px; height: 32px; border-radius: var(--r-sm); background: var(--surface-2);
   border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
   color: var(--text-3); flex-shrink: 0; }
 .ar-ico svg { width: 18px; height: 18px; }
-.ar-card.is-on .ar-ico { color: var(--accent); border-color: rgba(88,166,255,.35);
-  background: rgba(88,166,255,.10); }
+.ar-card.is-on .ar-ico { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ar-head-body { flex: 1; min-width: 0; }
-.ar-title { font-weight: 600; font-size: .98rem; color: var(--text); }
-.ar-desc { color: var(--text-2); font-size: .8rem; margin-top: .1rem; font-family: var(--mono); }
+.ar-title { font-weight: var(--fw-semibold); font-size: var(--fs-lg); color: var(--text); }
+.ar-desc { color: var(--text-2); font-size: var(--fs-sm); margin-top: .1rem; font-family: var(--mono); }
 /* pill toggle */
 .ar-switch { position: relative; display: inline-block; width: 42px; height: 25px; flex-shrink: 0; cursor: pointer; }
 .ar-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .ar-track { position: absolute; inset: 0; background: var(--surface-3);
-  border: 1px solid var(--border-2); border-radius: 99px; transition: .18s; }
+  border: 1px solid var(--border-2); border-radius: var(--r-pill); transition: .18s; }
 .ar-track:before { content: ""; position: absolute; height: 19px; width: 19px; left: 3px; top: 2px;
   background: #fff; border-radius: 50%; transition: .18s; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 .ar-switch input:checked + .ar-track { background: var(--accent); border-color: var(--accent); }
 .ar-switch input:checked + .ar-track:before { transform: translateX(17px); }
 .ar-controls { margin-top: .85rem; padding-top: .8rem; border-top: 1px solid var(--border); }
-.ar-ctl-label { font-size: .86rem; color: var(--text-2); margin-bottom: .5rem; }
+.ar-ctl-label { font-size: var(--fs-md); color: var(--text-2); margin-bottom: var(--sp-2); }
 .ar-ctl-label b { color: var(--text); font-family: var(--mono); }
 .ar-ctl-grid { display: flex; align-items: center; gap: .7rem; }
-.ar-slider { flex: 1; height: 5px; border-radius: 99px; -webkit-appearance: none; appearance: none; cursor: pointer;
+.ar-slider { flex: 1; height: 5px; border-radius: var(--r-pill); -webkit-appearance: none; appearance: none; cursor: pointer;
   background: linear-gradient(to right, var(--accent) 0 var(--fill,50%), var(--surface-3) var(--fill,50%) 100%); }
 .ar-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 19px; height: 19px; border-radius: 50%;
   background: #fff; border: 2px solid var(--accent); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
 .ar-slider::-moz-range-thumb { width: 19px; height: 19px; border-radius: 50%; background: #fff;
   border: 2px solid var(--accent); cursor: pointer; }
 .ar-num { width: 72px; text-align: center; background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: .45rem; color: var(--text); font-family: var(--mono); font-size: .9rem; }
+  border-radius: var(--r-sm); padding: .45rem; color: var(--text); font-family: var(--mono); font-size: var(--fs-base); }
 .ar-meta { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
-.ar-tag { font-size: .7rem; color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 99px; padding: .15rem .5rem; font-family: var(--mono); }
+.ar-tag { font-size: var(--fs-xs); color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); padding: .15rem var(--sp-2); font-family: var(--mono); }
 .ar-tag--alarm { color: var(--amber); border-color: var(--amber-soft); }
-.ar-foot { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; flex-wrap: wrap; }
+.ar-foot { display: flex; align-items: center; gap: var(--sp-2); margin-top: .8rem; flex-wrap: wrap; }
 /* Card actions (Test, Edit, Delete, Configure, Pair) read as buttons: bordered, with a hover state.
    First-time setup is the primary style; Delete sits apart from Edit so it is hard to hit by mistake. */
 .ar-link {
@@ -299,7 +299,7 @@ html.in-wattpost-app .container {
   min-height: 32px; padding: .3rem .85rem;
   border: 1px solid var(--border-2); border-radius: var(--r-sm);
   background: var(--surface-2); color: var(--text);
-  font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer;
   transition: background .12s ease, border-color .12s ease;
 }
 .ar-link:hover { background: var(--surface-3); }
@@ -307,39 +307,39 @@ html.in-wattpost-app .container {
 .ar-link--primary:hover { background: var(--accent); filter: brightness(1.08); }
 .ar-link--danger { margin-left: auto; background: transparent; border-color: transparent; color: var(--red); }
 .ar-link--danger:hover { background: var(--red-soft); border-color: var(--red); }
-.ar-note { margin-top: .5rem; font-size: .78rem; color: var(--text-2); }
+.ar-note { margin-top: var(--sp-2); font-size: var(--fs-xs); color: var(--text-2); }
 .ar-card--featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-@media (pointer: coarse) { .ar-link { min-height: 44px; padding: .5rem 1rem; } }
+@media (pointer: coarse) { .ar-link { min-height: 44px; padding: var(--sp-2) var(--sp-4); } }
 
 /* ---- Alert-rule edit/add form (card idiom) ---- */
 .ar-card--edit { border-color: var(--accent); }
-.ar-form-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.ar-form-title { font-weight: 600; font-size: 1rem; color: var(--text); }
+.ar-form-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.ar-form-title { font-weight: var(--fw-semibold); font-size: var(--fs-lg); color: var(--text); }
 .ar-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem .8rem; margin-top: .8rem; }
 .ar-field { display: flex; flex-direction: column; gap: .3rem; grid-column: span 2; min-width: 0; }
 .ar-field--sm { grid-column: span 1; }
-.ar-field > span { font-size: .78rem; color: var(--text-2); font-weight: 500; }
+.ar-field > span { font-size: var(--fs-xs); color: var(--text-2); font-weight: var(--fw-medium); }
 .ar-field input, .ar-field select { background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: .5rem .6rem; color: var(--text); font: inherit; font-size: .9rem; width: 100%; }
+  border-radius: var(--r-sm); padding: var(--sp-2) .6rem; color: var(--text); font: inherit; font-size: var(--fs-base); width: 100%; }
 .ar-field input:focus, .ar-field select:focus { outline: none; border-color: var(--accent); }
 .ar-field-custom { margin-top: .4rem; }
 .ar-form-section { margin-top: .95rem; }
-.ar-form-section-label { font-size: .78rem; color: var(--text-2); font-weight: 500; margin-bottom: .45rem; }
+.ar-form-section-label { font-size: var(--fs-xs); color: var(--text-2); font-weight: var(--fw-medium); margin-bottom: .45rem; }
 .ar-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
 .ar-chip { display: inline-flex; align-items: center; gap: .35rem; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 99px; padding: .3rem .6rem; font-size: .82rem;
+  border: 1px solid var(--border); border-radius: var(--r-pill); padding: .3rem .6rem; font-size: var(--fs-sm);
   color: var(--text-2); cursor: pointer; }
-.ar-chip:has(input:checked) { border-color: var(--accent); color: var(--text); background: rgba(88,166,255,.10); }
+.ar-chip:has(input:checked) { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .ar-chip input { accent-color: var(--accent); }
-.ar-muted { color: var(--text-3); font-size: .82rem; }
-.ar-form-actions { display: flex; align-items: center; gap: .6rem; margin-top: 1rem; }
+.ar-muted { color: var(--text-3); font-size: var(--fs-sm); }
+.ar-form-actions { display: flex; align-items: center; gap: .6rem; margin-top: var(--sp-4); }
 .ar-btn { background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
-  border-radius: 8px; padding: .5rem .9rem; font: inherit; font-size: .88rem; font-weight: 500; cursor: pointer; }
+  border-radius: var(--r-sm); padding: var(--sp-2) .9rem; font: inherit; font-size: var(--fs-md); font-weight: var(--fw-medium); cursor: pointer; }
 .ar-btn:hover { border-color: var(--border-2); }
 .ar-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 .ar-btn--primary:hover { filter: brightness(1.08); }
-.ar-form .alerts-form-status { font-size: .8rem; color: var(--text-3); }
-.ar-form .alerts-form-status.err { color: var(--red, #f85149); }
+.ar-form .alerts-form-status { font-size: var(--fs-sm); color: var(--text-3); }
+.ar-form .alerts-form-status.err { color: var(--red, var(--red)); }
 
 /* ---- Legacy edit/add forms adopt the card-edit idiom ----
    The transport, quiet-hours and all five integration forms still use the
@@ -352,25 +352,25 @@ html.in-wattpost-app .container {
 .alerts-form {
   background: var(--surface);
   border-radius: var(--r-lg);
-  padding: .9rem 1rem;
+  padding: .9rem var(--sp-4);
   gap: .8rem;
 }
 .alerts-form label {
-  font-size: .78rem; color: var(--text-2); font-weight: 500; gap: .3rem;
+  font-size: var(--fs-xs); color: var(--text-2); font-weight: var(--fw-medium); gap: .3rem;
 }
 .alerts-form input,
 .alerts-form select {
   background: var(--surface-2);
-  border-radius: 8px;
-  padding: .5rem .6rem;
-  font-size: .9rem;
+  border-radius: var(--r-sm);
+  padding: var(--sp-2) .6rem;
+  font-size: var(--fs-base);
   font-family: inherit;
 }
 .alerts-form input:focus,
 .alerts-form select:focus { outline: none; border-color: var(--accent); }
 .alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
 /* Form action buttons → .ar-btn proportions (the colours already match). */
-.alerts-form-actions .btn-action { border-radius: 8px; padding: .5rem .9rem; }
+.alerts-form-actions .btn-action { border-radius: var(--r-sm); padding: var(--sp-2) .9rem; }
 
 /* ---- Inline key/value editors adopt the card idiom too ----
    History & polling, Solar-aware charger pause and the WiFi hotspot are
@@ -409,7 +409,7 @@ html.in-wattpost-app .container {
 .hist-input select {
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: .42rem .55rem;
 }
 .hist-input input:not([type="checkbox"]):focus,
@@ -422,35 +422,35 @@ html.in-wattpost-app .container {
    alert rules, transports, quiet hours, integrations. These helpers
    give it status tags and a prose (non-mono) description so the same
    card structure covers conditions (mono) AND prose with links/code. */
-.ar-tag--ok   { color: var(--green); border-color: rgba(63,185,80,.35); }
-.ar-tag--warn { color: var(--amber); border-color: rgba(210,153,34,.35); }
+.ar-tag--ok   { color: var(--green); border-color: color-mix(in srgb, var(--green) 35%, transparent); }
+.ar-tag--warn { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 35%, transparent); }
 .ar-desc--prose {
-  font-family: inherit; color: var(--text-2); font-size: .82rem; line-height: 1.45;
+  font-family: inherit; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.45;
   overflow-wrap: anywhere;
 }
 .ar-desc--prose a { color: var(--accent); }
 .ar-desc--prose code {
   font-family: var(--mono); font-size: .9em;
-  background: var(--surface-2); padding: 0 .25rem; border-radius: 4px;
+  background: var(--surface-2); padding: 0 var(--sp-1); border-radius: var(--r-2xs);
 }
 
 /* ---- Device card: per-metric icons + SoC gauge (Beszel-style) ---- */
-.dev-card-row-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-row-left { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .dev-card-row-ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); display: flex; }
 .dev-card-row-ico svg { width: 16px; height: 16px; }
-.dev-card-soc { height: 5px; border-radius: 99px; background: var(--surface-3);
+.dev-card-soc { height: 5px; border-radius: var(--r-pill); background: var(--surface-3);
   overflow: hidden; margin: .15rem 0 .7rem; }
-.dev-card-soc-fill { height: 100%; border-radius: 99px; transition: width .3s ease; }
+.dev-card-soc-fill { height: 100%; border-radius: var(--r-pill); transition: width .3s ease; }
 .dev-card-soc-fill.lvl-ok  { background: var(--green); }
 .dev-card-soc-fill.lvl-mid { background: var(--amber); }
-.dev-card-soc-fill.lvl-low { background: var(--red, #f85149); }
+.dev-card-soc-fill.lvl-low { background: var(--red, var(--red)); }
 
 /* ---- Devices: Cards / List view toggle + compact list (Beszel-style) ---- */
 .dev-view-toggle { display: inline-flex; gap: 2px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px; }
 .dv-seg { display: inline-flex; align-items: center; gap: .35rem; background: none; border: 0;
-  cursor: pointer; color: var(--text-2); font: inherit; font-size: .8rem; font-weight: 500;
-  padding: .3rem .6rem; border-radius: 7px; }
+  cursor: pointer; color: var(--text-2); font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  padding: .3rem .6rem; border-radius: var(--r-xs); }
 .dv-seg svg { width: 15px; height: 15px; }
 .dv-seg.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-soft); }
 .dv-seg:hover:not(.is-active) { color: var(--text); }
@@ -460,9 +460,9 @@ html.in-wattpost-app .container {
   box-shadow: var(--shadow-soft); }
 
 /* ---- Device list = real columned table (Beszel systems-table style) ---- */
-.dev-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.dev-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .dev-table thead th {
-  text-align: left; font-size: .7rem; font-weight: 600; color: var(--text-3);
+  text-align: left; font-size: var(--fs-xs); font-weight: var(--fw-semibold); color: var(--text-3);
   text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
   padding: .55rem .85rem; border-bottom: 1px solid var(--border); background: var(--surface-2);
 }
@@ -472,11 +472,11 @@ html.in-wattpost-app .container {
 .dev-table tbody tr:hover { background: var(--surface-2); }
 .dev-table tbody tr.dev-row-silent { opacity: .5; }
 .dev-table td { padding: .62rem .85rem; color: var(--text); vertical-align: middle; white-space: nowrap; }
-.dev-table td.dt-name { font-weight: 500; }
-.dev-table td.dt-name .dev-row-ico { vertical-align: middle; margin-right: .5rem; }
+.dev-table td.dt-name { font-weight: var(--fw-medium); }
+.dev-table td.dt-name .dev-row-ico { vertical-align: middle; margin-right: var(--sp-2); }
 .dev-table td.dt-name .dev-row-ico svg { width: 17px; height: 17px; }
-.dt-soc-wrap { display: inline-flex; align-items: center; gap: .5rem; }
-.dt-soc-pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: .82rem; min-width: 30px; }
+.dt-soc-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.dt-soc-pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: var(--fs-sm); min-width: 30px; }
 .dt-u { color: var(--text-3); }
 .dt-na { color: var(--text-3); }
 .dev-table .dt-chev svg { width: 15px; height: 15px; color: var(--text-3); vertical-align: middle; }
@@ -503,14 +503,14 @@ html.in-wattpost-app .container {
 .dev-row:hover { background: var(--surface-2); }
 .dev-row-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-3); display: inline-flex; }
 .dev-row-ico svg { width: 18px; height: 18px; }
-.dev-row-soc { width: 56px; height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+.dev-row-soc { width: 56px; height: 6px; background: var(--surface-3); border-radius: var(--r-pill); overflow: hidden; }
 /* span children are inline by default → width/height ignored; force block
    so the inline-width fill actually paints (the card gauge uses a div). */
-.dev-row-soc-fill { display: block; height: 100%; border-radius: 99px; }
+.dev-row-soc-fill { display: block; height: 100%; border-radius: var(--r-pill); }
 .dev-row-soc-fill.lvl-ok  { background: var(--green); }
 .dev-row-soc-fill.lvl-mid { background: var(--amber); }
-.dev-row-soc-fill.lvl-low { background: var(--red, #f85149); }
-.dev-row-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem;
+.dev-row-soc-fill.lvl-low { background: var(--red, var(--red)); }
+.dev-row-status { display: inline-flex; align-items: center; gap: .35rem; font-size: var(--fs-xs);
   color: var(--text-2); font-family: var(--mono); }
 .dev-row-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
 .dev-row-silent { opacity: .55; }
@@ -521,14 +521,14 @@ html.in-wattpost-app .container {
    table, a long filename) instead of staying at the viewport width.
    min-width:0 + width:100% pins it to the viewport so wide children
    scroll/wrap inside their own boxes. */
-.settings-wrap { max-width: 760px; width: 100%; min-width: 0; margin: 0 auto; padding: .25rem 0 2rem; }
-.set-page-title { font-size: 1.55rem; font-weight: 600; letter-spacing: -.01em; margin: .25rem 0 0; color: var(--text); }
+.settings-wrap { max-width: 760px; width: 100%; min-width: 0; margin: 0 auto; padding: var(--sp-1) 0 var(--sp-6); }
+.set-page-title { font-size: var(--fs-3xl); font-weight: var(--fw-semibold); letter-spacing: -.01em; margin: var(--sp-1) 0 0; color: var(--text); }
 
 /* Menu list (mirrors the cloud account menu) */
 .set-menu { display: flex; flex-direction: column; border: 1px solid var(--border);
   border-radius: var(--r-lg); overflow: hidden; background: var(--surface);
-  box-shadow: var(--shadow-soft); margin: 1rem 0; }
-.set-menu-row { display: flex; align-items: center; gap: .85rem; padding: .95rem 1rem;
+  box-shadow: var(--shadow-soft); margin: var(--sp-4) 0; }
+.set-menu-row { display: flex; align-items: center; gap: .85rem; padding: .95rem var(--sp-4);
   text-decoration: none; color: var(--text); border-top: 1px solid var(--border);
   transition: background .12s ease; }
 .set-menu-row:first-child { border-top: 0; }
@@ -537,22 +537,22 @@ html.in-wattpost-app .container {
   align-items: center; justify-content: center; color: var(--text-2); }
 .set-menu-icon svg { width: 20px; height: 20px; }
 .set-menu-body { flex: 1; display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
-.set-menu-title { font-weight: 600; color: var(--text); }
-.set-menu-sub { font-size: .8rem; color: var(--text-3); }
+.set-menu-title { font-weight: var(--fw-semibold); color: var(--text); }
+.set-menu-sub { font-size: var(--fs-sm); color: var(--text-3); }
 .set-menu-chev { width: 18px; height: 18px; color: var(--text-3); flex: none; }
 
 /* Focused section view */
 .set-back { display: inline-flex; align-items: center; gap: .3rem; color: var(--accent);
-  text-decoration: none; font-size: .9rem; font-weight: 500; margin: .25rem 0 .85rem; }
+  text-decoration: none; font-size: var(--fs-base); font-weight: var(--fw-medium); margin: var(--sp-1) 0 .85rem; }
 .set-back svg { width: 16px; height: 16px; }
 .set-back:hover { text-decoration: underline; }
 .set-section-head { margin-bottom: 1.15rem; }
-.set-section-head h1 { margin: 0 0 .15rem; font-size: 1.55rem; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
-.set-section-sub { margin: 0; color: var(--text-2); font-size: .92rem; }
+.set-section-head h1 { margin: 0 0 .15rem; font-size: var(--fs-3xl); font-weight: var(--fw-semibold); letter-spacing: -.01em; color: var(--text); }
+.set-section-sub { margin: 0; color: var(--text-2); font-size: var(--fs-base); }
 
 /* The section's blocks become a single centred column (override the tiled
    grid) of white cards on the page bg — no enclosing grey panel. */
-#settings-section .settings-grid { display: flex; flex-direction: column; gap: 1rem;
+#settings-section .settings-grid { display: flex; flex-direction: column; gap: var(--sp-4);
   max-width: none; margin: 0; min-width: 0; }
 /* Flex items default to min-width:auto and won't shrink below their
    content's intrinsic width — a wide child (backup snapshot table, the
@@ -580,7 +580,7 @@ html.in-wattpost-app .container {
   --pf-load:#9d8dff;      --pf-load-2:#bcb0ff;
   --pf-discharge:#ff6f9d; --pf-discharge-2:#ff95b6;
   --pf-critical:#ff6b63;  --pf-critical-2:#ff9a94;
-  --pf-hold:#58a6ff;      --pf-hold-2:#9cc7ff;
+  --pf-hold:var(--accent);      --pf-hold-2:#9cc7ff;
   --pf-orbit:      rgba(255,255,255,.05);
   --pf-ring-track: rgba(255,255,255,.08);
   --pf-node-bg:    var(--surface-2);
@@ -597,17 +597,17 @@ html.in-wattpost-app .container {
 .pf-legend {
   display: flex; flex-wrap: wrap; gap: 7px 18px;
   justify-content: center;
-  margin-top: 6px; padding-top: 12px;
+  margin-top: 6px; padding-top: var(--sp-3);
   border-top: 1px solid var(--border);
 }
-.pf-lg { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-2); }
-.pf-sw { width: 18px; height: 4px; border-radius: 2px; flex: none; }
-.pf-lg b { color: var(--text); font-weight: 650; font-variant-numeric: tabular-nums; }
+.pf-lg { display: inline-flex; align-items: center; gap: 7px; font-size: var(--fs-xs); color: var(--text-2); }
+.pf-sw { width: 18px; height: 4px; border-radius: var(--r-2xs); flex: none; }
+.pf-lg b { color: var(--text); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
 
 /* Runway feature bar (hero) — SoC fill, state-coloured to match the donut + reactor */
-.hero-runway-bar { margin-top: 10px; height: 6px; border-radius: 4px; background: rgba(127,127,127,.16); overflow: hidden; }
-.hero-runway-bar i { display: block; height: 100%; border-radius: 4px; width: 0;
-  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+.hero-runway-bar { margin-top: 10px; height: 6px; border-radius: var(--r-2xs); background: rgba(127,127,127,.16); overflow: hidden; }
+.hero-runway-bar i { display: block; height: 100%; border-radius: var(--r-2xs); width: 0;
+  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, var(--accent)); }
 #bank-time-tile.charging    #bank-time-bar { background: linear-gradient(90deg, #2ea043, #6ff09a); }
 #bank-time-tile.discharging #bank-time-bar { background: linear-gradient(90deg, #e8497f, #ff95b6); }
 
@@ -615,20 +615,20 @@ html.in-wattpost-app .container {
 body.combined-flow .hero-v2 { display: none; }
 body.combined-flow #flow-panel .panel-header { display: none; }
 .pf-statrow {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-top: var(--sp-4);
 }
 @media (max-width: 700px) { .pf-statrow { grid-template-columns: repeat(2, 1fr); } }
 .pf-statbox {
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 14px 16px;
+  border-radius: var(--r-lg); padding: 14px var(--sp-4);
 }
-.pf-statk { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; }
-.pf-statv { font-size: 26px; font-weight: 680; letter-spacing: -.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
-.pf-statu { font-size: .5em; color: var(--text-3); margin-left: 3px; font-weight: 600; }
-.pf-stats { font-size: 12px; color: var(--text-3); margin-top: 3px; }
-.pf-statbar { margin-top: 10px; height: 6px; border-radius: 4px; background: rgba(127,127,127,.16); overflow: hidden; }
-.pf-statbar i { display: block; height: 100%; border-radius: 4px; width: 0;
-  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+.pf-statk { font-size: var(--fs-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--fw-semibold); }
+.pf-statv { font-size: 26px; font-weight: var(--fw-bold); letter-spacing: -.02em; margin-top: var(--sp-1); font-variant-numeric: tabular-nums; }
+.pf-statu { font-size: .5em; color: var(--text-3); margin-left: 3px; font-weight: var(--fw-semibold); }
+.pf-stats { font-size: var(--fs-xs); color: var(--text-3); margin-top: 3px; }
+.pf-statbar { margin-top: 10px; height: 6px; border-radius: var(--r-2xs); background: rgba(127,127,127,.16); overflow: hidden; }
+.pf-statbar i { display: block; height: 100%; border-radius: var(--r-2xs); width: 0;
+  transition: width .9s var(--ease, ease); background: linear-gradient(90deg, #1f6feb, var(--accent)); }
 .pf-statbar.charging    i { background: linear-gradient(90deg, #2ea043, #6ff09a); }
 .pf-statbar.discharging i { background: linear-gradient(90deg, #e8497f, #ff95b6); }
 /* Reactor + combined-stat numbers use the dashboard's mono/tabular figures
@@ -641,8 +641,8 @@ body.combined-flow #flow-panel .panel-header { display: none; }
    instead of spilling past its right edge. */
 .pf-statbox--text .pf-statv {
   font-family: var(--font);
-  font-size: 16px;
-  font-weight: 650;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   letter-spacing: 0;
   line-height: 1.25;
   overflow-wrap: anywhere;

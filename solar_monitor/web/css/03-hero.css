@@ -2,15 +2,15 @@
 .hero-v2 {
   display: grid;
   grid-template-columns: minmax(220px, 280px) 1fr;
-  gap: 1.5rem;
+  gap: var(--sp-5);
   background:
-    radial-gradient(circle at 18% 0%, rgba(63,185,80,0.12), transparent 55%),
-    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.08), transparent 60%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--green) 12%, transparent), transparent 55%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
     var(--card-highlight),
     var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 1.5rem;
+  padding: var(--sp-5);
   box-shadow: var(--shadow-soft);
   position: relative;
   overflow: hidden;
@@ -18,15 +18,15 @@
 /* Hero hue follows SoC state for subtle emotional cue */
 .hero-v2.soc-low {
   background:
-    radial-gradient(circle at 18% 0%, rgba(248,81,73,0.16), transparent 55%),
-    radial-gradient(circle at 100% 100%, rgba(248,81,73,0.06), transparent 60%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--red) 16%, transparent), transparent 55%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--red) 6%, transparent), transparent 60%),
     var(--card-highlight),
     var(--surface);
 }
 .hero-v2.soc-mid {
   background:
-    radial-gradient(circle at 18% 0%, rgba(210,153,34,0.14), transparent 55%),
-    radial-gradient(circle at 100% 100%, rgba(210,153,34,0.05), transparent 60%),
+    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--amber) 14%, transparent), transparent 55%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--amber) 5%, transparent), transparent 60%),
     var(--card-highlight),
     var(--surface);
 }
@@ -51,21 +51,21 @@
      paint. Pre-state default = holding (calm blue). */
   stroke: url(#g-soc-holding);
   transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
-  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 35%, transparent));
 }
 /* Legacy band coloring, used by the per-pack mini donuts in the
    bank-compare detail view (`.hero-donut-wrap` without a `.donut-state`
    wrapper, so the new state palette doesn't kick in). Two-class
    specificity beats the default `.donut-arc` rule so these win. */
-.donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px rgba(248,81,73,0.45)); }
-.donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(210,153,34,0.4)); }
-.donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
+.donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--red) 45%, transparent)); }
+.donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--amber) 40%, transparent)); }
+.donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px color-mix(in srgb, var(--green) 35%, transparent)); }
 
 /* State palette: charging green, holding blue, discharging amber,
    critical red. The gradient IDs are duplicated in the kiosk donut
    under a `-k-` prefix so the two SVGs don't share defs. */
 .donut-state.charging    .donut-arc { stroke: url(#g-soc-charging);    filter: drop-shadow(0 0 10px rgba(86,211,100,0.50)); }
-.donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  rgba(88,166,255,0.35)); }
+.donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  color-mix(in srgb, var(--accent) 35%, transparent)); }
 .donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(255,111,157,0.50)); }
 .donut-state.critical    .donut-arc { stroke: url(#g-soc-critical);    filter: drop-shadow(0 0 12px rgba(255,123,114,0.65)); }
 .kiosk-donut.donut-state.charging    .donut-arc { stroke: url(#g-soc-k-charging); }
@@ -80,9 +80,9 @@
   transition: cx 0.8s ease, cy 0.8s ease, fill 0.4s ease, stroke 0.4s ease;
   pointer-events: none;
 }
-.donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-head      { fill: var(--accent); stroke: #ffffff; }
 .donut-head-glow {
-  fill: rgba(88,166,255,0.55);
+  fill: color-mix(in srgb, var(--accent) 55%, transparent);
   /* Animate via transform+opacity rather than the `r` attribute,
      iOS Safari historically didn't animate `r` via CSS, and even on
      versions that do it's silently dropped under "Reduce Motion"
@@ -95,8 +95,8 @@
 }
 .donut-state.charging    .donut-head      { fill: #56d364; stroke: #ffffff; }
 .donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.55); }
-.donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
-.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.50); }
+.donut-state.holding     .donut-head      { fill: var(--accent); stroke: #ffffff; }
+.donut-state.holding     .donut-head-glow { fill: color-mix(in srgb, var(--accent) 50%, transparent); }
 .donut-state.discharging .donut-head      { fill: #ff6f9d; stroke: #ffffff; }
 .donut-state.discharging .donut-head-glow { fill: rgba(255,111,157,0.55); }
 .donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
@@ -126,25 +126,25 @@
   display: inline-block;
   margin-top: .35rem;
   padding: .1rem .55rem;
-  border-radius: 999px;
-  font-size: .7rem;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text-2);
 }
-.donut-health.good  { color: var(--green); border-color: rgba(63,185,80,0.45);  background: rgba(63,185,80,0.08); }
-.donut-health.warn  { color: var(--amber); border-color: rgba(210,153,34,0.45); background: rgba(210,153,34,0.08); }
-.donut-health.alarm { color: var(--red);   border-color: rgba(248,81,73,0.55);  background: rgba(248,81,73,0.10); }
+.donut-health.good  { color: var(--green); border-color: color-mix(in srgb, var(--green) 45%, transparent);  background: color-mix(in srgb, var(--green) 8%, transparent); }
+.donut-health.warn  { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 8%, transparent); }
+.donut-health.alarm { color: var(--red);   border-color: color-mix(in srgb, var(--red) 55%, transparent);  background: color-mix(in srgb, var(--red) 10%, transparent); }
 
 .donut-flow {
   display: inline-flex; align-items: center; gap: .3rem;
   margin-top: .55rem;
   padding: .15rem .55rem;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--surface-2);
   border: 1px solid var(--border);
   font-family: var(--mono);
-  font-size: .78rem;
+  font-size: var(--fs-xs);
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
   transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
@@ -155,8 +155,8 @@
 }
 .donut-state.charging .donut-flow {
   color: var(--green);
-  border-color: rgba(63,185,80,0.45);
-  background: rgba(63,185,80,0.08);
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  background: color-mix(in srgb, var(--green) 8%, transparent);
 }
 .donut-state.charging .donut-flow-arrow::before {
   content: "";
@@ -182,7 +182,7 @@
 .donut-state.idle .donut-flow-arrow::before {
   content: "•";
   color: var(--text-3);
-  font-size: 1.3rem;
+  font-size: var(--fs-2xl);
   line-height: .5;
 }
 
@@ -196,17 +196,17 @@
 .donut-pct {
   font-family: var(--mono);
   font-size: 3.1rem;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   letter-spacing: -0.02em;
   line-height: 1;
 }
 .donut-pct-unit {
-  font-size: 1.2rem;
+  font-size: var(--fs-2xl);
   color: var(--text-2);
   margin-left: 2px;
 }
 .donut-label {
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -217,7 +217,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: auto auto auto;
-  gap: .75rem;
+  gap: var(--sp-3);
   align-content: start;
 }
 @media (max-width: 540px) {
@@ -238,12 +238,12 @@
 }
 .hero-stat-val {
   font-family: var(--mono);
-  font-size: 1.4rem;
-  font-weight: 600;
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
   margin-top: .15rem;
-  display: flex; align-items: baseline; gap: .25rem;
+  display: flex; align-items: baseline; gap: var(--sp-1);
   /* Long device/model strings must not break the grid cell */
   min-width: 0;
   overflow: hidden;
@@ -257,20 +257,20 @@
 }
 /* When the value is a non-numeric string (e.g. bank meta), don't blow up
    the font; let it shrink and fit on one line. */
-.hero-stat-val.is-text { font-size: .95rem; font-weight: 500; }
+.hero-stat-val.is-text { font-size: var(--fs-base); font-weight: var(--fw-medium); }
 .hero-stat--big .hero-stat-val { font-size: 1.7rem; }
 .hero-stat-unit {
-  font-size: .95rem;
+  font-size: var(--fs-base);
   color: var(--text-2);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .hero-stat-sub {
-  font-size: .76rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
   margin-top: .2rem;
 }
 .hero-stat-forecast {
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--blue, #6c8ef2);
   margin-top: .15rem;
   font-variant-numeric: tabular-nums;
@@ -283,11 +283,11 @@
 #bank-power-tile.idle .hero-stat-val { color: var(--text-2); }
 
 .meta-k {
-  font-size: .68rem;
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   display: block;
 }
 

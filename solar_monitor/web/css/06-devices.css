@@ -8,7 +8,7 @@
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: .9rem 1rem 1rem;
+  padding: .9rem var(--sp-4) var(--sp-4);
 }
 /* Silent: device hasn't advertised in > 60s. Grey out the values so
  * the card is visually obvious as "we have no current data" without
@@ -18,22 +18,22 @@
 .dev-card-silent .dev-card-name { color: var(--text-2); }
 .dev-card-silent-badge {
   margin-top: .55rem;
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
-  font-weight: 500;
-  padding: .25rem .5rem;
+  font-weight: var(--fw-medium);
+  padding: var(--sp-1) var(--sp-2);
   background: rgba(255, 138, 122, .08);
   border: 1px solid rgba(255, 138, 122, .25);
   color: #d9886f;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   display: inline-block;
   opacity: 1;
 }
 .dev-card-head {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: .25rem;
+  margin-bottom: var(--sp-1);
 }
-.dev-card-head-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-head-left { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .dev-card-icon {
   width: 18px; height: 18px;
   display: inline-flex; align-items: center;
@@ -46,17 +46,17 @@
 .dev-card.kind-dcdc_charger      .dev-card-icon { color: var(--grid); }
 .dev-card.kind-shunt             .dev-card-icon { color: var(--batt); }
 .dev-card-name {
-  font-weight: 600; font-size: .92rem;
+  font-weight: var(--fw-semibold); font-size: var(--fs-base);
   /* Long raw labels (e.g. "renogy.charge_controller.16") must truncate
      rather than overflow into the slave-id badge on the right. */
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .dev-card-head-right {
-  display: flex; align-items: center; gap: .5rem;
+  display: flex; align-items: center; gap: var(--sp-2);
   flex: none;            /* never shrink/overlap the badge; the name truncates instead */
   color: var(--text-3);
 }
-.dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
+.dev-card-slave { font-size: var(--fs-xs); color: var(--text-3); font-family: var(--mono); }
 .dev-card-del {
   /* Tiny trash icon button on each device row's head. The card
    * itself is an <a> so clicks navigate to /#/device/<label>; this
@@ -66,7 +66,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   color: var(--text-3);
   cursor: pointer;
   padding: 0;
@@ -76,7 +76,7 @@
 .dev-card-del:hover {
   color: var(--red);
   border-color: var(--red);
-  background: rgba(248,81,73,0.10);
+  background: color-mix(in srgb, var(--red) 10%, transparent);
 }
 .dev-card-chevron {
   width: 16px; height: 16px;
@@ -90,13 +90,13 @@ a.dev-card:hover .dev-card-chevron {
 
 /* Footer "View detail" hint */
 .dev-card-foot {
-  margin-top: .75rem;
+  margin-top: var(--sp-3);
   padding-top: .55rem;
   border-top: 1px dashed var(--border);
   display: flex; justify-content: space-between; align-items: center;
-  font-size: .75rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   letter-spacing: 0.02em;
 }
 .dev-card-foot svg {
@@ -107,13 +107,13 @@ a.dev-card:hover .dev-card-foot {
   color: var(--accent);
 }
 a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
-.dev-card-sub { font-size: .76rem; color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
+.dev-card-sub { font-size: var(--fs-xs); color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
 /* align-items:flex-start (not baseline): a long value (e.g. a charger
    model name) wraps to several lines, and baseline-aligning the
    single-line label against it dropped the label down so it overlapped
    the value. Top-aligning keeps the label pinned to the value's first
    line; the value wraps cleanly below on its own side. */
-.dev-card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; padding: .2rem 0; font-size: .85rem; }
+.dev-card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--sp-3); padding: .2rem 0; font-size: var(--fs-md); }
 .dev-card-row .k { color: var(--text-3); }
 .dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text);
   min-width: 0; text-align: right; overflow-wrap: anywhere; }
@@ -123,9 +123,9 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .dev-card-lifetime {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: .5rem;
-  margin: .25rem 0 .65rem;
-  padding: .5rem .55rem;
+  gap: var(--sp-2);
+  margin: var(--sp-1) 0 .65rem;
+  padding: var(--sp-2) .55rem;
   background: var(--surface-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -133,14 +133,14 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .lt-cell { display: flex; flex-direction: column; min-width: 0; }
 .lt-cell .lt-v {
   font-family: var(--mono);
-  font-size: .92rem;
+  font-size: var(--fs-base);
   font-variant-numeric: tabular-nums;
   color: var(--text);
 }
 .lt-cell--unreliable .lt-v,
 .lt-cell--unreliable .meta-k { color: var(--text-3, var(--text-2)); opacity: .55; }
 .lt-eff-win {
-  font-size: .7rem;
+  font-size: var(--fs-xs);
   font-family: var(--mono);
   color: var(--text-2);
   text-transform: lowercase;
@@ -153,8 +153,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
  * in a row. Soft blue tint matches the border so the tile reads as
  * part of the dashboard's tinted-panel family, not a flat one-off. */
 .weather-panel {
-  border-color: rgba(88, 166, 255, 0.18);
-  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
+  border-color: color-mix(in srgb, var(--accent) 18%, transparent);
+  --panel-tint: linear-gradient(135deg, color-mix(in srgb, var(--accent) 6%, transparent), color-mix(in srgb, var(--accent) 0%, transparent) 70%);
   transition: --panel-tint .8s ease, border-color .8s ease;
 }
 
@@ -168,9 +168,9 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .location-map {
   width: 100%;
   height: 220px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   overflow: hidden;
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
   background: rgba(255, 255, 255, .03);
 }
 /* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
@@ -221,7 +221,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   display: flex; flex-direction: column; gap: .65rem;
 }
 .weather-hero {
-  display: flex; align-items: center; gap: 1rem;
+  display: flex; align-items: center; gap: var(--sp-4);
 }
 .weather-icon {
   width: 56px; height: 56px; flex: none;
@@ -232,31 +232,31 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   display: flex; align-items: baseline; gap: .15rem;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .weather-temp-v { font-size: 2.4rem; line-height: 1; color: var(--text); }
-.weather-temp-unit { font-size: 1rem; color: var(--text-2); }
+.weather-temp-unit { font-size: var(--fs-lg); color: var(--text-2); }
 .weather-cond {
-  font-size: 1rem; color: var(--text-2);
+  font-size: var(--fs-lg); color: var(--text-2);
   margin-left: auto;       /* push to the right */
-  font-weight: 500;
+  font-weight: var(--fw-medium);
 }
 .weather-meta {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: .5rem;
-  padding-top: .5rem;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
   border-top: 1px dashed var(--border);
 }
 @media (max-width: 720px) {
   .weather-meta { grid-template-columns: repeat(3, 1fr); }
-  .weather-cond { margin-left: 0; font-size: .85rem; }
+  .weather-cond { margin-left: 0; font-size: var(--fs-md); }
 }
 .weather-cell { display: flex; flex-direction: column; min-width: 0; }
 .weather-v {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: .9rem;
+  font-size: var(--fs-base);
   color: var(--text);
 }
 
@@ -268,7 +268,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: .35rem;
   padding-top: .6rem;
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
   border-top: 1px dashed var(--border);
 }
 @media (max-width: 720px) {
@@ -291,7 +291,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .weather-hour-t {
   font-family: var(--mono);
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
 }
 .weather-hour-i {
@@ -303,7 +303,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .weather-hour-v {
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
-  font-size: .85rem;
+  font-size: var(--fs-md);
   color: var(--text);
 }
 
@@ -321,14 +321,14 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   align-items: center;
 }
 @media (max-width: 720px) {
-  .today-grid { grid-template-columns: 1fr; gap: .75rem; }
+  .today-grid { grid-template-columns: 1fr; gap: var(--sp-3); }
 }
 .today-hero {
   display: flex; flex-direction: column; gap: .8rem;
   min-width: 0;
 }
 .today-hero-block {
-  display: flex; flex-direction: column; gap: .25rem;
+  display: flex; flex-direction: column; gap: var(--sp-1);
 }
 .today-hero-k {
   /* Caption above the big number, was unlabeled, leaving users
@@ -340,20 +340,20 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
   font-size: 2.6rem; line-height: 1;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--text);
 }
 .today-hero-cells {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .5rem;
+  gap: var(--sp-2);
 }
 .today-hero-cells .today-cell {
   border-left: none;
   padding-left: 0;
 }
 .today-hero-cells .today-v {
-  font-size: .95rem;
+  font-size: var(--fs-base);
   margin-top: .15rem;
 }
 .today-spark { min-height: 104px; }
@@ -363,10 +363,10 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
  * as a footnote, not another headline. */
 .today-tomorrow {
   margin-top: .65rem;
-  padding-top: .5rem;
+  padding-top: var(--sp-2);
   border-top: 1px dashed var(--border);
-  display: flex; align-items: center; gap: .5rem;
-  font-size: .82rem; color: var(--text-2);
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--text-2);
 }
 .today-tomorrow svg {
   width: 16px; height: 16px; flex: none; color: var(--amber);
@@ -384,9 +384,9 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
  * inside the row are styled separately from the row tint so they
  * remain readable. */
 .settings-row--update {
-  background: rgba(210,153,34,0.07);
+  background: color-mix(in srgb, var(--amber) 7%, transparent);
   border-left: 2px solid var(--amber);
-  padding-left: .5rem;
+  padding-left: var(--sp-2);
   border-radius: var(--r-sm);
 }
 
@@ -396,15 +396,15 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
  * signal that Solcast's array model needs re-tuning (capacity, tilt,
  * azimuth, shading). */
 .forecast-accuracy {
-  margin-top: .5rem; padding-top: .5rem;
+  margin-top: var(--sp-2); padding-top: var(--sp-2);
   border-top: 1px dashed var(--border);
-  font-size: .78rem; color: var(--text-2);
+  font-size: var(--fs-xs); color: var(--text-2);
   display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap;
 }
 .forecast-accuracy strong { color: var(--text); font-variant-numeric: tabular-nums; }
-.acc-ok   { color: var(--green, #3fb950); }
+.acc-ok   { color: var(--green, var(--green)); }
 .acc-warn { color: var(--amber); }
-.acc-off  { color: var(--red,   #f85149); }
+.acc-off  { color: var(--red,   var(--red)); }
 
 /* 5-day outlook strip: horizontal row of day-cards under the Today
  * tile. Today's card is highlighted with a slightly brighter border
@@ -412,7 +412,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
  * headline above. Cards scroll horizontally on narrow screens rather
  * than wrapping; a 5-card row that wraps to 2 rows looks worse than
  * one row the user can swipe. */
-.week-panel { border-color: rgba(210,153,34,0.18); }
+.week-panel { border-color: color-mix(in srgb, var(--amber) 18%, transparent); }
 .week-panel .panel-header h2 .h-icon { color: var(--amber); }
 .week-strip {
   display: grid;
@@ -431,25 +431,25 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .week-card {
   display: flex; flex-direction: column;
-  padding: .5rem .6rem;
+  padding: var(--sp-2) .6rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   min-width: 0;
 }
 .week-card--featured {
-  border-color: rgba(210,153,34,0.55);
-  background: rgba(210,153,34,0.06);
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  background: color-mix(in srgb, var(--amber) 6%, transparent);
 }
 .week-card-head {
   display: flex; align-items: baseline; justify-content: space-between; gap: .35rem;
 }
 .week-card-day {
-  font-weight: 600; font-size: .82rem; color: var(--text);
+  font-weight: var(--fw-semibold); font-size: var(--fs-sm); color: var(--text);
   white-space: nowrap;
 }
 .week-card-date {
-  font-size: .68rem; color: var(--text-2);
+  font-size: var(--fs-2xs); color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 .week-card-spark {
@@ -460,14 +460,14 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .week-card-spark svg { width: 100%; }
 .week-card-num {
   font-family: var(--mono);
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   line-height: 1.1;
 }
-.week-card-num .meta-k { font-size: .68rem; font-family: inherit; }
+.week-card-num .meta-k { font-size: var(--fs-2xs); font-family: inherit; }
 .week-card-foot {
-  font-size: .68rem; color: var(--text-2); margin-top: .2rem;
+  font-size: var(--fs-2xs); color: var(--text-2); margin-top: .2rem;
   font-variant-numeric: tabular-nums;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -490,20 +490,20 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .tomorrow-empty-text { flex: 1; min-width: 0; }
 .tomorrow-empty-text h3 {
-  margin: 0 0 .25rem; font-size: .95rem; color: var(--text);
+  margin: 0 0 var(--sp-1); font-size: var(--fs-base); color: var(--text);
 }
 .tomorrow-empty-text p {
-  margin: 0 0 .35rem; font-size: .85rem; color: var(--text-2); line-height: 1.45;
+  margin: 0 0 .35rem; font-size: var(--fs-md); color: var(--text-2); line-height: 1.45;
 }
 .tomorrow-empty-text a { color: var(--accent); }
 .tomorrow-empty-cta {
-  display: inline-block; font-size: .8rem;
+  display: inline-block; font-size: var(--fs-sm);
   margin-top: .15rem;
 }
 .tomorrow-empty-close {
   position: absolute; top: .35rem; right: .55rem;
   background: transparent; border: none; cursor: pointer;
-  color: var(--text-2); font-size: 1.2rem; line-height: 1;
+  color: var(--text-2); font-size: var(--fs-2xl); line-height: 1;
   padding: .15rem .35rem; border-radius: var(--r-sm);
 }
 .tomorrow-empty-close:hover { background: var(--surface-3); color: var(--text); }
@@ -517,29 +517,29 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   gap: .7rem;
   align-items: start;
 }
-.alerts-form-status.ok { color: var(--green, #3fb950); }
-.alerts-form-status.err { color: var(--red, #f85149); }
+.alerts-form-status.ok { color: var(--green, var(--green)); }
+.alerts-form-status.err { color: var(--red, var(--red)); }
 
 /* Per-window efficiency breakdown on the device detail page. Hidden
  * until the fetch resolves so an unfinished smart_battery (no data
  * yet) doesn't show an empty grid. */
 .dev-efficiency-detail {
-  margin-top: .75rem;
-  padding-top: .5rem;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-2);
   border-top: 1px dashed var(--border);
 }
 .dev-efficiency-detail h4 {
-  margin: 0 0 .4rem; font-size: .82rem; color: var(--text-2);
-  font-weight: 600;
+  margin: 0 0 .4rem; font-size: var(--fs-sm); color: var(--text-2);
+  font-weight: var(--fw-semibold);
 }
 .eff-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: .5rem;
+  gap: var(--sp-2);
 }
 .eff-cell {
   display: flex; flex-direction: column;
-  padding: .5rem .55rem;
+  padding: var(--sp-2) .55rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -547,13 +547,13 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .eff-cell-val {
   font-family: var(--mono);
-  font-size: 1rem;
+  font-size: var(--fs-lg);
   font-variant-numeric: tabular-nums;
   color: var(--text);
   margin-top: .15rem;
 }
 .eff-cell-foot {
-  font-size: .7rem;
+  font-size: var(--fs-xs);
   color: var(--text-2);
   margin-top: .15rem;
   font-variant-numeric: tabular-nums;
@@ -569,7 +569,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: .8rem;
-  margin-bottom: 1rem;
+  margin-bottom: var(--sp-4);
 }
 .bhealth-stat {
   display: flex; flex-direction: column;
@@ -577,25 +577,25 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   padding: .55rem .65rem;
   background: var(--bg-2);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 .bhealth-k {
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   text-transform: uppercase;
   letter-spacing: .04em;
   color: var(--text-3);
 }
 .bhealth-v {
   font-family: var(--mono);
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
 }
 /* #294, honest empty state when a BMS-only field has no data.
    Shrunk + dim'd so it reads as "not available" rather than
    "the number happens to be small". */
 .bhealth-v.bhealth-v-empty {
-  font-size: .85rem;
-  font-weight: 500;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
   color: var(--text-2);
   font-family: var(--font);
   letter-spacing: .02em;
@@ -604,24 +604,24 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
    "from BMS" / "from shunt" hint, small + grey so it reads as
    metadata not data. */
 .bhealth-src {
-  font-size: .68rem;
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   letter-spacing: .02em;
   margin-top: -.15rem;
 }
 .bhealth-residency {
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
   padding-top: .85rem;
   border-top: 1px solid var(--border);
 }
 .bhealth-residency-head {
   display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: .5rem;
+  margin-bottom: var(--sp-2);
   flex-wrap: wrap; gap: .35rem;
 }
 .bhealth-residency-stat {
   font-family: var(--mono);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
@@ -642,8 +642,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .bhealth-bars-axis {
   display: flex;
   justify-content: space-between;
-  margin-top: .25rem;
-  font-size: .68rem;
+  margin-top: var(--sp-1);
+  font-size: var(--fs-2xs);
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
   padding: 0 2px;
@@ -662,7 +662,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .cell-drift-trend-stat {
   font-family: var(--mono);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   color: var(--amber);
   font-variant-numeric: tabular-nums;
 }
@@ -670,10 +670,10 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   min-height: 90px;
 }
 .empty-spark {
-  padding: 1rem;
+  padding: var(--sp-4);
   text-align: center;
   color: var(--text-3);
-  font-size: .8rem;
+  font-size: var(--fs-sm);
   font-style: italic;
 }
 
@@ -683,7 +683,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .heatmap-rows {
   display: flex; flex-direction: column;
   gap: 3px;
-  margin: .5rem 0 .75rem;
+  margin: var(--sp-2) 0 var(--sp-3);
 }
 .hm-row {
   display: grid;
@@ -692,8 +692,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .hm-cell {
   height: 22px;
-  border-radius: 2px;
-  font-size: .65rem;
+  border-radius: var(--r-2xs);
+  font-size: var(--fs-2xs);
   display: flex; align-items: center; justify-content: center;
 }
 .hm-cell--label {
@@ -703,13 +703,13 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   font-variant-numeric: tabular-nums;
   justify-content: flex-end;
   padding-right: .35rem;
-  font-size: .72rem;
+  font-size: var(--fs-xs);
 }
 .hm-row--head { gap: 3px; }
 .hm-row--head .hm-cell--hour {
   height: 16px;
   color: var(--text-3);
-  font-size: .65rem;
+  font-size: var(--fs-2xs);
   font-family: var(--mono);
 }
 .hm-cell--empty {
@@ -723,14 +723,14 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 .hm-cell--data:hover { transform: scale(1.4); z-index: 5; position: relative; }
 .hm-legend {
   display: flex; align-items: center; gap: .55rem;
-  font-size: .78rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
-  margin-top: .5rem;
+  margin-top: var(--sp-2);
 }
 .hm-legend-grad {
   flex: 1;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--r-2xs);
   background: linear-gradient(90deg,
     hsl(50, 35%, 18%),
     hsl(35, 65%, 32%),
@@ -739,8 +739,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 @media (max-width: 540px) {
   .hm-row { grid-template-columns: 28px repeat(24, 1fr); gap: 2px; }
-  .hm-cell { height: 16px; font-size: .55rem; }
-  .hm-cell--label { font-size: .65rem; padding-right: .2rem; }
+  .hm-cell { height: 16px; font-size: var(--fs-2xs); }
+  .hm-cell--label { font-size: var(--fs-2xs); padding-right: .2rem; }
 }
 
 /* ---------------- action buttons ---------------- */
@@ -751,8 +751,8 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
-  font-size: .85rem;
-  font-weight: 500;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
   text-decoration: none;
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s;
@@ -777,20 +777,20 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 /* ---------------- per-device detail page ---------------- */
 .dev-detail-head {
   display: flex; justify-content: space-between; align-items: center;
-  margin: -.5rem 0 .25rem;
-  gap: 1rem;
+  margin: -.5rem 0 var(--sp-1);
+  gap: var(--sp-4);
   flex-wrap: wrap;
 }
 .dev-detail-crumb { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
 .dev-detail-crumb > a {
   color: var(--text-2);
   text-decoration: none;
-  font-size: .78rem;
+  font-size: var(--fs-xs);
 }
 .dev-detail-crumb > a:hover { color: var(--accent); }
 .dev-detail-title {
   display: flex; align-items: center; gap: .55rem;
-  font-size: 1.25rem; font-weight: 600;
+  font-size: var(--fs-2xl); font-weight: var(--fw-semibold);
 }
 .dev-detail-icon {
   display: inline-flex; align-items: center;
@@ -799,11 +799,11 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
 }
 .dev-detail-icon svg { width: 100%; height: 100%; }
 .dev-detail-meta {
-  font-size: .8rem; color: var(--text-3); font-family: var(--mono);
+  font-size: var(--fs-sm); color: var(--text-3); font-family: var(--mono);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dev-detail-nav { display: flex; gap: .4rem; flex-shrink: 0; }
-@media (max-width: 540px) { .dev-detail-title { font-size: 1.05rem; } }
+@media (max-width: 540px) { .dev-detail-title { font-size: var(--fs-lg); } }
 
 /* dev-card is now an <a>, kill default link decoration */
 a.dev-card { text-decoration: none; color: inherit; display: block; }
@@ -811,7 +811,7 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
 
 /* ---------------- placeholder pages ---------------- */
 .placeholder {
-  padding: 1.5rem .5rem .5rem;
+  padding: var(--sp-5) var(--sp-2) var(--sp-2);
   display: flex; flex-direction: column;
   gap: .9rem;
   max-width: 640px;

@@ -2,7 +2,7 @@
 .theme-picker {
   display: flex;
   gap: .4rem;
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
 }
 .theme-opt {
   flex: 1 1 0;
@@ -10,14 +10,14 @@
   flex-direction: column;
   align-items: center;
   gap: .35rem;
-  padding: .65rem .5rem;
+  padding: .65rem var(--sp-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--text-2);
   font: inherit;
-  font-size: .82rem;
-  font-weight: 500;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.08s;
 }
@@ -40,13 +40,13 @@
  * from the default Modbus-hint adapter; unknown / busy ports get an
  * amber warning tone. */
 .wiz-vendor-hint--gps {
-  background: rgba(63,185,80,0.12);
-  border-color: rgba(63,185,80,0.4);
-  color: var(--green, #3fb950);
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green) 40%, transparent);
+  color: var(--green, var(--green));
 }
 .wiz-vendor-hint--warn {
-  background: rgba(210,153,34,0.10);
-  border-color: rgba(210,153,34,0.4);
+  background: color-mix(in srgb, var(--amber) 10%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 40%, transparent);
   color: var(--amber);
 }
 /* Victron-branded chip, uses their familiar accent blue. */
@@ -58,7 +58,7 @@
 /* Key-entry form revealed under a Victron scan row when the user
  * taps Pair. Tucked inside the same .wiz-results card. */
 .wiz-victron-key {
-  margin: -.5rem 0 .5rem 0;
+  margin: -.5rem 0 var(--sp-2) 0;
   padding: .65rem .85rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -71,13 +71,13 @@
  * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
  * without faking-out the wizard by deleting and re-adding. */
 .wiz-add-another {
-  margin-top: .75rem;
-  padding-top: .75rem;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
   border-top: 1px dashed var(--border);
 }
 .wiz-add-another-btn {
   width: auto;
-  font-size: .9rem;
+  font-size: var(--fs-base);
 }
 .wiz-add-another-panel {
   margin-top: .65rem;
@@ -92,23 +92,23 @@
  * add-rule form so users don't have to learn the metric-path schema
  * or invent thresholds from scratch. */
 /* Kiosk display links (Settings → Privacy). */
-.kiosk-token-list { margin-top: .75rem; display: flex; flex-direction: column; gap: .4rem; }
-.kiosk-token-empty { font-size: .82rem; color: var(--text-3); }
+.kiosk-token-list { margin-top: var(--sp-3); display: flex; flex-direction: column; gap: .4rem; }
+.kiosk-token-empty { font-size: var(--fs-sm); color: var(--text-3); }
 .kiosk-token-row {
-  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
   padding: .45rem .6rem;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
 }
 .kiosk-token-name {
-  font-size: .85rem; color: var(--text);
+  font-size: var(--fs-md); color: var(--text);
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .kiosk-token-revoke {
-  flex: 0 0 auto; font-size: .78rem; padding: .25rem .6rem;
-  background: none; border: 1px solid var(--border); border-radius: 7px;
+  flex: 0 0 auto; font-size: var(--fs-xs); padding: var(--sp-1) .6rem;
+  background: none; border: 1px solid var(--border); border-radius: var(--r-xs);
   color: var(--text-2); cursor: pointer; transition: border-color .15s, color .15s;
 }
-.kiosk-token-revoke:hover { border-color: #f85149; color: #f85149; }
+.kiosk-token-revoke:hover { border-color: var(--red); color: var(--red); }
 
 /* First-run discovery banner (top of page until the user sets a
    password or dismisses it for the session). */
@@ -117,7 +117,7 @@
   padding: .55rem .85rem;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
-  font-size: .85rem; color: var(--text);
+  font-size: var(--fs-md); color: var(--text);
 }
 .first-run-banner .frb-ico { display: flex; color: var(--accent); }
 .first-run-banner .frb-ico svg { width: 16px; height: 16px; }
@@ -125,13 +125,13 @@
 .first-run-banner .frb-cta {
   flex: 0 0 auto;
   background: var(--accent); color: var(--bg);
-  padding: .3rem .7rem; border-radius: 7px;
-  text-decoration: none; font-weight: 600; font-size: .82rem;
+  padding: .3rem .7rem; border-radius: var(--r-xs);
+  text-decoration: none; font-weight: var(--fw-semibold); font-size: var(--fs-sm);
 }
 .first-run-banner .frb-x {
   flex: 0 0 auto;
   background: none; border: none; color: var(--text-3);
-  font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 .2rem;
+  font-size: var(--fs-2xl); line-height: 1; cursor: pointer; padding: 0 .2rem;
 }
 @media (max-width: 480px) {
   .first-run-banner { flex-wrap: wrap; }
@@ -140,16 +140,16 @@
 
 /* Quick-start templates: a tidy equal-width grid of two-line tiles
    (name + condition) instead of a ragged row of variable-width pills. */
-.alerts-templates { margin: .35rem 0 1rem; }
+.alerts-templates { margin: .35rem 0 var(--sp-4); }
 .alerts-templates-head {
   display: block;
-  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em;
   color: var(--text-3); margin-bottom: .55rem;
 }
 .alerts-template-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: .5rem;
+  gap: var(--sp-2);
 }
 @media (min-width: 560px) {
   .alerts-template-grid { grid-template-columns: repeat(3, 1fr); }
@@ -158,19 +158,19 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: .1rem;
   min-width: 0; width: 100%;
   text-align: left;
-  padding: .5rem .65rem;
+  padding: var(--sp-2) .65rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--r);
   cursor: pointer;
   transition: background .15s, border-color .15s;
 }
 .alerts-template-chip .tmpl-name {
-  font-size: .82rem; font-weight: 500; color: var(--text); line-height: 1.25;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--text); line-height: 1.25;
   overflow-wrap: anywhere;
 }
 .alerts-template-chip .tmpl-cond {
-  font-size: .72rem; font-family: var(--mono); color: var(--text-3);
+  font-size: var(--fs-xs); font-family: var(--mono); color: var(--text-3);
 }
 .alerts-template-chip:hover {
   background: var(--surface);
@@ -183,7 +183,7 @@
  * a "for your information" diagnostic, not an alarm. */
 .donut-disagreement {
   margin-top: .35rem;
-  font-size: .65rem;
+  font-size: var(--fs-2xs);
   font-family: var(--mono);
   color: var(--text-3);
   letter-spacing: 0.02em;

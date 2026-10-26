@@ -8,27 +8,27 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
   gap: .7rem;
   align-items: start;
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
 }
 .alerts-list > .alerts-sub-head,
 .alerts-list > .alerts-templates,
 .alerts-list > .settings-foot,
 .alerts-list > .settings-empty,
 .alerts-list > .ar-card--edit { grid-column: 1 / -1; }
-.alerts-test-status { font-size: .76rem; color: var(--text-3); }
+.alerts-test-status { font-size: var(--fs-xs); color: var(--text-3); }
 .alerts-test-status.ok { color: var(--green); }
 .alerts-test-status.err { color: var(--red); }
 .settings-empty {
-  color: var(--text-3); font-size: .85rem;
-  padding: .6rem .75rem;
+  color: var(--text-3); font-size: var(--fs-md);
+  padding: .6rem var(--sp-3);
   background: var(--surface-2);
   border: 1px dashed var(--border);
   border-radius: var(--r);
 }
 .settings-foot {
-  font-size: .76rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
-  margin: .5rem 0 0;
+  margin: var(--sp-2) 0 0;
 }
 .settings-table {
   width: 100%;
@@ -41,11 +41,11 @@
 }
 .settings-table tr:last-child td { border-bottom: none; }
 .settings-row-label {
-  font-weight: 500;
+  font-weight: var(--fw-medium);
   color: var(--text);
 }
 .settings-row-help {
-  font-size: .74rem;
+  font-size: var(--fs-xs);
   color: var(--text-3);
   margin-top: .15rem;
 }
@@ -61,24 +61,24 @@
   position: fixed; inset: 0;
   background: rgba(0, 0, 0, .55);
   display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
+  z-index: var(--z-modal);
+  padding: var(--sp-4);
 }
 .settings-edit-modal {
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--r);
-  padding: 1.25rem 1.25rem 1rem;
+  padding: 1.25rem 1.25rem var(--sp-4);
   width: 100%; max-width: 24rem;
   box-shadow: 0 12px 40px rgba(0,0,0,.4);
 }
-.settings-edit-modal h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+.settings-edit-modal h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-lg); }
 .settings-edit-row {
   display: flex; align-items: center; justify-content: space-between;
-  gap: .75rem; margin: .85rem 0;
+  gap: var(--sp-3); margin: .85rem 0;
 }
 .settings-edit-row label {
-  font-size: .82rem; color: var(--text-2); flex-shrink: 0;
+  font-size: var(--fs-sm); color: var(--text-2); flex-shrink: 0;
 }
 .settings-edit-row input[type="number"],
 .settings-edit-row select {
@@ -86,25 +86,25 @@
   padding: .45rem .55rem;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   color: var(--text);
   font: inherit;
 }
-.settings-edit-cur-label { font-size: .78rem; color: var(--text-3); }
+.settings-edit-cur-label { font-size: var(--fs-xs); color: var(--text-3); }
 .settings-edit-cur {
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
 }
 .settings-edit-warn {
-  font-size: .78rem; color: #d9886f;
+  font-size: var(--fs-xs); color: #d9886f;
   padding: .4rem .55rem;
   background: rgba(255, 138, 122, .08);
   border: 1px solid rgba(255, 138, 122, .25);
-  border-radius: 6px;
-  margin-top: .25rem;
+  border-radius: var(--r-xs);
+  margin-top: var(--sp-1);
 }
 .settings-edit-actions {
-  display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem;
+  display: flex; gap: var(--sp-2); justify-content: flex-end; margin-top: var(--sp-4);
 }
 .btn-action--primary {
   background: var(--accent, #3a86ff);
@@ -120,15 +120,15 @@
 .alerts-sub-head:first-child { margin-top: 0; }
 .alerts-sub-head h2 {
   margin: 0;
-  font-size: .92rem;
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
   text-transform: none;
   letter-spacing: -0.01em;
   color: var(--text);
 }
 .alerts-add-btn {
-  font: inherit; font-size: .8rem; font-weight: 500;
-  padding: .25rem .6rem;
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  padding: var(--sp-1) .6rem;
   background: var(--surface-3);
   color: var(--accent);
   border: 1px solid var(--border);
@@ -161,7 +161,7 @@
 .alerts-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: .55rem .75rem;
+  gap: .55rem var(--sp-3);
   /* min-width on the grid container caps any intrinsic-width child
    * (e.g. an input with a long placeholder) so the whole form can't
    * push past its parent's right edge on narrow viewports. */
@@ -179,8 +179,8 @@
 }
 .alerts-form-grid--full { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 .alerts-form label {
-  display: flex; flex-direction: column; gap: .25rem;
-  font-size: .76rem;
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  font-size: var(--fs-xs);
   color: var(--text-2);
   /* CSS-grid items refuse to shrink below content size by default;
    * min-width:0 lets the input below it use width:100% without
@@ -190,7 +190,7 @@
 .alerts-form .alerts-field-wide { grid-column: span 2; min-width: 0; }
 .alerts-form input,
 .alerts-form select {
-  font: inherit; font-size: .88rem;
+  font: inherit; font-size: var(--fs-md);
   padding: .4rem .55rem;
   background: var(--bg);
   color: var(--text);
@@ -211,7 +211,7 @@
   flex-direction: row !important;
   align-items: center;
   gap: .4rem;
-  font-size: .85rem !important;
+  font-size: var(--fs-md) !important;
   color: var(--text) !important;
 }
 .alerts-checkbox input { width: 16px; height: 16px; flex-shrink: 0; }
@@ -219,15 +219,15 @@
   display: flex; align-items: center; gap: .55rem;
   flex-wrap: wrap;
 }
-.alerts-form-status { font-size: .78rem; color: var(--text-3); }
+.alerts-form-status { font-size: var(--fs-xs); color: var(--text-3); }
 .alerts-form-status.err { color: var(--red); }
 .alerts-restart-banner {
-  background: rgba(210,153,34,0.12);
-  border: 1px solid rgba(210,153,34,0.45);
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   color: var(--text);
   padding: .55rem .8rem;
   border-radius: var(--r-sm);
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   margin-bottom: .55rem;
 }
 
