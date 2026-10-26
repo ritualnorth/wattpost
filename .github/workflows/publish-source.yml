@@ -113,7 +113,7 @@ jobs:
       # is the canonical home the cloud's /api/releases/latest reads from.
       - name: Attach source to GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             ${{ steps.tarball.outputs.out_dir }}/wattpost-source.tar.gz

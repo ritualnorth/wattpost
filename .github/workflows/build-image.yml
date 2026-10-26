@@ -43,7 +43,7 @@ jobs:
       # toolchains, which is tight. Free up ~25 GB by dropping bits we
       # don't need (Haskell, .NET, Android SDK, etc).
       - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
+        uses: jlumbroso/free-disk-space@ceedf095f4ec1a097402bc6bd80831f2e1a6fde6 # v2.0.0
         with:
           tool-cache: false
           android: true
@@ -70,7 +70,7 @@ jobs:
         # SIGSEGV intermittently — flaky under Ubuntu's apt qemu, even
         # the 24.04 8.x version). Pinning to this action removes that
         # whole class of failures.
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
         with:
           image: tonistiigi/binfmt:latest
           platforms: arm64,arm
@@ -162,7 +162,7 @@ jobs:
       # without losing the release body.
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             ${{ steps.locate.outputs.image }}
