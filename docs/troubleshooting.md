@@ -31,7 +31,7 @@ Common ones:
 
 ## "Cloud says Offline but the appliance is fine"
 
-The cloud's heartbeat watcher flips to Offline after 15 minutes of no heartbeat. Most common cause: the daemon was restarted but the **cloud heartbeat service didn't auto-start** because the pairing was set up on a daemon that's no longer running. Restart wattpost (`systemctl restart wattpost` or **Settings → System → Restart daemon**). The pair flow now hot-starts the cloud service in-process, so newer pairings don't have this issue.
+The cloud's heartbeat watcher flips to Offline after 15 minutes of no heartbeat. Most common cause: the daemon was restarted but the **cloud heartbeat service didn't auto-start** because the pairing was set up on a daemon that's no longer running. Restart wattpost (`systemctl restart wattpost` or **Settings → About → Restart daemon**). The pair flow now hot-starts the cloud service in-process, so newer pairings don't have this issue.
 
 ## "Update Now does nothing / crashes"
 

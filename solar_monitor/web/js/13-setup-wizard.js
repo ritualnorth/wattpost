@@ -851,7 +851,7 @@ function renderLanPeerPanel(peers) {
           A Renogy BT-2 dongle only allows one connection at a time.
           If the same dongle is already paired on the host above,
           this appliance won't see it. Either remove the dongle from
-          the other host (Settings → Devices → Delete) or stop its
+          the other host (Devices → Delete) or stop its
           WattPost daemon, then scan again.
         </div>
       </div>

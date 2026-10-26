@@ -102,7 +102,7 @@ one failing changes the design:
 
 ## 1. Manual hotspot (3a)
 
-- [ ] Settings → WiFi hotspot: set SSID + an 8–63 char password, **Save**.
+- [ ] Settings → Network → WiFi hotspot: set SSID + an 8–63 char password, **Save**.
 - [ ] `GET /api/hotspot/status` → `nmcli_available: true`, `configured: true`.
 - [ ] **Turn on now** → the SSID appears in a phone's WiFi list within a
   few seconds.

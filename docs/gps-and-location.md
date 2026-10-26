@@ -112,7 +112,7 @@ location:
   map, **geofences**, and **anchor watch** (alert if the boat drifts off
   its mooring).
 
-The toggle lives in **Settings → Location** and is authoritative on the
+The toggle lives in **Settings → Privacy & sharing → Location** and is authoritative on the
 appliance side — this box only contributes location when *you* set this.
 
 ## API

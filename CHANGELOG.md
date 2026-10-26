@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- Settings reorganised into nine sections. "Devices" is now **Add devices** (it was easily confused with the Devices tab); new **Display** (theme, kiosk) and **Network** (WiFi, hotspot, IP address, firewall/SSH) sections replace the three-screen Advanced page; **Device health** moves to About; the static Retention card is gone (History & polling already holds the editable values); the Quiet hours card is one full-width card with a single Configure button. Integrations gets a link icon. Documentation paths updated to match (several pointed at sections that no longer existed).
 - Internal: removed 87 dead CSS rules (51 unused classes, the old Settings section dropdown and its JS) from `styles.css`, about 290 lines. Verified with an A/B screenshot comparison of 44 page/theme/viewport combinations: no visual change beyond animation frames.
 - UI accessibility pass: muted-text colours darkened so all text meets 4.5:1 in both themes (was 2.9:1 dark, 3.5:1 light); one `h1` per view and no heading skips; alert sliders, number boxes and two selects now have names; designed keyboard focus ring; 44px touch targets on touch devices; phone tab labels 11.5px (were 9.9px); primary buttons use dark text on the dark theme's accent; unstyled links use the accent colour; the demo "view only" badge no longer overlaps content.
 - Tooling: `scripts/ux/audit.mjs` (Playwright audit of contrast, labels, tap targets, headings and screenshots) and `docs/design/ui-ux-remediation.md`, the scope and targets for the UI/UX work.

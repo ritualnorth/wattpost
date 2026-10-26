@@ -81,7 +81,7 @@ not recommended.
 m. For longer runs use shielded twisted pair and terminate at one end
 with a 120 Ω resistor across A/B.
 
-**Add it in the wizard:** Settings → Setup → Add transport → pick
+**Add it in the wizard:** Settings → Add devices → Add transport → pick
 **Serial Modbus**. The wizard's USB scan tries to classify each
 `/dev/ttyUSB*` device as `modbus_rtu`, `nmea_gps`, or `unknown`.
 

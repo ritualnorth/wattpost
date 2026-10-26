@@ -15,7 +15,7 @@ The `/kiosk` route is **always anonymous**. Never gated by the local web passwor
 - **Old Android tablet:** install **Fully Kiosk Browser** (free), set start URL to the kiosk URL, enable "stay on" and "lock screen orientation". You get a dedicated solar display for ~$0 of new hardware.
 - **iPad:** Safari → bookmark → Add to Home Screen → tap the icon → fullscreen. Set Auto-Lock to Never in Settings.
 - **Raspberry Pi connected to a monitor:** install chromium + xdotool, drop a systemd unit that launches `chromium --kiosk <url>` on boot.
-- **Browser on a laptop:** the dashboard's Settings → **Kiosk by default on this device** toggle in localStorage. Opens kiosk on first load every time.
+- **Browser on a laptop:** the dashboard's **Settings → Display → Open the local display in kiosk** switch. Opens kiosk on first load every time.
 
 ## Sharing a kiosk link from the cloud
 
