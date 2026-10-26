@@ -8,6 +8,7 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+- UI accessibility pass: muted-text colours darkened so all text meets 4.5:1 in both themes (was 2.9:1 dark, 3.5:1 light); one `h1` per view and no heading skips; alert sliders, number boxes and two selects now have names; designed keyboard focus ring; 44px touch targets on touch devices; phone tab labels 11.5px (were 9.9px); primary buttons use dark text on the dark theme's accent; unstyled links use the accent colour; the demo "view only" badge no longer overlaps content.
 - Tooling: `scripts/ux/audit.mjs` (Playwright audit of contrast, labels, tap targets, headings and screenshots) and `docs/design/ui-ux-remediation.md`, the scope and targets for the UI/UX work.
 - Docs: kiosk page describes the cloud wall-display link (Manage sheet, one-time URL, revocable, read-only) instead of the removed tunnel link, and drops a `?lock=1` option the UI doesn't implement.
 - Tests: node-based tests for the chart logic (`tests/js/`, run from pytest): x-axis window, range stats, forecast interpolation, unit labels. Skipped where node isn't installed.

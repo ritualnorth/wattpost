@@ -57,7 +57,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=193" />
+  <link rel="stylesheet" href="/web/styles.css?v=194" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -233,6 +233,7 @@
          ROUTE: Dashboard (default)
          ===================================================== -->
     <section class="route" data-route="dashboard">
+      <h1 class="sr-only">Dashboard</h1>
       <!-- HERO -->
       <section class="hero-v2">
         <div class="hero-donut-wrap donut-state" id="donut-wrap" data-radius="86">
@@ -534,6 +535,7 @@
          ROUTE: History
          ===================================================== -->
     <section class="route" data-route="history">
+      <h1 class="sr-only">History</h1>
 
       <!-- ENERGY TODAY, Powerwall-style overview chart. Multi-series
            area + SoC line, four kWh totals, self-powered breakdown.
@@ -659,6 +661,7 @@
          ROUTE: Devices
          ===================================================== -->
     <section class="route" data-route="devices">
+      <h1 class="sr-only">Devices</h1>
       <section class="panel">
         <div class="panel-header">
           <h2>
@@ -757,7 +760,7 @@
              this; #/settings/<sub> shows the focused section view below.
              Built + wired by renderSettingsMenu() in app.js. -->
         <div id="settings-menu">
-          <h2 class="set-page-title">Settings</h2>
+          <h1 class="set-page-title">Settings</h1>
           <div id="settings-menu-list" class="set-menu"></div>
         </div>
 
@@ -769,7 +772,7 @@
             Settings
           </a>
           <div class="set-section-head">
-            <h2 id="settings-section-title"></h2>
+            <h1 id="settings-section-title"></h1>
             <p id="settings-section-sub" class="set-section-sub"></p>
           </div>
 
@@ -780,7 +783,7 @@
                out" up here means you don't accidentally walk away
                from an authed session on a shared tablet. -->
           <div class="settings-block" data-subroute="about">
-            <h3>System status</h3>
+            <h2>System status</h2>
             <button id="settings-status" class="status" type="button" style="margin:0 0 .55rem">
               <span class="dot"></span>
               <span class="status-icon"></span>
@@ -801,7 +804,7 @@
             </a>
           </div>
           <div class="settings-block" data-subroute="about">
-            <h3>Session &amp; system</h3>
+            <h2>Session &amp; system</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Restart the daemon to apply pending changes (new transports,
               devices, exporters). The UI reconnects automatically. Takes
@@ -819,7 +822,7 @@
             </div>
           </div>
           <div class="settings-block settings-block--cta" data-subroute="devices">
-            <h3>Devices &amp; setup</h3>
+            <h2>Devices &amp; setup</h2>
             <p class="settings-cta-blurb">Scan over Bluetooth and pair Renogy gear. No config files.</p>
             <a class="btn-action btn-action--primary" href="#/setup">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h2a3 3 0 0 1 6 0M14 12h6"/><circle cx="9" cy="12" r="2.5"/><path d="M9 5v3M9 16v3"/></svg>
@@ -827,7 +830,7 @@
             </a>
           </div>
           <div class="settings-block" data-subroute="advanced">
-            <h3>Appearance</h3>
+            <h2>Appearance</h2>
             <div class="theme-picker" role="radiogroup" aria-label="Theme">
               <button class="theme-opt" data-theme-pref="system" role="radio" aria-checked="false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -852,7 +855,7 @@
             <div class="hist-row" id="kiosk-skin-row" style="margin-top:.5rem">
               <span>Kiosk skin</span>
               <span class="hist-input">
-                <select id="kiosk-skin-select" style="font-size:.85em">
+                <select id="kiosk-skin-select" aria-label="Kiosk skin" style="font-size:.85em">
                   <option value="halo">Halo &middot; minimal</option>
                   <option value="ember">Ember &middot; cozy / night</option>
                   <option value="command">Command &middot; detailed</option>
@@ -861,14 +864,14 @@
             </div>
           </div>
           <div class="settings-block settings-block--alerts" data-subroute="alerts">
-            <h3>Alerts</h3>
+            <h2>Alerts</h2>
             <div id="settings-alerts" class="alerts-list">
               <div class="settings-empty">Loading…</div>
             </div>
             <p class="settings-foot">Edits apply on the next daemon restart for transports; rule changes hot-reload immediately.</p>
           </div>
           <div class="settings-block" id="settings-history-block" data-subroute="advanced">
-            <h3>History &amp; polling</h3>
+            <h2>History &amp; polling</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               How often the daemon polls each device and how long each
               retention tier keeps data. Changes apply live; the next
@@ -915,7 +918,7 @@
           </div>
 
           <div class="settings-block" id="settings-devhealth-block" data-subroute="advanced">
-            <h3>Device health</h3>
+            <h2>Device health</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Live host metrics for this appliance &mdash; the same data the
               cloud sees in the heartbeat. Under-voltage / throttling here
@@ -940,7 +943,7 @@
                Re-enable by removing the `hidden` attribute below — the JS
                (refreshSolarPauseSettings) and CSS already key off it. -->
           <div class="settings-block" id="settings-solar-pause-block" data-subroute="alerts" hidden>
-            <h3>Solar-aware charger pause <span class="settings-foot" style="font-weight:normal">· Pro</span></h3>
+            <h2>Solar-aware charger pause <span class="settings-foot" style="font-weight:normal">· Pro</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Pause your AC charger when solar is covering the load.
               The daemon re-enables it before the bank drops too low.
@@ -1010,14 +1013,14 @@
             </div>
           </div>
           <div class="settings-block" data-subroute="advanced">
-            <h3>Retention</h3>
+            <h2>Retention</h2>
             <div class="settings-row"><span>Raw samples</span><span class="v">7 days</span></div>
             <div class="settings-row"><span>1-min rollup</span><span class="v">30 days</span></div>
             <div class="settings-row"><span>1-hour rollup</span><span class="v">1 year</span></div>
             <div class="settings-row"><span>1-day rollup</span><span class="v">forever</span></div>
           </div>
           <div class="settings-block" data-subroute="integrations">
-            <h3>Integrations</h3>
+            <h2>Integrations</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Optional data sources and exports. Solcast and Open-Meteo use your own
               credentials and are called straight from this appliance. If you pair
@@ -1029,12 +1032,12 @@
             </div>
           </div>
           <div class="settings-block" data-subroute="about">
-            <h3>About</h3>
+            <h2>About</h2>
             <div class="settings-row"><span>Version</span><span class="v" id="settings-version">·</span></div>
             <div class="settings-row" id="settings-channel-row">
               <span>Update channel</span>
               <span class="v">
-                <select id="settings-channel-select" style="font-size:.85em">
+                <select id="settings-channel-select" aria-label="Update channel" style="font-size:.85em">
                   <option value="stable">Stable</option>
                   <option value="beta">Beta</option>
                 </select>
@@ -1079,7 +1082,7 @@
           <!-- Session & system block moved to top of the grid above. -->
 
           <div class="settings-block" data-subroute="privacy">
-            <h3>Web password</h3>
+            <h2>Web password</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               The local password protects writes from the LAN. Rotate it
               if you've forgotten yours, or if you suspect it's been
@@ -1093,7 +1096,7 @@
             <div id="rotate-pw-result" class="rotate-pw-result" hidden></div>
           </div>
           <div class="settings-block" data-subroute="privacy">
-            <h3>Kiosk displays <span class="pill" style="font-size:.7rem;vertical-align:middle">Local network</span></h3>
+            <h2>Kiosk displays <span class="pill" style="font-size:.7rem;vertical-align:middle">Local network</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               A kiosk link opens a read-only, chrome-free wall-display
               view that doesn't need a login. Create one per screen and
@@ -1120,7 +1123,7 @@
             <div id="kiosk-token-list" class="kiosk-token-list"></div>
           </div>
           <div class="settings-block" data-subroute="privacy">
-            <h3>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h3>
+            <h2>Location <span class="pill" style="font-size:.7rem;vertical-align:middle">Privacy</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Where this appliance shows up on the cloud fleet map &mdash; or whether it shows up at all.
               <strong>Off</strong> by default. Your dashboard always knows where you are; this toggle only controls what gets shared to wattpost.cloud.
@@ -1151,7 +1154,7 @@
             <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
           <div class="settings-block" id="settings-netsec-block" data-subroute="advanced">
-            <h3>Network security <span class="settings-foot" style="font-weight:normal">&middot; Pi only</span></h3>
+            <h2>Network security <span class="settings-foot" style="font-weight:normal">&middot; Pi only</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Host-level protection for the Pi image. Docker installs
               manage their own firewall, so these don't apply there.
@@ -1171,7 +1174,7 @@
             <p class="settings-foot" id="netsec-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
           <div class="settings-block" id="settings-network-block" data-subroute="advanced">
-            <h3>Network address <span class="settings-foot" style="font-weight:normal">&middot; this box's IP</span></h3>
+            <h2>Network address <span class="settings-foot" style="font-weight:normal">&middot; this box's IP</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Pin this box to a fixed (static) IP so it always lives at the
               same address, or leave it on automatic (DHCP). After a change the
@@ -1183,7 +1186,7 @@
             <span id="network-msg" class="settings-foot hist-status"></span>
           </div>
           <div class="settings-block" id="settings-wifi-block" data-subroute="advanced">
-            <h3>Join a WiFi network <span class="settings-foot" style="font-weight:normal">&middot; put this box on your LAN</span></h3>
+            <h2>Join a WiFi network <span class="settings-foot" style="font-weight:normal">&middot; put this box on your LAN</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Scan for nearby networks and connect this appliance to your
               WiFi &mdash; handy when it's in hotspot mode or was flashed
@@ -1249,7 +1252,7 @@
             </div>
           </div>
           <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
-            <h3>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h3>
+            <h2>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Turn this appliance's WiFi radio into an access point so a
               phone or laptop can reach the dashboard with no other
@@ -1298,7 +1301,7 @@
             </div>
           </div>
           <div class="settings-block settings-block--backup" data-subroute="backup">
-            <h3>Backup &amp; restore</h3>
+            <h2>Backup &amp; restore</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Download a single archive containing the full SQLite
               database (all history, devices, alerts) plus
@@ -1338,7 +1341,7 @@
               history back onto a fresh, clean config.
             </p>
             <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:1rem 0">
-            <h4 style="margin:0 0 .35rem 0">Automatic backups</h4>
+            <h2 style="margin:0 0 .35rem 0">Automatic backups</h2>
             <p class="settings-foot" id="backup-sched-summary" style="margin-top:0;margin-bottom:.5rem">
               Loading&hellip;
             </p>
@@ -1355,7 +1358,7 @@
             </div>
           </div>
           <div class="settings-block" data-subroute="privacy">
-            <h3>Discovery telemetry</h3>
+            <h2>Discovery telemetry</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Anonymous: when you scan for BLE / Modbus devices, the
               appliance sends a fingerprint of anything our drivers
@@ -1370,7 +1373,7 @@
             </div>
           </div>
           <div class="settings-block" data-subroute="privacy">
-            <h3>Anonymous install ping</h3>
+            <h2>Anonymous install ping</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               On the daily update check, the appliance can include an
               anonymous install ID + version so we can count how many
@@ -1385,7 +1388,7 @@
             </div>
           </div>
           <div class="settings-block settings-block--diagnostics" data-subroute="advanced">
-            <h3>Diagnostics</h3>
+            <h2>Diagnostics</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Live log tail from the daemon. Newest at the bottom.
               Send these lines if you open a support ticket.
@@ -1405,7 +1408,7 @@
             <pre id="diag-log" class="diag-log">Loading…</pre>
           </div>
           <div class="settings-block settings-block--danger" id="settings-reset-block" data-subroute="about">
-            <h3>Reset to defaults</h3>
+            <h2>Reset to defaults</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.5rem">
               Wipes all configured transports, devices, exporters, alerts
               and smart-scene rules so this appliance behaves like a
@@ -1446,10 +1449,10 @@
     <section class="route docs-route" data-route="docs">
       <section class="panel docs-panel">
         <div class="panel-header">
-          <h2>
+          <h1>
             <svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             Documentation
-          </h2>
+          </h1>
         </div>
         <div class="docs-layout">
           <nav id="docs-nav" class="docs-nav" aria-label="Documentation topics">
@@ -1480,20 +1483,20 @@
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
   <!-- The UI is plain scripts, loaded in order; they share one global scope. -->
-  <script src="/web/js/01-core.js?v=290"></script>
-  <script src="/web/js/02-dashboard.js?v=290"></script>
-  <script src="/web/js/03-power-flow.js?v=290"></script>
-  <script src="/web/js/04-forecast-weather.js?v=290"></script>
-  <script src="/web/js/05-alerts-devices.js?v=290"></script>
-  <script src="/web/js/06-history.js?v=290"></script>
-  <script src="/web/js/07-routing-settings.js?v=290"></script>
-  <script src="/web/js/08-network.js?v=290"></script>
-  <script src="/web/js/08b-system.js?v=290"></script>
-  <script src="/web/js/09-integrations.js?v=290"></script>
-  <script src="/web/js/10-alerts-editor.js?v=290"></script>
-  <script src="/web/js/11-wiring.js?v=290"></script>
-  <script src="/web/js/12-device-pages.js?v=290"></script>
-  <script src="/web/js/13-setup-wizard.js?v=290"></script>
-  <script src="/web/js/14-diagnostics-docs.js?v=290"></script>
+  <script src="/web/js/01-core.js?v=291"></script>
+  <script src="/web/js/02-dashboard.js?v=291"></script>
+  <script src="/web/js/03-power-flow.js?v=291"></script>
+  <script src="/web/js/04-forecast-weather.js?v=291"></script>
+  <script src="/web/js/05-alerts-devices.js?v=291"></script>
+  <script src="/web/js/06-history.js?v=291"></script>
+  <script src="/web/js/07-routing-settings.js?v=291"></script>
+  <script src="/web/js/08-network.js?v=291"></script>
+  <script src="/web/js/08b-system.js?v=291"></script>
+  <script src="/web/js/09-integrations.js?v=291"></script>
+  <script src="/web/js/10-alerts-editor.js?v=291"></script>
+  <script src="/web/js/11-wiring.js?v=291"></script>
+  <script src="/web/js/12-device-pages.js?v=291"></script>
+  <script src="/web/js/13-setup-wizard.js?v=291"></script>
+  <script src="/web/js/14-diagnostics-docs.js?v=291"></script>
 </body>
 </html>

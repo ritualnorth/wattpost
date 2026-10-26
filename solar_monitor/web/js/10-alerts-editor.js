@@ -110,7 +110,7 @@ function renderAlertsPanel() {
   const transportIds = alertsState.transports.map(t => t.id);
 
   let html = renderQuietHoursBlock();
-  html += `<div class="alerts-sub-head"><h4>Alert rules</h4>
+  html += `<div class="alerts-sub-head"><h2>Alert rules</h2>
     <button class="alerts-add-btn" data-add="rule">+ Add rule</button></div>`;
 
   // One-tap templates row, pre-fills the add-rule form with sensible
@@ -147,7 +147,7 @@ function renderAlertsPanel() {
     }
   }
 
-  html += `<div class="alerts-sub-head"><h4>Transports</h4>
+  html += `<div class="alerts-sub-head"><h2>Transports</h2>
     <button class="alerts-add-btn" data-add="transport">+ Add transport</button></div>`;
   if (alertsState.editing?.type === "transport" && alertsState.editing.mode === "add") {
     html += renderTransportForm(null);
@@ -268,9 +268,9 @@ function renderRuleRow(r, transportIds) {
       <div class="ar-controls">
         <div class="ar-ctl-label" data-rule-cond="${r.id}">Triggers when <b>${escHtml(r.metric)} ${opLbl} ${r.threshold}</b></div>
         <div class="ar-ctl-grid">
-          <input type="range" class="ar-slider" data-rule-threshold="${r.id}"
+          <input type="range" class="ar-slider" data-rule-threshold="${r.id}" aria-label="${escHtml(r.name || r.metric)} threshold"
                  min="${rng.min}" max="${rng.max}" step="${rng.step}" value="${r.threshold}" style="--fill:${fill}%">
-          <input type="number" class="ar-num" data-rule-threshold-num="${r.id}" step="${rng.step}" value="${r.threshold}">
+          <input type="number" class="ar-num" data-rule-threshold-num="${r.id}" aria-label="${escHtml(r.name || r.metric)} threshold value" step="${rng.step}" value="${r.threshold}">
         </div>
         <div class="ar-meta">
           <span class="ar-tag ar-tag--${r.severity}">${r.severity}</span>
@@ -378,7 +378,7 @@ function renderQuietHoursBlock() {
   if (editing) return renderQuietHoursForm(qh);
   return `
     <div class="alerts-sub-head">
-      <h4>Quiet hours</h4>
+      <h2>Quiet hours</h2>
       <button class="alerts-add-btn" data-edit-quiet>${qh ? "Edit" : "Configure"}</button>
     </div>
     <div class="ar-card${qh ? " is-on" : ""}">
@@ -405,7 +405,7 @@ function renderQuietHoursForm(qh) {
   const start = qh?.start_hour ?? 22;
   const end   = qh?.end_hour   ?? 7;
   return `
-    <div class="alerts-sub-head"><h4>Quiet hours</h4></div>
+    <div class="alerts-sub-head"><h2>Quiet hours</h2></div>
     <form class="alerts-form" data-form="quiet_hours">
       <label class="alerts-checkbox alerts-quiet-enable">
         <input type="checkbox" name="enabled" ${enabled ? "checked" : ""}/>
