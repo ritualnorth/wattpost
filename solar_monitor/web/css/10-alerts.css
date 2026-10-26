@@ -1,0 +1,233 @@
+/* ---------------- settings → alerts ---------------- */
+.settings-block--alerts { grid-column: 1 / -1; }
+.alerts-list {
+  /* Tile rule/transport/quiet cards across the full-width Alerts block
+     on desktop; sub-heads, templates, foot text and the open edit form
+     span the full row. Collapses to one column on mobile. */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: .7rem;
+  align-items: start;
+  margin-top: .25rem;
+}
+.alerts-list > .alerts-sub-head,
+.alerts-list > .alerts-templates,
+.alerts-list > .settings-foot,
+.alerts-list > .settings-empty,
+.alerts-list > .ar-card--edit { grid-column: 1 / -1; }
+.alerts-test-status { font-size: .76rem; color: var(--text-3); }
+.alerts-test-status.ok { color: var(--green); }
+.alerts-test-status.err { color: var(--red); }
+.settings-empty {
+  color: var(--text-3); font-size: .85rem;
+  padding: .6rem .75rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.settings-foot {
+  font-size: .76rem;
+  color: var(--text-3);
+  margin: .5rem 0 0;
+}
+.settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.settings-table td {
+  padding: .55rem .65rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.settings-table tr:last-child td { border-bottom: none; }
+.settings-row-label {
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-row-help {
+  font-size: .74rem;
+  color: var(--text-3);
+  margin-top: .15rem;
+}
+.settings-row-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-align: right;
+}
+/* Edit modal for #111 phase 2. Hand-rolled rather than carrying a
+ * generic modal component just for this. */
+.settings-edit-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+.settings-edit-modal {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1.25rem 1.25rem 1rem;
+  width: 100%; max-width: 24rem;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.settings-edit-modal h3 { margin: 0 0 .25rem; font-size: 1.05rem; }
+.settings-edit-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin: .85rem 0;
+}
+.settings-edit-row label {
+  font-size: .82rem; color: var(--text-2); flex-shrink: 0;
+}
+.settings-edit-row input[type="number"],
+.settings-edit-row select {
+  width: 11rem;
+  padding: .45rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+}
+.settings-edit-cur-label { font-size: .78rem; color: var(--text-3); }
+.settings-edit-cur {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.settings-edit-warn {
+  font-size: .78rem; color: #d9886f;
+  padding: .4rem .55rem;
+  background: rgba(255, 138, 122, .08);
+  border: 1px solid rgba(255, 138, 122, .25);
+  border-radius: 6px;
+  margin-top: .25rem;
+}
+.settings-edit-actions {
+  display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem;
+}
+.btn-action--primary {
+  background: var(--accent, #3a86ff);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+.btn-action--primary:hover { filter: brightness(1.1); }
+.btn-action--primary[disabled] { opacity: .6; cursor: not-allowed; }
+.alerts-sub-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: .85rem 0 .35rem;
+}
+.alerts-sub-head:first-child { margin-top: 0; }
+.alerts-sub-head h2 {
+  margin: 0;
+  font-size: .92rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.alerts-add-btn {
+  font: inherit; font-size: .8rem; font-weight: 500;
+  padding: .25rem .6rem;
+  background: var(--surface-3);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.alerts-add-btn:hover { border-color: var(--accent); background: var(--surface); }
+.alerts-icon-btn {
+  font: inherit;
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.alerts-icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
+.alerts-icon-btn--danger:hover { color: var(--red); border-color: var(--red); }
+/* Inline forms (add / edit) */
+.alerts-form {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r);
+  padding: .85rem;
+  display: flex; flex-direction: column;
+  gap: .7rem;
+  margin-bottom: .55rem;
+}
+.alerts-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .55rem .75rem;
+  /* min-width on the grid container caps any intrinsic-width child
+   * (e.g. an input with a long placeholder) so the whole form can't
+   * push past its parent's right edge on narrow viewports. */
+  min-width: 0;
+}
+/* The HTML5 `hidden` attribute defaults to `display:none` via the
+ * UA stylesheet, but ANY class rule with `display: grid|flex|etc`
+ * wins the specificity fight and leaves the element visible.
+ * Without this, the forecast form's provider-switched field groups
+ * stay visible when their provider isn't selected, every Solcast
+ * user sees the Open-Meteo lat/lon/array fields uselessly. */
+.alerts-form-grid[hidden],
+.alerts-form .settings-foot[hidden] {
+  display: none !important;
+}
+.alerts-form-grid--full { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.alerts-form label {
+  display: flex; flex-direction: column; gap: .25rem;
+  font-size: .76rem;
+  color: var(--text-2);
+  /* CSS-grid items refuse to shrink below content size by default;
+   * min-width:0 lets the input below it use width:100% without
+   * blowing out the column on long placeholders / values. */
+  min-width: 0;
+}
+.alerts-form .alerts-field-wide { grid-column: span 2; min-width: 0; }
+.alerts-form input,
+.alerts-form select {
+  font: inherit; font-size: .88rem;
+  padding: .4rem .55rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  /* Fill the grid column. box-sizing makes border + padding count
+   * toward 100% so inputs don't peek out by 2px. */
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+.alerts-form select { font-family: inherit; }
+.alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
+.alerts-form input[name="metric_custom"][hidden] { display: none; }
+.alerts-checkbox {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: .4rem;
+  font-size: .85rem !important;
+  color: var(--text) !important;
+}
+.alerts-checkbox input { width: 16px; height: 16px; flex-shrink: 0; }
+.alerts-form-actions {
+  display: flex; align-items: center; gap: .55rem;
+  flex-wrap: wrap;
+}
+.alerts-form-status { font-size: .78rem; color: var(--text-3); }
+.alerts-form-status.err { color: var(--red); }
+.alerts-restart-banner {
+  background: rgba(210,153,34,0.12);
+  border: 1px solid rgba(210,153,34,0.45);
+  color: var(--text);
+  padding: .55rem .8rem;
+  border-radius: var(--r-sm);
+  font-size: .82rem;
+  margin-bottom: .55rem;
+}
+

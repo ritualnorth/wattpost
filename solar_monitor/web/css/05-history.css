@@ -1,0 +1,197 @@
+/* ---------------- history chart ---------------- */
+.chart-controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.chart-controls label {
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: center; gap: .4rem;
+}
+.chart-controls select {
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem; border-radius: var(--r-sm);
+  font-size: .85rem; font-family: inherit;
+}
+.range-btns { display: flex; gap: .25rem; }
+.range-btns button {
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.range-btns button:hover { color: var(--text); border-color: var(--border-2); }
+.range-btns button.active {
+  color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,0.08);
+}
+.chart-compare { user-select: none; cursor: pointer; }
+.chart-compare input { margin: 0; cursor: pointer; }
+.chart-compare.is-disabled { opacity: .4; cursor: not-allowed; }
+.chart-compare.is-disabled input { cursor: not-allowed; }
+.chart-export-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: .35rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .8rem; font-family: inherit;
+  cursor: pointer;
+  margin-left: auto; /* push to right end of chart-controls */
+}
+.chart-export-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
+.chart-export-btn svg { width: 14px; height: 14px; }
+/* ===== History chart panel ===== */
+/* No special tint, chart and heatmap panels on the same route share the
+ * default panel background so they read as siblings. */
+
+/* Inline header controls (replaces the stacked label+select layout) */
+.chart-controls > select {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .42rem .65rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: inherit;
+  min-width: 0;
+  max-width: 180px;
+}
+.chart-controls > select:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+/* Custom date range picker, shown when the user clicks the Custom
+ * range button. Native datetime-local inputs get iOS Safari's built-in
+ * picker for free. */
+.custom-range {
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+/* `display: flex` above overrides the HTML `hidden` attribute,
+ * so we have to opt back into hiding when the attribute is set. */
+.custom-range[hidden] {
+  display: none;
+}
+.custom-range label {
+  display: flex; flex-direction: column; gap: .2rem;
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+}
+.custom-range input[type="datetime-local"] {
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: .35rem .55rem;
+  border-radius: var(--r-sm);
+  font-size: .85rem;
+  font-family: var(--mono);
+  color-scheme: dark;  /* dark-mode native picker on Chromium */
+  min-width: 170px;
+}
+
+/* ----- Stat strip ----- */
+.chart-statstrip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .5rem;
+  margin: 0 0 1rem;
+  padding: .6rem .5rem;
+  background: linear-gradient(180deg, var(--surface-2), transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+.cs-cell {
+  display: flex; flex-direction: column;
+  min-width: 0;
+  padding: 0 .5rem;
+}
+.cs-cell + .cs-cell { border-left: 1px solid var(--border-2); }
+.cs-cell .cs-k {
+  font-size: .65rem; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+  margin-bottom: .15rem;
+}
+.cs-cell .cs-v {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cs-cell--now .cs-v { color: var(--accent); font-size: 1.15rem; }
+@media (max-width: 720px) {
+  .chart-statstrip { grid-template-columns: repeat(2, 1fr); gap: .35rem; }
+  .cs-cell + .cs-cell { border-left: none; }
+  .cs-cell { padding: .35rem .35rem; background: var(--surface-2); border-radius: var(--r-sm); }
+}
+
+/* Resolution subtitle, small grey line under the stat strip telling
+   the user what bucket the chart is in (raw / 1-min avg / 1-hour avg
+   / 1-day avg) and how many points are visible. Used to live in the
+   stat strip but it's debug context, not a stat. */
+.chart-resbar {
+  font-size: .72rem;
+  color: var(--text-3);
+  margin: .25rem 0 .5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Floating value-at-cursor tooltip on every uPlot chart. Anchored
+   absolutely inside u.over by valueTooltipPlugin(), left/top set
+   in JS each setCursor frame. */
+.chart-value-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .45rem .65rem;
+  font-size: .76rem;
+  line-height: 1.45;
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  z-index: 5;
+  max-width: 240px;
+  white-space: nowrap;
+}
+.chart-value-tip strong {
+  display: block; margin-bottom: .3rem;
+  font-size: .72rem; color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.chart-value-tip div { color: var(--text-2); }
+.chart-value-tip em {
+  font-style: normal; font-weight: 700; color: var(--text);
+}
+.chart-value-tip-sw {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  margin-right: .35rem; vertical-align: middle;
+}
+
+/* ----- The chart itself ----- */
+.chart-host {
+  min-height: 380px;
+  padding-bottom: .5rem;
+}
+/* Style uPlot's own legend + crosshair to feel like part of the design */
+.u-legend {
+  margin-top: .5rem !important;
+  font-family: var(--font) !important;
+  font-size: .82rem !important;
+  color: var(--text-2) !important;
+}
+.u-legend .u-label, .u-legend .u-value { color: var(--text) !important; }
+.u-cursor-x, .u-cursor-y { background: var(--accent) !important; opacity: 0.5 !important; }
+.u-cursor-pt { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent) !important; }
+.uplot { font-family: var(--font) !important; }
+

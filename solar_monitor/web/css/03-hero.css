@@ -1,0 +1,293 @@
+/* ---------------- hero v2: donut + stats ---------------- */
+.hero-v2 {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 1.5rem;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(63,185,80,0.12), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(88,166,255,0.08), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+}
+/* Hero hue follows SoC state for subtle emotional cue */
+.hero-v2.soc-low {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(248,81,73,0.16), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(248,81,73,0.06), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+}
+.hero-v2.soc-mid {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(210,153,34,0.14), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(210,153,34,0.05), transparent 60%),
+    var(--card-highlight),
+    var(--surface);
+}
+@media (max-width: 740px) {
+  .hero-v2 { grid-template-columns: 1fr; }
+}
+.hero-donut-wrap {
+  position: relative;
+  width: 220px; height: 220px;
+  justify-self: center;
+}
+.hero-donut {
+  width: 100%; height: 100%;
+  display: block;
+}
+.donut-track {
+  stroke: var(--surface-3);
+}
+.donut-arc {
+  /* Gradient + halo are picked per state via .donut-state.<state>
+     selectors below. JS sets the wrapper's state class on every snapshot
+     paint. Pre-state default = holding (calm blue). */
+  stroke: url(#g-soc-holding);
+  transition: stroke-dasharray 0.8s ease, filter 0.4s ease;
+  filter: drop-shadow(0 0 6px rgba(88,166,255,0.35));
+}
+/* Legacy band coloring, used by the per-pack mini donuts in the
+   bank-compare detail view (`.hero-donut-wrap` without a `.donut-state`
+   wrapper, so the new state palette doesn't kick in). Two-class
+   specificity beats the default `.donut-arc` rule so these win. */
+.donut-arc.soc-low  { stroke: var(--red);   filter: drop-shadow(0 0 6px rgba(248,81,73,0.45)); }
+.donut-arc.soc-mid  { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(210,153,34,0.4)); }
+.donut-arc.soc-high { stroke: var(--green); filter: drop-shadow(0 0 6px rgba(63,185,80,0.35)); }
+
+/* State palette: charging green, holding blue, discharging amber,
+   critical red. The gradient IDs are duplicated in the kiosk donut
+   under a `-k-` prefix so the two SVGs don't share defs. */
+.donut-state.charging    .donut-arc { stroke: url(#g-soc-charging);    filter: drop-shadow(0 0 10px rgba(86,211,100,0.50)); }
+.donut-state.holding     .donut-arc { stroke: url(#g-soc-holding);     filter: drop-shadow(0 0 6px  rgba(88,166,255,0.35)); }
+.donut-state.discharging .donut-arc { stroke: url(#g-soc-discharging); filter: drop-shadow(0 0 10px rgba(255,111,157,0.50)); }
+.donut-state.critical    .donut-arc { stroke: url(#g-soc-critical);    filter: drop-shadow(0 0 12px rgba(255,123,114,0.65)); }
+.kiosk-donut.donut-state.charging    .donut-arc { stroke: url(#g-soc-k-charging); }
+.kiosk-donut.donut-state.holding     .donut-arc { stroke: url(#g-soc-k-holding); }
+.kiosk-donut.donut-state.discharging .donut-arc { stroke: url(#g-soc-k-discharging); }
+.kiosk-donut.donut-state.critical    .donut-arc { stroke: url(#g-soc-k-critical); }
+
+/* Leading-edge dot, small solid circle at the tip of the arc with a
+   halo that pulses outward. Replaces the old rotating "ring runner"
+   indicator. JS positions cx/cy on every snapshot paint. */
+.donut-head, .donut-head-glow {
+  transition: cx 0.8s ease, cy 0.8s ease, fill 0.4s ease, stroke 0.4s ease;
+  pointer-events: none;
+}
+.donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-head-glow {
+  fill: rgba(88,166,255,0.55);
+  /* Animate via transform+opacity rather than the `r` attribute,
+     iOS Safari historically didn't animate `r` via CSS, and even on
+     versions that do it's silently dropped under "Reduce Motion"
+     without firing the prefers-reduced-motion media query reliably
+     on every install. transform-box: fill-box ensures the scale
+     happens about the circle's own centre, not the SVG viewport. */
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: donut-head-pulse 1800ms ease-out infinite;
+}
+.donut-state.charging    .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.charging    .donut-head-glow { fill: rgba(86,211,100,0.55); }
+.donut-state.holding     .donut-head      { fill: #58a6ff; stroke: #ffffff; }
+.donut-state.holding     .donut-head-glow { fill: rgba(88,166,255,0.50); }
+.donut-state.discharging .donut-head      { fill: #ff6f9d; stroke: #ffffff; }
+.donut-state.discharging .donut-head-glow { fill: rgba(255,111,157,0.55); }
+.donut-state.critical    .donut-head      { fill: #ff7b72; stroke: #ffffff; }
+.donut-state.critical    .donut-head-glow { fill: rgba(255,123,114,0.65); animation-duration: 900ms; }
+/* Decouple the leading-edge dot + halo colour from the arc colour
+   when there's a non-trivial flow. The arc still reflects SoC
+   severity; the head reflects flow direction. The visible case
+   this unlocks is "critical SoC, but charging", red arc + green
+   pulsing head, telegraphing recovery without losing the "we're
+   low" message. Applied only when |netW| > 5 W; the holding band
+   keeps its neutral blue head. */
+.donut-state.donut-head-flow-up   .donut-head      { fill: #56d364; stroke: #ffffff; }
+.donut-state.donut-head-flow-up   .donut-head-glow { fill: rgba(86,211,100,0.55); }
+.donut-state.donut-head-flow-down .donut-head      { fill: #f0c849; stroke: #ffffff; }
+.donut-state.donut-head-flow-down .donut-head-glow { fill: rgba(240,200,73,0.55); }
+@keyframes donut-head-pulse {
+  0%   { transform: scale(1);   opacity: 0.7; }
+  60%  { transform: scale(2.2); opacity: 0;   }
+  100% { transform: scale(1);   opacity: 0;   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .donut-head-glow { animation: none; opacity: 0.35; }
+}
+
+/* Net W indicator under "State of charge" */
+.donut-health {
+  display: inline-block;
+  margin-top: .35rem;
+  padding: .1rem .55rem;
+  border-radius: 999px;
+  font-size: .7rem;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.donut-health.good  { color: var(--green); border-color: rgba(63,185,80,0.45);  background: rgba(63,185,80,0.08); }
+.donut-health.warn  { color: var(--amber); border-color: rgba(210,153,34,0.45); background: rgba(210,153,34,0.08); }
+.donut-health.alarm { color: var(--red);   border-color: rgba(248,81,73,0.55);  background: rgba(248,81,73,0.10); }
+
+.donut-flow {
+  display: inline-flex; align-items: center; gap: .3rem;
+  margin-top: .55rem;
+  padding: .15rem .55rem;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  transition: color 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+.donut-flow-arrow {
+  display: inline-flex;
+  width: 10px; height: 10px;
+}
+.donut-state.charging .donut-flow {
+  color: var(--green);
+  border-color: rgba(63,185,80,0.45);
+  background: rgba(63,185,80,0.08);
+}
+.donut-state.charging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid currentColor;
+}
+.donut-state.discharging .donut-flow {
+  color: #ff6f9d;
+  border-color: rgba(255,111,157,0.45);
+  background: rgba(255,111,157,0.08);
+}
+.donut-state.discharging .donut-flow-arrow::before {
+  content: "";
+  display: inline-block;
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid currentColor;
+}
+.donut-state.idle .donut-flow-arrow::before {
+  content: "•";
+  color: var(--text-3);
+  font-size: 1.3rem;
+  line-height: .5;
+}
+
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.donut-pct {
+  font-family: var(--mono);
+  font-size: 3.1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.donut-pct-unit {
+  font-size: 1.2rem;
+  color: var(--text-2);
+  margin-left: 2px;
+}
+.donut-label {
+  font-size: .72rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: .35rem;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto auto;
+  gap: .75rem;
+  align-content: start;
+}
+@media (max-width: 540px) {
+  .hero-stats { grid-template-columns: 1fr 1fr; }
+}
+.hero-stat {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+}
+.hero-stat--big {
+  grid-column: span 1;
+  background: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+}
+@media (max-width: 540px) {
+  .hero-stat--big { grid-column: span 2; }
+}
+.hero-stat-val {
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-top: .15rem;
+  display: flex; align-items: baseline; gap: .25rem;
+  /* Long device/model strings must not break the grid cell */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-stat-val > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* When the value is a non-numeric string (e.g. bank meta), don't blow up
+   the font; let it shrink and fit on one line. */
+.hero-stat-val.is-text { font-size: .95rem; font-weight: 500; }
+.hero-stat--big .hero-stat-val { font-size: 1.7rem; }
+.hero-stat-unit {
+  font-size: .95rem;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.hero-stat-sub {
+  font-size: .76rem;
+  color: var(--text-3);
+  margin-top: .2rem;
+}
+.hero-stat-forecast {
+  font-size: .72rem;
+  color: var(--blue, #6c8ef2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+  cursor: help;
+}
+
+/* Net power color cues */
+#bank-power-tile.charging .hero-stat-val { color: var(--green); }
+#bank-power-tile.discharging .hero-stat-val { color: #ff6f9d; }
+#bank-power-tile.idle .hero-stat-val { color: var(--text-2); }
+
+.meta-k {
+  font-size: .68rem;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  display: block;
+}
+

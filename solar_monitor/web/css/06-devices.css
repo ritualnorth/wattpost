@@ -1,0 +1,818 @@
+/* ---------------- device cards ---------------- */
+.device-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: .85rem;
+}
+.dev-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .9rem 1rem 1rem;
+}
+/* Silent: device hasn't advertised in > 60s. Grey out the values so
+ * the card is visually obvious as "we have no current data" without
+ * hiding it entirely, keeps the customer's mental model of "what
+ * hardware is configured" stable. See #171. */
+.dev-card-silent { opacity: .55; }
+.dev-card-silent .dev-card-name { color: var(--text-2); }
+.dev-card-silent-badge {
+  margin-top: .55rem;
+  font-size: .72rem;
+  color: var(--text-3);
+  font-weight: 500;
+  padding: .25rem .5rem;
+  background: rgba(255, 138, 122, .08);
+  border: 1px solid rgba(255, 138, 122, .25);
+  color: #d9886f;
+  border-radius: 6px;
+  display: inline-block;
+  opacity: 1;
+}
+.dev-card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: .25rem;
+}
+.dev-card-head-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.dev-card-icon {
+  width: 18px; height: 18px;
+  display: inline-flex; align-items: center;
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.dev-card.kind-charge_controller .dev-card-icon { color: var(--pv); }
+.dev-card.kind-smart_battery     .dev-card-icon { color: var(--batt); }
+.dev-card.kind-inverter          .dev-card-icon { color: var(--ac); }
+.dev-card.kind-dcdc_charger      .dev-card-icon { color: var(--grid); }
+.dev-card.kind-shunt             .dev-card-icon { color: var(--batt); }
+.dev-card-name {
+  font-weight: 600; font-size: .92rem;
+  /* Long raw labels (e.g. "renogy.charge_controller.16") must truncate
+     rather than overflow into the slave-id badge on the right. */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dev-card-head-right {
+  display: flex; align-items: center; gap: .5rem;
+  flex: none;            /* never shrink/overlap the badge; the name truncates instead */
+  color: var(--text-3);
+}
+.dev-card-slave { font-size: .72rem; color: var(--text-3); font-family: var(--mono); }
+.dev-card-del {
+  /* Tiny trash icon button on each device row's head. The card
+   * itself is an <a> so clicks navigate to /#/device/<label>; this
+   * button stops propagation in JS to keep destructive clicks
+   * separate from the "open detail" tap. */
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.dev-card-del svg { width: 14px; height: 14px; }
+.dev-card-del:hover {
+  color: var(--red);
+  border-color: var(--red);
+  background: rgba(248,81,73,0.10);
+}
+.dev-card-chevron {
+  width: 16px; height: 16px;
+  color: var(--text-3);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+a.dev-card:hover .dev-card-chevron {
+  color: var(--accent);
+  transform: translateX(3px);
+}
+
+/* Footer "View detail" hint */
+.dev-card-foot {
+  margin-top: .75rem;
+  padding-top: .55rem;
+  border-top: 1px dashed var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: .75rem;
+  color: var(--text-3);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.dev-card-foot svg {
+  width: 13px; height: 13px;
+  transition: transform 0.15s ease;
+}
+a.dev-card:hover .dev-card-foot {
+  color: var(--accent);
+}
+a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
+.dev-card-sub { font-size: .76rem; color: var(--text-3); font-family: var(--mono); margin-bottom: .7rem; }
+/* align-items:flex-start (not baseline): a long value (e.g. a charger
+   model name) wraps to several lines, and baseline-aligning the
+   single-line label against it dropped the label down so it overlapped
+   the value. Top-aligning keeps the label pinned to the value's first
+   line; the value wraps cleanly below on its own side. */
+.dev-card-row { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem; padding: .2rem 0; font-size: .85rem; }
+.dev-card-row .k { color: var(--text-3); }
+.dev-card-row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--text);
+  min-width: 0; text-align: right; overflow-wrap: anywhere; }
+.dev-card-row .dev-card-row-left { flex-shrink: 0; }
+
+/* Lifetime stats strip on smart-battery cards */
+.dev-card-lifetime {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+  margin: .25rem 0 .65rem;
+  padding: .5rem .55rem;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.lt-cell { display: flex; flex-direction: column; min-width: 0; }
+.lt-cell .lt-v {
+  font-family: var(--mono);
+  font-size: .92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.lt-cell--unreliable .lt-v,
+.lt-cell--unreliable .meta-k { color: var(--text-3, var(--text-2)); opacity: .55; }
+.lt-eff-win {
+  font-size: .7rem;
+  font-family: var(--mono);
+  color: var(--text-2);
+  text-transform: lowercase;
+}
+
+/* "Right now" panel, current weather conditions from Open-Meteo.
+ * Sits between Today (energy state) and the daily outlook. The big
+ * temperature reading + icon dominates so the panel reads at a glance;
+ * supporting cells (cloud, wind, humidity, sunrise/sunset) sit below
+ * in a row. Soft blue tint matches the border so the tile reads as
+ * part of the dashboard's tinted-panel family, not a flat one-off. */
+.weather-panel {
+  border-color: rgba(88, 166, 255, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.06), rgba(88,166,255,0) 70%);
+  transition: --panel-tint .8s ease, border-color .8s ease;
+}
+
+/* #264, "Where you are" location panel. Fixed-height map area; Leaflet
+ * controls + tile imagery handle their own colours. Border + tint match
+ * the dashboard's panel family so it doesn't look pasted-in. */
+.location-panel {
+  border-color: rgba(132, 204, 22, 0.18);
+  --panel-tint: linear-gradient(135deg, rgba(132,204,22,0.05), rgba(132,204,22,0) 70%);
+}
+.location-map {
+  width: 100%;
+  height: 220px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: .25rem;
+  background: rgba(255, 255, 255, .03);
+}
+/* Weather-aware tint variants. Applied as `wx-bg-<state>` classes
+ * by renderWeather() based on WMO code + is_day. All intentionally
+ * gentle (<=8% alpha), the dashboard's information density is the
+ * star; this is mood lighting, not a Weather Channel takeover. */
+.weather-panel.wx-bg-clear-day {
+  border-color: rgba(245, 158, 11, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(250,204,21,0.08), rgba(245,158,11,0.02) 70%);
+}
+.weather-panel.wx-bg-clear-night {
+  border-color: rgba(99, 102, 241, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(30,41,59,0.02) 70%);
+}
+.weather-panel.wx-bg-partly-day {
+  border-color: rgba(125, 211, 252, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(125,211,252,0.08), rgba(125,211,252,0) 70%);
+}
+.weather-panel.wx-bg-partly-night {
+  border-color: rgba(100, 116, 139, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(100,116,139,0.08), rgba(100,116,139,0) 70%);
+}
+.weather-panel.wx-bg-cloudy {
+  border-color: rgba(148, 163, 184, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(148,163,184,0.08), rgba(148,163,184,0) 70%);
+}
+.weather-panel.wx-bg-fog {
+  border-color: rgba(203, 213, 225, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(203,213,225,0.08), rgba(203,213,225,0) 70%);
+}
+.weather-panel.wx-bg-drizzle {
+  border-color: rgba(56, 189, 248, 0.22);
+  --panel-tint: linear-gradient(135deg, rgba(56,189,248,0.07), rgba(56,189,248,0) 70%);
+}
+.weather-panel.wx-bg-rain {
+  border-color: rgba(59, 130, 246, 0.24);
+  --panel-tint: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(30,64,175,0.02) 70%);
+}
+.weather-panel.wx-bg-snow {
+  border-color: rgba(186, 230, 253, 0.28);
+  --panel-tint: linear-gradient(135deg, rgba(224,242,254,0.10), rgba(186,230,253,0.02) 70%);
+}
+.weather-panel.wx-bg-thunder {
+  border-color: rgba(168, 85, 247, 0.26);
+  --panel-tint: linear-gradient(135deg, rgba(168,85,247,0.08), rgba(67,56,202,0.03) 70%);
+}
+.weather-strip {
+  display: flex; flex-direction: column; gap: .65rem;
+}
+.weather-hero {
+  display: flex; align-items: center; gap: 1rem;
+}
+.weather-icon {
+  width: 56px; height: 56px; flex: none;
+  color: var(--accent);
+}
+.weather-icon svg { width: 100%; height: 100%; }
+.weather-temp {
+  display: flex; align-items: baseline; gap: .15rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.weather-temp-v { font-size: 2.4rem; line-height: 1; color: var(--text); }
+.weather-temp-unit { font-size: 1rem; color: var(--text-2); }
+.weather-cond {
+  font-size: 1rem; color: var(--text-2);
+  margin-left: auto;       /* push to the right */
+  font-weight: 500;
+}
+.weather-meta {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: .5rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-meta { grid-template-columns: repeat(3, 1fr); }
+  .weather-cond { margin-left: 0; font-size: .85rem; }
+}
+.weather-cell { display: flex; flex-direction: column; min-width: 0; }
+.weather-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .9rem;
+  color: var(--text);
+}
+
+/* Hourly forecast strip (next ~8 hours). Sits under the meta row; on
+ * narrow viewports the cells scroll horizontally rather than wrap so
+ * the row keeps reading as a continuous timeline. */
+.weather-hourly {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: .35rem;
+  padding-top: .6rem;
+  margin-top: .25rem;
+  border-top: 1px dashed var(--border);
+}
+@media (max-width: 720px) {
+  .weather-hourly {
+    grid-auto-flow: column;
+    grid-auto-columns: 56px;
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: .15rem;
+  }
+}
+.weather-hour {
+  display: flex; flex-direction: column;
+  align-items: center; gap: .15rem;
+  padding: .35rem .15rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.weather-hour-t {
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--text-3);
+}
+.weather-hour-i {
+  width: 24px; height: 24px;
+  color: var(--accent);
+  display: block;
+}
+.weather-hour-i svg { width: 100%; height: 100%; display: block; }
+.weather-hour-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: .85rem;
+  color: var(--text);
+}
+
+/* Today panel, two-column layout: hero numbers on the left, the
+ * forecast sparkline on the right. The hero's big kWh-so-far reading
+ * sits above three compact sub-cells (charged Ah, peak, load). The
+ * sparkline shows the day's predicted PV curve with the past portion
+ * solid and the "still to come" portion dashed; a faint vertical line
+ * marks "now". On narrow screens we stack vertically so neither half
+ * gets squeezed. */
+.today-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 1.25rem;
+  align-items: center;
+}
+@media (max-width: 720px) {
+  .today-grid { grid-template-columns: 1fr; gap: .75rem; }
+}
+.today-hero {
+  display: flex; flex-direction: column; gap: .8rem;
+  min-width: 0;
+}
+.today-hero-block {
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.today-hero-k {
+  /* Caption above the big number, was unlabeled, leaving users
+     guessing "what's 940?". meta-k already gives the uppercase
+     micro-label aesthetic used in every other cell on the card. */
+  display: block;
+}
+.today-hero-val {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.6rem; line-height: 1;
+  font-weight: 600;
+  color: var(--text);
+}
+.today-hero-cells {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.today-hero-cells .today-cell {
+  border-left: none;
+  padding-left: 0;
+}
+.today-hero-cells .today-v {
+  font-size: .95rem;
+  margin-top: .15rem;
+}
+.today-spark { min-height: 104px; }
+.today-spark svg { display: block; width: 100%; }
+
+/* One-line Tomorrow preview at the bottom of the Today tile. Reads
+ * as a footnote, not another headline. */
+.today-tomorrow {
+  margin-top: .65rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .82rem; color: var(--text-2);
+}
+.today-tomorrow svg {
+  width: 16px; height: 16px; flex: none; color: var(--amber);
+}
+
+/* Sleep mode, after sunset (no PV remaining today + tomorrow forecast
+ * known) the panel flips: the hero shows tomorrow's expected kWh, and
+ * today's tally demotes to the footer. Sub-stats stay live so the user
+ * can still see the day's totals at a glance. */
+.today-panel--sleep .panel-header h2 .h-icon { color: var(--text-3); }
+
+/* Settings → About: "Latest available" row gains a soft amber tint
+ * when a newer version is published, so the user notices on the
+ * Settings tab without having to read the labels. The button + link
+ * inside the row are styled separately from the row tint so they
+ * remain readable. */
+.settings-row--update {
+  background: rgba(210,153,34,0.07);
+  border-left: 2px solid var(--amber);
+  padding-left: .5rem;
+  border-radius: var(--r-sm);
+}
+
+/* "Yesterday: predicted X kWh · actual Y kWh · Z% of forecast" line.
+ * Lives at the bottom of the Today panel so the user can see how
+ * well the previous day's forecast held up, drift here is the early
+ * signal that Solcast's array model needs re-tuning (capacity, tilt,
+ * azimuth, shading). */
+.forecast-accuracy {
+  margin-top: .5rem; padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+  font-size: .78rem; color: var(--text-2);
+  display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap;
+}
+.forecast-accuracy strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.acc-ok   { color: var(--green, #3fb950); }
+.acc-warn { color: var(--amber); }
+.acc-off  { color: var(--red,   #f85149); }
+
+/* 5-day outlook strip: horizontal row of day-cards under the Today
+ * tile. Today's card is highlighted with a slightly brighter border
+ * so it reads as the "you are here" of the week, matching the Today
+ * headline above. Cards scroll horizontally on narrow screens rather
+ * than wrapping; a 5-card row that wraps to 2 rows looks worse than
+ * one row the user can swipe. */
+.week-panel { border-color: rgba(210,153,34,0.18); }
+.week-panel .panel-header h2 .h-icon { color: var(--amber); }
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  gap: .55rem;
+  overflow-x: auto;
+  padding-bottom: .15rem;     /* room for any horizontal scrollbar */
+}
+@media (max-width: 720px) {
+  .week-strip {
+    /* Pin to 5 fixed-width cards so the grid still feels intentional
+     * even when it overflows; the user can swipe to reach the later
+     * days rather than seeing them wrap badly. */
+    grid-template-columns: repeat(5, 130px);
+  }
+}
+.week-card {
+  display: flex; flex-direction: column;
+  padding: .5rem .6rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.week-card--featured {
+  border-color: rgba(210,153,34,0.55);
+  background: rgba(210,153,34,0.06);
+}
+.week-card-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .35rem;
+}
+.week-card-day {
+  font-weight: 600; font-size: .82rem; color: var(--text);
+  white-space: nowrap;
+}
+.week-card-date {
+  font-size: .68rem; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.week-card-spark {
+  margin: .35rem 0 .35rem;
+  height: 32px;
+  display: flex; align-items: stretch;
+}
+.week-card-spark svg { width: 100%; }
+.week-card-num {
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  line-height: 1.1;
+}
+.week-card-num .meta-k { font-size: .68rem; font-family: inherit; }
+.week-card-foot {
+  font-size: .68rem; color: var(--text-2); margin-top: .2rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Empty-state nudge for users without Solcast set up. Mid-weight,
+ * present enough to be discovered, polite enough to be ignored. */
+.tomorrow-empty {
+  position: relative;
+  border: 1px dashed var(--border-2, var(--border));
+  background: var(--surface-2);
+}
+.tomorrow-empty-body {
+  display: flex; gap: .9rem; align-items: flex-start;
+  padding: .35rem .2rem;
+}
+.tomorrow-empty-icon {
+  width: 38px; height: 38px; flex: none;
+  color: var(--amber);
+  opacity: .85;
+}
+.tomorrow-empty-text { flex: 1; min-width: 0; }
+.tomorrow-empty-text h3 {
+  margin: 0 0 .25rem; font-size: .95rem; color: var(--text);
+}
+.tomorrow-empty-text p {
+  margin: 0 0 .35rem; font-size: .85rem; color: var(--text-2); line-height: 1.45;
+}
+.tomorrow-empty-text a { color: var(--accent); }
+.tomorrow-empty-cta {
+  display: inline-block; font-size: .8rem;
+  margin-top: .15rem;
+}
+.tomorrow-empty-close {
+  position: absolute; top: .35rem; right: .55rem;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 1.2rem; line-height: 1;
+  padding: .15rem .35rem; border-radius: var(--r-sm);
+}
+.tomorrow-empty-close:hover { background: var(--surface-3); color: var(--text); }
+
+/* Integrations panel (Settings → Integrations) */
+.integrations-block {
+  /* Tile cards across the full-width block on desktop; collapses to a
+     single column on mobile (minmax floor). */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+  gap: .7rem;
+  align-items: start;
+}
+.alerts-form-status.ok { color: var(--green, #3fb950); }
+.alerts-form-status.err { color: var(--red, #f85149); }
+
+/* Per-window efficiency breakdown on the device detail page. Hidden
+ * until the fetch resolves so an unfinished smart_battery (no data
+ * yet) doesn't show an empty grid. */
+.dev-efficiency-detail {
+  margin-top: .75rem;
+  padding-top: .5rem;
+  border-top: 1px dashed var(--border);
+}
+.dev-efficiency-detail h4 {
+  margin: 0 0 .4rem; font-size: .82rem; color: var(--text-2);
+  font-weight: 600;
+}
+.eff-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .5rem;
+}
+.eff-cell {
+  display: flex; flex-direction: column;
+  padding: .5rem .55rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  min-width: 0;
+}
+.eff-cell-val {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  margin-top: .15rem;
+}
+.eff-cell-foot {
+  font-size: .7rem;
+  color: var(--text-2);
+  margin-top: .15rem;
+  font-variant-numeric: tabular-nums;
+}
+.eff-cell--unreliable .eff-cell-val,
+.eff-cell--unreliable .eff-cell-foot,
+.eff-cell--unreliable .meta-k { opacity: .5; }
+
+/* Battery health tile (#109), cycle/lifetime stats + SoC residency */
+#panel-battery-health { --panel-tint: linear-gradient(180deg, rgba(99,140,242,0.05), transparent 50%); }
+#panel-battery-health .h-icon { color: var(--blue, #6c8ef2); }
+.bhealth-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: .8rem;
+  margin-bottom: 1rem;
+}
+.bhealth-stat {
+  display: flex; flex-direction: column;
+  gap: .15rem;
+  padding: .55rem .65rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bhealth-k {
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-3);
+}
+.bhealth-v {
+  font-family: var(--mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+/* #294, honest empty state when a BMS-only field has no data.
+   Shrunk + dim'd so it reads as "not available" rather than
+   "the number happens to be small". */
+.bhealth-v.bhealth-v-empty {
+  font-size: .85rem;
+  font-weight: 500;
+  color: var(--text-2);
+  font-family: var(--font);
+  letter-spacing: .02em;
+}
+/* #295, provenance caption under cycle/lifetime numbers.
+   "from BMS" / "from shunt" hint, small + grey so it reads as
+   metadata not data. */
+.bhealth-src {
+  font-size: .68rem;
+  color: var(--text-3);
+  letter-spacing: .02em;
+  margin-top: -.15rem;
+}
+.bhealth-residency {
+  margin-top: .25rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.bhealth-residency-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .5rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.bhealth-residency-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.bhealth-bars {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  height: 80px;
+  align-items: end;
+  padding: 0 2px;
+}
+.bhealth-bar {
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: opacity .15s ease;
+}
+.bhealth-bar:hover { opacity: .8; cursor: help; }
+.bhealth-bars-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: .25rem;
+  font-size: .68rem;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  padding: 0 2px;
+}
+
+/* Cell-drift trend sparkline */
+.cell-drift-trend {
+  margin-top: .9rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--border);
+}
+.cell-drift-trend-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: .35rem;
+  flex-wrap: wrap; gap: .35rem;
+}
+.cell-drift-trend-stat {
+  font-family: var(--mono);
+  font-size: .82rem;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+#cell-drift-spark {
+  min-height: 90px;
+}
+.empty-spark {
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-3);
+  font-size: .8rem;
+  font-style: italic;
+}
+
+/* Load heatmap, uses the default panel background like the chart panel
+ * above it, so the two siblings on the History route match. */
+.heatmap-panel { /* no tint */ }
+.heatmap-rows {
+  display: flex; flex-direction: column;
+  gap: 3px;
+  margin: .5rem 0 .75rem;
+}
+.hm-row {
+  display: grid;
+  grid-template-columns: 38px repeat(24, 1fr);
+  gap: 3px;
+}
+.hm-cell {
+  height: 22px;
+  border-radius: 2px;
+  font-size: .65rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.hm-cell--label {
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  justify-content: flex-end;
+  padding-right: .35rem;
+  font-size: .72rem;
+}
+.hm-row--head { gap: 3px; }
+.hm-row--head .hm-cell--hour {
+  height: 16px;
+  color: var(--text-3);
+  font-size: .65rem;
+  font-family: var(--mono);
+}
+.hm-cell--empty {
+  background: var(--surface-3);
+  opacity: 0.3;
+}
+.hm-cell--data {
+  cursor: help;
+  transition: transform 0.12s ease;
+}
+.hm-cell--data:hover { transform: scale(1.4); z-index: 5; position: relative; }
+.hm-legend {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: .78rem;
+  color: var(--text-3);
+  margin-top: .5rem;
+}
+.hm-legend-grad {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg,
+    hsl(50, 35%, 18%),
+    hsl(35, 65%, 32%),
+    hsl(15, 85%, 45%),
+    hsl(0, 95%, 50%));
+}
+@media (max-width: 540px) {
+  .hm-row { grid-template-columns: 28px repeat(24, 1fr); gap: 2px; }
+  .hm-cell { height: 16px; font-size: .55rem; }
+  .hm-cell--label { font-size: .65rem; padding-right: .2rem; }
+}
+
+/* ---------------- action buttons ---------------- */
+.btn-action {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .4rem .85rem;
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: .85rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+}
+.btn-action:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-action--primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.btn-action--primary:hover {
+  background: #79b7ff;
+  color: var(--bg);
+  border-color: #79b7ff;
+}
+.btn-action svg { width: 14px; height: 14px; }
+
+/* ---------------- per-device detail page ---------------- */
+.dev-detail-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin: -.5rem 0 .25rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.dev-detail-crumb { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
+.dev-detail-crumb > a {
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: .78rem;
+}
+.dev-detail-crumb > a:hover { color: var(--accent); }
+.dev-detail-title {
+  display: flex; align-items: center; gap: .55rem;
+  font-size: 1.25rem; font-weight: 600;
+}
+.dev-detail-icon {
+  display: inline-flex; align-items: center;
+  width: 22px; height: 22px;
+  color: var(--text-2);
+}
+.dev-detail-icon svg { width: 100%; height: 100%; }
+.dev-detail-meta {
+  font-size: .8rem; color: var(--text-3); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dev-detail-nav { display: flex; gap: .4rem; flex-shrink: 0; }
+@media (max-width: 540px) { .dev-detail-title { font-size: 1.05rem; } }
+
+/* dev-card is now an <a>, kill default link decoration */
+a.dev-card { text-decoration: none; color: inherit; display: block; }
+a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); transition: all 0.15s; }
+
+/* ---------------- placeholder pages ---------------- */
+.placeholder {
+  padding: 1.5rem .5rem .5rem;
+  display: flex; flex-direction: column;
+  gap: .9rem;
+  max-width: 640px;
+}

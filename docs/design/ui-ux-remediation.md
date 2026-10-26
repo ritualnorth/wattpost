@@ -60,7 +60,7 @@ Old links keep working: `#/settings/advanced` stays valid; anchors that moved re
 2. Delete dead CSS and JS.
 3. Settings information architecture.
 4. Action affordances and form controls.
-5. Split `styles.css` into layered files.
+5. Split `styles.css` into ordered files under `web/css/` (pure concatenation, no `@layer`: layers would change precedence between sections and `!important` ordering).
 6. Type, space, radius, weight and z-index tokens; literal colours to tokens.
 7. Repeated inline styles to classes.
 8. Guard tests in CI so none of it regresses.

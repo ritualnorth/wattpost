@@ -59,3 +59,19 @@ def test_ui_scripts_load_in_numeric_order_and_the_service_worker_precaches_them(
         assert f"'/web/js/{n}'" in sw, f"sw.js does not precache {n}"
     version = tags[0][1]
     assert f"app{version}" in sw, "bump CACHE_VERSION in sw.js together with the ?v= cache-buster"
+
+
+def test_ui_stylesheets_load_in_numeric_order_and_the_service_worker_precaches_them():
+    html = (WEB / "index.html").read_text()
+    tags = re.findall(r'<link rel="stylesheet" href="/web/css/([^"?]+)\?v=(\d+)"', html)
+    names = [n for n, _ in tags]
+    assert names, "index.html loads no /web/css/ stylesheets"
+    assert names == sorted(names), "stylesheets must load in numeric order (later files override earlier ones)"
+    assert len({v for _, v in tags}) == 1, "all stylesheets should carry the same cache-buster"
+    on_disk = sorted(p.name for p in (WEB / "css").glob("*.css"))
+    assert names == on_disk, "every web/css/*.css must be linked by index.html, and vice versa"
+    sw = (WEB / "sw.js").read_text()
+    for n in names:
+        assert f"'/web/css/{n}'" in sw, f"sw.js does not precache {n}"
+    version = tags[0][1]
+    assert f"css{version}" in sw, "bump CACHE_VERSION in sw.js together with the stylesheet ?v="

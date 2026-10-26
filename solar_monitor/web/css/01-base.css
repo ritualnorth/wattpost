@@ -1,0 +1,169 @@
+/* solar-monitor, design tokens & layout
+ * Dark by default (off-grid users live in dim places). Grid-organised,
+ * generous spacing. Inspired by Cerbo GX overview + Sol-Ark flow + Solar-Assistant.
+ * Theme palette ported from Beszel (henrygd/beszel, shadcn tokens): warm
+ * neutral light, cool neutral dark, Inter, 0.8rem-scale radius — WattPost
+ * blue accent retained.
+ */
+
+/* Inter (variable) — self-hosted for local-first; no CDN at runtime. */
+@font-face {
+  font-family: "InterVariable";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/web/InterVariable.woff2") format("woff2");
+}
+
+:root {
+  /* Surfaces — Beszel .dark (cool neutral, hue 220) */
+  --bg:        hsl(220 5.5% 9%);
+  --surface:   hsl(220 5.5% 10.5%);
+  --surface-2: hsl(220 4% 16%);
+  --surface-3: hsl(220 4% 22%);
+  --border:    hsl(220 3% 17%);
+  --border-2:  hsl(220 4% 22%);
+
+  /* Text — Beszel .dark */
+  --text:      hsl(220 2% 97%);
+  --text-2:    hsl(220 4% 76%);
+  --text-3:    hsl(220 4% 65%);   /* >= 4.6:1 on every dark surface */
+
+  /* Source/storage/load colors, match Cerbo GX vocabulary */
+  --pv:        #f0b429;   /* yellow = solar/PV */
+  --pv-soft:   rgba(240,180,41,0.12);
+  --batt:      #58a6ff;   /* blue = DC battery storage */
+  --batt-soft: rgba(88,166,255,0.12);
+  --ac:        #3fb950;   /* green = AC loads */
+  --ac-soft:   rgba(63,185,80,0.12);
+  --dc:        #2cc9b1;   /* teal = DC loads */
+  --dc-soft:   rgba(44,201,177,0.12);
+  --grid:      #f85149;   /* red = grid/genset AC input */
+  --grid-soft: rgba(248,81,73,0.12);
+  --neutral:   #6b7689;
+  --neutral-soft: rgba(107,118,137,0.12);
+
+  /* Accents */
+  --accent:    #58a6ff;
+  --on-accent: #0b1220;   /* text on an accent fill: 7.4:1 (white would be 2.5:1) */
+  --green:     #3fb950;
+  --green-soft:#1d4d2a;
+  --amber:     #d29922;
+  --amber-soft:#4a3717;
+  --red:       #f85149;
+  --red-soft:  #4a1f1f;
+  --sky:       #79c0ff;
+  --violet:    #a371f7;
+
+  /* Radii / shadow — Beszel 0.8rem-scale + softer elevation */
+  --r-sm: 8px;
+  --r:    11px;
+  --r-lg: 13px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.14);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.14);
+
+  /* Theme-variable surfaces, overridden in [data-theme="light"] below. */
+  --header-bg:      rgba(13,17,23,0.85);
+  --card-highlight: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0) 60%);
+  --chart-grid:     rgba(106,118,137,0.08);
+  --chart-grid-strong: rgba(106,118,137,0.15);
+  --chart-band-fill:rgba(88,166,255,0.12);
+  --chart-accent-fill: rgba(88,166,255,0.16);
+  --chart-amber-fill: rgba(210,153,34,0.15);
+  --body-bg-glow-1: rgba(88,166,255,0.06);
+  --body-bg-glow-2: rgba(63,185,80,0.04);
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(63,185,80,0.85);
+  --donut-pulse-discharging-glow: rgba(255,111,157,0.85);
+
+  /* Type — Inter (bundled), Beszel's UI face */
+  --font: "InterVariable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ===== Light theme overrides =====
+ * The inline script in <head> sets [data-theme="light|dark"] before paint.
+ * Only properties that need to flip live here, everything else inherits
+ * from :root.
+ */
+[data-theme="light"] {
+  /* Surfaces/text/borders — Beszel :root (warm neutral, hue 30) */
+  --bg:        hsl(30 8% 98%);
+  --surface:   hsl(30 0% 100%);
+  --surface-2: hsl(240 4.76% 95.88%);
+  --surface-3: hsl(26 6% 94%);
+  --border:    hsl(30 8.11% 85.49%);
+  --border-2:  hsl(30 4.29% 72.55%);
+
+  --text:      hsl(30 0% 10%);
+  --text-2:    hsl(24 2.79% 30%);
+  --text-3:    hsl(30 3.97% 40%);   /* >= 4.6:1 on every light surface */
+
+  /* Source/storage/load colors, deepen slightly so they read on white */
+  --pv:        #b87800;
+  --pv-soft:   rgba(184,120,0,0.10);
+  --batt:      #0969da;
+  --batt-soft: rgba(9,105,218,0.10);
+  --ac:        #1a7f37;
+  --ac-soft:   rgba(26,127,55,0.10);
+  --dc:        #2a8576;
+  --dc-soft:   rgba(42,133,118,0.10);
+  --grid:      #cf222e;
+  --grid-soft: rgba(207,34,46,0.10);
+  --neutral:   #7a8595;
+  --neutral-soft: rgba(122,133,149,0.10);
+
+  --accent:    #0969da;
+  --on-accent: #ffffff;
+  --green:     #1a7f37;
+  --green-soft:#d4edd9;
+  --amber:     #8a5c00;   /* 5.0:1 on --amber-soft */
+  --amber-soft:#fbeec0;
+  --red:       #cf222e;
+  --red-soft:  #fbd5d6;
+  --sky:       #2a6fc4;
+  --violet:    #6f42c1;
+
+  --shadow:        0 1px 3px rgba(20,20,30,0.08), 0 1px 2px rgba(20,20,30,0.05);
+  --shadow-soft:   0 1px 2px rgba(20,20,30,0.06);
+
+  --header-bg:        rgba(255,255,255,0.85);
+  --card-highlight:   linear-gradient(135deg, rgba(15,23,42,0.025), rgba(15,23,42,0) 60%);
+  --chart-grid:       rgba(60,72,95,0.10);
+  --chart-grid-strong:rgba(60,72,95,0.20);
+  --chart-band-fill:  rgba(9,105,218,0.08);
+  --chart-accent-fill:rgba(9,105,218,0.12);
+  --chart-amber-fill: rgba(154,103,0,0.12);
+  --body-bg-glow-1:   rgba(9,105,218,0.05);
+  --body-bg-glow-2:   rgba(26,127,55,0.04);
+  /* In light mode pure white would just look like a gap in the ring, so
+     we use a saturated mid-tone of the action color that's clearly
+     lighter than the ring stroke. */
+  --donut-pulse-stroke:           #ffffff;
+  --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
+  --donut-pulse-discharging-glow: rgba(255,111,157,0.6);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+html {
+  /* Disable iOS Safari + Android Chrome's auto text-inflation.
+   * Mobile browsers will otherwise scale up text in long-prose
+   * containers (most visible on /docs body content), bypassing the
+   * font-size rules we set and making body text 2x the nav text on
+   * the same page. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 600px at 70% -100px, var(--body-bg-glow-1), transparent 60%),
+    radial-gradient(800px 400px at 0% 100%, var(--body-bg-glow-2), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+

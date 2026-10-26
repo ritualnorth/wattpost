@@ -26,8 +26,8 @@ identical. Animated elements (the donut rings, the status dot) and changing numb
 between any two loads, so compare A-vs-B against A-vs-A rather than expecting zero.
 
 ```sh
-git show main:solar_monitor/web/styles.css > /tmp/old.css
+git show 86a4d55:solar_monitor/web/styles.css > /tmp/old.css   # any earlier revision, or a dir of css
 NODE_PATH=$(npm root -g) node scripts/ux/ab.mjs --password ux-pass --css-a /tmp/old.css \
-    --css-b solar_monitor/web/styles.css --out /tmp/ux-ab
+    --css-b solar_monitor/web/css --out /tmp/ux-ab
 python3 scripts/ux/compare.py /tmp/ux-ab/a /tmp/ux-ab/b      # and /tmp/ux-ab/a /tmp/ux-ab/a2 for the noise floor
 ```
