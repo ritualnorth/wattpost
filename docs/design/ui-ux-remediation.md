@@ -72,3 +72,29 @@ vendored copy in the cloud in sync, and is checked with before/after audit runs 
 ## Out of scope
 
 A framework or component library, a redesign of the dashboard or charts, new features.
+
+## Outcome
+
+Delivered across wattpost #63 to #71 and wattpost-cloud #39. Measured on the audit (`scripts/ux/audit.mjs`, both themes, desktop and phone, every Settings section).
+
+| Measure | Before | After | Target met |
+|---|---|---|---|
+| Low-contrast text nodes | 8 to 35 per view | 0 on every view | yes |
+| Unlabelled controls | 9 on Alerts, 1 on Advanced and About | 0 | yes |
+| `h1` per view | 0 | 1 (heading skips: 0) | yes |
+| Smallest text on phone | 9.9px | 11.9px (12px nearly everywhere) | yes |
+| Phone targets under 44px | 3 to 28 per page | only native checkboxes (24px) and slider tracks | yes, with those exceptions |
+| Settings pages (desktop height) | Advanced 3,450px | longest are About 2,099px, Alerts 1,593px, Privacy 1,571px | no: About is over 1,800px |
+| Font sizes | 63 distinct | nine tokens plus display numerals | yes |
+| Literal colours (hex, `rgb()`, `hsl()`, token file included) | 470 | 314 (220 outside the token file) | no, target was under 30 |
+| `!important` | 67 | 66 | no |
+| Unused classes | 42 | 0 (guarded) | yes |
+| Inline styles in `index.html` | 193 | 49 | partly |
+
+What did not land, and why.
+
+- **Literal colours.** Down by a third (470 to 314), not to under 30. The brand colours and their tints now use tokens (`color-mix()`), and the token file itself holds about 94 of what is left. The rest outside it are `rgba()` overlays (shadows, glows, chart fills, kiosk skins), one-offs with no matching token. A ceiling test holds the number where it is. (The 191 in the baseline above counted a different subset, so it is not comparable.)
+- **`!important`.** Almost all of it is the portrait power-flow connector and the kiosk flow, which override later base rules and an animated dot. Removing it means reordering those blocks and screenshotting every active flow state, so it was left as recorded debt, capped by a test.
+- **About page height.** It carries the device health charts and diagnostics. Moving diagnostics under Advanced would bring it under target; not done.
+
+Guards that keep this from rotting: `tests/test_ui_guards.py` (appliance) and `cloud/tests/test_ui_token_parity.py` (cloud), plus `scripts/ux/` for the browser audit and before/after screenshot comparison.
