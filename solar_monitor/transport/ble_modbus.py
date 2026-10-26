@@ -167,6 +167,8 @@ class BleModbusTransport(Transport):
         async with HCI_DISCOVER_LOCK:
             victron_was_running = False
             disc_was_running = False
+            govee_was_running = False
+            ruuvi_was_running = False
             try:
                 from .ble_victron_advertise import _scanner as _victron_scanner
                 victron_was_running = await _victron_scanner().pause()
@@ -177,6 +179,18 @@ class BleModbusTransport(Transport):
                 disc_was_running = await ble_discovery.scanner().pause()
             except Exception:
                 log.debug("[%s] discovery scanner pause skipped (not in use)", self.id)
+            # Govee + Ruuvi passive listeners hold the discovery slot too;
+            # left running, connect() fails with org.bluez.Error.InProgress.
+            try:
+                from .ble_govee_advertise import _scanner as _govee_scanner
+                govee_was_running = await _govee_scanner().pause()
+            except Exception:
+                log.debug("[%s] govee scanner pause skipped (not in use)", self.id)
+            try:
+                from .ble_ruuvi_advertise import _scanner as _ruuvi_scanner
+                ruuvi_was_running = await _ruuvi_scanner().pause()
+            except Exception:
+                log.debug("[%s] ruuvi scanner pause skipped (not in use)", self.id)
             try:
                 dev = await BleakScanner.find_device_by_address(
                     self.address, timeout=self.discovery_timeout
@@ -203,6 +217,18 @@ class BleModbusTransport(Transport):
                         await ble_discovery.scanner().resume()
                     except Exception:
                         log.warning("[%s] discovery scanner resume failed", self.id)
+                if govee_was_running:
+                    try:
+                        from .ble_govee_advertise import _scanner as _govee_scanner
+                        await _govee_scanner().resume()
+                    except Exception:
+                        log.warning("[%s] govee scanner resume failed", self.id)
+                if ruuvi_was_running:
+                    try:
+                        from .ble_ruuvi_advertise import _scanner as _ruuvi_scanner
+                        await _ruuvi_scanner().resume()
+                    except Exception:
+                        log.warning("[%s] ruuvi scanner resume failed", self.id)
         # Enumerate the GATT services + characteristics we actually
         # got. Used both for diagnostics ("connected but probe times
         # out" is usually a wrong-characteristic issue) and to
