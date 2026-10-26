@@ -1,0 +1,220 @@
+/* ---------------- kiosk mode ---------------- */
+/* The kiosk route is chrome-free: header, nav, alerts banner all hidden
+   so a wall-mounted tablet shows only the at-a-glance facts. Activated
+   by body.kiosk-active (set by setRoute when the route name is "kiosk"). */
+body.kiosk-active .app-header,
+body.kiosk-active .app-nav,
+body.kiosk-active .alerts { display: none !important; }
+body.kiosk-active main {
+  max-width: none;
+  padding: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+body.kiosk-active .route.kiosk-route.active {
+  /* Column flex + margin:auto on the inner stage = vertically centered
+     when content fits, scrollable when it doesn't. Avoids the previous
+     "align-items: center clips equally top + bottom" failure on phones
+     where the donut + flow stack is taller than 100dvh. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Respect notch / home-bar / status-bar so the donut doesn't clip
+     under iOS chrome. env() falls back to 0 on platforms without it. */
+  padding-top:    max(2vh, env(safe-area-inset-top));
+  padding-right:  max(4vw, env(safe-area-inset-right));
+  padding-bottom: max(2vh, env(safe-area-inset-bottom));
+  padding-left:   max(4vw, env(safe-area-inset-left));
+  gap: 0;
+}
+
+/* ---- kiosk skin engine (kiosk-skins.js) ----
+   The active skin renders one full-bleed <svg class="wp-skin"> into
+   #kiosk-skin-root. The svg's own viewBox scales it crisply to any wall
+   display; these rules are just the shared chrome (background + the
+   .k-* binding classes the skins reference). */
+.kiosk-skin-root { flex: 1 1 auto; width: 100%; min-height: 0; position: relative; }
+/* Absolute-fill the SVG to its container. With only width/height:100% an
+   inline <svg> whose parent has an indefinite height collapses to its
+   intrinsic aspect height (width ÷ viewBox-ratio) and pins to the top —
+   so on a display taller than the skin's 1.6 ratio the artwork sat high
+   with a dead band beneath it. inset:0 forces the element to the full
+   container, so preserveAspectRatio="xMidYMid meet" centres the letterbox
+   instead. */
+.kiosk-skin-root svg.wp-skin { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+body.kiosk-active .route.kiosk-route.active {
+  background: radial-gradient(120% 90% at 50% 38%, #11161f 0%, #080b10 60%, #05070b 100%);
+}
+/* Per-skin page backgrounds. The skin SVG is letterboxed on most
+   displays; without a matching page bg the gutters show the default
+   cool gradient — jarring behind a warm skin. These mirror each skin's
+   own background fill (e.g. Ember's kEmBg radial) so the gutters blend
+   seamlessly into the artwork. Keyed off body[data-kiosk-skin], set by
+   renderKiosk(). */
+body.kiosk-active[data-kiosk-skin="ember"] .route.kiosk-route.active {
+  background: radial-gradient(110% 95% at 50% 26%, #2a1d14 0%, #1a1310 48%, #0d0907 100%);
+}
+.wp-skin text { fill: #e9eef5; }
+.wp-skin .k-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.wp-skin .k-dim { fill: #7b8694; }
+.wp-skin .k-label { font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; fill: #7b8694; }
+.wp-skin .k-flow { stroke-dasharray: 2 16; animation: k-march 1s linear infinite; }
+.wp-skin .k-flow.k-rev { animation-direction: reverse; }
+@keyframes k-march { to { stroke-dashoffset: -18; } }
+/* Night mode: dim the wall display after local sunset (toggled by app.js
+   from the sun times) so it isn't a lightbox in a dark van/cabin/bedroom.
+   Slow transition so it's never jarring. */
+body.kiosk-night .wp-skin { filter: brightness(0.6); transition: filter 2s ease; }
+.kiosk-donut {
+  position: relative;
+  /* Pick whichever axis is the constraint, a landscape phone is short
+     vertically, a portrait phone is narrow horizontally. Bumped the cap
+     to 560px so the ring fills more of the left half on a landscape
+     tablet without crowding the flow column. */
+  width: min(72vh, 80vw, 560px);
+  aspect-ratio: 1 / 1;
+}
+.kiosk-donut .hero-donut { width: 100%; height: 100%; display: block; }
+.kiosk-donut .donut-center {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+}
+.kiosk-donut .donut-pct {
+  font-family: var(--mono);
+  font-size: clamp(2.6rem, 11vh, 7rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  /* "%" should hug "83.4" instead of wrapping to a new line when the
+     donut is small (landscape phone). The clamp floor also drops so the
+     two together stay shorter than the donut diameter. */
+  white-space: nowrap;
+}
+.kiosk-donut .donut-pct-unit {
+  font-size: clamp(0.95rem, 3.5vh, 2rem);
+  color: var(--text-2);
+  margin-left: .2rem;
+  /* Lift the % off the baseline so it reads like a superscript hugging
+     the top-right of the digits, instead of slumping under "5". */
+  vertical-align: 0.45em;
+}
+.kiosk-donut .donut-label {
+  font-size: clamp(.8rem, 1.6vh, 1rem);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-top: .5rem;
+}
+.kiosk-donut .donut-flow {
+  margin-top: 1rem;
+  padding: .25rem .85rem;
+  font-size: clamp(.9rem, 1.8vh, 1.05rem);
+}
+.kiosk-flow {
+  width: 100%;
+  /* Reuse the existing flow strip components inside this host, but
+     scale typography & padding up so the tiles read from a couch. */
+  font-size: 1.15rem;
+  /* When the viewport is short (landscape phone), the column scrolls
+     internally instead of pushing content under the bottom chrome.
+     padding adds breathing room so the top Solar tile doesn't sit
+     flush with the top of the viewport. */
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 2vh 0;
+}
+/* The "53 W" / "0 W" pills in the connector are redundant at kiosk
+   scale, the Solar / Battery / Load tiles already show the wattage,
+   and one less label to read across the room is cleaner. Keep the
+   animated dot so flow direction is still obvious. */
+.kiosk-flow .flow-arrow-label { display: none !important; }
+.kiosk-flow .flow-tile {
+  padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
+}
+.kiosk-flow .flow-tile-sub {
+  font-size: clamp(.8rem, 1.5vh, .95rem);
+}
+.kiosk-flow .flow-arrow-label {
+  font-size: clamp(.85rem, 1.6vh, 1rem);
+}
+.kiosk-exit {
+  position: fixed;
+  /* Sit inside the safe-area inset so it never overlaps the Solar tile
+     on a landscape phone where the right column starts at the route's
+     padding edge. */
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  width: 44px; height: 44px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0.25;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+  z-index: 50;
+}
+.kiosk-exit svg { width: 20px; height: 20px; }
+.kiosk-exit:hover, .kiosk-exit:focus-visible {
+  opacity: 1;
+  color: var(--text);
+  background: var(--surface-2);
+}
+/* Revealed on mouse-move / tap (JS), highlighted so it's easy to find,
+   then fades back out when the screen goes still. */
+.kiosk-exit--show {
+  opacity: 1;
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.35);
+}
+/* Pulses a few times when the kiosk first loads to advertise the exit. */
+.kiosk-exit--flash { animation: kioskExitFlash 3.2s ease-in-out 1; }
+@keyframes kioskExitFlash {
+  0%   { opacity: .25; box-shadow: 0 0 0 0  rgba(88,166,255,0); }
+  15%  { opacity: 1;   box-shadow: 0 0 0 5px rgba(88,166,255,.5); }
+  30%  { opacity: .4;  box-shadow: 0 0 0 0  rgba(88,166,255,0); }
+  45%  { opacity: 1;   box-shadow: 0 0 0 5px rgba(88,166,255,.5); }
+  60%  { opacity: .4;  box-shadow: 0 0 0 0  rgba(88,166,255,0); }
+  75%  { opacity: 1;   box-shadow: 0 0 0 5px rgba(88,166,255,.5); }
+  100% { opacity: .25; box-shadow: 0 0 0 0  rgba(88,166,255,0); }
+}
+body:not(.kiosk-active) .kiosk-exit { display: none; }
+/* Honour `hidden` set by JS, needed because the `.kiosk-exit`
+   author rule above has equal specificity to the UA `[hidden]`
+   declaration and wins by source order, silently leaving the
+   kiosk-share Exit button visible. */
+.kiosk-exit[hidden] { display: none !important; }
+
+/* Settings toggle row (Appearance → Kiosk default) */
+.settings-toggle {
+  display: flex; align-items: flex-start; gap: .7rem;
+  margin-top: .75rem;
+  padding: .65rem .75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.settings-toggle input[type="checkbox"] {
+  margin-top: .15rem;
+  accent-color: var(--accent);
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+}
+.settings-toggle-label { display: flex; flex-direction: column; gap: .15rem; }
+.settings-toggle-label > span:first-child { font-weight: 500; color: var(--text); }
+.settings-toggle-sub {
+  font-size: 0.78rem;
+  color: var(--text-3);
+  line-height: 1.45;
+}
+

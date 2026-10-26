@@ -1,0 +1,40 @@
+/* ---------------- accessibility (UX remediation phase 1) ---------------- */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+/* Links with no styling of their own used the browser's default blue (1.9:1 on dark). */
+a { color: var(--accent); }
+
+/* One designed keyboard focus ring for everything focusable. Mouse clicks do not show it. */
+:where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: max(var(--focus-radius, 4px), 0px);
+}
+/* Touch devices: every stand-alone control gets a 44px target. */
+@media (pointer: coarse) {
+  :where(button, select, .set-back, .help-btn, .status, .set-menu-row, .erange, .theme-opt, .btn) {
+    min-height: 44px;
+  }
+  .help-btn { min-width: 44px; }
+  .set-back { padding: .6rem .4rem .6rem 0; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  .settings-toggle, label.settings-toggle { min-height: 44px; }
+}
+
+/* Cards that should span the whole row of an .ar-card grid (quiet hours). */
+.ar-card--wide { grid-column: 1 / -1; width: 100%; max-width: none; }
+
+/* ---------------- form control defaults (UX remediation phase 4) ----------------
+   Zero specificity (:where), so any component rule still wins; this only gives the
+   leftover native controls the same look as the styled ones. */
+:where(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--accent); }
+:where(select) {
+  font: inherit; color: var(--text);
+  background-color: var(--surface-2);
+  border: 1px solid var(--border-2); border-radius: var(--r-sm);
+  padding: .35rem .6rem; min-height: 34px;
+}
+:where(select):hover { border-color: var(--text-3); }
+:where(select):disabled { opacity: .55; cursor: not-allowed; }

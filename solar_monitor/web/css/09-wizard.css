@@ -1,0 +1,342 @@
+/* ---------------- setup wizard ---------------- */
+.wizard { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0; }
+.wiz-step { display: flex; flex-direction: column; gap: 0.6rem; }
+
+/* BLE-adapter status banner at the top of the wizard. Lights up
+ * the moment the user lands on Setup so they know whether their
+ * dongle / Docker passthrough is reaching the daemon, before they
+ * try (and fail) to scan. */
+.wiz-ble-status {
+  display: flex; align-items: center; gap: .55rem;
+  padding: .55rem .8rem;
+  border-radius: 8px;
+  font-size: .9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.wiz-ble-status .wiz-ble-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+.wiz-ble-status.wiz-ble-ok   { border-color: rgba(63, 185, 80, 0.4); background: rgba(63, 185, 80, 0.08); }
+.wiz-ble-status.wiz-ble-ok   .wiz-ble-dot { background: #3fb950; }
+.wiz-ble-status.wiz-ble-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.08); }
+.wiz-ble-status.wiz-ble-warn .wiz-ble-dot { background: #d29922; }
+.wiz-ble-status.wiz-ble-bad  { border-color: rgba(248, 81, 73, 0.4); background: rgba(248, 81, 73, 0.08); }
+.wiz-ble-status.wiz-ble-bad  .wiz-ble-dot { background: #f85149; }
+.wiz-ble-warn-text { color: #d29922; }
+.wiz-ble-status code { background: transparent; padding: 0; font-size: .85em; }
+
+/* BLE diagnostic widget (#158). Sits below the status pill, expands
+ * into a counts + verdict box when the user clicks Run diagnostics.
+ * Colour tracks the verdict similar to the status pill. */
+.wiz-ble-diag-row { margin: -.4rem 0 .85rem .25rem; display: flex; align-items: flex-start; gap: .75rem; flex-wrap: wrap; }
+.wiz-ble-diag-row .btn-sm { font-size: .78rem; padding: .2rem .6rem; }
+.wiz-ble-diag-out {
+  flex: 1 1 240px; min-width: 240px;
+  font-size: .85rem; line-height: 1.35;
+  padding: .55rem .75rem; border: 1px solid var(--surface-3);
+  border-radius: 8px; background: var(--surface-1);
+}
+.wiz-ble-diag-counts { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.wiz-ble-diag-suggest { margin-top: .4rem; opacity: .85; }
+.wiz-ble-diag-err { color: #f85149; }
+.wiz-ble-diag-running { color: var(--text-muted); }
+.wiz-ble-diag-ok   { border-color: rgba(63, 185, 80, 0.4);  background: rgba(63, 185, 80, 0.06); }
+.wiz-ble-diag-warn { border-color: rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.06); }
+.wiz-ble-diag-bad  { border-color: rgba(248, 81, 73, 0.4);  background: rgba(248, 81, 73, 0.06); }
+
+/* History & polling editor (#172). Two-column form rows; numeric input
+ * with a unit suffix on the right. Match the dashboard's settings-row
+ * grammar so the new tile sits naturally beside the existing rows. */
+.hist-form { display: flex; flex-direction: column; gap: .5rem; }
+.hist-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; font-size: .9rem; min-width: 0; }
+.hist-row > span:first-child { color: var(--text-muted); min-width: 0; }
+.hist-input { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; max-width: 100%; }
+.hist-input input {
+  width: 5.5rem; text-align: right; font-variant-numeric: tabular-nums;
+  padding: .25rem .4rem; border: 1px solid var(--surface-3);
+  border-radius: 6px; background: var(--surface-1); color: inherit;
+}
+/* Free-text settings fields (hotspot SSID / WPA password) — fill the row
+   and left-align, instead of the narrow right-aligned numeric default, so
+   the value + placeholder don't truncate. Grows on wide settings columns,
+   shrinks gracefully on a narrow one. */
+.hist-input--text { flex: 1 1 11rem; min-width: 0; }
+.hist-input--text input {
+  width: 100%; text-align: left; min-width: 0;
+  font-variant-numeric: normal;
+}
+/* <select> inside hist-input would otherwise size to the longest
+   option's text, when the placeholder is something verbose like
+   "No smart plug or AC charger output configured" (solar-pause panel
+   with no plugs yet), the dropdown blows past the row's right edge
+   on narrow viewports. Cap the width and let the browser ellipsis
+   the visible option. */
+.hist-input select {
+  max-width: 14rem;
+  min-width: 0;
+  text-overflow: ellipsis;
+  padding: .25rem .4rem; border: 1px solid var(--surface-3);
+  border-radius: 6px; background: var(--surface-1); color: inherit;
+  font: inherit;
+}
+.hist-input .hist-unit { color: var(--text-muted); font-size: .82rem; min-width: 3.5rem; }
+.hist-actions { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin-top: .35rem; }
+.hist-status { margin: 0; }
+.hist-status--ok  { color: var(--success, #3fb950); }
+.hist-status--err { color: #f85149; }
+
+/* "Find my dongle" result rows. Each is a flex card with the device
+ * name + MAC on the left and a "Use this" button on the right. */
+.wiz-result-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem;
+  padding: .65rem .8rem;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2);
+  margin-top: .55rem;
+}
+.wiz-result-info { flex: 1 1 auto; min-width: 0; }
+/* Transport list row: button-styled card on the left + small trash
+ * delete on the right. Clicking the trash disconnects the BT-2 and
+ * removes the entry from config.yaml (cascades to its devices). */
+.wiz-transport-row {
+  display: flex; align-items: stretch; gap: .35rem;
+  margin-bottom: .4rem;
+  min-width: 0;
+}
+.wiz-transport-row .wiz-transport {
+  flex: 1 1 0;
+  margin: 0;
+  min-width: 0;
+}
+.wiz-transport-del {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s;
+}
+.wiz-transport-del:hover {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.6);
+  background: rgba(248, 81, 73, 0.08);
+}
+.wiz-transport-del svg { width: 16px; height: 16px; }
+/* On narrow viewports the trash + pencil buttons crowd the
+ * status pill and force the row text to wrap. Tighten everything
+ * a notch so a 390 px iPhone still fits id + pill + 2 action
+ * buttons on one line. */
+@media (max-width: 420px) {
+  .wiz-transport-row { gap: .25rem; }
+  .wiz-transport-del { width: 32px; }
+  .wiz-transport-del svg { width: 14px; height: 14px; }
+}
+
+/* "Recently visible but missing" panel on the dongle-scan results.
+ * Calls out devices we KNEW were broadcasting but aren't now,
+ * because the #1 BLE debug surprise is "my Renogy BT-2 was here
+ * a minute ago, where is it?". Amber tint = informational, not
+ * an error. */
+.wiz-missing {
+  border: 1px solid rgba(210, 153, 34, 0.35);
+  background: rgba(210, 153, 34, 0.08);
+  border-radius: var(--r);
+  padding: .65rem .8rem;
+  margin: 0 0 .65rem;
+}
+.wiz-missing-head {
+  display: flex; justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: .35rem;
+  color: var(--text);
+  font-size: .88rem;
+}
+.wiz-missing-row {
+  display: flex; gap: .75rem;
+  align-items: flex-start; justify-content: space-between;
+  padding: .35rem 0;
+  border-top: 1px dashed rgba(210, 153, 34, 0.20);
+  font-size: .85rem;
+}
+.wiz-missing-row:first-of-type { border-top: none; }
+.wiz-missing-cause {
+  color: var(--text-2);
+  font-size: .78rem;
+  text-align: right;
+  max-width: 55%;
+  line-height: 1.4;
+}
+
+.wiz-vendor-hint {
+  display: inline-block;
+  margin-left: .4rem;
+  padding: 1px 7px;
+  font-size: .72rem;
+  border-radius: 999px;
+  background: rgba(63, 185, 80, 0.12);
+  color: #3fb950;
+  border: 1px solid rgba(63, 185, 80, 0.32);
+}
+.wiz-step-head {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-weight: 600; color: var(--text);
+}
+.wiz-num {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 0.78rem; font-weight: 700;
+}
+.wiz-help { color: var(--text-2); font-size: 0.88rem; margin: 0; }
+.wiz-transports { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-transport {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+  font: inherit; text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.wiz-transport:hover:not(:disabled) { background: var(--surface-3); }
+.wiz-transport:disabled { opacity: 0.55; cursor: not-allowed; }
+.wiz-transport.active {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+.wiz-transport-main { display: flex; flex-direction: column; gap: 0.15rem; }
+.wiz-transport-id { font-weight: 600; }
+.wiz-transport-addr { color: var(--text-3); font-family: var(--mono); font-size: 0.78rem; }
+/* Status pill on each transport row, one-line nowrap, ellipsis if
+ * something larger ever lands. Previous copy "offline · will
+ * reconnect on scan" was misleading (the daemon auto-retries every
+ * poll regardless of user action) AND wrapped across two lines
+ * inside the pill on iPhone widths. Shortened in JS to "offline ·
+ * retrying"; this keeps it visually tidy. */
+.wiz-transport-state {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 14rem;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 0.15rem 0.55rem; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.wiz-transport-state.on  { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-transport-state.off { background: rgba(107,118,137,0.12); color: var(--text-3); }
+.wiz-controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.wiz-status { color: var(--text-2); font-size: 0.88rem; }
+.wiz-results { display: flex; flex-direction: column; gap: 0.5rem; }
+.wiz-empty {
+  color: var(--text-3);
+  font-size: 0.88rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--r);
+}
+.wiz-empty--quiet {
+  /* Mid-scan placeholder. Borderless, very low contrast, doesn't
+   * compete for attention while live results stream in below it. */
+  background: transparent;
+  border: 0;
+  padding: 0.5rem 0;
+  color: var(--text-3);
+  font-style: italic;
+}
+.wiz-spinner {
+  display: inline-block;
+  width: 0.85em; height: 0.85em;
+  margin-right: 0.35em;
+  border: 2px solid var(--text-3);
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: -0.15em;
+  animation: wiz-spin 0.9s linear infinite;
+}
+@keyframes wiz-spin {
+  to { transform: rotate(360deg); }
+}
+.wiz-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  transition: background 0.15s, opacity 0.2s;
+}
+.wiz-row.known { opacity: 0.65; }
+.wiz-row-main { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; flex: 1 1 0; }
+.wiz-row-title { display: flex; align-items: baseline; gap: 0.5rem; }
+.wiz-row-slave {
+  font-family: var(--mono); font-weight: 600; color: var(--text-3);
+  font-size: 0.82rem;
+}
+.wiz-row-model { font-weight: 600; color: var(--text); }
+.wiz-row-meta { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.wiz-tag {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.wiz-tag--known { background: rgba(63,185,80,0.12); color: var(--green); }
+.wiz-row-action { flex-shrink: 0; }
+.wiz-add-form {
+  display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;
+}
+.wiz-label {
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  min-width: 10rem;
+}
+.wiz-saved {
+  font-size: 0.82rem;
+  color: var(--green);
+  font-weight: 500;
+}
+.wiz-error {
+  flex-basis: 100%;
+  color: var(--red);
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+.wiz-restart {
+  display: flex; align-items: center; gap: 0.7rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0.7rem 0.95rem;
+  background: rgba(210,153,34,0.10);
+  border: 1px solid rgba(210,153,34,0.45);
+  border-radius: var(--r);
+  color: var(--text);
+}
+.wiz-restart svg { width: 18px; height: 18px; color: var(--amber); flex-shrink: 0; }
+.wiz-restart strong { color: var(--amber); margin-right: 0.4rem; }
+.wiz-restart[hidden] { display: none; }
+@media (max-width: 540px) {
+  .wiz-row { flex-direction: column; align-items: stretch; }
+  .wiz-row-action { width: 100%; }
+  .wiz-add-form { width: 100%; }
+  .wiz-label { flex: 1 1 0; min-width: 0; }
+}
+

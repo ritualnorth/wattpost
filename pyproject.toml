@@ -47,6 +47,7 @@ include = ["solar_monitor*"]
 solar_monitor = [
     "web/*.html",
     "web/*.css",
+    "web/css/*.css",
     "web/*.js",
     "web/js/*.js",
     "web/*.webmanifest",

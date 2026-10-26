@@ -1,0 +1,201 @@
+/* ---------------- theme picker (Settings → Appearance) ---------------- */
+.theme-picker {
+  display: flex;
+  gap: .4rem;
+  margin-top: .25rem;
+}
+.theme-opt {
+  flex: 1 1 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: .65rem .5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  color: var(--text-2);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.08s;
+}
+.theme-opt svg {
+  width: 20px; height: 20px;
+}
+.theme-opt:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.theme-opt:active { transform: scale(0.98); }
+.theme-opt[aria-checked="true"] {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Vendor-hint variants for the USB-scan classification: NMEA GPS
+ * receivers get an accent-coloured tag so they're visually distinct
+ * from the default Modbus-hint adapter; unknown / busy ports get an
+ * amber warning tone. */
+.wiz-vendor-hint--gps {
+  background: rgba(63,185,80,0.12);
+  border-color: rgba(63,185,80,0.4);
+  color: var(--green, #3fb950);
+}
+.wiz-vendor-hint--warn {
+  background: rgba(210,153,34,0.10);
+  border-color: rgba(210,153,34,0.4);
+  color: var(--amber);
+}
+/* Victron-branded chip, uses their familiar accent blue. */
+.wiz-vendor-hint--victron {
+  background: rgba(0,114,206,0.12);
+  border-color: rgba(0,114,206,0.45);
+  color: #0072ce;
+}
+/* Key-entry form revealed under a Victron scan row when the user
+ * taps Pair. Tucked inside the same .wiz-results card. */
+.wiz-victron-key {
+  margin: -.5rem 0 .5rem 0;
+  padding: .65rem .85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.wiz-victron-key .settings-foot { margin-bottom: .55rem; }
+
+/* "Add another transport", collapsible block in the wizard's
+ * transport-list view. Lets a customer wire up BLE + USB side by
+ * side (Renogy BT-2 for the MPPT, USB-RS485 for a JK BMS, etc.)
+ * without faking-out the wizard by deleting and re-adding. */
+.wiz-add-another {
+  margin-top: .75rem;
+  padding-top: .75rem;
+  border-top: 1px dashed var(--border);
+}
+.wiz-add-another-btn {
+  width: auto;
+  font-size: .9rem;
+}
+.wiz-add-another-panel {
+  margin-top: .65rem;
+  padding: .65rem .85rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+}
+
+/* Quick-template chips for the Alerts panel (#107). Sit above the
+ * rule list with a "Quick templates:" label. Clicking pre-fills the
+ * add-rule form so users don't have to learn the metric-path schema
+ * or invent thresholds from scratch. */
+/* Kiosk display links (Settings → Privacy). */
+.kiosk-token-list { margin-top: .75rem; display: flex; flex-direction: column; gap: .4rem; }
+.kiosk-token-empty { font-size: .82rem; color: var(--text-3); }
+.kiosk-token-row {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .45rem .6rem;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+}
+.kiosk-token-name {
+  font-size: .85rem; color: var(--text);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kiosk-token-revoke {
+  flex: 0 0 auto; font-size: .78rem; padding: .25rem .6rem;
+  background: none; border: 1px solid var(--border); border-radius: 7px;
+  color: var(--text-2); cursor: pointer; transition: border-color .15s, color .15s;
+}
+.kiosk-token-revoke:hover { border-color: #f85149; color: #f85149; }
+
+/* First-run discovery banner (top of page until the user sets a
+   password or dismisses it for the session). */
+.first-run-banner {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .55rem .85rem;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  font-size: .85rem; color: var(--text);
+}
+.first-run-banner .frb-ico { display: flex; color: var(--accent); }
+.first-run-banner .frb-ico svg { width: 16px; height: 16px; }
+.first-run-banner .frb-text { flex: 1 1 auto; min-width: 0; }
+.first-run-banner .frb-cta {
+  flex: 0 0 auto;
+  background: var(--accent); color: var(--bg);
+  padding: .3rem .7rem; border-radius: 7px;
+  text-decoration: none; font-weight: 600; font-size: .82rem;
+}
+.first-run-banner .frb-x {
+  flex: 0 0 auto;
+  background: none; border: none; color: var(--text-3);
+  font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 .2rem;
+}
+@media (max-width: 480px) {
+  .first-run-banner { flex-wrap: wrap; }
+  .first-run-banner .frb-text { flex-basis: 100%; }
+}
+
+/* Quick-start templates: a tidy equal-width grid of two-line tiles
+   (name + condition) instead of a ragged row of variable-width pills. */
+.alerts-templates { margin: .35rem 0 1rem; }
+.alerts-templates-head {
+  display: block;
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3); margin-bottom: .55rem;
+}
+.alerts-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .5rem;
+}
+@media (min-width: 560px) {
+  .alerts-template-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.alerts-template-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: .1rem;
+  min-width: 0; width: 100%;
+  text-align: left;
+  padding: .5rem .65rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.alerts-template-chip .tmpl-name {
+  font-size: .82rem; font-weight: 500; color: var(--text); line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.alerts-template-chip .tmpl-cond {
+  font-size: .72rem; font-family: var(--mono); color: var(--text-3);
+}
+.alerts-template-chip:hover {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+/* Source-disagreement hint (#121). Tucked under the donut-flow pill
+ * inside the donut centre. Only shows when shunt + BMS SoC differ
+ * by >5pp. Deliberately quiet, small, low-contrast, because it's
+ * a "for your information" diagnostic, not an alarm. */
+.donut-disagreement {
+  margin-top: .35rem;
+  font-size: .65rem;
+  font-family: var(--mono);
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  /* Single-line clamp so the hint never pushes content past the
+   * bottom of the donut ring on narrow viewports. The compact JS
+   * format ("shunt 94% · BMS 0%") fits well under 12rem; the
+   * ellipsis is a last-resort guard. */
+  max-width: 13rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
