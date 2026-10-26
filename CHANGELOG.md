@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.189] - 2026-10-26
+
+The UI/UX remediation release: a re-organised Settings (nine sections plus Diagnostics), a split stylesheet with design tokens, WCAG AA contrast and labelling throughout, 44px touch targets on phones, and a large batch of earlier work. Details below.
+
 - New **Diagnostics** section in Settings (Device health, daemon logs, support bundle). About was the longest page at about 2,100px; it is now about 1,450px, and Advanced is just History & polling (about 900px). Old `#/settings/advanced` and `#/settings/about` links still work.
 - Removed the old power-flow strip's CSS and JS (tiles, connectors, arrows, donut): nothing had built that markup since the SVG power flow replaced it, and it carried 60 of the stylesheet's `!important` declarations. `!important` is now 12, all genuine (`[hidden]` rules, the app-embedded header, alert-card overrides). uPlot's legend and crosshair overrides no longer need it either, because our stylesheet loads after uPlot's. The dead-class guard now matches whole words in code only, which is how it found a leftover `.dev-row`.
 - Phone touch targets: selects, text/number inputs, action links, the dismiss button on tips, the device delete button and the history range buttons are now 44px on touch screens (selects were stuck at 34px because a zero-specificity default sat later in the file than the touch rule). Checkboxes and radios are 24px, the WCAG 2.2 minimum. Sign-in fields and button are 44px too.
