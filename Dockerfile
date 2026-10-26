@@ -31,7 +31,12 @@ COPY solar_monitor /app/solar_monitor
 RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --prefer-binary .
 
+# No bytecode written at run time (the container's root filesystem is read-only
+# in production), so compile everything once here instead.
+RUN python -m compileall -q /usr/local/lib/python3.13 /app || true
+
 ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
     WATTPOST_DEMO=1 \
     WATTPOST_CONFIG=/app/demo-config.yaml \
     WATTPOST_DB=/var/lib/wattpost/solar-monitor.db
@@ -68,6 +73,14 @@ RUN mkdir -p /var/lib/wattpost && \
       '  lon: -0.1278' \
       '  poll_minutes: 15' \
         > /app/demo-config.yaml
+
+# Run as an unprivileged user. The only path the daemon writes is
+# /var/lib/wattpost (a throwaway database; production mounts it as a tmpfs
+# owned by this uid, and the daily restart wipes it).
+RUN groupadd --system --gid 10001 wattpost \
+ && useradd --system --uid 10001 --gid wattpost --home-dir /tmp --shell /usr/sbin/nologin wattpost \
+ && chown -R wattpost:wattpost /var/lib/wattpost
+USER wattpost
 
 EXPOSE 8000
 
