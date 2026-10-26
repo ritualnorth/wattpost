@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning].
 
 ## [Unreleased]
 
+## [0.1.190] - 2026-10-26
+
+- Fix: a Govee or Ruuvi passive listener running alongside a Renogy BLE transport could keep the BlueZ discovery slot, so connecting failed with `org.bluez.Error.InProgress` and retried forever. The Renogy transport now pauses those scanners for the connect, like it already did for Victron and discovery, and resumes them afterwards.
+
 ## [0.1.189] - 2026-10-26
 
 The UI/UX remediation release: a re-organised Settings (nine sections plus Diagnostics), a split stylesheet with design tokens, WCAG AA contrast and labelling throughout, 44px touch targets on phones, and a large batch of earlier work. Details below.
@@ -15,7 +19,6 @@ The UI/UX remediation release: a re-organised Settings (nine sections plus Diagn
 - New **Diagnostics** section in Settings (Device health, daemon logs, support bundle). About was the longest page at about 2,100px; it is now about 1,450px, and Advanced is just History & polling (about 900px). Old `#/settings/advanced` and `#/settings/about` links still work.
 - Removed the old power-flow strip's CSS and JS (tiles, connectors, arrows, donut): nothing had built that markup since the SVG power flow replaced it, and it carried 60 of the stylesheet's `!important` declarations. `!important` is now 12, all genuine (`[hidden]` rules, the app-embedded header, alert-card overrides). uPlot's legend and crosshair overrides no longer need it either, because our stylesheet loads after uPlot's. The dead-class guard now matches whole words in code only, which is how it found a leftover `.dev-row`.
 - Phone touch targets: selects, text/number inputs, action links, the dismiss button on tips, the device delete button and the history range buttons are now 44px on touch screens (selects were stuck at 34px because a zero-specificity default sat later in the file than the touch rule). Checkboxes and radios are 24px, the WCAG 2.2 minimum. Sign-in fields and button are 44px too.
-- Fix: a Govee or Ruuvi passive listener running alongside a Renogy BLE transport could keep the BlueZ discovery slot, so connecting failed with `org.bluez.Error.InProgress` and retried forever. The Renogy transport now pauses those scanners for the connect, like it already did for Victron and discovery, and resumes them afterwards.
 - `tests/test_ui_guards.py`: CI now fails if text tokens drop below 4.5:1 in either theme, a font size bypasses the type scale, `!important`, literal colours or inline styles creep past their ceilings, a CSS class has no user, a form control has no accessible name, or heading levels skip. `scripts/ux/audit.mjs` remains the browser-side check.
 - Repeated inline `style=""` attributes are now classes: 50 of the 97 in `index.html` and 21 of the 89 built in JS (the rest are one-offs or computed widths and colours). Shared one-line helpers live in a new last-loaded `css/15-utilities.css` (`ut-*`), and the location-sharing radio rows get a real `.settings-share-opt` rule.
 - Design tokens for the stylesheet: a type scale (`--fs-2xs` 11px to `--fs-3xl`), font weights, spacing (`--sp-1`..`--sp-6`), radii (`--r-2xs`..`--r-pill`) and a z-index scale now replace ~650 literal values, and hard-coded brand colours (blue/green/red/amber/yellow, plus their translucent tints) use the theme tokens so light mode picks up the right shade. The 54 different font sizes collapse to nine; the smallest text on the phone is now 12px (it was 10.9px). Layout shifts are at most a pixel.
