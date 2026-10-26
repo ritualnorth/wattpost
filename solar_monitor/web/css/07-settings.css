@@ -6,8 +6,8 @@
      left beside empty columns. Multi-block subsections tile across. */
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
-  gap: 1rem;
-  margin: .5rem auto 0;
+  gap: var(--sp-4);
+  margin: var(--sp-2) auto 0;
   max-width: 1300px;
 }
 /* Blocks whose content is one wide stack (rule list, log, danger,
@@ -26,10 +26,10 @@
   display: none;
   flex-direction: column;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--surface-2);
-  margin: .25rem 0 .75rem;
+  margin: var(--sp-1) 0 var(--sp-3);
 }
 /* On menu landing: show menu, hide every settings-block. */
 body[data-route-sub="menu"] .settings-menu { display: flex; }
@@ -62,8 +62,8 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
 }
 .settings-block h2 {
   margin: 0 0 .55rem;
-  font-size: 1.02rem;
-  font-weight: 600;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
   text-transform: none;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -71,9 +71,9 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
 .settings-row {
   display: flex; justify-content: space-between;
   align-items: baseline;
-  gap: .75rem;
-  padding: .25rem 0;
-  font-size: .87rem;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+  font-size: var(--fs-md);
   color: var(--text-2);
 }
 .settings-row > span:first-child {
@@ -92,14 +92,14 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
 .settings-block--cta {
   /* spans the whole row, more visual weight than the data blocks */
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, rgba(88,166,255,0.08), rgba(88,166,255,0) 70%), var(--surface-2);
-  border-color: rgba(88,166,255,0.25);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), color-mix(in srgb, var(--accent) 0%, transparent) 70%), var(--surface-2);
+  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
   display: flex; flex-direction: column; gap: .55rem;
 }
 .settings-cta-blurb {
   margin: 0;
   color: var(--text-2);
-  font-size: .88rem;
+  font-size: var(--fs-md);
   line-height: 1.45;
 }
 

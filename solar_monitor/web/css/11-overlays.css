@@ -3,22 +3,22 @@
   position: fixed;
   top: 64px;            /* below the header */
   right: 1rem;
-  z-index: 60;
+  z-index: var(--z-popover);
   width: min(360px, calc(100vw - 2rem));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
-  padding: .85rem 1rem;
+  padding: .85rem var(--sp-4);
   display: flex; flex-direction: column; gap: .55rem;
 }
 .status-legend[hidden] { display: none; }
 .status-legend-head {
   display: flex; align-items: center; justify-content: space-between;
-  font-weight: 600; font-size: .92rem;
+  font-weight: var(--fw-semibold); font-size: var(--fs-base);
 }
 .status-legend-close {
-  font: inherit; font-size: 1.1rem; line-height: 1;
+  font: inherit; font-size: var(--fs-xl); line-height: 1;
   width: 28px; height: 28px; border-radius: 50%;
   background: transparent; border: 1px solid var(--border);
   color: var(--text-3); cursor: pointer;
@@ -29,25 +29,25 @@
   display: flex; flex-direction: column; gap: .45rem;
 }
 .status-legend-list li {
-  font-size: .82rem; color: var(--text-2);
+  font-size: var(--fs-sm); color: var(--text-2);
   line-height: 1.45;
 }
 .status-legend-pill {
   display: inline-block;
-  font-size: .72rem; font-weight: 600;
-  padding: .12rem .5rem;
-  border-radius: 999px;
+  font-size: var(--fs-xs); font-weight: var(--fw-semibold);
+  padding: .12rem var(--sp-2);
+  border-radius: var(--r-pill);
   margin-right: .4rem;
   white-space: nowrap;
 }
-.status-legend-pill--ok   { background: rgba(63,185,80,0.14);  color: var(--green); }
-.status-legend-pill--warn { background: rgba(210,153,34,0.16); color: var(--amber); }
-.status-legend-pill--err  { background: rgba(248,81,73,0.14);  color: var(--red); }
+.status-legend-pill--ok   { background: color-mix(in srgb, var(--green) 14%, transparent);  color: var(--green); }
+.status-legend-pill--warn { background: color-mix(in srgb, var(--amber) 16%, transparent); color: var(--amber); }
+.status-legend-pill--err  { background: color-mix(in srgb, var(--red) 14%, transparent);  color: var(--red); }
 .status-legend-link {
-  font-size: .78rem;
+  font-size: var(--fs-xs);
   color: var(--accent);
   text-decoration: none;
-  margin-top: .25rem;
+  margin-top: var(--sp-1);
 }
 .status-legend-link:hover { text-decoration: underline; }
 
@@ -57,8 +57,8 @@
   grid-column: 1 / -1;
   border: 1px solid rgba(220, 38, 38, .45);
   background: rgba(220, 38, 38, .04);
-  border-radius: 12px;
-  padding: .85rem 1rem;
+  border-radius: var(--r-lg);
+  padding: .85rem var(--sp-4);
 }
 .settings-block--danger h2 {
   color: var(--red);
@@ -86,7 +86,7 @@
   border-radius: var(--r);
   padding: .65rem .8rem;
   font-family: var(--mono);
-  font-size: .72rem;
+  font-size: var(--fs-xs);
   line-height: 1.45;
   max-height: 360px;
   overflow: auto;
@@ -129,18 +129,18 @@
   .docs-nav { border-right: none; border-bottom: 1px solid var(--border); }
 }
 .docs-nav-section {
-  font-size: .68rem; font-weight: 700;
+  font-size: var(--fs-2xs); font-weight: var(--fw-bold);
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--text-3);
-  padding: .55rem 1.15rem .25rem;
+  padding: .55rem 1.15rem var(--sp-1);
 }
 .docs-nav-link {
   display: block;
   padding: .42rem 1.15rem;
   color: var(--text-2);
   text-decoration: none;
-  font-size: .88rem;
+  font-size: var(--fs-md);
   border-left: 3px solid transparent;
 }
 .docs-nav-link:hover { color: var(--text); background: var(--surface-3); }
@@ -148,10 +148,10 @@
   color: var(--accent);
   background: var(--surface-3);
   border-left-color: var(--accent);
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 .docs-content {
-  padding: 1.25rem 1.5rem;
+  padding: 1.25rem var(--sp-5);
   max-width: 800px;
   line-height: 1.55;
   /* CRITICAL on mobile: grid items default to `min-width: auto`
@@ -174,18 +174,18 @@
   word-break: break-word;
 }
 .docs-content h1 {
-  font-size: 1.55rem; margin: 0 0 .9rem;
+  font-size: var(--fs-3xl); margin: 0 0 .9rem;
 }
 .docs-content h2 {
-  font-size: 1.15rem; margin: 1.6rem 0 .55rem;
+  font-size: var(--fs-xl); margin: 1.6rem 0 .55rem;
   padding-top: .35rem;
   border-top: 1px solid var(--border);
 }
 .docs-content h2:first-of-type { border-top: none; padding-top: 0; margin-top: 1.2rem; }
-.docs-content h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
-.docs-content p { margin: .5rem 0; color: var(--text-2); }
+.docs-content h3 { font-size: var(--fs-lg); margin: 1.2rem 0 .4rem; }
+.docs-content p { margin: var(--sp-2) 0; color: var(--text-2); }
 .docs-content ul, .docs-content ol {
-  margin: .5rem 0 .5rem 1.4rem;
+  margin: var(--sp-2) 0 var(--sp-2) 1.4rem;
   color: var(--text-2);
 }
 .docs-content li { margin: .15rem 0; }
@@ -203,7 +203,7 @@
   border-radius: var(--r);
   padding: .65rem .85rem;
   overflow-x: auto;
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   line-height: 1.45;
 }
 .docs-content pre code {
@@ -214,7 +214,7 @@
 .docs-content table {
   border-collapse: collapse;
   margin: .85rem 0;
-  font-size: .88rem;
+  font-size: var(--fs-md);
   width: 100%;
   /* Wide markdown tables (the SD-card vs Docker comparison in
    * docker-install.md is the canonical case) get a horizontal
@@ -240,8 +240,8 @@
 .docs-content a { color: var(--accent); }
 .docs-content blockquote {
   margin: .85rem 0;
-  padding: .5rem .85rem;
-  background: rgba(88,166,255,0.08);
+  padding: var(--sp-2) .85rem;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   border-left: 3px solid var(--accent);
   border-radius: var(--r-sm);
   color: var(--text-2);
@@ -254,7 +254,7 @@
 .restart-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-modal);
   display: flex; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
@@ -269,15 +269,15 @@
   padding: 1.4rem 1.8rem;
   box-shadow: var(--shadow);
   display: flex; flex-direction: column; align-items: center;
-  gap: .75rem;
+  gap: var(--sp-3);
   min-width: 240px;
 }
 .restart-overlay-title {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: var(--text);
 }
 .restart-overlay-sub {
-  font-size: .82rem;
+  font-size: var(--fs-sm);
   color: var(--text-3);
 }
 .restart-spinner {
