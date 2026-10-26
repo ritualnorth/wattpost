@@ -51,7 +51,7 @@ compose up -d`.
 
 ## Built-in local backups
 
-**Settings → System → Backups** runs a Home-Assistant-style snapshot
+**Settings → Backup & restore** runs a Home-Assistant-style snapshot
 flow: rotating weekly archives of `config.yaml` + the SQLite DB,
 stored on the appliance itself (or any USB stick you mount). Restore
 is one click from the same panel.

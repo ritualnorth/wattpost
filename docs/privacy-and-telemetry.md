@@ -45,7 +45,7 @@ The 24-hour update check fires either way (we need it to show the "Update availa
 
 ### 5. Location sharing, *opt-in, default OFF, three modes*
 
-If, and only if, you flip `location.share_with_cloud` to `approx` or `precise` (from Settings → Location or directly in `config.yaml`), the appliance ships coordinates in its heartbeat. **Default is `off`**, even a paired appliance with a working GPS will not transmit location until you flip this.
+If, and only if, you flip `location.share_with_cloud` to `approx` or `precise` (from Settings → Privacy & sharing → Location or directly in `config.yaml`), the appliance ships coordinates in its heartbeat. **Default is `off`**, even a paired appliance with a working GPS will not transmit location until you flip this.
 
 Three modes:
 

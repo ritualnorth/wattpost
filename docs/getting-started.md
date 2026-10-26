@@ -90,7 +90,7 @@ Then:
    `/dev/ttyUSB0` (or `ttyUSB1` if you already have another USB-serial
    adapter attached, e.g. GPS).
 2. Plug the RJ45 end into your Renogy device's comms port.
-3. In the dashboard: **Settings → Setup → Add another connection →
+3. In the dashboard: **Settings → Add devices → Add another connection →
    Wired (USB-RS485 adapter)**. The wizard scans `/dev/ttyUSB*` and
    shows what's attached + the chip type. Pick yours, save.
 4. Hit **Scan for devices** on that connection. Same Renogy slave-ID
@@ -108,7 +108,7 @@ directly. No dongle, no wire. So they don't need this option.
 
 In the dashboard:
 
-1. **Settings → Setup**
+1. **Settings → Add devices**
 2. Confirm the **Bluetooth ready** banner at the top is green ·
    that's the daemon seeing your BLE adapter.
 3. Click **Find my dongle** in step 1. The wizard scans for

@@ -57,7 +57,7 @@
     })();
   </script>
   <link rel="stylesheet" href="/web/uPlot.min.css" />
-  <link rel="stylesheet" href="/web/styles.css?v=195" />
+  <link rel="stylesheet" href="/web/styles.css?v=196" />
   <!-- Leaflet 1.9.4 for the "Where am I" map tile (#264). Vendored
        locally (web/vendor/leaflet/) rather than pulled from a CDN: the
        appliance is offline-first, and a render-blocking CDN stylesheet
@@ -829,7 +829,7 @@
               <span>Run device setup</span>
             </a>
           </div>
-          <div class="settings-block" data-subroute="advanced">
+          <div class="settings-block" data-subroute="display">
             <h2>Appearance</h2>
             <div class="theme-picker" role="radiogroup" aria-label="Theme">
               <button class="theme-opt" data-theme-pref="system" role="radio" aria-checked="false">
@@ -874,7 +874,7 @@
             <h2>History &amp; polling</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               How often the daemon polls each device and how long each
-              retention tier keeps data. Changes apply live; the next
+              retention tier keeps data (daily rollups are kept forever). Changes apply live; the next
               poll cycle uses the new interval and the next maintenance
               pass (~10 min) applies the new retention windows.
             </p>
@@ -917,7 +917,7 @@
             <div class="settings-row"><span>Errors (current cycle)</span><span class="v" id="settings-errors">·</span></div>
           </div>
 
-          <div class="settings-block" id="settings-devhealth-block" data-subroute="advanced">
+          <div class="settings-block" id="settings-devhealth-block" data-subroute="about">
             <h2>Device health</h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Live host metrics for this appliance &mdash; the same data the
@@ -1011,13 +1011,6 @@
               <div class="settings-row" style="margin-top:.5rem"><span>Live decision</span><span class="v" id="sp-decision">·</span></div>
               <div class="settings-row"><span>Reason</span><span class="v" id="sp-reason">·</span></div>
             </div>
-          </div>
-          <div class="settings-block" data-subroute="advanced">
-            <h2>Retention</h2>
-            <div class="settings-row"><span>Raw samples</span><span class="v">7 days</span></div>
-            <div class="settings-row"><span>1-min rollup</span><span class="v">30 days</span></div>
-            <div class="settings-row"><span>1-hour rollup</span><span class="v">1 year</span></div>
-            <div class="settings-row"><span>1-day rollup</span><span class="v">forever</span></div>
           </div>
           <div class="settings-block" data-subroute="integrations">
             <h2>Integrations</h2>
@@ -1153,7 +1146,7 @@
             </fieldset>
             <p class="settings-foot" id="settings-location-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
-          <div class="settings-block" id="settings-netsec-block" data-subroute="advanced">
+          <div class="settings-block" id="settings-netsec-block" data-subroute="network">
             <h2>Network security <span class="settings-foot" style="font-weight:normal">&middot; Pi only</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Host-level protection for the Pi image. Docker installs
@@ -1173,7 +1166,7 @@
             </label>
             <p class="settings-foot" id="netsec-msg" style="margin:.25rem 0 0;min-height:1.2em"></p>
           </div>
-          <div class="settings-block" id="settings-network-block" data-subroute="advanced">
+          <div class="settings-block" id="settings-network-block" data-subroute="network">
             <h2>Network address <span class="settings-foot" style="font-weight:normal">&middot; this box's IP</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Pin this box to a fixed (static) IP so it always lives at the
@@ -1185,7 +1178,7 @@
             <div id="network-list"></div>
             <span id="network-msg" class="settings-foot hist-status"></span>
           </div>
-          <div class="settings-block" id="settings-wifi-block" data-subroute="advanced">
+          <div class="settings-block" id="settings-wifi-block" data-subroute="network">
             <h2>Join a WiFi network <span class="settings-foot" style="font-weight:normal">&middot; put this box on your LAN</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Scan for nearby networks and connect this appliance to your
@@ -1251,7 +1244,7 @@
               </div>
             </div>
           </div>
-          <div class="settings-block" id="settings-hotspot-block" data-subroute="advanced">
+          <div class="settings-block" id="settings-hotspot-block" data-subroute="network">
             <h2>WiFi hotspot <span class="settings-foot" style="font-weight:normal">&middot; appliance-as-AP</span></h2>
             <p class="settings-foot" style="margin-top:0;margin-bottom:.55rem">
               Turn this appliance's WiFi radio into an access point so a
@@ -1483,20 +1476,20 @@
   <script src="/web/uPlot.iife.min.js"></script>
   <script src="/web/kiosk-skins.js?v=4"></script>
   <!-- The UI is plain scripts, loaded in order; they share one global scope. -->
-  <script src="/web/js/01-core.js?v=292"></script>
-  <script src="/web/js/02-dashboard.js?v=292"></script>
-  <script src="/web/js/03-power-flow.js?v=292"></script>
-  <script src="/web/js/04-forecast-weather.js?v=292"></script>
-  <script src="/web/js/05-alerts-devices.js?v=292"></script>
-  <script src="/web/js/06-history.js?v=292"></script>
-  <script src="/web/js/07-routing-settings.js?v=292"></script>
-  <script src="/web/js/08-network.js?v=292"></script>
-  <script src="/web/js/08b-system.js?v=292"></script>
-  <script src="/web/js/09-integrations.js?v=292"></script>
-  <script src="/web/js/10-alerts-editor.js?v=292"></script>
-  <script src="/web/js/11-wiring.js?v=292"></script>
-  <script src="/web/js/12-device-pages.js?v=292"></script>
-  <script src="/web/js/13-setup-wizard.js?v=292"></script>
-  <script src="/web/js/14-diagnostics-docs.js?v=292"></script>
+  <script src="/web/js/01-core.js?v=293"></script>
+  <script src="/web/js/02-dashboard.js?v=293"></script>
+  <script src="/web/js/03-power-flow.js?v=293"></script>
+  <script src="/web/js/04-forecast-weather.js?v=293"></script>
+  <script src="/web/js/05-alerts-devices.js?v=293"></script>
+  <script src="/web/js/06-history.js?v=293"></script>
+  <script src="/web/js/07-routing-settings.js?v=293"></script>
+  <script src="/web/js/08-network.js?v=293"></script>
+  <script src="/web/js/08b-system.js?v=293"></script>
+  <script src="/web/js/09-integrations.js?v=293"></script>
+  <script src="/web/js/10-alerts-editor.js?v=293"></script>
+  <script src="/web/js/11-wiring.js?v=293"></script>
+  <script src="/web/js/12-device-pages.js?v=293"></script>
+  <script src="/web/js/13-setup-wizard.js?v=293"></script>
+  <script src="/web/js/14-diagnostics-docs.js?v=293"></script>
 </body>
 </html>

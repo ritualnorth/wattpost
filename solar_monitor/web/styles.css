@@ -2978,6 +2978,8 @@ body[data-route-sub="backup"]       .settings-grid > .settings-block:not([data-s
 body[data-route-sub="privacy"]      .settings-grid > .settings-block:not([data-subroute="privacy"])      { display: none; }
 body[data-route-sub="integrations"] .settings-grid > .settings-block:not([data-subroute="integrations"]) { display: none; }
 body[data-route-sub="advanced"]     .settings-grid > .settings-block:not([data-subroute="advanced"])     { display: none; }
+body[data-route-sub="display"]      .settings-grid > .settings-block:not([data-subroute="display"])      { display: none; }
+body[data-route-sub="network"]      .settings-grid > .settings-block:not([data-subroute="network"])      { display: none; }
 body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-subroute="about"])        { display: none; }
 
 /* Solar-aware charger pause is hidden from prod until ready (#163). The
@@ -4987,3 +4989,6 @@ a { color: var(--accent); }
   input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
   .settings-toggle, label.settings-toggle { min-height: 44px; }
 }
+
+/* Cards that should span the whole row of an .ar-card grid (quiet hours). */
+.ar-card--wide { grid-column: 1 / -1; width: 100%; max-width: none; }

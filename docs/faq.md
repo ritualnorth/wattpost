@@ -14,7 +14,7 @@ No. The SD image and local appliance are free forever. The optional [cloud tier]
 
 Flash a fresh SD image, restore your `/etc/wattpost/config.yaml` and `/var/lib/wattpost/solar-monitor.db` backups, plug in. The cloud pairing is preserved (it's tied to the bearer token in config.yaml). Total recovery: 10 minutes.
 
-We recommend backing up those two files periodically; the dashboard's Settings → Diagnostics shows their paths.
+We recommend backing up those two files periodically; the dashboard's Settings → Advanced → Diagnostics shows their paths.
 
 ## Can I add hardware that's not on the supported list?
 

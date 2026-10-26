@@ -16,7 +16,7 @@ A "transport" is one BT-2 (or compatible) dongle the daemon talks
 to. Each dongle is one transport; you can pair multiple if you have
 more than one site / RV.
 
-1. **Settings → Setup**. The banner at the top shows whether the
+1. **Settings → Add devices**. The banner at the top shows whether the
    daemon can see a Bluetooth adapter. Green ⇒ ready. Red ⇒ check
    the dongle / Docker passthrough first.
 2. **Step 1 → Find my dongle**. The wizard scans BLE advertisements
@@ -25,14 +25,14 @@ more than one site / RV.
    Renogy BT-2" hint badge in the result row.
 3. Click **Use this** on the right row. The transport is written to
    `/etc/wattpost/config.yaml` and a "restart daemon" banner appears.
-4. **Settings → System → Restart daemon** (or `docker compose restart
+4. **Settings → About → Restart daemon** (or `docker compose restart
    wattpost` if running in Docker).
 
 ## Step 2. Scan for devices on a transport
 
 Once you have at least one transport configured:
 
-1. **Settings → Setup → Step 2 Scan for devices** is now active.
+1. **Settings → Add devices → Step 2 Scan for devices** is now active.
 2. Hit **Scan**. The wizard probes the standard Renogy slave IDs
    (1, 16, 32–36, 48–55, 96, 97) on the live BLE link.
 3. Each device that responds is shown with its model + slave ID.
@@ -45,7 +45,7 @@ previous version is preserved at `config.yaml.bak`).
 
 ## Removing a device
 
-**Settings → Setup → Devices** lists every paired device with a
+**Settings → Add devices → Devices** lists every paired device with a
 **Remove** button next to each. The wizard rewrites `config.yaml`
 atomically and prompts to restart the daemon.
 

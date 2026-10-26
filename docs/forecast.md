@@ -44,7 +44,7 @@ more than enough for one or two appliances.
      next peak X.X kW at HH:MM" if the credentials are valid.
    - Click **Save**.
 
-4. **Restart the daemon** (Settings → System → *Restart daemon*) so
+4. **Restart the daemon** (Settings → About → *Restart daemon*) so
    the background poller picks up the new config.
 
 The first fetch lands within a few seconds of the restart; subsequent

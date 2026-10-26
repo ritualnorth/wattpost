@@ -40,7 +40,7 @@ solar/<label>/state              full snapshot JSON (retained, every poll)
 solar/<label>/<metric>           one value per topic (retained)
 ```
 
-- `<label>` is whatever you named the device in **Settings → Setup**
+- `<label>` is whatever you named the device in **Settings → Add devices**
   (lowercased, spaces → hyphens). "Bank shunt" becomes
   `solar/bank-shunt/...`.
 - `<metric>` is the raw field name: `voltage_v`, `current_a`,

@@ -48,7 +48,7 @@ services:
     restart: unless-stopped
 ```
 
-That combo is the least-privilege path that reliably reaches the host's BlueZ on Ubuntu / Debian. If your distro is unusual and BLE still doesn't show up under **Settings → Setup**, replace `cap_add`/`security_opt` with `privileged: true`. Same result, bigger hammer.
+That combo is the least-privilege path that reliably reaches the host's BlueZ on Ubuntu / Debian. If your distro is unusual and BLE still doesn't show up under **Settings → Add devices**, replace `cap_add`/`security_opt` with `privileged: true`. Same result, bigger hammer.
 
 Then:
 
@@ -58,7 +58,7 @@ docker compose up -d
 
 Open `http://<this-host-ip>` in a browser on the same network (it serves on port 80 by default).
 First-boot drops a minimal `config.yaml` in `./wattpost-config/` ·
-edit via **Settings → Devices & setup** in the dashboard, no SSH or
+edit via **Settings → Add devices** in the dashboard, no SSH or
 file-editing needed.
 
 ## First-boot password (find it in the logs)
@@ -84,7 +84,7 @@ gets written to `./wattpost-config/web-password` on the host (and
 `docker exec wattpost cat /etc/wattpost/web-password` works if you
 miss it in the logs.
 
-Rotate any time via **Settings → System → Reset web password** in
+Rotate any time via **Settings → Privacy & sharing → Rotate web password** in
 the dashboard.
 
 ## Bluetooth passthrough

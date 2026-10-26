@@ -53,7 +53,7 @@ The Cloud tier adds:
 
 Configurable per-appliance overnight window (e.g. 22:00 → 07:00). During quiet hours, `info` and `warn` alerts buffer; they're replayed (or dropped if too stale) when the window ends. `alarm` severity always pages through.
 
-Quiet hours are local to the appliance's timezone. Set in **Settings → System → Locale + clock**.
+Quiet hours are local to the appliance's timezone. Set in **Settings → Alerts → Quiet hours**; the times follow the appliance's timezone.
 
 ## Cooldown
 

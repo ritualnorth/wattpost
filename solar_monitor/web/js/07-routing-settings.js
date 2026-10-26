@@ -52,8 +52,8 @@ function showFirstRunBanner() {
 // Settings sub-routes (#328). Menu landing when sub is null; each
 // sub renders only its own block group via CSS on body[data-route-sub].
 const SETTINGS_SUBROUTES = new Set([
-  "devices", "alerts", "backup", "privacy",
-  "integrations", "advanced", "about",
+  "devices", "alerts", "display", "network", "integrations",
+  "privacy", "backup", "advanced", "about",
 ]);
 
 // Section dropdown (replaces the old menu-landing drill-down). Entering
@@ -61,13 +61,15 @@ const SETTINGS_SUBROUTES = new Set([
 // sections. Order + labels + icons live here.
 // icon = key into _ICO (lucide line icons), rendered via _ico() at draw time.
 const SETTINGS_SECTIONS = [
-  { id: "devices",      label: "Devices",            icon: "plug",    sub: "Pair Renogy/Victron/BMS gear" },
+  { id: "devices",      label: "Add devices",        icon: "plug",    sub: "Pair Renogy, Victron and BMS gear" },
   { id: "alerts",       label: "Alerts",             icon: "bell",    sub: "Rules, transports, quiet hours" },
-  { id: "integrations", label: "Integrations",       icon: "puzzle",  sub: "Solcast, weather, MQTT, cloud" },
+  { id: "display",      label: "Display",            icon: "monitor", sub: "Theme and kiosk display" },
+  { id: "network",      label: "Network",            icon: "wifi",    sub: "WiFi, hotspot, IP address, firewall" },
+  { id: "integrations", label: "Integrations",       icon: "link",    sub: "WattPost cloud, Solcast, weather, MQTT" },
+  { id: "privacy",      label: "Privacy & sharing",  icon: "lock",    sub: "Web password, kiosk links, location, telemetry" },
   { id: "backup",       label: "Backup & restore",   icon: "drive",   sub: "Download, restore, schedule" },
-  { id: "privacy",      label: "Privacy & sharing",  icon: "lock",    sub: "Web password, location, telemetry" },
-  { id: "advanced",     label: "Advanced",           icon: "sliders", sub: "Appearance, polling, hotspot, logs" },
-  { id: "about",        label: "About",              icon: "info",    sub: "Version, updates, reset" },
+  { id: "advanced",     label: "Advanced",           icon: "sliders", sub: "History and polling, diagnostics" },
+  { id: "about",        label: "About",              icon: "info",    sub: "Status, updates, device health, reset" },
 ];
 const DEFAULT_SETTINGS_SUB = "devices";
 

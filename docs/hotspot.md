@@ -66,7 +66,7 @@ onboarding](#first-boot-onboarding-no-monitor-no-router) above.
 
 ## Turning it on
 
-**From the dashboard:** Settings → **WiFi hotspot**. Set the network
+**From the dashboard:** Settings → **Network → WiFi hotspot**. Set the network
 name and (optionally) a password, then **Save**. Use **Turn on now** /
 **Turn off** for manual control, and tick **Start on boot** to bring it
 up automatically every time the appliance starts.
@@ -132,7 +132,7 @@ the config first (the UI does this for you).
 ## Auto-handoff
 
 With **Auto-enable when offline** (`auto_handoff: true`, or the checkbox
-in Settings → WiFi hotspot), the appliance manages the AP for you: it
+in Settings → Network → WiFi hotspot), the appliance manages the AP for you: it
 brings the hotspot up whenever it has no other network, and drops it
 again when a real LAN returns. This is the off-grid / vanlife path —
 park anywhere, and the dashboard is always reachable at
@@ -164,7 +164,7 @@ already always on.
 ## Captive portal
 
 With **Captive portal** on (`captive_portal: true`, or the checkbox in
-Settings → WiFi hotspot), joining the hotspot **pops the dashboard
+Settings → Network → WiFi hotspot), joining the hotspot **pops the dashboard
 automatically** on the phone or laptop — the "Sign in to network" sheet
 every OS shows for hotel/airport WiFi — so nobody has to know or type
 `http://10.42.0.1`.

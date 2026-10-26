@@ -40,7 +40,7 @@ up overnight).
    - Click **Save**.
 
 3. **Restart the daemon** so the background poller picks up the new
-   config (Settings → System → *Restart daemon*).
+   config (Settings → About → *Restart daemon*).
 
 The first fetch lands within a few seconds of the restart; subsequent
 fetches happen every 15 min by default.
