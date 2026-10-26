@@ -87,8 +87,8 @@ function renderIntegrationsPanel() {
   // One card shape for every integration, mirroring the alert-rule /
   // transport cards: icon chip + name + status tag in the header, a
   // prose description, and the Configure/Edit action in the footer.
-  const intgCard = ({ id, name, ok, status, sub, action, attr }) => `
-    <div class="ar-card${ok ? " is-on" : ""}" data-integration="${id}">
+  const intgCard = ({ id, name, ok, status, sub, action, attr, featured, note }) => `
+    <div class="ar-card${ok ? " is-on" : ""}${featured ? " ar-card--wide ar-card--featured" : ""}" data-integration="${id}">
       <div class="ar-head">
         <div class="ar-ico">${integrationIcon(id)}</div>
         <div class="ar-head-body">
@@ -99,13 +99,22 @@ function renderIntegrationsPanel() {
       <div class="ar-meta">
         <span class="ar-tag ar-tag--${ok ? "ok" : "warn"}">${status}</span>
       </div>
+      ${note ? `<div class="ar-note">${note}</div>` : ""}
       <div class="ar-foot">
-        <button class="ar-link" ${attr}>${action}</button>
+        <button class="ar-link${featured && !ok ? " ar-link--primary" : ""}" ${attr}>${action}</button>
       </div>
     </div>`;
 
   host.innerHTML =
     intgCard({
+      id: "cloud", name: "WattPost cloud", ok: cloudConfigured, featured: true,
+      note: cloudConfigured ? "" : "Nothing is sent to the cloud until you pair. You choose what uploads, and can unpair at any time.",
+      status: cloudConfigured ? "paired" : "not paired",
+      sub: cloudConfigured
+        ? `${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""} · heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.telemetry_sync === false ? "history upload off" : `uploading history every ${integrationsState.cloud.telemetry_minutes ?? 5}m`}`
+        : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`,
+      action: cloudConfigured ? "Edit" : "Pair", attr: "data-edit-cloud",
+    }) +    intgCard({
       id: "solcast", name: "Solcast PV forecast", ok: forecastConfigured,
       status: forecastConfigured ? "configured" : "not set up",
       sub: forecastConfigured
@@ -121,14 +130,7 @@ function renderIntegrationsPanel() {
         : `Current conditions (temp, cloud, sunrise/sunset). No API key. Free public service.`,
       action: weatherConfigured ? "Edit" : "Configure", attr: "data-edit-weather",
     }) +
-    intgCard({
-      id: "cloud", name: "WattPost cloud", ok: cloudConfigured,
-      status: cloudConfigured ? "paired" : "not paired",
-      sub: cloudConfigured
-        ? `${integrationsState.cloud.label || "·"}${integrationsState.cloud.appliance_id ? ` · #${integrationsState.cloud.appliance_id}` : ""} · heartbeat every ${integrationsState.cloud.heartbeat_minutes}m · ${integrationsState.cloud.telemetry_sync === false ? "history upload off" : `uploading history every ${integrationsState.cloud.telemetry_minutes ?? 5}m`}`
-        : `Pair with your <a href="${(integrationsState.cloud?.endpoint || "https://wattpost.cloud")}" target="_blank" rel="noopener">wattpost.cloud</a> account for the multi-site dashboard + offline alerts.`,
-      action: cloudConfigured ? "Edit" : "Pair", attr: "data-edit-cloud",
-    }) +
+
     intgCard({
       id: "mqtt", name: "MQTT export", ok: mqttEnabled,
       status: mqttEnabled ? "enabled" : "not set up",
