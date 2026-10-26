@@ -143,9 +143,6 @@
   --donut-pulse-charging-glow:    rgba(26,127,55,0.7);
   --donut-pulse-discharging-glow: rgba(255,111,157,0.6);
 }
-[data-theme="light"] .donut-state.charging .donut-pulse    { stroke: #5dd373; }
-[data-theme="light"] .donut-state.discharging .donut-pulse { stroke: #ff6f9d; }
-
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 html {
@@ -302,9 +299,8 @@ body.is-demo #settings-update-apply { display: none !important; }
 .app-header {
   position: sticky;
   top: 0;
-  /* Above .sec-nav (20) and its open menu (30) so the sticky header
-     always clips scrolling settings content rather than being painted
-     over by it. */
+  /* Above page content so the sticky header always clips scrolling
+     content rather than being painted over by it. */
   z-index: 41;
   display: flex;
   /* Brand pushes right via margin-right:auto on .brand below, gives
@@ -379,45 +375,7 @@ body.is-demo #settings-update-apply { display: none !important; }
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-/* "Sign in" affordance in the header, sits next to the status pill
- * when there's no local session. Visual weight: pill-style like the
- * status, but uses the accent blue so it reads as a CTA. */
-.header-signin {
-  display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .82rem;
-  color: var(--blue, #6c8ef2);
-  padding: .35rem .7rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--blue, #6c8ef2);
-  text-decoration: none;
-  transition: background 0.15s;
-  margin-left: .5rem;
-}
-.header-signin:hover { background: var(--surface-2); }
-.header-signin svg { width: 14px; height: 14px; }
-@media (max-width: 360px) {
-  .header-signin span { display: none; }
-  .header-signin { padding: .35rem .55rem; }
-}
-/* Kiosk share URL panel (Settings → Kiosk share URL) */
-.kiosk-url-row {
-  display: flex;
-  gap: .5rem;
-  margin-bottom: .55rem;
-}
-.kiosk-url-input {
-  flex: 1;
-  font-family: ui-monospace, SFMono-Regular, monospace;
-  font-size: .82rem;
-  background: var(--bg-2);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: .4rem .55rem;
-  min-width: 0;  /* let the flex item shrink below content width */
-}
-.kiosk-url-input:focus { outline: 2px solid var(--accent, #58a6ff); outline-offset: -2px; }
+/* Kiosk actions row */
 .kiosk-actions { display: flex; align-items: center; gap: .75rem; }
 
 /* Rotate-password result panel (Settings → System) */
@@ -1087,17 +1045,6 @@ main {
   align-items: stretch;
   gap: 0;
 }
-.flow-col {
-  display: flex; flex-direction: column;
-  gap: .5rem;
-  min-width: 160px;
-  flex: 1;
-  /* Centre tiles vertically within the column so a single-tile
-   * column (Battery, Load) lines up against the middle of a multi-
-   * tile column (Sources stack: AC Charger + Solar) instead of
-   * top-aligning to the first source tile. */
-  justify-content: center;
-}
 .flow-conn {
   flex: 0 0 auto;
   min-width: 90px;
@@ -1117,8 +1064,6 @@ main {
     align-items: stretch;
     gap: 0;
   }
-  .flow-col { width: 100%; }
-
   .flow-conn {
     position: relative;
     width: 100%;
@@ -1256,7 +1201,6 @@ body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after 
   align-items: stretch;
   gap: 0;
 }
-.kiosk-flow .flow-col { width: 100%; }
 .kiosk-flow .flow-conn {
   position: relative;
   width: 100%;
@@ -1857,11 +1801,6 @@ body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after 
 .flow.flow--idle {
   justify-content: center;
 }
-.flow-col--solo {
-  flex: 0 1 400px;
-  max-width: 100%;
-}
-
 /* ---------------- today strip ---------------- */
 .today-panel { padding: .9rem 1.25rem; }
 .today-strip {
@@ -2695,26 +2634,6 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   gap: .7rem;
   align-items: start;
 }
-.integration-row {
-  display: flex; align-items: center; gap: .75rem;
-  padding: .55rem .65rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-}
-.integration-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; }
-.integration-row-head { display: flex; align-items: baseline; gap: .55rem; flex-wrap: wrap; }
-.integration-row-name { font-weight: 600; color: var(--text); }
-.integration-row-sub {
-  font-size: .78rem; color: var(--text-2);
-  overflow-wrap: anywhere;     /* long resource_id / endpoint URL */
-}
-.integration-row-sub a { color: var(--accent); }
-.integration-row-sub code {
-  font-family: var(--mono); font-size: .9em;
-  background: var(--surface-3); padding: 0 .2rem; border-radius: 3px;
-}
-.integration-row-actions { display: flex; gap: .35rem; }
 .alerts-form-status.ok { color: var(--green, #3fb950); }
 .alerts-form-status.err { color: var(--red, #f85149); }
 
@@ -2797,10 +2716,6 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   color: var(--text-2);
   font-family: var(--font);
   letter-spacing: .02em;
-}
-.bhealth-v-redundant {
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
 }
 /* #295, provenance caption under cycle/lifetime numbers.
    "from BMS" / "from shunt" hint, small + grey so it reads as
@@ -2945,8 +2860,7 @@ a.dev-card:hover .dev-card-foot svg { transform: translateX(2px); }
   .hm-cell--label { font-size: .65rem; padding-right: .2rem; }
 }
 
-/* ---------------- panel-actions / action buttons ---------------- */
-.panel-actions { display: flex; gap: .5rem; }
+/* ---------------- action buttons ---------------- */
 .btn-action {
   display: inline-flex; align-items: center; gap: .35rem;
   padding: .4rem .85rem;
@@ -3013,49 +2927,12 @@ a.dev-card { text-decoration: none; color: inherit; display: block; }
 a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); transition: all 0.15s; }
 
 /* ---------------- placeholder pages ---------------- */
-.placeholder-panel { --panel-tint: linear-gradient(135deg, rgba(88,166,255,0.05), transparent 60%); }
 .placeholder {
   padding: 1.5rem .5rem .5rem;
   display: flex; flex-direction: column;
   gap: .9rem;
   max-width: 640px;
 }
-.placeholder-headline {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text);
-}
-.placeholder-sub {
-  margin: 0;
-  color: var(--text-2);
-  line-height: 1.55;
-}
-.placeholder-list {
-  margin: 0;
-  padding-left: 1.2rem;
-  color: var(--text-2);
-  line-height: 1.7;
-}
-.placeholder-list li::marker { color: var(--accent); }
-.placeholder-status {
-  margin: .25rem 0 0;
-  padding: .55rem .75rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--amber);
-  border-radius: var(--r-sm);
-  color: var(--text-2);
-  font-size: .85rem;
-}
-.placeholder-status code {
-  background: var(--surface-3);
-  padding: .1rem .4rem;
-  border-radius: 3px;
-  font-size: .82rem;
-  font-family: var(--mono);
-}
-
 /* ---------------- settings page ---------------- */
 .settings-grid {
   /* Fill the width like Beszel. auto-FIT (not auto-fill) collapses
@@ -3089,55 +2966,12 @@ a.dev-card:hover { border-color: var(--accent); transform: translateY(-1px); tra
   background: var(--surface-2);
   margin: .25rem 0 .75rem;
 }
-.settings-menu-row {
-  display: flex;
-  align-items: center;
-  gap: .85rem;
-  padding: .85rem 1rem;
-  text-decoration: none;
-  color: var(--text);
-  border-bottom: 1px solid var(--border);
-  transition: background .12s ease;
-}
-.settings-menu-row:last-child { border-bottom: 0; }
-.settings-menu-row:hover { background: rgba(255,255,255,.04); }
-.settings-menu-icon {
-  flex: none;
-  width: 30px; height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-}
-.settings-menu-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: .15rem;
-  min-width: 0;
-}
-.settings-menu-title { font-weight: 600; color: var(--text); }
-.settings-menu-sub { font-size: .78rem; color: var(--text-3); }
-.settings-menu-chev { color: var(--text-3); font-size: 1.2rem; }
-
-.settings-sub-back {
-  display: none;
-  margin: 0 0 .5rem;
-  color: var(--accent, #3a7bd5);
-  text-decoration: none;
-  font-size: .9rem;
-}
-.settings-sub-back:hover { text-decoration: underline; }
-
 /* On menu landing: show menu, hide every settings-block. */
 body[data-route-sub="menu"] .settings-menu { display: flex; }
 body[data-route-sub="menu"] .settings-grid > .settings-block { display: none; }
-body[data-route-sub="menu"] .settings-sub-back { display: none; }
-
 /* On a sub-route: hide menu, show ONLY blocks for that sub. The
    :not selector list mirrors SETTINGS_SUBROUTES in app.js. */
 body[data-route-sub]:not([data-route-sub="menu"]) .settings-menu { display: none; }
-body[data-route-sub]:not([data-route-sub="menu"]) .settings-sub-back { display: inline-block; }
 body[data-route-sub="devices"]      .settings-grid > .settings-block:not([data-subroute="devices"])      { display: none; }
 body[data-route-sub="alerts"]       .settings-grid > .settings-block:not([data-subroute="alerts"])       { display: none; }
 body[data-route-sub="backup"]       .settings-grid > .settings-block:not([data-subroute="backup"])       { display: none; }
@@ -3238,18 +3072,6 @@ body.kiosk-active .route.kiosk-route.active {
   padding-bottom: max(2vh, env(safe-area-inset-bottom));
   padding-left:   max(4vw, env(safe-area-inset-left));
   gap: 0;
-}
-.kiosk-stage {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 4vw;
-  align-items: center;
-  justify-items: center;
-  width: 100%; max-width: 1400px;
-  margin: auto 0;  /* vertical centering only when room allows */
-}
-@media (max-width: 820px) {
-  .kiosk-stage { grid-template-columns: 1fr; gap: 3vh; }
 }
 
 /* ---- kiosk skin engine (kiosk-skins.js) ----
@@ -3356,12 +3178,6 @@ body.kiosk-night .wp-skin { filter: brightness(0.6); transition: filter 2s ease;
 .kiosk-flow .flow-arrow-label { display: none !important; }
 .kiosk-flow .flow-tile {
   padding: clamp(.7rem, 1.4vh, 1.15rem) 1.35rem;
-}
-.kiosk-flow .flow-tile-power {
-  font-size: clamp(1.6rem, 3.6vh, 2.4rem);
-}
-.kiosk-flow .flow-tile-label {
-  font-size: clamp(.85rem, 1.6vh, 1rem);
 }
 .kiosk-flow .flow-tile-sub {
   font-size: clamp(.8rem, 1.5vh, .95rem);
@@ -3802,55 +3618,6 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .alerts-list > .settings-foot,
 .alerts-list > .settings-empty,
 .alerts-list > .ar-card--edit { grid-column: 1 / -1; }
-.alerts-row {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: .75rem;
-  padding: .6rem .75rem;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-}
-.alerts-row--alarm { border-color: rgba(248,81,73,0.45); background: rgba(248,81,73,0.04); }
-.alerts-row--warn  { border-color: rgba(210,153,34,0.35); }
-.alerts-row-main { display: flex; flex-direction: column; gap: .2rem; min-width: 0; flex: 1 1 0; }
-.alerts-row-title { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
-.alerts-row-name  { font-weight: 600; color: var(--text); }
-.alerts-row-cond  {
-  font-family: var(--mono); font-size: .78rem; color: var(--text-3);
-  font-variant-numeric: tabular-nums;
-  /* Long values (Discord webhook URLs, SMTP from-addresses with
-   * angle brackets, etc.) used to spill past the row's right edge.
-   * Wrap by character so a single long token can't blow the layout. */
-  overflow-wrap: anywhere;
-  min-width: 0;
-}
-.alerts-row-meta  {
-  display: flex; gap: .4rem; flex-wrap: wrap;
-  font-size: .72rem; color: var(--text-2);
-}
-.alerts-row-tag {
-  padding: .1rem .5rem;
-  border-radius: 999px;
-  background: var(--surface-3);
-}
-.alerts-row-tag--warn  { background: rgba(210,153,34,0.12); color: var(--amber); }
-.alerts-row-tag--alarm { background: rgba(248,81,73,0.12); color: var(--red); }
-.alerts-row-action {
-  flex-shrink: 0;
-  display: flex; align-items: center; gap: .35rem;
-}
-.alerts-test-btn {
-  font: inherit; font-size: .8rem; font-weight: 500;
-  padding: .35rem .7rem;
-  background: var(--surface-3);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.alerts-test-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
-.alerts-test-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .alerts-test-status { font-size: .76rem; color: var(--text-3); }
 .alerts-test-status.ok { color: var(--green); }
 .alerts-test-status.err { color: var(--red); }
@@ -3984,9 +3751,6 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 .alerts-icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--surface-3); }
 .alerts-icon-btn--danger:hover { color: var(--red); border-color: var(--red); }
-.alerts-row-tag--ok   { background: rgba(63,185,80,0.12); color: var(--green); }
-.alerts-row-tag--warn { background: rgba(210,153,34,0.12); color: var(--amber); }
-
 /* Inline forms (add / edit) */
 .alerts-form {
   background: var(--surface-2);
@@ -4045,19 +3809,6 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 .alerts-form select { font-family: inherit; }
 .alerts-form input[readonly] { background: var(--surface-3); color: var(--text-3); }
 .alerts-form input[name="metric_custom"][hidden] { display: none; }
-.alerts-form-transports {
-  border: 1px dashed var(--border);
-  border-radius: var(--r-sm);
-  padding: .5rem .7rem;
-  display: flex; flex-direction: column; gap: .35rem;
-}
-.alerts-form-transports legend {
-  padding: 0 .35rem;
-  font-size: .76rem;
-  color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: .06em;
-}
 .alerts-checkbox {
   display: inline-flex !important;
   flex-direction: row !important;
@@ -4765,17 +4516,12 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
    duplicate chrome. Hide it. Also hide the floating help-FAB,
    docs route lives in the cloud's Account tab anyway. */
 html.in-wattpost-app .app-header { display: none !important; }
-html.in-wattpost-app .help-fab,
-html.in-wattpost-app #help-fab,
-html.in-wattpost-app .docs-fab {
-  display: none !important;
-}
+
 /* Tighten main padding now the header's gone */
 html.in-wattpost-app body > main,
 html.in-wattpost-app .container {
   padding-top: max(12px, env(safe-area-inset-top)) !important;
 }
-
 
 /* #292, Battery detail page. Bank summary grid + per-pack mini-cards.
    Drilled into from the SoC donut on the dashboard. */
@@ -5003,36 +4749,6 @@ html.in-wattpost-app .container {
   background: var(--surface-2); padding: 0 .25rem; border-radius: 4px;
 }
 
-/* ---- Settings section dropdown (replaces the menu drill-down) ---- */
-.sec-nav { position: relative; margin: 0 auto 1rem; max-width: 1180px; }
-.sec-nav-btn { width: 100%; display: flex; align-items: center; gap: .6rem;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: .75rem .85rem; color: var(--text); font: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
-.sec-nav-btn:hover { border-color: var(--border-2); }
-.sec-nav-ico { display: inline-flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; color: var(--text-2); flex-shrink: 0; }
-.sec-nav-ico svg { width: 17px; height: 17px; }
-.sec-nav-opt.is-active .sec-nav-ico { color: var(--accent); }
-.sec-nav-label { flex: 1; text-align: left; }
-.sec-nav-chev { color: var(--text-3); font-size: 1.1rem; }
-.sec-nav-menu { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-  padding: 6px; box-shadow: 0 16px 44px rgba(0,0,0,.5); }
-.sec-nav-opt { display: flex; align-items: center; gap: .55rem; width: 100%;
-  padding: .6rem .65rem; border-radius: 8px; color: var(--text-2); font-size: .95rem; text-decoration: none; }
-.sec-nav-opt:hover { background: var(--surface-2); color: var(--text); }
-.sec-nav-opt.is-active { background: var(--surface-2); color: var(--text); font-weight: 600; }
-.sec-nav-check { width: 14px; color: var(--accent); font-size: .85rem; flex-shrink: 0; }
-.sec-nav-opt-label { flex: 1; }
-
-/* The section dropdown must paint above the section blocks below it.
-   .panel > * pins children to z-index:1, trapping the open menu inside
-   .sec-nav's stacking context so the later .settings-grid sibling paints
-   over it. Raise .sec-nav above its siblings; drop the settings panel's
-   overflow:hidden so a long menu isn't clipped at the panel edge. */
-.placeholder-panel { overflow: visible; }
-.sec-nav { z-index: 20; }
-
 /* ---- Device card: per-metric icons + SoC gauge (Beszel-style) ---- */
 .dev-card-row-left { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 .dev-card-row-ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); display: flex; }
@@ -5102,9 +4818,6 @@ html.in-wattpost-app .container {
 .dev-row:hover { background: var(--surface-2); }
 .dev-row-ico { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-3); display: inline-flex; }
 .dev-row-ico svg { width: 18px; height: 18px; }
-.dev-row-name { flex: 1; min-width: 0; font-weight: 500; font-size: .9rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dev-row-mid { display: inline-flex; align-items: center; gap: .45rem; flex-shrink: 0; }
 .dev-row-soc { width: 56px; height: 6px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
 /* span children are inline by default → width/height ignored; force block
    so the inline-width fill actually paints (the card gauge uses a div). */
@@ -5112,14 +4825,9 @@ html.in-wattpost-app .container {
 .dev-row-soc-fill.lvl-ok  { background: var(--green); }
 .dev-row-soc-fill.lvl-mid { background: var(--amber); }
 .dev-row-soc-fill.lvl-low { background: var(--red, #f85149); }
-.dev-row-pct { font-size: .8rem; color: var(--text-2); font-variant-numeric: tabular-nums;
-  width: 32px; text-align: right; }
 .dev-row-status { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem;
   color: var(--text-2); font-family: var(--mono); }
 .dev-row-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
-.dev-row-metric { font-family: var(--mono); font-size: .8rem; color: var(--text-2);
-  min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
-.dev-row-chev { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
 .dev-row-silent { opacity: .55; }
 
 /* ===== Settings: cloud-style menu list + focused section views ===== */
