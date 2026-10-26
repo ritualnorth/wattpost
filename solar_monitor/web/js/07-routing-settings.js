@@ -53,7 +53,7 @@ function showFirstRunBanner() {
 // sub renders only its own block group via CSS on body[data-route-sub].
 const SETTINGS_SUBROUTES = new Set([
   "devices", "alerts", "display", "network", "integrations",
-  "privacy", "backup", "advanced", "about",
+  "privacy", "backup", "advanced", "diagnostics", "about",
 ]);
 
 // Section dropdown (replaces the old menu-landing drill-down). Entering
@@ -68,8 +68,9 @@ const SETTINGS_SECTIONS = [
   { id: "integrations", label: "Integrations",       icon: "link",    sub: "WattPost cloud, Solcast, weather, MQTT" },
   { id: "privacy",      label: "Privacy & sharing",  icon: "lock",    sub: "Web password, kiosk links, location, telemetry" },
   { id: "backup",       label: "Backup & restore",   icon: "drive",   sub: "Download, restore, schedule" },
-  { id: "advanced",     label: "Advanced",           icon: "sliders", sub: "History and polling, diagnostics" },
-  { id: "about",        label: "About",              icon: "info",    sub: "Status, updates, device health, reset" },
+  { id: "advanced",     label: "Advanced",           icon: "sliders", sub: "History and polling" },
+  { id: "diagnostics",  label: "Diagnostics",        icon: "activity", sub: "Device health, logs, support bundle" },
+  { id: "about",        label: "About",              icon: "info",    sub: "Status, updates, reset" },
 ];
 const DEFAULT_SETTINGS_SUB = "devices";
 

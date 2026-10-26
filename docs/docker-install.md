@@ -258,7 +258,7 @@ The Docker image:
   daemon logs and the diagnostics bundle live under Diagnostics,
   the web password rotates under Security, "Check for updates"
   lives under About, and a Reset to defaults button lives at the
-  bottom of Diagnostics (type `RESET` to enable, keeps history
+  bottom of About (type `RESET` to enable, keeps history
   and cloud pairing by default). The one thing that has to stay
   on the host is the web port · it defaults to **80** (the bare host
   IP works). To change it, set `WATTPOST_PORT` (e.g. `WATTPOST_PORT=8080`)

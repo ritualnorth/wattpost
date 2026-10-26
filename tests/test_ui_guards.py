@@ -17,8 +17,8 @@ WEB = ROOT / "solar_monitor" / "web"
 CSS_FILES = sorted((WEB / "css").glob("*.css"))
 
 # Ceilings, measured when the guard was added.
-MAX_IMPORTANT = 70
-MAX_LITERAL_COLOURS_OUTSIDE_BASE = 225
+MAX_IMPORTANT = 12
+MAX_LITERAL_COLOURS_OUTSIDE_BASE = 219
 MAX_INLINE_STYLES_IN_INDEX = 50
 
 
@@ -138,13 +138,25 @@ def test_every_css_class_is_used_somewhere():
     css = _all_css()
     css = re.sub(r"url\([^)]*\)|\"[^\"]*\"|'[^']*'|\d+\.\d+", "", css)
     classes = set(re.findall(r"\.([a-zA-Z_][\w-]*)", css))
+    def code_only(src: str, suffix: str) -> str:
+        if suffix == ".js":
+            src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+            src = re.sub(r"(?<![:\"'\\])//[^\n]*", "", src)
+        elif suffix == ".html":
+            src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
+        return src
     corpus = "".join(
-        p.read_text() for p in WEB.rglob("*") if p.suffix in {".js", ".html"} and "vendor" not in p.parts and p.name != "uPlot.iife.min.js"
+        code_only(p.read_text(), p.suffix)
+        for p in WEB.rglob("*")
+        if p.suffix in {".js", ".html"} and "vendor" not in p.parts and p.name != "uPlot.iife.min.js"
     )
     corpus += "".join(p.read_text() for p in (ROOT / "solar_monitor").rglob("*.py"))
     # Built at runtime from data (`kind-${kind}`, `acc-${cls}`, ...) or owned by a vendored library.
     dynamic = ("kind-", "acc-", "ar-tag--", "u-", "uplot", "reverse")
-    dead = sorted(c for c in classes if c not in corpus and not c.startswith(dynamic))
+    dead = sorted(
+        c for c in classes
+        if not re.search(r"(?<![\w-])" + re.escape(c) + r"(?![\w-])", corpus) and not c.startswith(dynamic)
+    )
     assert not dead, f"CSS classes nothing refers to: {dead}"
 
 

@@ -43,6 +43,7 @@ body[data-route-sub="backup"]       .settings-grid > .settings-block:not([data-s
 body[data-route-sub="privacy"]      .settings-grid > .settings-block:not([data-subroute="privacy"])      { display: none; }
 body[data-route-sub="integrations"] .settings-grid > .settings-block:not([data-subroute="integrations"]) { display: none; }
 body[data-route-sub="advanced"]     .settings-grid > .settings-block:not([data-subroute="advanced"])     { display: none; }
+body[data-route-sub="diagnostics"]  .settings-grid > .settings-block:not([data-subroute="diagnostics"])  { display: none; }
 body[data-route-sub="display"]      .settings-grid > .settings-block:not([data-subroute="display"])      { display: none; }
 body[data-route-sub="network"]      .settings-grid > .settings-block:not([data-subroute="network"])      { display: none; }
 body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-subroute="about"])        { display: none; }
