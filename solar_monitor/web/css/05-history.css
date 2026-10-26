@@ -185,13 +185,13 @@
 }
 /* Style uPlot's own legend + crosshair to feel like part of the design */
 .u-legend {
-  margin-top: var(--sp-2) !important;
-  font-family: var(--font) !important;
-  font-size: var(--fs-sm) !important;
-  color: var(--text-2) !important;
+  margin-top: var(--sp-2);
+  font-family: var(--font);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
 }
-.u-legend .u-label, .u-legend .u-value { color: var(--text) !important; }
-.u-cursor-x, .u-cursor-y { background: var(--accent) !important; opacity: 0.5 !important; }
-.u-cursor-pt { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent) !important; }
-.uplot { font-family: var(--font) !important; }
+.u-legend .u-label, .u-legend .u-value { color: var(--text); }
+.u-cursor-x, .u-cursor-y { background: var(--accent); opacity: 0.5; }
+.u-cursor-pt { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+.uplot { font-family: var(--font); }
 

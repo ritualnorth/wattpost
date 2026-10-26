@@ -42,8 +42,9 @@ Nine sections, ordered by how often people need them.
 | Integrations | Solcast, weather, MQTT, Prometheus, WattPost cloud (cloud first) |
 | Privacy and sharing | web password, kiosk links, location, discovery, install ping |
 | Backup and restore | unchanged |
-| Advanced | history and polling (with the duplicate Retention card merged in), diagnostics |
-| About | system status, device health, session, version and updates, reset to defaults |
+| Advanced | history and polling (with the duplicate Retention card merged in) |
+| Diagnostics | device health, daemon logs, support bundle |
+| About | system status, session, version and updates, reset to defaults |
 
 Old links keep working: `#/settings/advanced` stays valid; anchors that moved redirect to their new section.
 
@@ -84,17 +85,16 @@ Delivered across wattpost #63 to #71 and wattpost-cloud #39. Measured on the aud
 | `h1` per view | 0 | 1 (heading skips: 0) | yes |
 | Smallest text on phone | 9.9px | 11.9px (12px nearly everywhere) | yes |
 | Phone targets under 44px | 3 to 28 per page | only native checkboxes (24px) and slider tracks | yes, with those exceptions |
-| Settings pages (desktop height) | Advanced 3,450px | longest are About 2,099px, Alerts 1,593px, Privacy 1,571px | no: About is over 1,800px |
+| Settings pages (desktop height) | Advanced 3,450px | longest are Alerts 1,593px, Privacy 1,571px, Diagnostics 1,472px | yes |
 | Font sizes | 63 distinct | nine tokens plus display numerals | yes |
-| Literal colours (hex, `rgb()`, `hsl()`, token file included) | 470 | 314 (220 outside the token file) | no, target was under 30 |
-| `!important` | 67 | 66 | no |
+| Literal colours (hex, `rgb()`, `hsl()`, token file included) | 470 | 313 (219 outside the token file) | no, target was under 30 |
+| `!important` | 67 | 12 | yes |
 | Unused classes | 42 | 0 (guarded) | yes |
 | Inline styles in `index.html` | 193 | 49 | partly |
 
 What did not land, and why.
 
-- **Literal colours.** Down by a third (470 to 314), not to under 30. The brand colours and their tints now use tokens (`color-mix()`), and the token file itself holds about 94 of what is left. The rest outside it are `rgba()` overlays (shadows, glows, chart fills, kiosk skins), one-offs with no matching token. A ceiling test holds the number where it is. (The 191 in the baseline above counted a different subset, so it is not comparable.)
-- **`!important`.** Almost all of it is the portrait power-flow connector and the kiosk flow, which override later base rules and an animated dot. Removing it means reordering those blocks and screenshotting every active flow state, so it was left as recorded debt, capped by a test.
-- **About page height.** It carries the device health charts and diagnostics. Moving diagnostics under Advanced would bring it under target; not done.
+- **Literal colours.** Down by about a third (470 to 313), not to under 30. The brand colours and their tints now use tokens (`color-mix()`), and the token file itself holds 94 of what is left. The rest outside it are `rgba()` overlays (shadows, glows, chart fills, kiosk skins), one-offs with no matching token. A ceiling test holds the number where it is. (The 191 in the baseline above counted a different subset, so it is not comparable.)
+Follow-up (same day): the `!important` count and the About page height were fixed. The `!important` was almost all in power-flow markup that nothing had built since the SVG flow replaced it, so the CSS and JS were deleted rather than reordered. Device health and Diagnostics moved to their own Diagnostics section, which took About from 2,099px to 1,454px.
 
 Guards that keep this from rotting: `tests/test_ui_guards.py` (appliance) and `cloud/tests/test_ui_token_parity.py` (cloud), plus `scripts/ux/` for the browser audit and before/after screenshot comparison.

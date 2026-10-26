@@ -60,7 +60,7 @@ A single `wattpost.service` Python daemon. It:
 - Sends a heartbeat to the cloud (if paired)
 - Polls weather + Solcast forecast (if configured)
 
-Tail it: `journalctl -u wattpost -f` from SSH, or **Settings → Advanced → Diagnostics** in the dashboard.
+Tail it: `journalctl -u wattpost -f` from SSH, or **Settings → Diagnostics** in the dashboard.
 
 ## What if Bluetooth doesn't connect?
 
