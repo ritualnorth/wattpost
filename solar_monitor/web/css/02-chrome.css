@@ -11,6 +11,10 @@
   border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
   border-radius: var(--r);
   overflow: hidden;
+  /* In the phone layout the body is a 100dvh flex column; overflow:hidden lets
+     a flex item shrink below its content, which squashed this banner to an
+     empty strip. Keep it at its natural height. */
+  flex-shrink: 0;
 }
 .alerts.crit {
   background: rgba(218,54,51,0.12);
