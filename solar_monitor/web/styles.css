@@ -4623,10 +4623,25 @@ html.in-wattpost-app .container {
 .ar-tag { font-size: .7rem; color: var(--text-3); background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 99px; padding: .15rem .5rem; font-family: var(--mono); }
 .ar-tag--alarm { color: var(--amber); border-color: var(--amber-soft); }
-.ar-foot { display: flex; align-items: center; gap: .9rem; margin-top: .7rem; }
-.ar-link { background: none; border: 0; color: var(--text-2); font: inherit; font-size: .78rem; cursor: pointer; padding: 0; }
-.ar-link:hover { color: var(--text); }
-.ar-link--danger:hover { color: var(--red, #f85149); }
+.ar-foot { display: flex; align-items: center; gap: .5rem; margin-top: .8rem; flex-wrap: wrap; }
+/* Card actions (Test, Edit, Delete, Configure, Pair) read as buttons: bordered, with a hover state.
+   First-time setup is the primary style; Delete sits apart from Edit so it is hard to hit by mistake. */
+.ar-link {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; padding: .3rem .85rem;
+  border: 1px solid var(--border-2); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer;
+  transition: background .12s ease, border-color .12s ease;
+}
+.ar-link:hover { background: var(--surface-3); }
+.ar-link--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ar-link--primary:hover { background: var(--accent); filter: brightness(1.08); }
+.ar-link--danger { margin-left: auto; background: transparent; border-color: transparent; color: var(--red); }
+.ar-link--danger:hover { background: var(--red-soft); border-color: var(--red); }
+.ar-note { margin-top: .5rem; font-size: .78rem; color: var(--text-2); }
+.ar-card--featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+@media (pointer: coarse) { .ar-link { min-height: 44px; padding: .5rem 1rem; } }
 
 /* ---- Alert-rule edit/add form (card idiom) ---- */
 .ar-card--edit { border-color: var(--accent); }
@@ -4992,3 +5007,16 @@ a { color: var(--accent); }
 
 /* Cards that should span the whole row of an .ar-card grid (quiet hours). */
 .ar-card--wide { grid-column: 1 / -1; width: 100%; max-width: none; }
+
+/* ---------------- form control defaults (UX remediation phase 4) ----------------
+   Zero specificity (:where), so any component rule still wins; this only gives the
+   leftover native controls the same look as the styled ones. */
+:where(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--accent); }
+:where(select) {
+  font: inherit; color: var(--text);
+  background-color: var(--surface-2);
+  border: 1px solid var(--border-2); border-radius: var(--r-sm);
+  padding: .35rem .6rem; min-height: 34px;
+}
+:where(select):hover { border-color: var(--text-3); }
+:where(select):disabled { opacity: .55; cursor: not-allowed; }
