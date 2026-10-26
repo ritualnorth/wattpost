@@ -17,7 +17,7 @@
       } catch (_) { document.documentElement.setAttribute("data-theme", "dark"); }
     })();
   </script>
-  <link rel="stylesheet" href="/web/css/01-base.css?v=200"/>
+  <link rel="stylesheet" href="/web/css/01-base.css?v=201"/>
   <style>
     /* Just enough page-specific layout that we don't need to touch
      * the main app stylesheet for a single one-off route. */
@@ -44,6 +44,7 @@
       color: var(--text);
       font-family: inherit; font-size: .95rem;
     }
+    .login-card input, .login-card button { min-height: 44px; }
     .login-card input:focus { outline: 2px solid var(--accent); border-color: transparent; }
     .login-card button {
       width: 100%; margin-top: 1rem;
