@@ -36,7 +36,7 @@ async function wizRenderNearby() {
     const rssi = d.rssi != null ? `${d.rssi} dBm` : "";
     return `<div class="wiz-nearby-row" style="display:flex;justify-content:space-between;gap:.6rem;padding:.35rem 0;border-top:1px solid var(--border)">
       <span><strong>${escHtml(v)}</strong>${nm}</span>
-      <span class="settings-foot" style="white-space:nowrap">${escHtml(rssi)}</span></div>`;
+      <span class="settings-foot ut-nowrap">${escHtml(rssi)}</span></div>`;
   }).join("");
   host.innerHTML = `<div class="wiz-nearby-card" style="margin:0 0 1rem;padding:.8rem 1rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
     <div style="font-weight:600;display:flex;align-items:center;gap:.4rem">
@@ -70,8 +70,8 @@ async function wizLoadTransports() {
         </div>
         <div id="wiz-find-results" class="wiz-results"></div>
         <details class="wiz-advanced" style="margin-top:.8rem">
-          <summary style="cursor:pointer;color:var(--text-2);font-size:.85rem">Wired (USB-RS485) or advanced setup</summary>
-          <p class="settings-foot" style="margin:.5rem 0">
+          <summary class="ut-link-ish">Wired (USB-RS485) or advanced setup</summary>
+          <p class="settings-foot ut-my-sm">
             A USB-to-RS485 dongle (~£10, FTDI / CH340) on the Pi, with Cat5 to your charger's RJ45 comms port. That port is RS-485, NOT Ethernet — it doesn't go in the Pi's network jack.
           </p>
           <div class="wiz-controls">
@@ -122,9 +122,9 @@ async function wizLoadTransports() {
         </button>
         <span id="wiz-find-status" class="wiz-status"></span>
         <div id="wiz-find-results" class="wiz-results"></div>
-        <details class="wiz-advanced" style="margin-top:.7rem">
-          <summary style="cursor:pointer;color:var(--text-2);font-size:.85rem">Wired (USB-RS485) or advanced setup</summary>
-          <p class="settings-foot" style="margin:.5rem 0">
+        <details class="wiz-advanced ut-mt-lg">
+          <summary class="ut-link-ish">Wired (USB-RS485) or advanced setup</summary>
+          <p class="settings-foot ut-my-sm">
             Bluetooth and USB-RS485 run side by side — e.g. a Renogy BT-2 for the MPPT and a USB dongle for a wired BMS.
           </p>
           <div class="wiz-controls">
@@ -660,7 +660,7 @@ async function wizFindDongle() {
       // taps "Pair Victron", keeps the scan-results card compact.
       keyFormHtml = `
         <div class="wiz-victron-key" data-victron-key-for="${escHtml(d.address)}" hidden style="margin-top:.6rem;padding:.7rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md)">
-          <p class="settings-foot" style="margin:0 0 .5rem">
+          <p class="settings-foot ut-mb-sm">
             Open VictronConnect on your phone, connect to this device,
             tap <strong>Settings</strong> → <strong>Product info</strong>,
             then <strong>Show</strong> next to <strong>Instant readout

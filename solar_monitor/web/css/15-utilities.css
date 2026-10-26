@@ -1,0 +1,26 @@
+/* ---------------- utilities ----------------
+ * Last file on purpose: single-class rules that replace repeated inline
+ * style="" attributes. Anything bespoke belongs with its component; only add
+ * a utility here when the same declaration is needed in several places. */
+.ut-foot-tight    { margin-top: 0; margin-bottom: .55rem; }
+.ut-foot-tight-sm { margin-top: 0; margin-bottom: .5rem; }
+.ut-normal   { font-weight: normal; }
+.ut-pointer  { cursor: pointer; }
+.ut-nowrap   { white-space: nowrap; }
+.ut-muted    { color: var(--text-3); }
+.ut-dim      { opacity: .7; }
+.ut-grow     { flex: 1 1 auto; min-width: 0; }
+.ut-mt-xs    { margin-top: .3rem; }
+.ut-mt-sm    { margin-top: .5rem; }
+.ut-mt-md    { margin-top: .6rem; }
+.ut-mt-lg    { margin-top: .7rem; }
+.ut-mb-sm    { margin: 0 0 .5rem; }
+.ut-mb-md    { margin-bottom: .6rem; }
+.ut-my-sm    { margin: .5rem 0; }
+.ut-wrap-gap { gap: .5rem; flex-wrap: wrap; }
+.ut-center-gap { align-items: center; gap: .5rem; }
+.ut-link-ish { cursor: pointer; color: var(--text-2); font-size: var(--fs-md); }
+/* Empty / error placeholder inside a card or chart host. */
+.ut-empty    { padding: 1rem; color: var(--text-3); font-size: var(--fs-md); }
+.ut-empty-sm { padding: .8rem; }
+.ut-error    { color: var(--red); }

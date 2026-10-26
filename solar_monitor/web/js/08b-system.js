@@ -54,7 +54,7 @@ function drawHostHealthChart(root, payload) {
   if (hostHealthChart) { hostHealthChart.destroy(); hostHealthChart = null; }
   const ts = (payload && payload.ts) || [];
   if (!ts.length) {
-    root.innerHTML = `<div style="padding:.8rem;color:var(--text-3);font-size:.85rem;">No system-health samples yet &mdash; give it a few minutes of polling.</div>`;
+    root.innerHTML = `<div class="ut-empty ut-empty-sm">No system-health samples yet &mdash; give it a few minutes of polling.</div>`;
     return;
   }
   const s = payload.series || {};
@@ -86,7 +86,7 @@ function drawHostHealthChart(root, payload) {
     hostHealthChart = new uPlot(opts, cols, root);
   } catch (e) {
     console.error("uPlot host-health failed:", e);
-    root.innerHTML = `<div style="padding:.8rem;color:var(--red);font-size:.85rem;">Chart render failed: ${e.message}</div>`;
+    root.innerHTML = `<div class="ut-empty ut-empty-sm ut-error">Chart render failed: ${e.message}</div>`;
   }
 }
 
