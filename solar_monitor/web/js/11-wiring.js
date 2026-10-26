@@ -261,7 +261,7 @@ async function loadKioskTokens() {
       const sk = _skinLabel((t.skin || "").toLowerCase());
       return `
       <div class="kiosk-token-row">
-        <span class="kiosk-token-name">${_escHtmlMini(t.name || "Kiosk")}${sk ? ` <span class="kiosk-token-skin" style="color:var(--text-3)">· ${_escHtmlMini(sk)}</span>` : ""}</span>
+        <span class="kiosk-token-name">${_escHtmlMini(t.name || "Kiosk")}${sk ? ` <span class="kiosk-token-skin ut-muted">· ${_escHtmlMini(sk)}</span>` : ""}</span>
         <button class="kiosk-token-revoke" type="button" data-id="${_escHtmlMini(t.id)}">Revoke</button>
       </div>`;
     }).join("");

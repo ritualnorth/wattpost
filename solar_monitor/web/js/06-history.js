@@ -248,7 +248,7 @@ function drawCompareChart(metric, datasets) {
     chart = new uPlot(opts, dataCols, root);
   } catch (e) {
     console.error("uPlot compare failed:", e);
-    root.innerHTML = `<div style="padding:1rem;color:var(--red)">Compare chart render failed: ${e.message}</div>`;
+    root.innerHTML = `<div class="ut-empty ut-error">Compare chart render failed: ${e.message}</div>`;
   }
 }
 
@@ -326,7 +326,7 @@ async function refreshEnergyOverview(rangeKey) {
       try { weather = await wr.json(); } catch (_) { weather = null; }
     }
   } catch (e) {
-    host.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">Couldn't load energy (${e.message}).</div>`;
+    host.innerHTML = `<div class="ut-empty">Couldn't load energy (${e.message}).</div>`;
     return;
   }
 
@@ -409,7 +409,7 @@ async function refreshEnergyOverview(rangeKey) {
     }
     if (!bars.children.length) {
       bars.innerHTML = `<span style="background:#3a4351; width:100%"></span>`;
-      leg.innerHTML = `<div class="self-row" style="color:var(--text-3)">No load detected today yet</div>`;
+      leg.innerHTML = `<div class="self-row ut-muted">No load detected today yet</div>`;
     }
   }
 }
@@ -422,7 +422,7 @@ function setText(id, t) {
 function drawEnergyChart(root, ts, series, window_ = null) {
   if (energyChart) { energyChart.destroy(); energyChart = null; }
   if (!ts.length) {
-    root.innerHTML = `<div style="padding:1rem;color:var(--text-3);font-size:.85rem;">No samples yet today.</div>`;
+    root.innerHTML = `<div class="ut-empty">No samples yet today.</div>`;
     return;
   }
   const width = Math.max(root.clientWidth, 320);
@@ -508,7 +508,7 @@ function drawEnergyChart(root, ts, series, window_ = null) {
     energyChart = new uPlot(opts, dataCols, root);
   } catch (e) {
     console.error("uPlot energy failed:", e);
-    root.innerHTML = `<div style="padding:1rem;color:var(--red);font-size:.85rem;">Chart render failed: ${e.message}</div>`;
+    root.innerHTML = `<div class="ut-empty ut-error">Chart render failed: ${e.message}</div>`;
   }
 }
 
@@ -848,7 +848,7 @@ function drawChart(label, metric, data, forecast = null) {
         series: [{}, { label: prettyKey(metric), stroke: pal.accent, width: 2, fill: pal.accentFill }],
       }, [ts, vals], root);
     } catch (e2) {
-      root.innerHTML = `<div style="padding:1rem;color:var(--red)">Chart render failed: ${e.message}</div>`;
+      root.innerHTML = `<div class="ut-empty ut-error">Chart render failed: ${e.message}</div>`;
     }
   }
 }

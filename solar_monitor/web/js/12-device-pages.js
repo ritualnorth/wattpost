@@ -139,7 +139,7 @@ async function renderDeviceSettings(label) {
   }).join("");
   host.innerHTML = `
     <section class="device-detail-card">
-      <h3 style="margin:0 0 .5rem">Settings</h3>
+      <h3 class="ut-mb-sm">Settings</h3>
       <p class="settings-foot" style="margin:0 0 .75rem">
         Live values pulled from the device. Edits write FC06
         Modbus to the device and read back to confirm.
@@ -782,7 +782,7 @@ function buildAcChargerDetail(dev) {
       <div class="today-cell">
         <span class="meta-k">Output ${n}</span>
         <span class="today-v">${fmt.num(p, 0)} W</span>
-        <span class="meta-k" style="opacity:.7">${fmt.num(v, 1)} V · ${fmt.num(i, 1)} A</span>
+        <span class="meta-k ut-dim">${fmt.num(v, 1)} V · ${fmt.num(i, 1)} A</span>
       </div>`;
   }).join("");
   return `
@@ -812,7 +812,7 @@ function buildChargerStatsBlock(dev) {
         <h2><svg class="h-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg> Charger stats</h2>
       </div>
       <div class="today-strip" style="margin-top:.4rem" data-chgstats-tiles></div>
-      <div class="chgstats-ribbon-wrap" style="margin-top:.7rem">
+      <div class="chgstats-ribbon-wrap ut-mt-lg">
         <div class="meta-k" style="margin-bottom:.3rem">Last 24 hours</div>
         <div data-chgstats-ribbon class="chgstats-ribbon"></div>
         <div class="chgstats-legend" data-chgstats-legend

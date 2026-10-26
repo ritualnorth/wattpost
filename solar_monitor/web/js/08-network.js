@@ -503,7 +503,7 @@ async function refreshGpsControl() {
       else if (g.acquiring || (g.satellites_in_view || 0) > 0) status = `acquiring (${g.satellites_in_view || 0} sat in view)`;
       else status = "searching — needs a clear view of the sky";
     }
-    body.innerHTML = `<div class="settings-row" style="align-items:center;gap:.5rem">
+    body.innerHTML = `<div class="settings-row ut-center-gap">
       <span>Enabled on <code>${_escHtmlMini(cfg.port)}</code> · ${_escHtmlMini(status)}</span>
       <button class="btn-action" id="gps-disable" type="button">Disable</button></div>`;
     const db = document.getElementById("gps-disable");
@@ -519,7 +519,7 @@ async function refreshGpsControl() {
     if (rs) rs.onclick = (e) => { e.preventDefault(); refreshGpsControl(); };
     return;
   }
-  body.innerHTML = adapters.map(a => `<div class="settings-row" style="align-items:center;gap:.5rem">
+  body.innerHTML = adapters.map(a => `<div class="settings-row ut-center-gap">
       <span>${_escHtmlMini(a.product || a.port)} <code>${_escHtmlMini(a.port)}</code></span>
       <button class="btn-action btn-action--primary" type="button" data-gps-enable="${_escHtmlMini(a.port)}">Enable</button></div>`).join("");
   body.querySelectorAll("[data-gps-enable]").forEach(b => b.onclick = () => setGps(true, b.dataset.gpsEnable));

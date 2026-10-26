@@ -106,3 +106,12 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
 /* footer removed, version + identity already live in Settings → About */
 main { padding-bottom: 3rem; }
 
+
+/* Location-sharing radio rows (Privacy). */
+.settings-share-opt {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: flex-start;
+  padding: .45rem 0;
+  cursor: pointer;
+}
