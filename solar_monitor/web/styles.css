@@ -26,8 +26,8 @@
 
   /* Text — Beszel .dark */
   --text:      hsl(220 2% 97%);
-  --text-2:    hsl(220 4% 67%);
-  --text-3:    hsl(220 4% 50%);
+  --text-2:    hsl(220 4% 76%);
+  --text-3:    hsl(220 4% 65%);   /* >= 4.6:1 on every dark surface */
 
   /* Source/storage/load colors, match Cerbo GX vocabulary */
   --pv:        #f0b429;   /* yellow = solar/PV */
@@ -45,6 +45,7 @@
 
   /* Accents */
   --accent:    #58a6ff;
+  --on-accent: #0b1220;   /* text on an accent fill: 7.4:1 (white would be 2.5:1) */
   --green:     #3fb950;
   --green-soft:#1d4d2a;
   --amber:     #d29922;
@@ -95,8 +96,8 @@
   --border-2:  hsl(30 4.29% 72.55%);
 
   --text:      hsl(30 0% 10%);
-  --text-2:    hsl(24 2.79% 35.1%);
-  --text-3:    hsl(30 3.97% 49.41%);
+  --text-2:    hsl(24 2.79% 30%);
+  --text-3:    hsl(30 3.97% 40%);   /* >= 4.6:1 on every light surface */
 
   /* Source/storage/load colors, deepen slightly so they read on white */
   --pv:        #b87800;
@@ -113,9 +114,10 @@
   --neutral-soft: rgba(122,133,149,0.10);
 
   --accent:    #0969da;
+  --on-accent: #ffffff;
   --green:     #1a7f37;
   --green-soft:#d4edd9;
-  --amber:     #9a6700;
+  --amber:     #8a5c00;   /* 5.0:1 on --amber-soft */
   --amber-soft:#fbeec0;
   --red:       #cf222e;
   --red-soft:  #fbd5d6;
@@ -264,7 +266,7 @@ body {
 body.is-demo .settings-block { position: relative; }
 body.is-demo .settings-block::before {
   content: "View only · demo mode";
-  position: absolute; top: .75rem; right: 1rem;
+  display: block; width: max-content; margin: 0 0 .55rem auto;
   font-size: .68rem; font-weight: 700;
   letter-spacing: .04em; text-transform: uppercase;
   color: var(--amber, #d29922);
@@ -607,7 +609,7 @@ body.is-demo #settings-update-apply { display: none !important; }
     align-items: center;
     gap: 3px;
     padding: .35rem .25rem;
-    font-size: .62rem;
+    font-size: .72rem;   /* 11.5px: was 9.9px */
     font-weight: 500;
     letter-spacing: .01em;
     border-radius: 12px;
@@ -1621,9 +1623,9 @@ body.kiosk-active[data-mode]:not([data-mode="home"]):not([data-mode=""])::after 
   padding: .35rem .75rem; border-radius: 6px;
   transition: background .12s ease, color .12s ease;
 }
-.energy-ranges .erange:hover { color: var(--text-1); background: rgba(255,255,255,.05); }
+.energy-ranges .erange:hover { color: var(--text); background: rgba(255,255,255,.05); }
 .energy-ranges .erange.is-active {
-  background: var(--accent, #3a7bd5); color: #fff;
+  background: var(--accent, #3a7bd5); color: var(--on-accent);
 }
 
 .energy-stats {
@@ -3157,7 +3159,7 @@ body[data-route-sub="about"]        .settings-grid > .settings-block:not([data-s
   padding: 1.05rem 1.15rem 1.15rem;   /* airier, Beszel-style */
   box-shadow: var(--shadow-soft);
 }
-.settings-block h3 {
+.settings-block h2 {
   margin: 0 0 .55rem;
   font-size: 1.02rem;
   font-weight: 600;
@@ -3942,7 +3944,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
 }
 .btn-action--primary {
   background: var(--accent, #3a86ff);
-  color: #fff;
+  color: var(--on-accent);
   border-color: transparent;
 }
 .btn-action--primary:hover { filter: brightness(1.1); }
@@ -3952,7 +3954,7 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   margin: .85rem 0 .35rem;
 }
 .alerts-sub-head:first-child { margin-top: 0; }
-.alerts-sub-head h4 {
+.alerts-sub-head h2 {
   margin: 0;
   font-size: .92rem;
   font-weight: 600;
@@ -4143,8 +4145,8 @@ body:not(.kiosk-active) .kiosk-exit { display: none; }
   border-radius: 12px;
   padding: .85rem 1rem;
 }
-.settings-block--danger h3 {
-  color: #b91c1c;
+.settings-block--danger h2 {
+  color: var(--red);
   margin-top: 0;
 }
 .settings-block--danger #reset-go:not([disabled]) {
@@ -5152,7 +5154,7 @@ html.in-wattpost-app .container {
 .set-back svg { width: 16px; height: 16px; }
 .set-back:hover { text-decoration: underline; }
 .set-section-head { margin-bottom: 1.15rem; }
-.set-section-head h2 { margin: 0 0 .15rem; font-size: 1.55rem; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
+.set-section-head h1 { margin: 0 0 .15rem; font-size: 1.55rem; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 .set-section-sub { margin: 0; color: var(--text-2); font-size: .92rem; }
 
 /* The section's blocks become a single centred column (override the tiled
@@ -5168,10 +5170,10 @@ html.in-wattpost-app .container {
 #settings-section .settings-block > * { min-width: 0; max-width: 100%; }
 
 /* Single-block sections: the block <h3> duplicates the section heading. */
-[data-route-sub="alerts"] .settings-block--alerts > h3,
-[data-route-sub="backup"] .settings-block--backup > h3,
-[data-route-sub="integrations"] .settings-block[data-subroute="integrations"] > h3,
-[data-route-sub="devices"] .settings-block--cta > h3 { display: none; }
+[data-route-sub="alerts"] .settings-block--alerts > h2,
+[data-route-sub="backup"] .settings-block--backup > h2,
+[data-route-sub="integrations"] .settings-block[data-subroute="integrations"] > h2,
+[data-route-sub="devices"] .settings-block--cta > h2 { display: none; }
 
 /* ===================== Reactor power flow (#design) =====================
  * The Core-reactor power-flow viz. Flow colours are shared across themes
@@ -5251,4 +5253,29 @@ body.combined-flow #flow-panel .panel-header { display: none; }
   letter-spacing: 0;
   line-height: 1.25;
   overflow-wrap: anywhere;
+}
+
+/* ---------------- accessibility (UX remediation phase 1) ---------------- */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+/* Links with no styling of their own used the browser's default blue (1.9:1 on dark). */
+a { color: var(--accent); }
+
+/* One designed keyboard focus ring for everything focusable. Mouse clicks do not show it. */
+:where(a, button, input, select, textarea, summary, [role="button"], [role="tab"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: max(var(--focus-radius, 4px), 0px);
+}
+/* Touch devices: every stand-alone control gets a 44px target. */
+@media (pointer: coarse) {
+  :where(button, select, .set-back, .help-btn, .status, .set-menu-row, .erange, .theme-opt, .btn) {
+    min-height: 44px;
+  }
+  .help-btn { min-width: 44px; }
+  .set-back { padding: .6rem .4rem .6rem 0; }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  .settings-toggle, label.settings-toggle { min-height: 44px; }
 }
