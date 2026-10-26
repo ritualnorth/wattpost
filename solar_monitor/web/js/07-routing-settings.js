@@ -71,8 +71,6 @@ const SETTINGS_SECTIONS = [
 ];
 const DEFAULT_SETTINGS_SUB = "devices";
 
-let _secNavOutsideWired = false;
-
 // Settings landing menu (cloud-style): a list of section rows, each
 // linking to its focused #/settings/<sub> view.
 function renderSettingsMenu() {
@@ -87,45 +85,6 @@ function renderSettingsMenu() {
       </span>
       <svg class="set-menu-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
     </a>`).join("");
-}
-
-// Build/refresh the settings section dropdown for the active sub.
-function renderSettingsNav(sub) {
-  const host = document.getElementById("settings-section-nav");
-  if (!host) return;
-  const cur = SETTINGS_SECTIONS.find(s => s.id === sub) || SETTINGS_SECTIONS[0];
-  host.innerHTML = `
-    <button class="sec-nav-btn" type="button" aria-haspopup="listbox" aria-expanded="false">
-      <span class="sec-nav-ico">${_ico(cur.icon)}</span>
-      <span class="sec-nav-label">${escHtml(cur.label)}</span>
-      <span class="sec-nav-chev" aria-hidden="true">⌄</span>
-    </button>
-    <div class="sec-nav-menu" role="listbox" hidden>
-      ${SETTINGS_SECTIONS.map(s => `
-        <a class="sec-nav-opt ${s.id === cur.id ? "is-active" : ""}" href="#/settings/${s.id}" role="option">
-          <span class="sec-nav-check">${s.id === cur.id ? "✓" : ""}</span>
-          <span class="sec-nav-ico">${_ico(s.icon)}</span>
-          <span class="sec-nav-opt-label">${escHtml(s.label)}</span>
-        </a>`).join("")}
-    </div>`;
-  const btn = host.querySelector(".sec-nav-btn");
-  const menu = host.querySelector(".sec-nav-menu");
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    menu.hidden = !menu.hidden;
-    btn.setAttribute("aria-expanded", String(!menu.hidden));
-  });
-  // Selecting an option navigates (hash change re-renders this nav closed).
-  menu.querySelectorAll(".sec-nav-opt").forEach(a =>
-    a.addEventListener("click", () => { menu.hidden = true; }));
-  if (!_secNavOutsideWired) {
-    _secNavOutsideWired = true;
-    document.addEventListener("click", (e) => {
-      const h = document.getElementById("settings-section-nav");
-      const m = h && h.querySelector(".sec-nav-menu");
-      if (m && !m.hidden && !h.contains(e.target)) m.hidden = true;
-    });
-  }
 }
 
 function parseRoute() {
